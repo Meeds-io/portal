@@ -20,7 +20,7 @@
   <parent>
     <groupId>io.meeds.portal</groupId>
     <artifactId>portal.web</artifactId>
-    <version>7.0.x-SNAPSHOT</version>
+    <version>7.0.x-meed-SNAPSHOT</version>
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
