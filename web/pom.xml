@@ -26,7 +26,7 @@
   <parent>
     <groupId>io.meeds.portal</groupId>
     <artifactId>portal.parent</artifactId>
-    <version>7.0.x-SNAPSHOT</version>
+    <version>7.0.x-meed-SNAPSHOT</version>
   </parent>
 
   <artifactId>portal.web</artifactId>
