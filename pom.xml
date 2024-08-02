@@ -31,7 +31,7 @@
 
   <groupId>io.meeds.portal</groupId>
   <artifactId>portal.parent</artifactId>
-    <version>7.0.x-exo-SNAPSHOT</version>
+    <version>7.0.x-experience-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Meeds - Portal</name>
