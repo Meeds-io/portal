@@ -208,7 +208,7 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
                            Map<String, Object> parameters) throws Exception {
 
     super.prepareDispatch(controllerContext,
-                          "PORTLET/social-portlet/ForgotPassword",
+                          "PORTLET/social/ForgotPassword",
                           Collections.emptyList(),
                           Collections.singletonList("portal/login"),
                           params -> extendApplicationParameters(params, parameters));

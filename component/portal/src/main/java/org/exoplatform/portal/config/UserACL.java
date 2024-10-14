@@ -21,8 +21,6 @@ package org.exoplatform.portal.config;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,11 +39,9 @@ import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.Authenticator;
-import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.services.security.IdentityRegistry;
-import org.exoplatform.services.security.MembershipEntry;
 
 import lombok.Data;
 import lombok.Getter;
@@ -55,12 +51,6 @@ import lombok.SneakyThrows;
 public class UserACL {
 
   public static final String                       EVERYONE               = "Everyone";
-
-  private static final Collection<MembershipEntry> NO_MEMBERSHIP          = Collections.emptyList();
-
-  private static final Collection<String>          NO_ROLES               = Collections.emptyList();
-
-  private static final Identity                    guest                  = new Identity(null, NO_MEMBERSHIP, NO_ROLES);
 
   @Getter
   private String                                   superUser;
@@ -327,20 +317,6 @@ public class UserACL {
     }
   }
 
-  public Identity getIdentity() {
-    ConversationState conv = ConversationState.getCurrent();
-    if (conv == null) {
-      return guest;
-    }
-
-    Identity id = conv.getIdentity();
-    if (id == null) {
-      return guest;
-    }
-
-    return id;
-  }
-
   public boolean hasPermission(Identity identity, String[] expressions) {
     return isAdministrator(identity) || Arrays.stream(expressions).anyMatch(expression -> isMemberOf(identity, expression));
   }
@@ -424,7 +400,7 @@ public class UserACL {
   }
 
   public boolean isAnonymousUser(String username) {
-    return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username);
+    return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username) || IdentityConstants.SYSTEM.equals(username);
   }
 
   public Authenticator getAuthenticator() {

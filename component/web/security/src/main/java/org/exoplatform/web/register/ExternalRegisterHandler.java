@@ -461,7 +461,7 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     request.getSession().removeAttribute(NAME);
 
     super.prepareDispatch(controllerContext,
-                          "PORTLET/social-portlet/ExternalOnboarding",
+                          "PORTLET/social/ExternalOnboarding",
                           Collections.emptyList(),
                           Collections.singletonList("portal/login"),
                           params -> extendApplicationParameters(params, parameters));

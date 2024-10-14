@@ -196,7 +196,7 @@ public class RegisterHandler extends JspBasedWebHandler {
     List<String> additionalCSSModules = Collections.singletonList("portal/login");
 
     super.prepareDispatch(controllerContext,
-                          "PORTLET/social-portlet/Register",
+                          "PORTLET/social/Register",
                           additionalJSModules,
                           additionalCSSModules,
                           params -> extendApplicationParameters(controllerContext, params, parameters));
