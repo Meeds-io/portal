@@ -82,7 +82,5 @@
       <access-permissions>Everyone</access-permissions>
       <show-info-bar>false</show-info-bar>
     </portlet-application>
-
   </portal-layout>
-
 </portal-config>

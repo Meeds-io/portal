@@ -22,8 +22,6 @@ package org.exoplatform.portal.config;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.exoplatform.container.PortalContainer;
-import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.portal.config.model.PortalConfig;
@@ -31,12 +29,12 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupEventListener;
 import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
+
+import io.meeds.common.ContainerTransactional;
 
 /**
  * This listener is used to initialize/destroy the Group Site Config of a group
@@ -44,18 +42,13 @@ import org.exoplatform.services.organization.OrganizationService;
  */
 public class GroupPortalConfigListener extends GroupEventListener {
 
-  /** . */
-  private final UserPortalConfigService portalConfigService;
+  private UserPortalConfigService portalConfigService;
 
-  /** . */
-  private final LayoutService           layoutService;
+  private LayoutService           layoutService;
 
-  /** . */
-  private final OrganizationService     orgService;
+  private OrganizationService     orgService;
 
-  private String                        groupNamePattern;
-
-  private static Log                    LOG = ExoLogger.getLogger(GroupPortalConfigListener.class);
+  private String                  groupNamePattern;
 
   public GroupPortalConfigListener(InitParams params,
                                    UserPortalConfigService portalConfigService,
@@ -72,41 +65,28 @@ public class GroupPortalConfigListener extends GroupEventListener {
     }
   }
 
+  @Override
+  @ContainerTransactional
   public void preDelete(Group group) throws Exception {
-    RequestLifeCycle.begin(PortalContainer.getInstance());
-    try {
-      String groupId = group.getId().trim();
+    String groupId = group.getId().trim();
 
-      // Remove all descendant navigations
-      removeGroupNavigation(group);
-
-      portalConfigService.removeUserPortalConfig(PortalConfig.GROUP_TYPE, groupId);
-    } finally {
-      RequestLifeCycle.end();
-    }
+    // Remove all descendant navigations
+    removeGroupNavigation(group);
+    portalConfigService.removeUserPortalConfig(PortalConfig.GROUP_TYPE, groupId);
   }
 
   @Override
+  @ContainerTransactional
   public void postSave(Group group, boolean isNew) throws Exception {
     if (!isNew) {
       return;
     }
 
-    RequestLifeCycle.begin(PortalContainer.getInstance());
-    try {
-      String groupId = group.getId();
-      
-      if (layoutService.getPortalConfig(SiteKey.group(groupId)) == null) {
-        if (groupNamePattern != null && groupId.startsWith(groupNamePattern)) {
-          portalConfigService.createGroupSite(groupId);
-        } else {
-          LOG.debug("The group name doesn't match the pattern. Ignore creating from listener", groupId);
-        }
-      } else {
-        LOG.debug("The group site {} already exists. Ignore creating from listener", groupId);
-      }
-    } finally {
-      RequestLifeCycle.end();
+    String groupId = group.getId();
+    if (groupNamePattern != null
+        && groupId.startsWith(groupNamePattern)
+        && layoutService.getPortalConfig(SiteKey.group(groupId)) == null) {
+      portalConfigService.createGroupSite(groupId);
     }
   }
 
@@ -128,7 +108,7 @@ public class GroupPortalConfigListener extends GroupEventListener {
 
   private Collection<String> getDescendantGroups(Group group, GroupHandler groupHandler) throws Exception {
     Collection<Group> groupCollection = groupHandler.findGroups(group);
-    Collection<String> col = new ArrayList<String>();
+    Collection<String> col = new ArrayList<>();
     for (Group childGroup : groupCollection) {
       col.add(childGroup.getId());
       col.addAll(getDescendantGroups(childGroup, groupHandler));

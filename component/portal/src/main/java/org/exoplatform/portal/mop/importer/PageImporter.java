@@ -45,15 +45,15 @@ public class PageImporter {
     /** . */
     private final ImportMode mode;
 
-    public PageImporter(ImportMode importMode, SiteKey siteKey, List<Page> list, LayoutService layoutService_) {
+    public PageImporter(ImportMode importMode, SiteKey siteKey, List<Page> list, LayoutService layoutService) {
         this.siteKey = siteKey;
         this.mode = importMode;
         this.list = list;
-        this.layoutService = layoutService_;
+        this.layoutService = layoutService;
     }
 
-    public void perform() throws Exception {
-        HashMap<String, Page> hashPageList = new HashMap<String, Page>();
+    public void perform() {
+        HashMap<String, Page> hashPageList = new HashMap<>();
         for (Page page : list) {
             hashPageList.put(page.getPageId(), page);
         }
