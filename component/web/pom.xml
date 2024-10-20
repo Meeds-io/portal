@@ -33,7 +33,6 @@
 
   <modules>
     <module>controller</module>
-    <module>server</module>
     <module>resources</module>
     <module>security</module>
     <module>api</module>

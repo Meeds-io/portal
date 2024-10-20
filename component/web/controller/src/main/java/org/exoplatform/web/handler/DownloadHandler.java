@@ -23,18 +23,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.download.DownloadResource;
 import org.exoplatform.download.DownloadService;
-import org.exoplatform.web.ControllerContext;
-import org.exoplatform.web.WebAppController;
-import org.exoplatform.web.WebRequestHandler;
-import org.exoplatform.services.log.Log;
 import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
+import org.exoplatform.web.ControllerContext;
+import org.exoplatform.web.WebRequestHandler;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Created by The eXo Platform SARL Author : LeBienThuy thuy.le@exoplatform.com Dec 9, 2006
@@ -49,11 +48,11 @@ public class DownloadHandler extends WebRequestHandler {
 
     @Override
     public boolean execute(ControllerContext context) throws Exception {
-        execute(context.getController(), context.getRequest(), context.getResponse());
+        execute(context.getRequest(), context.getResponse());
         return true;
     }
 
-    public void execute(WebAppController controller, HttpServletRequest req, HttpServletResponse res) throws Exception {
+    public void execute(HttpServletRequest req, HttpServletResponse res) throws Exception {
         String resourceId = req.getParameter("resourceId");
         boolean remove = !"false".equals(req.getParameter("remove"));
         res.setHeader("Cache-Control", "private max-age=600, s-maxage=120");

@@ -17,11 +17,10 @@ package org.exoplatform.services.organization.mock;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -70,14 +69,15 @@ public class InMemoryUserHandler implements UserHandler {
 
   private List<UserEventListener>  userListeners                    = new ArrayList<>();
 
-  private static Map<String, User> usersById                        = new HashMap<>();
+  private static Map<String, User> usersById                        = new ConcurrentHashMap<>();
 
   public InMemoryUserHandler(OrganizationService organizationService) {
     this.organizationService = organizationService;
   }
 
   public final List<UserEventListener> getUserEventListeners() {
-    return Collections.unmodifiableList(userListeners);
+    // Clone list to avoid ConcurrentModificationException (event with Vector got it)
+    return userListeners.stream().toList();
   }
 
   @Override
@@ -225,9 +225,9 @@ public class InMemoryUserHandler implements UserHandler {
                                 .map(user -> filterUserStatus(user, userStatus))
                                 .filter(Objects::nonNull)
                                 .filter(user -> contains(user.getEmail(), query.getEmail())
-                                    && contains(user.getFirstName(), query.getFirstName())
-                                    && contains(user.getLastName(), query.getLastName())
-                                    && contains(user.getUserName(), query.getUserName()))
+                                                && contains(user.getFirstName(), query.getFirstName())
+                                                && contains(user.getLastName(), query.getLastName())
+                                                && contains(user.getUserName(), query.getUserName()))
                                 .filter(Objects::nonNull)
                                 .toList();
     return new InMemoryListAccess<>(users, new User[0]);
@@ -259,10 +259,10 @@ public class InMemoryUserHandler implements UserHandler {
                                 .stream()
                                 .map(user -> filterUserStatus(user, userStatus))
                                 .filter(user -> CollectionUtils.isEmpty(groupIds)
-                                    || groupIds.stream()
-                                               .anyMatch(groupId -> !getMembershipHandler().findMembershipsByUserAndGroup(user.getUserName(),
-                                                                                                                          groupId)
-                                                                                           .isEmpty()))
+                                                || groupIds.stream()
+                                                           .anyMatch(groupId -> !getMembershipHandler().findMembershipsByUserAndGroup(user.getUserName(),
+                                                                                                                                      groupId)
+                                                                                                       .isEmpty()))
                                 .filter(Objects::nonNull)
                                 .toList();
     return new InMemoryListAccess<>(users, new User[0]);
@@ -275,9 +275,10 @@ public class InMemoryUserHandler implements UserHandler {
                                                    .stream()
                                                    .filter(Objects::nonNull)
                                                    .filter(profile -> profile.getUserInfoMap() != null
-                                                       && profile.getUserInfoMap().containsKey(attributeName)
-                                                       && StringUtils.equals(profile.getUserInfoMap().get(attributeName),
-                                                                             attributeValue))
+                                                                      && profile.getUserInfoMap().containsKey(attributeName)
+                                                                      && StringUtils.equals(profile.getUserInfoMap()
+                                                                                                   .get(attributeName),
+                                                                                            attributeValue))
                                                    .distinct()
                                                    .toList();
     User user = null;
@@ -341,73 +342,93 @@ public class InMemoryUserHandler implements UserHandler {
   }
 
   private void preSave(User user, boolean isNew) {
-    for (UserEventListener listener : userListeners) {
-      try {
-        listener.preSave(user, isNew);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
-    }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.preSave(user, isNew);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private void postSave(User user, boolean isNew) {
-    for (UserEventListener listener : userListeners) {
-      try {
-        listener.postSave(user, isNew);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
-    }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.postSave(user, isNew);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private void preDelete(User user) {
-    for (UserEventListener listener : userListeners) {
-      try {
-        listener.preDelete(user);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
-    }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.preDelete(user);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private void postDelete(User user) {
-    for (UserEventListener listener : userListeners) {
-      try {
-        listener.postDelete(user);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
-    }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.postDelete(user);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private void preSetEnabled(User user) {
-    for (UserEventListener listener : userListeners)
-      try {
-        listener.preSetEnabled(user);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.preSetEnabled(user);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private void postSetEnabled(User user) {
-    for (UserEventListener listener : userListeners)
-      try {
-        listener.postSetEnabled(user);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}", listener.getClass().getName()), e);
-      }
+    getUserEventListeners().forEach(listener -> {
+                             try {
+                               listener.postSetEnabled(user);
+                             } catch (RuntimeException e) {
+                               throw e;
+                             } catch (Exception e) {
+                               throw new IllegalStateException(ERROR_BROADCASTING_EVENT_MESSAGE.replace("{}",
+                                                                                                        listener.getClass()
+                                                                                                                .getName()),
+                                                               e);
+                             }
+                           });
   }
 
   private InMemoryUserProfileHandler getUserProfileHandler() {
