@@ -17,7 +17,7 @@ package org.exoplatform.portal.mop.user;
 
 import java.util.Comparator;
 
-import org.apache.commons.codec.binary.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.config.model.PageNavigation;
 import org.exoplatform.portal.mop.SiteType;
