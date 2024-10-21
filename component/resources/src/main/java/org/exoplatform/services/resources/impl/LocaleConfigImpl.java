@@ -24,8 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.ArrayUtils;
 
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.container.ExoContainerContext;
@@ -33,140 +32,161 @@ import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.services.resources.ResourceBundleService;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.Setter;
+
 /**
  * @author Benjamin Mestrallet benjamin.mestrallet@exoplatform.com
  */
 public class LocaleConfigImpl implements LocaleConfig {
 
-    private static Map<String, Locale> predefinedLocaleMap_ = null;
+  private static Map<String, Locale>   predefinedLocaleMap_ = null;
 
-    static {
-        predefinedLocaleMap_ = new HashMap<String, Locale>(10);
-        predefinedLocaleMap_.put("us", Locale.US);
-        predefinedLocaleMap_.put("en", Locale.ENGLISH);
-        predefinedLocaleMap_.put("fr", Locale.FRENCH);
-        predefinedLocaleMap_.put("zh", Locale.SIMPLIFIED_CHINESE);
+  @Setter
+  private static ResourceBundleService resourceBundleService;
+
+  static {
+    predefinedLocaleMap_ = new HashMap<>(10);
+    predefinedLocaleMap_.put("us", Locale.US);
+    predefinedLocaleMap_.put("en", Locale.ENGLISH);
+    predefinedLocaleMap_.put("fr", Locale.FRENCH);
+    predefinedLocaleMap_.put("zh", Locale.SIMPLIFIED_CHINESE);
+  }
+
+  private Locale         locale_;
+
+  private String         outputEncoding_;
+
+  private String         inputEncoding_;
+
+  private String         description_;
+
+  private String         localeName_;
+
+  private String         tagIdentifier_;
+
+  private Orientation    orientation;
+
+  private ResourceBundle        mergedGlobalNavigationBundle = null;
+
+  public String getDescription() {
+    return description_;
+  }
+
+  public void setDescription(String desc) {
+    description_ = desc;
+  }
+
+  public String getOutputEncoding() {
+    return outputEncoding_;
+  }
+
+  public void setOutputEncoding(String enc) {
+    outputEncoding_ = enc;
+  }
+
+  public String getInputEncoding() {
+    return inputEncoding_;
+  }
+
+  public void setInputEncoding(String enc) {
+    inputEncoding_ = enc;
+  }
+
+  public Locale getLocale() {
+    return locale_;
+  }
+
+  public void setLocale(Locale locale) {
+    this.locale_ = locale;
+    if (localeName_ == null) {
+      this.localeName_ = locale.getLanguage();
     }
+  }
 
-    private Locale locale_;
-
-    private String outputEncoding_;
-
-    private String inputEncoding_;
-
-    private String description_;
-
-    private String localeName_;
-
-    private String tagIdentifier_;
-
-    private Orientation orientation;
-
-    public LocaleConfigImpl() {
+  public void setLocale(String localeName) {
+    this.localeName_ = localeName;
+    this.locale_ = predefinedLocaleMap_.get(localeName);
+    if (locale_ == null) {
+      String[] localeParams = localeName.split("[_-]");
+      if (localeParams.length > 1) {
+        this.locale_ = new Locale.Builder().setLanguage(localeParams[0]).setRegion(localeParams[1]).build();
+      } else {
+        this.locale_ = new Locale.Builder().setLanguage(localeName).build();
+      }
+      tagIdentifier_ = I18N.toTagIdentifier(locale_);
     }
+  }
 
-    public String getDescription() {
-        return description_;
-    }
+  public String getTagIdentifier() {
+    return tagIdentifier_;
+  }
 
-    public void setDescription(String desc) {
-        description_ = desc;
-    }
+  public String getLanguage() {
+    return locale_.getLanguage();
+  }
 
-    public String getOutputEncoding() {
-        return outputEncoding_;
-    }
+  public String getLocaleName() {
+    return localeName_;
+  }
 
-    public void setOutputEncoding(String enc) {
-        outputEncoding_ = enc;
-    }
+  public void setLocaleName(String localeName) {
+    localeName_ = localeName;
+  }
 
-    public String getInputEncoding() {
-        return inputEncoding_;
-    }
+  public ResourceBundle getResourceBundle(String name) {
+    return getResourceBundleService().getResourceBundle(name, locale_);
+  }
 
-    public void setInputEncoding(String enc) {
-        inputEncoding_ = enc;
-    }
+  public ResourceBundle getMergeResourceBundle(String[] names) {
+    return getResourceBundleService().getResourceBundle(names, locale_);
+  }
 
-    public Locale getLocale() {
-        return locale_;
+  public ResourceBundle getNavigationResourceBundle(String ownerType, String ownerId) {
+    ResourceBundle resourceBundle = getResourceBundle("locale.navigation." + ownerType + "." + ownerId.replaceAll("/", "."));
+    if (resourceBundle == null) {
+      return getMergedNavigationBundle();
+    } else {
+      return resourceBundle;
     }
+  }
 
-    public void setLocale(Locale locale) {
-        locale_ = locale;
-        if (localeName_ == null)
-            localeName_ = locale.getLanguage();
-    }
+  public void setInput(HttpServletRequest req) throws java.io.UnsupportedEncodingException {
+    req.setCharacterEncoding(inputEncoding_);
+  }
 
-    public void setLocale(String localeName) {
-        localeName_ = localeName;
-        locale_ = predefinedLocaleMap_.get(localeName);
-        if (locale_ == null) {
-            String[] localeParams = localeName.split("_");
-            if (localeParams.length > 1) {
-                locale_ = new Locale(localeParams[0], localeParams[1]);
-            } else {
-                locale_ = new Locale(localeName);
-            }
-            tagIdentifier_ = I18N.toTagIdentifier(locale_);
-        }
-    }
+  public void setOutput(HttpServletResponse res) {
+    res.setContentType("text/html; charset=" + outputEncoding_);
+    res.setLocale(locale_);
+  }
 
-    public String getTagIdentifier() {
-        return tagIdentifier_;
-    }
+  public Orientation getOrientation() {
+    return orientation;
+  }
 
-    public String getLanguage() {
-        return locale_.getLanguage();
-    }
+  public void setOrientation(Orientation orientation) {
+    this.orientation = orientation;
+  }
 
-    public String getLocaleName() {
-        return localeName_;
-    }
+  @Override
+  public String toString() {
+    return "LocaleConfig[" + "localeName=" + localeName_ + ",locale=" + locale_ + ",description=" + description_ +
+        ",inputEncoding=" + inputEncoding_ + ",outputEncoding=" + outputEncoding_ + "]";
+  }
 
-    public void setLocaleName(String localeName) {
-        localeName_ = localeName;
+  private static ResourceBundleService getResourceBundleService() {
+    if (resourceBundleService == null) {
+      resourceBundleService =  ExoContainerContext.getService(ResourceBundleService.class);
     }
+    return resourceBundleService;
+  }
 
-    public ResourceBundle getResourceBundle(String name) {
-        ResourceBundleService service = (ResourceBundleService) ExoContainerContext.getCurrentContainer()
-                .getComponentInstanceOfType(ResourceBundleService.class);
-        ResourceBundle res = service.getResourceBundle(name, locale_);
-        return res;
+  private ResourceBundle getMergedNavigationBundle() {
+    if (mergedGlobalNavigationBundle == null) {
+      mergedGlobalNavigationBundle = getMergeResourceBundle(ArrayUtils.add(getResourceBundleService().getSharedResourceBundleNames(), "locale.navigation.portal.global"));
     }
+    return mergedGlobalNavigationBundle;
+  }
 
-    public ResourceBundle getMergeResourceBundle(String[] names) {
-        ResourceBundleService service = (ResourceBundleService) ExoContainerContext.getCurrentContainer()
-                .getComponentInstanceOfType(ResourceBundleService.class);
-        ResourceBundle res = service.getResourceBundle(names, locale_);
-        return res;
-    }
-
-    public ResourceBundle getNavigationResourceBundle(String ownerType, String ownerId) {
-        return getResourceBundle("locale.navigation." + ownerType + "." + ownerId.replaceAll("/", "."));
-    }
-
-    public void setInput(HttpServletRequest req) throws java.io.UnsupportedEncodingException {
-        req.setCharacterEncoding(inputEncoding_);
-    }
-
-    public void setOutput(HttpServletResponse res) {
-        res.setContentType("text/html; charset=" + outputEncoding_);
-        res.setLocale(locale_);
-    }
-
-    public Orientation getOrientation() {
-        return orientation;
-    }
-
-    public void setOrientation(Orientation orientation) {
-        this.orientation = orientation;
-    }
-
-    @Override
-    public String toString() {
-        return "LocaleConfig[" + "localeName=" + localeName_ + ",locale=" + locale_ + ",description=" + description_
-                + ",inputEncoding=" + inputEncoding_ + ",outputEncoding=" + outputEncoding_ + "]";
-    }
 }

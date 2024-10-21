@@ -21,10 +21,9 @@ package org.exoplatform.services.resources;
 
 import java.util.Collection;
 import java.util.Locale;
+import java.util.ResourceBundle;
 
 import org.exoplatform.container.PortalContainer;
-import org.exoplatform.services.resources.LocaleConfig;
-import org.exoplatform.services.resources.LocaleConfigService;
 
 /**
  * Thu, May 15, 2004 @
@@ -41,11 +40,15 @@ public class TestLocaleConfig extends AbstractResourceBundleTest {
     }
 
     public void setUp() throws Exception {
-        service_ = (LocaleConfigService) PortalContainer.getInstance().getComponentInstanceOfType(LocaleConfigService.class);
+        service_ = PortalContainer.getInstance().getComponentInstanceOfType(LocaleConfigService.class);
     }
+    
+    public void testGetNavigationResourceBundle() throws Exception {
+      LocaleConfig localeConfig = service_.getLocaleConfig("en");
+      assertNotNull(localeConfig);
 
-    public void tearDown() throws Exception {
-
+      ResourceBundle resourceBundle = localeConfig.getNavigationResourceBundle("group", "notfound");
+      assertNotNull(resourceBundle);
     }
 
     public void testLocaleConfigManager() throws Exception {
