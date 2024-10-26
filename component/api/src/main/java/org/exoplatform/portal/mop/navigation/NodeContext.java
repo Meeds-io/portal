@@ -23,6 +23,9 @@ import java.util.*;
 
 import org.exoplatform.portal.tree.list.ListTree;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
  * The context of a node.
  */
@@ -38,6 +41,8 @@ public final class NodeContext<N> extends ListTree<NodeContext<N>> {
     String handle;
 
     /** A data snapshot. */
+    @Getter
+    @Setter
     NodeData data;
 
     /** The new name if any. */

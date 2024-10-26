@@ -362,4 +362,46 @@ public interface LayoutService {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * @param siteKey {@link SiteKey} to create
+   * @param siteTemplateKey {@link SiteKey} of template
+   */
+  default void savePortalFromTemplate(SiteKey siteKey,
+                                      SiteKey siteTemplateKey) throws ObjectNotFoundException {
+    savePortalFromTemplate(siteKey, siteTemplateKey, null);
+  }
+
+  /**
+   * @param siteKey {@link SiteKey} to create
+   * @param siteTemplateKey {@link SiteKey} of template
+   * @param permission Permission to use to change pattern "@owenr@" if existing
+   *          in pages and portal layouts
+   */
+  default void savePortalFromTemplate(SiteKey siteKey,
+                                      SiteKey siteTemplateKey,
+                                      String permission) throws ObjectNotFoundException {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @param siteKey destination Site Key
+   * @param siteTemplateKey {@link SiteKey} of template
+   * @param permission Permission to use to change pattern "@owenr@" if existing
+   *          in pages and portal layouts
+   * @throws ObjectNotFoundException
+   */
+  default void savePagesFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey, String permission) throws ObjectNotFoundException {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @param siteKey destination Site Key
+   * @param pageTemplateKey Site template's Page Key
+   * @param permission Permission to use to change pattern "@owenr@" if existing
+   *          in pages and portal layouts
+   */
+  default void savePageFromTemplate(SiteKey siteKey, PageKey pageTemplateKey, String permission) throws ObjectNotFoundException {
+    throw new UnsupportedOperationException();
+  }
+
 }
