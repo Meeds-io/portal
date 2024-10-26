@@ -356,6 +356,8 @@ public class UserACL {
   public boolean hasEditPermission(Identity identity, String ownerType, String ownerId, String expression) {
     if (isAdministrator(identity)) {
       return true;
+    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)) {
+      return isAdministrator(identity);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
@@ -385,6 +387,8 @@ public class UserACL {
   public boolean hasAccessPermission(Identity identity, String ownerType, String ownerId, Stream<String> expressionsStream) {
     if (isAdministrator(identity)) {
       return true;
+    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)) {
+      return isAdministrator(identity);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
