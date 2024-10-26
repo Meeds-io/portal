@@ -22,7 +22,6 @@ package org.exoplatform.portal.mop.navigation;
 import java.util.Collection;
 import java.util.LinkedList;
 
-
 /**
  * A queuing implementation of the {@link NodeChangeListener} interface.
  *
@@ -30,44 +29,46 @@ import java.util.LinkedList;
  */
 public class NodeChangeQueue<N> extends LinkedList<NodeChange<N>> implements NodeChangeListener<N> {
 
-    public NodeChangeQueue() {
-    }
+  private static final long serialVersionUID = -4635111145546093584L;
 
-    public NodeChangeQueue(Collection<? extends NodeChange<N>> c) {
-        super(c);
-    }
+  public NodeChangeQueue() {
+  }
 
-    public void broadcast(NodeChangeListener<N> listener) {
-        for (NodeChange<N> change : this) {
-            change.dispatch(listener);
-        }
-    }
+  public NodeChangeQueue(Collection<? extends NodeChange<N>> c) {
+    super(c);
+  }
 
-    public void onAdd(N target, N parent, N previous) {
-        add(new NodeChange.Added<N>(parent, previous, target));
+  public void broadcast(NodeChangeListener<N> listener) {
+    for (NodeChange<N> change : this) {
+      change.dispatch(listener);
     }
+  }
 
-    public void onCreate(N target, N parent, N previous, String name) {
-        add(new NodeChange.Created<N>(parent, previous, target, name));
-    }
+  public void onAdd(N target, N parent, N previous) {
+    add(new NodeChange.Added<N>(parent, previous, target));
+  }
 
-    public void onRemove(N target, N parent) {
-        add(new NodeChange.Removed<N>(parent, target));
-    }
+  public void onCreate(N target, N parent, N previous, String name) {
+    add(new NodeChange.Created<N>(parent, previous, target, name));
+  }
 
-    public void onDestroy(N target, N parent) {
-        add(new NodeChange.Destroyed<N>(parent, target));
-    }
+  public void onRemove(N target, N parent) {
+    add(new NodeChange.Removed<N>(parent, target));
+  }
 
-    public void onRename(N target, N parent, String name) {
-        add(new NodeChange.Renamed<N>(parent, target, name));
-    }
+  public void onDestroy(N target, N parent) {
+    add(new NodeChange.Destroyed<N>(parent, target));
+  }
 
-    public void onUpdate(N target, NodeState state) {
-        add(new NodeChange.Updated<N>(target, state));
-    }
+  public void onRename(N target, N parent, String name) {
+    add(new NodeChange.Renamed<N>(parent, target, name));
+  }
 
-    public void onMove(N target, N from, N to, N previous) {
-        add(new NodeChange.Moved<N>(from, to, previous, target));
-    }
+  public void onUpdate(N target, NodeState state) {
+    add(new NodeChange.Updated<N>(target, state));
+  }
+
+  public void onMove(N target, N from, N to, N previous) {
+    add(new NodeChange.Moved<N>(from, to, previous, target));
+  }
 }

@@ -43,11 +43,6 @@
   <external-component-plugins>
     <target-component>org.exoplatform.services.organization.OrganizationService</target-component>
     <component-plugin>
-      <name>user.portal.config.listener</name>
-      <set-method>addListenerPlugin</set-method>
-      <type>org.exoplatform.portal.config.UserPortalConfigListener</type>
-    </component-plugin>
-    <component-plugin>
       <name>group.portal.config.listener</name>
       <set-method>addListenerPlugin</set-method>
       <type>org.exoplatform.portal.config.GroupPortalConfigListener</type>
@@ -182,7 +177,7 @@
   <external-component-plugins>
     <target-component>org.exoplatform.services.listener.ListenerService</target-component>
     <component-plugin>
-      <name>org.exoplatform.portal.config.DataStorage.portalConfigUpdated</name>
+      <name>org.exoplatform.portal.mop.service.LayoutService.portalConfigUpdated</name>
       <set-method>addListener</set-method>
       <type>org.exoplatform.portal.config.MetaPortalConfigUpdateListener</type>
     </component-plugin>

@@ -35,7 +35,7 @@ public class AddOnPluginImpl extends AddOnPlugin {
 
   private String               containerName;
 
-  private List<Application<?>> apps     = new LinkedList<Application<?>>();
+  private List<Application> apps     = new LinkedList<Application>();
 
   private int                  priority = 5;
 
@@ -51,16 +51,16 @@ public class AddOnPluginImpl extends AddOnPlugin {
         priority = Integer.parseInt(priorityParam.getValue());
       }
 
-      List<Application<?>> tmp = params.<Application<?>> getObjectParamValues((Class<Application<?>>) (Class<?>) Application.class);
+      List<Application> tmp = params.<Application> getObjectParamValues((Class<Application>) (Class<?>) Application.class);
       if (tmp != null) {
-        for (Application<?> app : tmp) {
+        for (Application app : tmp) {
           apps.add(buildApp(app));
         }
       }
     }
   }
 
-  protected Application<?> buildApp(Application<?> app) {
+  protected Application buildApp(Application app) {
     if (app instanceof PortletModel) {
       PortletModel portletModel = (PortletModel) app;
       PortletApplication pApp = new PortletApplication((ApplicationData) portletModel.build());
@@ -70,7 +70,7 @@ public class AddOnPluginImpl extends AddOnPlugin {
         pApp.setAccessPermissions(permissions.toArray(new String[permissions.size()]));
       }
 
-      TransientApplicationState<Portlet> state = new TransientApplicationState<Portlet>(portletModel.getContentId());
+      TransientApplicationState state = new TransientApplicationState(portletModel.getContentId());
       Map<String, Object> prefs = portletModel.getPortletPrefs();
       if (prefs != null) {
         PortletBuilder builder = new PortletBuilder();
@@ -92,7 +92,7 @@ public class AddOnPluginImpl extends AddOnPlugin {
   }
 
   @Override
-  public List<Application<?>> getApplications() {
+  public List<Application> getApplications() {
     return Collections.unmodifiableList(apps);
   }
 

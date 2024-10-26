@@ -6,8 +6,6 @@ import java.util.List;
 import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 
-import org.gatein.api.common.Pagination;
-
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
 
@@ -21,15 +19,15 @@ public class WindowDAOImpl extends AbstractDAO<WindowEntity> implements WindowDA
 
   @Override
   @ExoTransactional
-  public List<Long> findIdsByContentIds(List<String> contentIds, Pagination pagination) {
+  public List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit) {
     if (contentIds == null || contentIds.isEmpty()) {
       return Collections.emptyList();
     }
     TypedQuery<Long> query = getEntityManager().createNamedQuery("WindowEntity.findByContentIds", Long.class);
     query.setParameter("contentIds", contentIds);
-    if (pagination != null && pagination.getLimit() > 0) {
-      query.setFirstResult(pagination.getOffset());
-      query.setMaxResults(pagination.getLimit());
+    if (limit > 0) {
+      query.setFirstResult(offset);
+      query.setMaxResults(limit);
     }
     query.setParameter("contentIds", contentIds);
     return query.getResultList();

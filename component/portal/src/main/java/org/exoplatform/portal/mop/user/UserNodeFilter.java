@@ -19,12 +19,14 @@
 
 package org.exoplatform.portal.mop.user;
 
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.navigation.NodeFilter;
 import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
+import org.exoplatform.portal.mop.storage.PageStorage;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
@@ -54,9 +56,9 @@ class UserNodeFilter implements NodeFilter {
   private boolean canRead(NodeState state) {
     PageKey pageRef = state.getPageRef();
     if (pageRef != null) {
-      PageContext page = userPortal.service.getPageService().loadPage(pageRef);
+      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
       if (page != null) {
-        UserACL userACL = userPortal.service.getUserACL();
+        UserACL userACL = ExoContainerContext.getService(UserACL.class);
         return userACL.hasAccessPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
       }
     }
@@ -66,9 +68,9 @@ class UserNodeFilter implements NodeFilter {
   private boolean canWrite(NodeState state) {
     PageKey pageRef = state.getPageRef();
     if (pageRef != null) {
-      PageContext page = userPortal.service.getPageService().loadPage(pageRef);
+      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
       if (page != null) {
-        UserACL userACL = userPortal.service.getUserACL();
+        UserACL userACL = ExoContainerContext.getService(UserACL.class);
         return userACL.hasEditPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
       }
     }

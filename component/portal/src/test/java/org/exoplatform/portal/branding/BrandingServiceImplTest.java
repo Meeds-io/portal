@@ -72,6 +72,7 @@ import org.exoplatform.portal.branding.model.Background;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.services.resources.impl.LocaleConfigImpl;
@@ -1064,6 +1065,7 @@ public class BrandingServiceImplTest {
                                    uploadService,
                                    localeConfigService,
                                    mock(ListenerService.class),
+                                   mock(UserACL.class),
                                    initParams);
   }
 

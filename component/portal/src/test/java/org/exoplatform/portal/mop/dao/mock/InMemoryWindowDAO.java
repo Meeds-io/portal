@@ -18,7 +18,6 @@ package org.exoplatform.portal.mop.dao.mock;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import org.gatein.api.common.Pagination;
 
 import org.exoplatform.jpa.mock.AbstractInMemoryDAO;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
@@ -27,7 +26,7 @@ import org.exoplatform.portal.mop.dao.WindowDAO;
 public class InMemoryWindowDAO extends AbstractInMemoryDAO<WindowEntity> implements WindowDAO {
 
   @Override
-  public List<Long> findIdsByContentIds(List<String> contentIds, Pagination pagination) {
+  public List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit) {
     return entities.values()
                    .stream()
                    .filter(entity -> contentIds.contains(entity.getContentId()))

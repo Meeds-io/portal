@@ -190,7 +190,7 @@ public class UserNode {
       resolvedLabel = ExpressionUtil.getExpressionValue(bundle, context.getState().getLabel());
     } else if (id != null) {
       Locale portalLocale = owner.navigation.portal.getLocale();
-      DescriptionStorage descriptionStorage = owner.navigation.portal.service.getDescriptionService();
+      DescriptionStorage descriptionStorage = ExoContainerContext.getService(DescriptionStorage.class);
       org.exoplatform.portal.mop.State description = descriptionStorage.resolveDescription(id, portalLocale, userLocale);
       if (description != null) {
         resolvedLabel = description.getName();

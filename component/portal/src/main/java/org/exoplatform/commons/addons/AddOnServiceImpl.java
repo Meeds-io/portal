@@ -28,14 +28,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.TransientApplicationState;
 import org.exoplatform.portal.pom.data.ApplicationData;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
 public class AddOnServiceImpl implements AddOnService {
 
-    private List<ApplicationDecorator<Portlet>> apps = new ArrayList<>();
+    private List<ApplicationDecorator> apps = new ArrayList<>();
 
     @Override
-    public List<Application<Portlet>> getApplications(String containerName) {
+    public List<Application> getApplications(String containerName) {
       return this.apps.stream()
                       .filter(app -> app.getContainerName().equals(containerName))
                       .map(ApplicationDecorator::getApp)
@@ -43,49 +42,47 @@ public class AddOnServiceImpl implements AddOnService {
     }
 
     @Override
-    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void addPlugin(AddOnPlugin plugin) {
-      for (Application<?> app : plugin.getApplications()) {
+      for (Application app : plugin.getApplications()) {
         if (StringUtils.isBlank(app.getId())) {
           app.setId(UUID.randomUUID().toString());
         }
         apps.add(new ApplicationDecorator(app, plugin.getPriority(), plugin.getContainerName()));
       }
-      Collections.sort(apps, new Comparator<ApplicationDecorator<?>>() { // NOSONAR
+      Collections.sort(apps, new Comparator<ApplicationDecorator>() { // NOSONAR
           @Override
-          public int compare(ApplicationDecorator<?> o1, ApplicationDecorator<?> o2) {
+          public int compare(ApplicationDecorator o1, ApplicationDecorator o2) {
             if (o1.getAppPriority() != o2.getAppPriority()) {
               return o1.getAppPriority() - o2.getAppPriority();
             }
-            TransientApplicationState<?> s1 = (TransientApplicationState<?>)o1.getApp().getState();
-            TransientApplicationState<?> s2 = (TransientApplicationState<?>)o2.getApp().getState();
+            TransientApplicationState s1 = (TransientApplicationState)o1.getApp().getState();
+            TransientApplicationState s2 = (TransientApplicationState)o2.getApp().getState();
             return s1.getContentId().compareTo(s2.getContentId());
           }
       });
     }
     
-    class ApplicationDecorator<T> extends Application<T> {
+    class ApplicationDecorator extends Application {
       
-      private Application<T> app;
+      private Application app;
       private int appPriority;
       private String containerName;
       
-      public ApplicationDecorator(ApplicationData<T> appData) {
+      public ApplicationDecorator(ApplicationData appData) {
         super(appData);
       }
 
-      public ApplicationDecorator(Application<T> app, int priority, String containerName) {
-        super(app.getType());
+      public ApplicationDecorator(Application app, int priority, String containerName) {
         this.app = app;
         this.appPriority = priority;
         this.containerName = containerName;
       }
 
-      public Application<T> getApp() {
+      public Application getApp() {
         return app;
       }
 
-      public void setApp(Application<T> app) {
+      public void setApp(Application app) {
         this.app = app;
       }
 

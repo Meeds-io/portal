@@ -17,11 +17,7 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
 
-package org.exoplatform.portal.application;
-
-import java.util.List;
-
-import jakarta.servlet.http.HttpServletResponse;
+package org.exoplatform.web.handler;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -29,6 +25,8 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.WebRequestHandler;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>

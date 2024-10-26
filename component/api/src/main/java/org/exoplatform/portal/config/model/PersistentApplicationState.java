@@ -28,16 +28,19 @@ import lombok.ToString;
  * @version $Revision$
  */
 @ToString
-public class PersistentApplicationState<S> extends ApplicationState<S> {
+public class PersistentApplicationState implements ApplicationState {
 
-    /** The id of the content state. */
-    private final String storageId;
+  private static final long serialVersionUID = -1433372566324086785L;
 
-    public PersistentApplicationState(String storageId) {
-        this.storageId = storageId;
-    }
+  /** The id of the content state. */
+  private final String      storageId;
 
-    public String getStorageId() {
-        return storageId;
-    }
+  public PersistentApplicationState(String storageId) {
+    this.storageId = storageId;
+  }
+
+  public String getStorageId() {
+    return storageId;
+  }
+
 }

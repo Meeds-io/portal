@@ -25,7 +25,6 @@
 
   <page-nodes>
     <node>
-      <uri>home</uri>
       <name>home</name>
       <label>#{portal.classic.home}</label>
       <page-reference>
@@ -33,7 +32,6 @@
       </page-reference>
     </node>
     <node>
-      <uri>webexplorer</uri>
       <name>webexplorer</name>
       <label>#{portal.classic.webexplorer}</label>
       <page-reference>portal::classic::webexplorer</page-reference>

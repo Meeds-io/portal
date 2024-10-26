@@ -25,7 +25,6 @@ import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.ModelObject;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIComponent;
@@ -47,7 +46,7 @@ public class UIAddOnContainer extends UIContainer {
       if (!initialized
           || (PortalRequestContext.getCurrentInstance().isNoCache() && childrenComputed.get() == null)) {
         AddOnService addonService = getApplicationComponent(AddOnService.class);
-        List<Application<Portlet>> apps = addonService.getApplications(this.getName());
+        List<Application> apps = addonService.getApplications(this.getName());
         Container model = new Container();
         model.setChildren(new ArrayList<>(apps));
         UIContainer tmp = new UIContainer();

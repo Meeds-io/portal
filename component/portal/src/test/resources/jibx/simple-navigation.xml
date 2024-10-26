@@ -26,7 +26,6 @@
 
   <page-nodes>
     <node>
-      <uri>bar</uri>
       <name>bar</name>
       <label>bar_label</label>
     </node>

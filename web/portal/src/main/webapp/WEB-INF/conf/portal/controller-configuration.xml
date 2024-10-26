@@ -152,14 +152,19 @@
       <type>org.exoplatform.web.handler.DownloadHandler</type>
     </component-plugin>
     <component-plugin>
+      <name>DefaultRequestHandler</name>
+      <set-method>register</set-method>
+      <type>org.exoplatform.web.handler.DefaultRequestHandler</type>
+    </component-plugin>
+    <component-plugin>
+      <name>PermanentLinkRequestHandler</name>
+      <set-method>register</set-method>
+      <type>io.meeds.portal.permlink.web.PermanentLinkRequestHandler</type>
+    </component-plugin>
+    <component-plugin>
       <name>PortalRequestHandler</name>
       <set-method>register</set-method>
       <type>org.exoplatform.portal.application.PortalRequestHandler</type>
-    </component-plugin>
-    <component-plugin>
-      <name>DefaultRequestHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.portal.application.DefaultRequestHandler</type>
     </component-plugin>
     <component-plugin>
       <name>ScriptRequestHandler</name>
@@ -175,11 +180,6 @@
       <name>StaticResourceRequestHandler</name>
       <set-method>register</set-method>
       <type>org.exoplatform.portal.application.StaticResourceRequestHandler</type>
-    </component-plugin>
-    <component-plugin>
-      <name>PermanentLinkRequestHandler</name>
-      <set-method>register</set-method>
-      <type>io.meeds.portal.permlink.web.PermanentLinkRequestHandler</type>
     </component-plugin>
   </external-component-plugins>
 

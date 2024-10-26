@@ -48,7 +48,7 @@ public class TestSiteDataImportOverwrite extends AbstractSiteDataImportTest {
     PortalConfig portal = layoutService.getPortalConfig("classic");
     Container layout = portal.getPortalLayout();
     assertEquals(1, layout.getChildren().size());
-    Application<Portlet> layoutPortlet = (Application<Portlet>) layout.getChildren().get(0);
+    Application layoutPortlet = (Application) layout.getChildren().get(0);
     assertEquals("site2/layout", layoutService.getId(layoutPortlet.getState()));
     PageContext page = pageStorage.loadPage(PageKey.parse("portal::classic::home"));
     assertNull(page);
@@ -62,7 +62,7 @@ public class TestSiteDataImportOverwrite extends AbstractSiteDataImportTest {
     portal = layoutService.getPortalConfig(SiteType.GROUP.getName(), "/platform/administrators");
     layout = portal.getPortalLayout();
     assertEquals(1, layout.getChildren().size());
-    layoutPortlet = (Application<Portlet>) layout.getChildren().get(0);
+    layoutPortlet = (Application) layout.getChildren().get(0);
     assertEquals("site1/layout", layoutService.getId(layoutPortlet.getState()));
     page = pageStorage.loadPage(PageKey.parse("group::/platform/administrators::page1"));
     assertNotNull(page);
@@ -80,7 +80,7 @@ public class TestSiteDataImportOverwrite extends AbstractSiteDataImportTest {
     PortalConfig portal = layoutService.getPortalConfig("classic");
     Container layout = portal.getPortalLayout();
     assertEquals(1, layout.getChildren().size());
-    Application<Portlet> layoutPortlet = (Application<Portlet>) layout.getChildren().get(0);
+    Application layoutPortlet = (Application) layout.getChildren().get(0);
     assertEquals("site2/layout", layoutService.getId(layoutPortlet.getState()));
 
     //

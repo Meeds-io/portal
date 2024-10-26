@@ -20,11 +20,12 @@
 package org.exoplatform.portal.mop.navigation;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.StringUtils;
 
-import org.exoplatform.portal.mop.NodeTarget;
 import org.exoplatform.portal.mop.SiteKey;
 
 /**
@@ -35,170 +36,162 @@ import org.exoplatform.portal.mop.SiteKey;
  */
 public class NodeData implements Serializable {
 
-    /** . */
-    final String parentId;
+  private static final long serialVersionUID = 5801881702083669782L;
 
-    /** . */
-    final String id;
+  /** . */
+  final String              parentId;
 
-    /** . */
-    final SiteKey siteKey;
+  /** . */
+  final String              id;
 
-    /** . */
-    final String name;
+  /** . */
+  final SiteKey             siteKey;
 
-    /** . */
-    final NodeState state;
+  /** . */
+  final String              name;
 
-    /** . */
-    final String[] children;
+  /** . */
+  final NodeState           state;
 
-    /** . */
-    final String  target;
+  /** . */
+  final String[]            children;
 
-    /** . */
-    final long updatedDate;
+  /** . */
+  final String              target;
 
-    public NodeData(String parentId, String id, SiteKey siteKey, String name, NodeState state, String[] children, String target, long updatedDate) {
-      this.parentId = parentId;
-      this.id = id;
-      this.siteKey = siteKey;
-      this.name = name;
-      this.state = state;
-      this.children = children;
-      this.target = target;
-      this.updatedDate = updatedDate;
+  /** . */
+  final long                updatedDate;
+
+  public NodeData(String parentId,
+                  String id,
+                  SiteKey siteKey,
+                  String name,
+                  NodeState state,
+                  String[] children,
+                  String target,
+                  long updatedDate) {
+    this.parentId = parentId;
+    this.id = id;
+    this.siteKey = siteKey;
+    this.name = name;
+    this.state = state;
+    this.children = children;
+    this.target = target;
+    this.updatedDate = updatedDate;
+  }
+
+  NodeData(NodeContext<?> context) {
+    int size = 0;
+    for (NodeContext<?> current = context.getFirst(); current != null; current = current.getNext()) {
+      size++;
     }
-
-    public NodeData(String parentId, String id, SiteKey siteKey, String name, NodeState state, String[] children) {
-      this.parentId = parentId;
-      this.id = id;
-      this.siteKey = siteKey;
-      this.name = name;
-      this.state = state;
-      this.children = children;
-      this.target = NodeTarget.SAME_TAB.name();
-      this.updatedDate = 0;
+    String[] children = new String[size];
+    for (NodeContext<?> current = context.getFirst(); current != null; current = current.getNext()) {
+      children[children.length - size--] = current.handle;
     }
+    String parentId = context.getParent() != null ? context.getParent().handle : null;
+    String id = context.handle;
+    String name = context.getName();
+    NodeState state = context.getState();
 
-    NodeData(NodeContext<?> context) {
-        int size = 0;
-        for (NodeContext<?> current = context.getFirst(); current != null; current = current.getNext()) {
-            size++;
+    //
+    this.parentId = parentId;
+    this.id = id;
+    this.name = name;
+    this.state = state;
+    this.children = children;
+    this.siteKey = context.getState().getSiteKey();
+    this.target = state.getTarget();
+    this.updatedDate = state.getUpdatedDate();
+  }
+
+  public Iterator<String> iterator(boolean reverse) {
+    if (reverse) {
+      return new Iterator<String>() {
+        int index = children.length;
+
+        public boolean hasNext() {
+          return index > 0;
         }
-        String[] children = new String[size];
-        for (NodeContext<?> current = context.getFirst(); current != null; current = current.getNext()) {
-            children[children.length - size--] = current.handle;
+
+        public String next() {
+          if (index > 0) {
+            return children[--index];
+          } else {
+            throw new NoSuchElementException();
+          }
         }
-        String parentId = context.getParent() != null ? context.getParent().handle : null;
-        String id = context.handle;
-        String name = context.getName();
-        NodeState state = context.getState();
+      };
+    } else {
+      return new Iterator<String>() {
+        int index = 0;
 
-        //
-        this.parentId = parentId;
-        this.id = id;
-        this.name = name;
-        this.state = state;
-        this.children = children;
-        this.siteKey = context.getState().getSiteKey();
-        this.target = state.getTarget();
-        this.updatedDate = state.getUpdatedDate();
-    }
-
-    public Iterator<String> iterator(boolean reverse) {
-        if (reverse) {
-            return new Iterator<String>() {
-                int index = children.length;
-
-                public boolean hasNext() {
-                    return index > 0;
-                }
-
-                public String next() {
-                    if (index > 0) {
-                        return children[--index];
-                    } else {
-                        throw new NoSuchElementException();
-                    }
-                }
-
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
-            };
-        } else {
-            return new Iterator<String>() {
-                int index = 0;
-
-                public boolean hasNext() {
-                    return index < children.length;
-                }
-
-                public String next() {
-                    if (index < children.length) {
-                        return children[index++];
-                    } else {
-                        throw new NoSuchElementException();
-                    }
-                }
-
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
-            };
+        public boolean hasNext() {
+          return index < children.length;
         }
+
+        public String next() {
+          if (index < children.length) {
+            return children[index++];
+          } else {
+            throw new NoSuchElementException();
+          }
+        }
+      };
     }
+  }
 
-    public String getId() {
-        return id;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public NodeState getState() {
-        return state;
-    }
+  public NodeState getState() {
+    return state;
+  }
 
-    public SiteKey getSiteKey() {
-      return siteKey;
-    }
+  public SiteKey getSiteKey() {
+    return siteKey;
+  }
 
-    public String getParentId() {
-        return this.parentId;
-    }
+  public String getParentId() {
+    return this.parentId;
+  }
 
-    public String getTarget() {
-        return target;
-    }
+  public String getTarget() {
+    return target;
+  }
 
-    public long getUpdatedDate() {
-        return updatedDate;
-    }
+  public long getUpdatedDate() {
+    return updatedDate;
+  }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof NodeData)) return false;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o)
+      return true;
+    if (!(o instanceof NodeData))
+      return false;
 
-        NodeData nodeData = (NodeData) o;
+    NodeData nodeData = (NodeData) o;
 
-        return StringUtils.equals(parentId, nodeData.parentId) && StringUtils.equals(id, nodeData.id)
-                && StringUtils.equals(name, nodeData.name);
-    }
+    return StringUtils.equals(parentId, nodeData.parentId) && StringUtils.equals(id, nodeData.id)
+           && StringUtils.equals(name, nodeData.name);
+  }
 
-    @Override
-    public int hashCode() {
-        int result = parentId != null ? parentId.hashCode() : 0;
-        result = 31 * result + (id != null ? id.hashCode() : 0);
-        result = 31 * result + (name != null ? name.hashCode() : 0);
-        return result;
-    }
+  @Override
+  public int hashCode() {
+    int result = parentId != null ? parentId.hashCode() : 0;
+    result = 31 * result + (id != null ? id.hashCode() : 0);
+    result = 31 * result + (name != null ? name.hashCode() : 0);
+    return result;
+  }
 
-    @Override
-    public String toString() {
-        return "NodeData[id=" + id + ",name=" + name + ",state=" + state + ",children=" + Arrays.asList(children) + "]";
-    }
+  @Override
+  public String toString() {
+    return "NodeData[id=" + id + ",name=" + name + ",state=" + state + ",children=" + Arrays.asList(children) + "]";
+  }
 }

@@ -18,16 +18,12 @@ package org.exoplatform.commons.api.settings.data;
 
 import java.io.Serializable;
 
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
-
 /**
- * Associates setting properties with a specified context (GLOBAL/USER).
- * This is used to specify context of setting properties at the Context level when working with database and cache or dispatching the setting event.
- * @LevelAPI Experimental
+ * Associates setting properties with a specified context (GLOBAL/USER). This is
+ * used to specify context of setting properties at the Context level when
+ * working with database and cache or dispatching the setting event.
  */
 public class SettingContext implements Serializable {
-  private static final Log  LOG              = ExoLogger.getLogger(SettingContext.class);
 
   private static final long serialVersionUID = 437625857263645213L;
 
@@ -35,6 +31,7 @@ public class SettingContext implements Serializable {
    * Context of the setting object.
    */
   protected Context         context;
+
   /**
    * Path of the context.
    */
@@ -42,6 +39,7 @@ public class SettingContext implements Serializable {
 
   /**
    * Creates a SettingContext object with a specified context type.
+   * 
    * @param context The context type.
    * @LevelAPI Experimental
    */
@@ -50,6 +48,7 @@ public class SettingContext implements Serializable {
     this.context = context;
     this.contextPath = Tools.buildContextPath(context);
   }
+
   /**
    * Compares a specified object with the SettingContext for equality.
    */
@@ -62,8 +61,7 @@ public class SettingContext implements Serializable {
       return true;
     }
 
-    if (obj instanceof SettingContext) {
-      SettingContext dest = (SettingContext) obj;
+    if (obj instanceof SettingContext dest) {
       return this.getContextPath().equals(dest.getContextPath());
     }
     return false;
@@ -79,6 +77,7 @@ public class SettingContext implements Serializable {
 
   /**
    * Gets path of the SettingContext object.
+   * 
    * @return The setting context path.
    * @LevelAPI Experimental
    */
@@ -88,6 +87,7 @@ public class SettingContext implements Serializable {
 
   /**
    * Gets a context object associated with the SettingContext object.
+   * 
    * @return The context object.
    * @LevelAPI Experimental
    */

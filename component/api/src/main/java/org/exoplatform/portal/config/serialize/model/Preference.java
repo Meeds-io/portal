@@ -17,7 +17,7 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
 
-package org.exoplatform.portal.application;
+package org.exoplatform.portal.config.serialize.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,7 +32,7 @@ public class Preference {
 
     private String name;
 
-    private List<String> values = new ArrayList<String>(3);
+    private List<String> values = new ArrayList<>(3);
 
     private boolean readOnly = false;
 
