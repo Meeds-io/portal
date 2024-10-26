@@ -15,6 +15,7 @@
  */
 package org.exoplatform.portal.mop.service;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NodeChangeListener;
@@ -231,5 +232,12 @@ public interface NavigationService {
    * @param state node state
    */
   public void updateNode(Long nodeId, NodeState state);
+
+  /**
+   * @param siteKey {@link SiteKey} to create
+   * @param siteTemplateKey {@link SiteKey} of template
+   * @throws ObjectNotFoundException when Site Template isn't found
+   */
+  void saveNavigationFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey) throws ObjectNotFoundException;
 
 }

@@ -172,8 +172,15 @@ public final class NodeState implements Serializable {
 
     private long updatedDate;
 
-    public NodeState(String label, String icon, long startPublicationTime, long endPublicationTime, Visibility visibility,
-            PageKey pageRef, SiteKey siteKey, String target, long updatedDate) {
+    public NodeState(String label,
+                     String icon,
+                     long startPublicationTime,
+                     long endPublicationTime,
+                     Visibility visibility,
+                     PageKey pageRef,
+                     SiteKey siteKey,
+                     String target,
+                     long updatedDate) {
         this.label = label;
         this.icon = icon;
         this.startPublicationTime = startPublicationTime;
