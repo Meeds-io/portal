@@ -26,7 +26,6 @@
 
   <page-nodes>
     <node>
-      <uri>node_uri</uri>
       <name>node_name</name>
       <label>node_label</label>
       <icon>node_icon</icon>
@@ -36,7 +35,6 @@
       <page-reference>portal::test::test1</page-reference>
     </node>
     <node>
-      <uri>node_uri</uri>
       <name>node_name1</name>
       <label>node_label</label>
       <icon>node_icon</icon>
@@ -46,7 +44,6 @@
       <page-reference>portal::test::test1</page-reference>
     </node>
     <node>
-      <uri>node_uri</uri>
       <name>node_name2</name>
       <label>node_label</label>
       <icon>node_icon</icon>
@@ -55,7 +52,6 @@
       <page-reference>portal::test::test1</page-reference>
     </node>
     <node>
-      <uri>node_uri</uri>
       <name>node_name3</name>
       <label>node_label</label>
       <icon>node_icon</icon>
@@ -64,7 +60,6 @@
       <page-reference>portal::test::test1</page-reference>
     </node>
     <node>
-      <uri>node_uri</uri>
       <name>node_name4</name>
       <label>node_label4</label>
       <page-reference>portal::test::test1</page-reference>

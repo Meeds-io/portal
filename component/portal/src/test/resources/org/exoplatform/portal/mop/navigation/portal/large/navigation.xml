@@ -26,25 +26,20 @@
 
   <page-nodes>
     <node>
-      <uri>a</uri>
       <name>a</name>
       <label>A</label>
       <node>
-        <uri>c</uri>
         <name>c</name>
         <label>C</label>
       </node>
     </node>
     <node>
-      <uri>b</uri>
       <name>b</name>
       <label>B</label>
       <node>
-        <uri>d</uri>
         <name>d</name>
         <label>D</label>
         <node>
-          <uri>e</uri>
           <name>e</name>
           <label>E</label>
         </node>

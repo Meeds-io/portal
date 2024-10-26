@@ -15,14 +15,12 @@
  */
 package org.exoplatform.portal.mop.storage;
 
-import static org.exoplatform.portal.mop.storage.utils.MOPUtils.convertAppType;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.parseJsonArray;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.parseJsonObject;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.serialize;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.toJSONString;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.unserialize;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,7 +42,6 @@ import org.exoplatform.portal.config.StaleModelException;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationBackgroundStyle;
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.CloneApplicationState;
 import org.exoplatform.portal.config.model.ModelStyle;
 import org.exoplatform.portal.config.model.PersistentApplicationState;
@@ -92,53 +89,50 @@ public class LayoutStorage {
     this.permissionDAO = permissionDAO;
   }
 
-  @SuppressWarnings("unchecked")
-  public <S> S load(ApplicationState<S> state, ApplicationType<S> type) {
-    if (state instanceof TransientApplicationState) {
-      TransientApplicationState<S> transientState = (TransientApplicationState<S>) state;
-      S prefs = transientState.getContentState();
-      if (prefs == null && type.getContentType().getStateClass().equals(Portlet.class)) {
-        return (S) new Portlet();
+  public Portlet load(ApplicationState state) {
+    if (state instanceof TransientApplicationState transientState) {
+      Portlet prefs = transientState.getContentState();
+      if (prefs == null) {
+        return new Portlet();
+      } else {
+        return prefs;
       }
-      return prefs;
     }
 
     Long id;
-    if (state instanceof CloneApplicationState) {
-      id = Safe.parseLong(((CloneApplicationState<S>) state).getStorageId());
+    if (state instanceof CloneApplicationState cloneApplicationState) {
+      id = Safe.parseLong(cloneApplicationState.getStorageId());
     } else {
-      id = Safe.parseLong(((PersistentApplicationState<S>) state).getStorageId());
+      id = Safe.parseLong(((PersistentApplicationState) state).getStorageId());
     }
     WindowEntity window = findWindow(id);
     if (window != null) {
       byte[] customization = window.getCustomization();
       if (customization != null) {
-        return (S) unserialize(customization);
-      } else if (type.getContentType().getStateClass().equals(Portlet.class)) {
-        return (S) new Portlet();
+        return (Portlet) unserialize(customization);
       } else {
-        return null;
+        return new Portlet();
       }
     } else {
       return null;
     }
   }
 
-  public <S> ApplicationState<S> save(ApplicationState<S> state, S preferences) {
+  public ApplicationState save(ApplicationState state, Portlet preferences) {
     if (state instanceof TransientApplicationState) {
       throw new AssertionError("Does not make sense");
     }
 
     Long id;
-    if (state instanceof CloneApplicationState) {
-      id = Safe.parseLong(((CloneApplicationState<S>) state).getStorageId());
+    if (state instanceof CloneApplicationState cloneApplicationState) {
+      id = Safe.parseLong(cloneApplicationState.getStorageId());
     } else {
-      id = Safe.parseLong(((PersistentApplicationState<S>) state).getStorageId());
+      id = Safe.parseLong(((PersistentApplicationState) state).getStorageId());
     }
     WindowEntity window = findWindow(id);
     if (window != null) {
       if (preferences != null) {
-        window.setCustomization(serialize((Serializable) preferences));
+        window.setCustomization(serialize(preferences));
       } else {
         window.setCustomization(null);
       }
@@ -148,9 +142,8 @@ public class LayoutStorage {
     return state;
   }
 
-  public <S> String getId(ApplicationState<S> state) {
-    if (state instanceof TransientApplicationState) {
-      TransientApplicationState<S> tstate = (TransientApplicationState<S>) state;
+  public String getId(ApplicationState state) {
+    if (state instanceof TransientApplicationState tstate) {
       return tstate.getContentId();
     }
 
@@ -172,8 +165,7 @@ public class LayoutStorage {
 
   }
 
-  @SuppressWarnings("unchecked")
-  public <S> ApplicationData<S> getApplicationData(String applicationStorageId) {
+  public ApplicationData getApplicationData(String applicationStorageId) {
     WindowEntity window = windowDAO.find(Safe.parseLong(applicationStorageId));
     if (window != null) {
       return buildWindow(window);
@@ -182,9 +174,9 @@ public class LayoutStorage {
     }
   }
 
-  public <S> Application<S> getApplicationModel(String applicationStorageId) {
-    ApplicationData<S> applicationData = getApplicationData(applicationStorageId);
-    return new Application<>(applicationData);
+  public Application getApplicationModel(String applicationStorageId) {
+    ApplicationData applicationData = getApplicationData(applicationStorageId);
+    return new Application(applicationData);
   }
 
   public List<ComponentEntity> saveChildren(JSONArray pageBody, List<ComponentData> children) {
@@ -427,25 +419,17 @@ public class LayoutStorage {
     return dst;
   }
 
-  @SuppressWarnings({ "rawtypes", "unchecked" })
+  @SuppressWarnings("unchecked")
   private WindowEntity buildWindowEntity(WindowEntity dst, ApplicationData srcChild) {
     if (dst == null) {
       dst = new WindowEntity();
-
-      ApplicationType type = srcChild.getType();
-      if (type == null) {
-        LOG.warn("Application type of instance {} is not recognized, ignore it", dst.getContentId());
-        return null;
-      }
-      if (ApplicationType.PORTLET.getName().equals(type.getName())) {
-        dst.setAppType(AppType.PORTLET);
-      }
+      dst.setAppType(AppType.PORTLET);
 
       ApplicationState state = srcChild.getState();
       if (state instanceof TransientApplicationState s) {
         dst.setContentId(s.getContentId());
         if (s.getContentState() != null) {
-          dst.setCustomization(serialize((Serializable) s.getContentState()));
+          dst.setCustomization(serialize(s.getContentState()));
         }
       } else {
         throw new IllegalStateException("Can't create new window");
@@ -507,16 +491,9 @@ public class LayoutStorage {
     return results;
   }
 
-  @SuppressWarnings({
-                      "unchecked", "rawtypes"
-  })
+  @SuppressWarnings("unchecked")
   private ApplicationData buildWindow(WindowEntity windowEntity) {
-    ApplicationType<?> appType = convertAppType(windowEntity.getAppType());
-    if (appType == null) {
-      return null;
-    }
-    PersistentApplicationState<Portlet> state = new PersistentApplicationState<>(String.valueOf(windowEntity.getId()));
-
+    PersistentApplicationState state = new PersistentApplicationState(String.valueOf(windowEntity.getId()));
     Map<String, String> properties = new HashMap<>();
     JSONObject jProp = parseJsonObject(windowEntity.getProperties());
     jProp.forEach((key, value) -> {
@@ -541,7 +518,6 @@ public class LayoutStorage {
 
     return new ApplicationData(String.valueOf(windowEntity.getId()),
                                null,
-                               appType,
                                state,
                                String.valueOf(windowEntity.getId()),
                                windowEntity.getTitle(),
@@ -618,27 +594,25 @@ public class LayoutStorage {
 
         if (type == TYPE.WINDOW) {
           WindowEntity windowEntity = windows.get(id);
-          if (windowEntity == null) {
-            continue;
+          if (windowEntity != null) {
+            results.add(buildWindow(windowEntity));
           }
-          results.add(buildWindow(windowEntity));
         } else if (type == TYPE.CONTAINER) {
           ContainerEntity srcContainer = containerDAO.find(id);
-          if (srcContainer == null) {
-            continue;
-          }
-          JSONObject attrs = parseJsonObject(srcContainer.getProperties());
-          String ctype = (String) attrs.get(MappedAttributes.TYPE.getName());
-          if (BodyType.PAGE.name().equals(ctype)) {
-            ModelStyle cssStyle = mapPropertiesToStyle(attrs);
-            BodyData body = new BodyData(String.valueOf(id), BodyType.PAGE, cssStyle);
-            results.add(body);
-          } else {
-            results.add(buildContainer(containers.get(id),
-                                       jsonComponent,
-                                       attrs,
-                                       containers,
-                                       windows));
+          if (srcContainer != null) {
+            JSONObject attrs = parseJsonObject(srcContainer.getProperties());
+            String ctype = (String) attrs.get(MappedAttributes.TYPE.getName());
+            if (BodyType.PAGE.name().equals(ctype)) {
+              ModelStyle cssStyle = mapPropertiesToStyle(attrs);
+              BodyData body = new BodyData(String.valueOf(id), BodyType.PAGE, cssStyle);
+              results.add(body);
+            } else {
+              results.add(buildContainer(containers.get(id),
+                                         jsonComponent,
+                                         attrs,
+                                         containers,
+                                         windows));
+            }
           }
         }
       }
@@ -679,7 +653,7 @@ public class LayoutStorage {
       }
 
       if (dstChild == null || dstChild.getId() == null) { // create new
-        if (srcChild instanceof ContainerData srcChildContainer) {
+        if (srcChild instanceof ContainerData srcChildContainer) { // NOSONAR
           dstChild = buildContainerEntity(null, srcChildContainer);
           dstChild = containerDAO.create((ContainerEntity) dstChild);
         } else if (srcChild instanceof ApplicationData srcChildApplication) { // NOSONAR
@@ -775,7 +749,6 @@ public class LayoutStorage {
     return ids;
   }
 
-  @SuppressWarnings("unchecked")
   private void savePermissions(Long id, ComponentData srcChild) {
     if (id == null) {
       throw new IllegalArgumentException("id is null");

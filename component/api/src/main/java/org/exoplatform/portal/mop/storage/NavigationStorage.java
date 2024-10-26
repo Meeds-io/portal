@@ -18,9 +18,30 @@ package org.exoplatform.portal.mop.storage;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationData;
 import org.exoplatform.portal.mop.navigation.NavigationState;
-import org.exoplatform.portal.mop.navigation.NavigationStore;
+import org.exoplatform.portal.mop.navigation.NodeData;
+import org.exoplatform.portal.mop.navigation.NodeState;
 
-public interface NavigationStorage extends NavigationStore {
+public interface NavigationStorage {
+
+  NodeData loadNode(Long nodeId);
+
+  /**
+   * Load all Navigation node which refer to a page
+   * 
+   * @param pageRef
+   * @return
+   */
+  NodeData[] loadNodes(String pageRef);
+
+  NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state);
+
+  NodeData destroyNode(Long targetId);
+
+  NodeData updateNode(Long targetId, NodeState state);
+
+  NodeData[] moveNode(Long targetId, Long fromId, Long toId, Long previousId);
+
+  NodeData[] renameNode(Long targetId, Long parentId, String name);
 
   NavigationData loadNavigationData(SiteKey key);
 

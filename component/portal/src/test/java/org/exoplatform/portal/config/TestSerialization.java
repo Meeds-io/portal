@@ -55,12 +55,6 @@ public class TestSerialization extends AbstractGateInTest {
                                                             Collections.singletonList("foo11"),
                                                             Collections.<ComponentData> singletonList(body));
 
-    public void testNavigationKey() throws Exception {
-        NavigationKey key = new NavigationKey("foo", "bar");
-        assertEquals(key.hashCode(), IOTools.clone(key).hashCode());
-        assertEquals(key, IOTools.clone(key));
-    }
-
     public void testPortalKey() throws Exception {
         PortalKey key = new PortalKey("foo", "bar");
         assertEquals(key.hashCode(), IOTools.clone(key).hashCode());

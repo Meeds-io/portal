@@ -44,7 +44,6 @@ import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageState;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.webui.portal.UIPortal;
-import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.web.application.Application;
 
 import junit.framework.TestCase;
@@ -87,7 +86,7 @@ public class PortalRequestContextTest extends TestCase {
     when(prc.getTitle()).thenCallRealMethod();
 
     when(container.getComponentInstanceOfType(UserPortalConfigService.class)).thenReturn(configService);
-    when(configService.getPage(any())).thenReturn(page);
+    when(configService.getPage(any(), any())).thenReturn(page);
     when(page.getState()).thenReturn(state);
     when(state.getDisplayName()).thenReturn("title");
     when(userNode.getResolvedLabel()).thenReturn("test");

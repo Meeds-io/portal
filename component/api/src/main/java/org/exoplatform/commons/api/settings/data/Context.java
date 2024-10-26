@@ -23,22 +23,18 @@ import java.io.Serializable;
 
 /**
  * Saves some settings linked to a Context.
- * 
- * @LevelAPI Experimental
  */
-
 public class Context implements Cloneable, Serializable {
+
+  private static final long serialVersionUID = -3753327207819586801L;
+
   /**
    * GLOBAL: Settings should impact all users in the underlying scope.
-   * 
-   * @LevelAPI Experimental
    */
   public static final Context GLOBAL = new Context("GLOBAL", "GLOBAL");
 
   /**
    * USER: Each user should be able to save his own settings.
-   * 
-   * @LevelAPI Experimental
    */
   public static final Context USER   = new Context("USER", null);
 
@@ -55,15 +51,10 @@ public class Context implements Cloneable, Serializable {
    * Creates a context with a specified Id.
    * 
    * @param id The Id that is displayed as username.
-   * @LevelAPI Experimental
    */
   public Context id(String id) {
     Context result = null;
-    try {
-      result = (Context) this.clone();
-    } catch (CloneNotSupportedException e) {
-      throw new RuntimeException(e);
-    }
+    result = this.clone();
     result.id = id;
     return result;
   }
@@ -73,7 +64,6 @@ public class Context implements Cloneable, Serializable {
    * 
    * @return Returns "null" if the context is GLOBAL or user Id if the context
    *         is USER.
-   * @LevelAPI Experimental
    */
   public String getId() {
     if (id == null && USER.getName().equals(getName())) {
@@ -108,5 +98,10 @@ public class Context implements Cloneable, Serializable {
     int result = id != null ? id.hashCode() : 0;
     result = 31 * result + (name != null ? name.hashCode() : 0);
     return result;
+  }
+
+  @Override
+  public Context clone() { // NOSONAR
+    return new Context(name, id);
   }
 }

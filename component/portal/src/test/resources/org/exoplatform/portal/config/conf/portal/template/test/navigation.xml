@@ -26,7 +26,6 @@
 
   <page-nodes>
     <node>
-      <uri>uri</uri>
       <name>name</name>
       <label>label</label>
       <page-reference>portal::@owner@::index</page-reference>

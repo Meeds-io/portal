@@ -19,18 +19,17 @@
 
 package org.exoplatform.portal.mop.dao;
 
-import org.gatein.api.page.PageQuery;
-
 import org.exoplatform.commons.api.persistence.GenericDAO;
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.portal.jdbc.entity.PageEntity;
+import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.page.PageKey;
 
 public interface PageDAO extends GenericDAO<PageEntity, Long> {
 
     PageEntity findByKey(PageKey pageKey);    
 
-    ListAccess<PageKey> findByQuery(PageQuery query);
+    ListAccess<PageKey> findByQuery(SiteType siteType, String siteName, String name, int offset, int limit);
 
     void deleteByOwner(long id);
 }

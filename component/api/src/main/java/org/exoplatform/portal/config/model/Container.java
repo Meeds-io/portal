@@ -29,12 +29,14 @@ import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.pom.config.Utils;
 import org.exoplatform.portal.pom.data.*;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * @author Tuan Nguyen
  **/
+@EqualsAndHashCode(callSuper = true)
 public class Container extends ModelObject implements Cloneable {
 
   public static final String           EVERYONE                              = "Everyone";
@@ -208,7 +210,6 @@ public class Container extends ModelObject implements Cloneable {
 
   @Override
   public void checkStorage() throws ObjectNotFoundException {
-    super.checkStorage();
     if (getChildren() != null && !getChildren().isEmpty()) {
       for (ModelObject child : getChildren()) {
         child.checkStorage();
@@ -242,7 +243,7 @@ public class Container extends ModelObject implements Cloneable {
     }
     if (getChildren() != null && !getChildren().isEmpty()) {
       ArrayList<ComponentData> dataChildren = new ArrayList<>();
-      for (int i = 0; i < children.size(); i++) {
+      for (int i = 0; i < children.size(); i++) { // NOSONAR
         ModelObject node = children.get(i);
         if (node instanceof Container container) {
           String nodeProfiles = container.getProfiles();

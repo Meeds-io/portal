@@ -22,8 +22,6 @@
 
 package org.exoplatform.web.security.hash;
 
-import java.security.SecureRandom;
-
 /**
  * A {@link SaltedHashService} implementation which does not do any hashing at all. It simply returns the plaintext password
  * from {@link #getSaltedHash(String)} and tests the string equality of {@code password} and {@code saltedHash} in

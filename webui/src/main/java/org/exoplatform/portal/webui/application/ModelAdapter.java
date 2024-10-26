@@ -29,7 +29,6 @@ import org.gatein.pc.api.StatefulPortletContext;
 
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.TransientApplicationState;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.pc.ExoPortletState;
@@ -42,27 +41,21 @@ import org.exoplatform.portal.pom.spi.portlet.Preference;
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
-public abstract class ModelAdapter<S, C extends Serializable> {
+public abstract class ModelAdapter {
     private static final String LOCAL_STATE_ID = PortletContext.LOCAL_CONSUMER_CLONE.getId();
 
-    public static <S, C extends Serializable, I> ModelAdapter<S, C> getAdapter(ApplicationType<S> type) {
-        if (type == ApplicationType.PORTLET) {
-            @SuppressWarnings("unchecked")
-            ModelAdapter<S, C> adapter = (ModelAdapter<S, C>) PORTLET;
-            return adapter;
-        } else {
-            throw new AssertionError();
-        }
+    public static ModelAdapter getAdapter() {
+      return PORTLET;
     }
 
     /** . */
-    private static final ModelAdapter<Portlet, ExoPortletState> PORTLET = new ModelAdapter<Portlet, ExoPortletState>() {
+    private static final ModelAdapter PORTLET = new ModelAdapter() {
 
         @Override
         public StatefulPortletContext<ExoPortletState> getPortletContext(ExoContainer container, String applicationId,
-                ApplicationState<Portlet> applicationState) throws Exception {
+                ApplicationState applicationState) throws Exception {
             LayoutService layoutService = container.getComponentInstanceOfType(LayoutService.class);
-            Portlet preferences = layoutService.load(applicationState, ApplicationType.PORTLET);
+            Portlet preferences = layoutService.load(applicationState);
             PortletContext producerOfferedPortletContext = getProducerOfferedPortletContext(applicationId);
             ExoPortletState map = new ExoPortletState(producerOfferedPortletContext.getId());
             if (preferences != null) {
@@ -74,8 +67,7 @@ public abstract class ModelAdapter<S, C extends Serializable> {
         }
 
         @Override
-        public ApplicationState<Portlet> update(ExoContainer container, ExoPortletState updateState,
-                ApplicationState<Portlet> applicationState) throws Exception {
+        public ApplicationState update(ExoContainer container, ExoPortletState updateState, ApplicationState applicationState) throws Exception {
             // Compute new preferences
             PortletBuilder builder = new PortletBuilder();
             for (Map.Entry<String, List<String>> entry : updateState.getState().entrySet()) {
@@ -83,7 +75,7 @@ public abstract class ModelAdapter<S, C extends Serializable> {
             }
 
             if (applicationState instanceof TransientApplicationState) {
-                TransientApplicationState<Portlet> transientState = (TransientApplicationState<Portlet>) applicationState;
+                TransientApplicationState transientState = (TransientApplicationState) applicationState;
                 transientState.setContentState(builder.build());
                 return transientState;
             } else {
@@ -102,9 +94,9 @@ public abstract class ModelAdapter<S, C extends Serializable> {
         }
 
         @Override
-        public Portlet getState(ExoContainer container, ApplicationState<Portlet> applicationState) throws Exception {
+        public Portlet getState(ExoContainer container, ApplicationState applicationState) throws Exception {
             if (applicationState instanceof TransientApplicationState) {
-                TransientApplicationState<Portlet> transientState = (TransientApplicationState<Portlet>) applicationState;
+                TransientApplicationState transientState = (TransientApplicationState) applicationState;
                 Portlet pref = transientState.getContentState();
                 if (pref == null) {
                     pref = new Portlet();
@@ -112,7 +104,7 @@ public abstract class ModelAdapter<S, C extends Serializable> {
                 return pref;
             } else {
                 LayoutService layoutService = container.getComponentInstanceOfType(LayoutService.class);
-                Portlet pref = layoutService.load(applicationState, ApplicationType.PORTLET);
+                Portlet pref = layoutService.load(applicationState);
                 if (pref == null) {
                     pref = new Portlet();
                 }
@@ -153,11 +145,9 @@ public abstract class ModelAdapter<S, C extends Serializable> {
 
     public abstract PortletContext getProducerOfferedPortletContext(String applicationId);
 
-    public abstract StatefulPortletContext<C> getPortletContext(ExoContainer container, String applicationId,
-            ApplicationState<S> applicationState) throws Exception;
+    public abstract StatefulPortletContext<ExoPortletState> getPortletContext(ExoContainer container, String applicationId, ApplicationState applicationState) throws Exception;
 
-    public abstract ApplicationState<S> update(ExoContainer container, C updateState, ApplicationState<S> applicationState)
-            throws Exception;
+    public abstract ApplicationState update(ExoContainer container, ExoPortletState updateState, ApplicationState applicationState) throws Exception;
 
     /**
      * Returns the state of the gadget as preferences or null if the preferences cannot be edited as such.
@@ -167,7 +157,7 @@ public abstract class ModelAdapter<S, C extends Serializable> {
      * @return the preferences
      * @throws Exception any exception
      */
-    public abstract Portlet getState(ExoContainer container, ApplicationState<S> applicationState) throws Exception;
+    public abstract Portlet getState(ExoContainer container, ApplicationState applicationState) throws Exception;
 
     /**
      * Extracts the state based on what the current PortletContext is and the new modified PortletContext.
@@ -176,7 +166,7 @@ public abstract class ModelAdapter<S, C extends Serializable> {
      * @param modifiedPortletContext The new modified PortletContext
      * @return
      */
-    public abstract C getStateFromModifiedContext(PortletContext originalPortletContext, PortletContext modifiedPortletContext);
+    public abstract ExoPortletState getStateFromModifiedContext(PortletContext originalPortletContext, PortletContext modifiedPortletContext);
 
     /**
      * Extracts the state based on what the current PortletContext is and the new cloned PortletContext
@@ -185,6 +175,6 @@ public abstract class ModelAdapter<S, C extends Serializable> {
      * @param clonedPortletContext The new cloned PortletContext
      * @return
      */
-    public abstract C getstateFromClonedContext(PortletContext originalPortletContext, PortletContext clonedPortletContext);
+    public abstract ExoPortletState getstateFromClonedContext(PortletContext originalPortletContext, PortletContext clonedPortletContext);
 
 }

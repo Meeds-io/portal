@@ -274,8 +274,7 @@ public class OnboardingHandler extends JspBasedWebHandler {
     HttpSession session = req.getSession();
     Captcha captcha;
     if (session.getAttribute(NAME) == null) {
-      List<java.awt.Font> textFonts = Arrays.asList(
-                                                    new Font("Arial", Font.BOLD, 40),
+      List<java.awt.Font> textFonts = Arrays.asList(new Font("Arial", Font.BOLD, 40),
                                                     new Font("Courier", Font.BOLD, 40));
       captcha = new Captcha.Builder(CAPTCHA_WIDTH, CAPTCHA_HEIGHT)
                                                                   .addText(new DefaultTextProducer(5),

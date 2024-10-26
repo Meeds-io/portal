@@ -52,7 +52,6 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.page.PageContext;
-import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
@@ -548,8 +547,7 @@ public class PortalRequestContext extends WebuiRequestContext {
       if (node != null) {
         ExoContainer container = getApplication().getApplicationServiceContainer();
         UserPortalConfigService configService = container.getComponentInstanceOfType(UserPortalConfigService.class);
-        PageKey pageRef = node.getPageRef();
-        PageContext pageContext = configService.getPage(pageRef);
+        PageContext pageContext = configService.getPage(node.getPageRef(), getRequest().getRemoteUser());
 
         //
         if (pageContext != null) {
@@ -670,14 +668,6 @@ public class PortalRequestContext extends WebuiRequestContext {
    */
   public String getMetaPortal() {
     return portalConfigService.getMetaPortal();
-  }
-
-  /**
-   * @return default portal name
-   * @deprecated notion of 'default' portal doesn't exist anymore
-   */
-  public String getDefaultPortal() {
-    return getMetaPortal();
   }
 
   public String getNodePath() {

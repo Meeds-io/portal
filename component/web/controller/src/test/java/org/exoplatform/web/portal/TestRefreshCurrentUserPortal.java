@@ -28,6 +28,7 @@ import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.portal.config.UserPortalConfig;
 import org.exoplatform.portal.config.UserPortalConfigService;
+import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationState;
@@ -202,7 +203,7 @@ public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONA
   }
 
   private void createTestedNavigation() throws Exception {
-    portalConfigService.createGroupSite(TEST_USER_PORTAL_GROUP);
+    portalConfigService.createUserPortalConfig(PortalConfig.GROUP_TYPE, TEST_USER_PORTAL_GROUP, "group", "jar:/org/exoplatform/portal/config/conf");
     navigationService.saveNavigation(new NavigationContext(TEST_USER_PORTAL_SITE_KEY, new NavigationState(1)));
   }
 

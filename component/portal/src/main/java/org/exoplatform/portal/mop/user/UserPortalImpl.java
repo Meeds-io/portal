@@ -49,6 +49,7 @@ import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.navigation.Scope;
 import org.exoplatform.portal.mop.navigation.VisitMode;
 import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.resources.LocaleContextInfo;
 import org.exoplatform.services.resources.ResourceBundleManager;
 import org.exoplatform.services.resources.ResourceBundleService;
@@ -439,9 +440,9 @@ public class UserPortalImpl implements UserPortal {
       return StringUtils.firstNonBlank(getLabel(siteKey, label, locale),
                                        siteKey.getName());
     } else if (siteKey.getType() == SiteType.GROUP) {
-      Group siteGroup = service.getOrganizationService()
-                               .getGroupHandler()
-                               .findGroupById(siteKey.getName());
+      Group siteGroup = ExoContainerContext.getService(OrganizationService.class)
+                                           .getGroupHandler()
+                                           .findGroupById(siteKey.getName());
       if (siteGroup != null) {
         return siteGroup.getLabel();
       }
@@ -463,9 +464,9 @@ public class UserPortalImpl implements UserPortal {
     if (siteKey.getType() == SiteType.PORTAL && description != null) {
       return getLabel(siteKey, description, locale);
     } else if (siteKey.getType() == SiteType.GROUP) {
-      Group siteGroup = service.getOrganizationService()
-                               .getGroupHandler()
-                               .findGroupById(siteKey.getName());
+      Group siteGroup = ExoContainerContext.getService(OrganizationService.class)
+                                           .getGroupHandler()
+                                           .findGroupById(siteKey.getName());
       if (siteGroup != null) {
         return siteGroup.getLabel();
       }
@@ -526,7 +527,8 @@ public class UserPortalImpl implements UserPortal {
       UserACL userACL = service.getUserACL();
       UserNavigation userNavigation = new UserNavigation(this,
                                                          navigationContext,
-                                                         userACL.hasEditPermission(sitePortalConfig, userACL.getUserIdentity(userName)));
+                                                         userACL.hasEditPermission(sitePortalConfig,
+                                                                                   userACL.getUserIdentity(userName)));
       this.navigations.add(userNavigation);
       Collections.sort(this.navigations, userNavigationComparator);
       return userNavigation;
@@ -543,7 +545,9 @@ public class UserPortalImpl implements UserPortal {
       groups = conversationState.getIdentity().getGroups();
     } else {
       try {
-        groups = service.getOrganizationService().getGroupHandler().findGroupsOfUser(userName);
+        groups = ExoContainerContext.getService(OrganizationService.class)
+                                    .getGroupHandler()
+                                    .findGroupsOfUser(userName);
       } catch (Exception e) {
         throw new IllegalStateException("Could not retrieve groups", e);
       }

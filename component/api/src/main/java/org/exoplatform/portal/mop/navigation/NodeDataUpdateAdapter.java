@@ -20,20 +20,21 @@
 package org.exoplatform.portal.mop.navigation;
 
 import org.exoplatform.commons.utils.Safe;
+import org.exoplatform.portal.mop.storage.NavigationStorage;
 
 /**
 * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
 */
 class NodeDataUpdateAdapter implements TreeUpdateAdapter<NodeData> {
 
-    static NodeDataUpdateAdapter create(NodeStore persistence) {
+    static NodeDataUpdateAdapter create(NavigationStorage persistence) {
         return new NodeDataUpdateAdapter(persistence);
     }
 
     /** . */
-    private final NodeStore persistence;
+    private final NavigationStorage persistence;
 
-    NodeDataUpdateAdapter(NodeStore persistence) {
+    NodeDataUpdateAdapter(NavigationStorage persistence) {
         this.persistence = persistence;
     }
 

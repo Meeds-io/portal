@@ -26,12 +26,8 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import org.exoplatform.portal.config.model.Application;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.ModelObject;
-import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
-import org.exoplatform.portal.mop.SiteType;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
 public class MOPUtils {
 
@@ -48,18 +44,6 @@ public class MOPUtils {
     } else if (obj instanceof Application) {
       obj.setStorageName(UUID.randomUUID().toString());
     }
-  }
-
-  public static org.gatein.api.site.SiteType convertSiteType(SiteType siteType) {
-    if (siteType == null) {
-      return null;
-    }
-    return switch (siteType) {
-    case GROUP -> org.gatein.api.site.SiteType.SPACE;
-    case PORTAL -> org.gatein.api.site.SiteType.SITE;
-    case USER -> org.gatein.api.site.SiteType.DASHBOARD;
-    default -> null;
-    };
   }
 
   public static JSONArray parseJsonArray(String content) {
@@ -98,14 +82,6 @@ public class MOPUtils {
       return IOTools.serialize(obj);
     } catch (Exception e) {
       throw new IllegalStateException("Error serializing object: " + obj, e);
-    }
-  }
-
-  public static ApplicationType<Portlet> convertAppType(AppType appType) {
-    if (appType == AppType.PORTLET) {
-      return ApplicationType.PORTLET;
-    } else {
-      return null;
     }
   }
 

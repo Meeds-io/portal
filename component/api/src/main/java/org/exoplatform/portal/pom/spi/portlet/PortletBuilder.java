@@ -41,11 +41,9 @@ public class PortletBuilder {
      * @param that the preferences to clone
      */
     public PortletBuilder(Portlet that) {
-        Portlet prefs = new Portlet();
-        prefs.state.putAll(that.state);
-
-        //
-        this.prefs = prefs;
+        Portlet portlet = new Portlet();
+        portlet.state.putAll(that.state);
+        this.prefs = portlet;
     }
 
     public PortletBuilder add(Preference preference) {

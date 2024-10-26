@@ -55,7 +55,7 @@ import org.gatein.pc.api.invocation.response.PortletInvocationResponse;
 /**
  * Created by The eXo Platform SAS May 8, 2006
  */
-public class UIPortletLifecycle<S, C extends Serializable, I> extends Lifecycle<UIPortlet<S, C>> {
+public class UIPortletLifecycle<S, C extends Serializable, I> extends Lifecycle<UIPortlet> {
 
     protected static final Log LOG = ExoLogger.getLogger("portal:UIPortletLifecycle");
 
@@ -69,7 +69,7 @@ public class UIPortletLifecycle<S, C extends Serializable, I> extends Lifecycle<
      * container (Portlet API methods here) In those 3 cases, dedicated events are created and broadcasted and the portlet is
      * added in the list of components to update within the AJAX call
      */
-    public void processAction(UIPortlet<S, C> uicomponent, WebuiRequestContext context) throws Exception {
+    public void processAction(UIPortlet uicomponent, WebuiRequestContext context) throws Exception {
         try {
             // The PortletMode and WindowState can change during a portlet invocation, so we need
             // to be able to compare the results before and after invoking the portlet to know if
@@ -169,7 +169,7 @@ public class UIPortletLifecycle<S, C extends Serializable, I> extends Lifecycle<
      * of the Portlet Container to get the HTML generated fragment 3) Then if the current request is an AJAX one, just write in
      * the buffer the content returned by the portlet container 4) If not AJAX, then merge the content with the UIPortlet.gtmpl
      */
-    public void processRender(UIPortlet<S, C> uicomponent, WebuiRequestContext context) throws Exception {
+    public void processRender(UIPortlet uicomponent, WebuiRequestContext context) throws Exception {
         PortalRequestContext prcontext = (PortalRequestContext) context;
         ExoContainer container = prcontext.getApplication().getApplicationServiceContainer();
 

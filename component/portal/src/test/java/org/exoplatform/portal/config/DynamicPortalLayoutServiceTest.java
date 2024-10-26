@@ -26,6 +26,8 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.service.LayoutService;
 
+import lombok.SneakyThrows;
+
 public class DynamicPortalLayoutServiceTest {
 
   private static final String EXISTING_PORTAL_SITE_NAME     = "testPortal";
@@ -73,6 +75,7 @@ public class DynamicPortalLayoutServiceTest {
   }
 
   @Test
+  @SneakyThrows
   public void testThrowExceptionWhenGettingLayoutWithNullSiteKey() {
     DynamicPortalLayoutService dynamicPortalLayoutService = mockDynamicLayoutService(false, true, true, false);
     try {
@@ -80,25 +83,21 @@ public class DynamicPortalLayoutServiceTest {
       fail("Should throw IllegalArgumentException when using null siteKey");
     } catch (IllegalArgumentException e) {
       // expected
-    } catch (Exception e) {
-      fail("Unhandled error occurs when invoking getPortalConfigWithDynamicLayout : " + e.getMessage());
     }
   }
 
   @Test
+  @SneakyThrows
   public void testWithNonExistingSiteKeyAndNullCurrentPortal() {
     DynamicPortalLayoutService dynamicPortalLayoutService = mockDynamicLayoutService(false, true, true, false);
-    PortalConfig result = null;
-    try {
-      result = dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.portal(NON_EXISTING_PORTAL_SITE_NAME), null);
-      assertNull(result);
-      result = dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.group(NON_EXISTING_GROUP_SITE_NAME), null);
-      assertNull(result);
-      result = dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.user(NON_EXISTING_USER_SITE_NAME), null);
-      assertNull(result);
-    } catch (Exception e) {
-      fail("Unhandled error occurs when invoking getPortalConfigWithDynamicLayout : " + e.getMessage());
-    }
+    PortalConfig result =
+                        dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.portal(NON_EXISTING_PORTAL_SITE_NAME),
+                                                                                    null);
+    assertNull(result);
+    result = dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.group(NON_EXISTING_GROUP_SITE_NAME), null);
+    assertNull(result);
+    result = dynamicPortalLayoutService.getPortalConfigWithDynamicLayout(SiteKey.user(NON_EXISTING_USER_SITE_NAME), null);
+    assertNull(result);
   }
 
   @Test
