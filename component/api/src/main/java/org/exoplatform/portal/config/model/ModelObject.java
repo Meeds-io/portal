@@ -25,98 +25,67 @@ import org.exoplatform.portal.pom.data.BodyData;
 import org.exoplatform.portal.pom.data.ContainerData;
 import org.exoplatform.portal.pom.data.ModelData;
 import org.exoplatform.portal.pom.data.PageData;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
+@Data
 public abstract class ModelObject {
 
-    /** Storage id. */
-    protected String storageId;
+  /** Storage id. */
+  protected String     storageId;
 
-    /** The storage name that is unique among a container context. */
-    protected String storageName;
+  /** The storage name that is unique among a container context. */
+  protected String     storageName;
 
-    @Getter
-    @Setter
-    protected String width;
+  protected String     width;
 
-    @Getter
-    @Setter
-    protected String height;
+  protected String     height;
 
-    @Getter
-    @Setter
-    protected String cssClass;
+  protected String     cssClass;
 
-    @Getter
-    @Setter
-    protected ModelStyle cssStyle;
+  protected ModelStyle cssStyle;
 
-    /**
-     * Create a new object.
-     *
-     * @param storageId if the storage id is null
-     */
-    public ModelObject(String storageId) {
-        this.storageId = storageId;
+  protected ModelObject(String storageId) {
+    this.storageId = storageId;
+  }
+
+  protected ModelObject() {
+    this.storageId = null;
+  }
+
+  public void checkStorage() throws ObjectNotFoundException {
+    // A method to use to check consistency of storage information
+  }
+
+  public void resetStorage() throws ObjectNotFoundException {
+    this.checkStorage();
+    this.storageId = null;
+    this.storageName = null;
+  }
+
+  public abstract ModelData build();
+
+  public static ModelObject build(ModelData data) {
+    if (data instanceof ContainerData containerData) {
+      return new Container(containerData);
+    } else if (data instanceof PageData pageData) {
+      return new Page(pageData);
+    } else if (data instanceof BodyData bodyData) {
+      switch (bodyData.getType()) {
+      case PAGE:
+        return new PageBody(data.getStorageId());
+      case SITE:
+        return new SiteBody(data.getStorageId());
+      default:
+        throw new AssertionError();
+      }
+    } else if (data instanceof ApplicationData applicationData) {
+      return Application.createPortletApplication(applicationData);
     }
-
-    protected ModelObject() {
-        this.storageId = null;
-    }
-
-    public String getStorageId() {
-        return storageId;
-    }
-
-    public String getStorageName() {
-        return storageName;
-    }
-
-    public void setStorageName(String storageName) {
-        this.storageName = storageName;
-    }
-
-    public void checkStorage() throws ObjectNotFoundException {
-      // A method to use to check consistency of storage information
-    }
-
-    public void resetStorage() throws ObjectNotFoundException {
-      checkStorage();
-      this.storageId = null;
-      this.storageName = null;
-    }
-
-    public abstract ModelData build();
-
-    public static ModelObject build(ModelData data) {
-        if (data instanceof ContainerData) {
-            return new Container((ContainerData) data);
-        } else if (data instanceof PageData) {
-            return new Page((PageData) data);
-        } else if (data instanceof BodyData) {
-            BodyData bodyData = (BodyData) data;
-            switch (bodyData.getType()) {
-                case PAGE:
-                    return new PageBody(data.getStorageId());
-                case SITE:
-                    return new SiteBody(data.getStorageId());
-                default:
-                    throw new AssertionError();
-            }
-        } else if (data instanceof ApplicationData) {
-            ApplicationData applicationData = (ApplicationData) data;
-            ApplicationType type = applicationData.getType();
-            if (ApplicationType.PORTLET == type) {
-                return Application.createPortletApplication((ApplicationData<Portlet>) applicationData);
-            }
-        }
-        return null;
-    }
+    return null;
+  }
 }

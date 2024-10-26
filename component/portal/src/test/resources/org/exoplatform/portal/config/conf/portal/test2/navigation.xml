@@ -28,17 +28,14 @@
 
   <page-nodes>
     <node>
-      <uri>test</uri>
       <name>test</name>
       <label>Test</label>
       <page-reference>portal::test2::test</page-reference>
     </node>
     <node>
-      <uri>home</uri>
       <name>home</name>
       <label>Home</label>
       <node>
-        <uri>page</uri>
         <name>page</name>
         <label>Page</label>
         <page-reference>portal::test2::homepage</page-reference>

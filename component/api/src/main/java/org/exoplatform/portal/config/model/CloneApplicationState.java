@@ -18,6 +18,7 @@
  */
 package org.exoplatform.portal.config.model;
 
+import lombok.Getter;
 import lombok.ToString;
 
 /**
@@ -25,16 +26,15 @@ import lombok.ToString;
  * @version $Revision$
  */
 @ToString
-public class CloneApplicationState<S> extends ApplicationState<S> {
+public class CloneApplicationState implements ApplicationState {
 
-    /** . */
-    private final String storageId;
+  private static final long serialVersionUID = 858416967999498183L;
 
-    public CloneApplicationState(String storageId) {
-        this.storageId = storageId;
-    }
+  @Getter
+  private final String      storageId;
 
-    public String getStorageId() {
-        return storageId;
-    }
+  public CloneApplicationState(String storageId) {
+    this.storageId = storageId;
+  }
+
 }

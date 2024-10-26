@@ -42,7 +42,12 @@ import org.exoplatform.services.resources.ResourceBundleManager;
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
  * @author <a href="mailto:nscavell@redhat.com">Nick Scavelli</a>
+ * @deprecated should be removed since the Portal API is defined using Service
+ *             Layers instead of contextual API which doesn't help to get
+ *             stateless mode. This is kept for now until removing ecms from
+ *             eXo addons
  */
+@Deprecated(forRemoval = true, since = "7.0")
 public class NavigationImpl implements Navigation {
     private final NavigationService navigationService;
     private final NavigationContext navCtx;

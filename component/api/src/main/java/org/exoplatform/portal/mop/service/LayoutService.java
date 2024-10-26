@@ -23,11 +23,9 @@ import java.util.List;
 import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.commons.utils.LazyPageList;
 import org.exoplatform.commons.utils.ListAccess;
-import org.exoplatform.portal.config.DataStorage;
 import org.exoplatform.portal.config.Query;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
@@ -42,19 +40,19 @@ import org.exoplatform.portal.mop.page.PageState;
 import org.exoplatform.portal.pom.data.ModelChange;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
-public interface LayoutService extends DataStorage {
+public interface LayoutService {
 
-  String PAGE_CREATED          = "org.exoplatform.portal.config.DataStorage.pageCreated".intern();
+  String PAGE_CREATED          = "org.exoplatform.portal.mop.service.LayoutService.pageCreated".intern();
 
-  String PAGE_REMOVED          = "org.exoplatform.portal.config.DataStorage.pageRemoved".intern();
+  String PAGE_REMOVED          = "org.exoplatform.portal.mop.service.LayoutService.pageRemoved".intern();
 
-  String PAGE_UPDATED          = "org.exoplatform.portal.config.DataStorage.pageUpdated".intern();
+  String PAGE_UPDATED          = "org.exoplatform.portal.mop.service.LayoutService.pageUpdated".intern();
 
-  String PORTAL_CONFIG_CREATED = "org.exoplatform.portal.config.DataStorage.portalConfigCreated".intern();
+  String PORTAL_CONFIG_CREATED = "org.exoplatform.portal.mop.service.LayoutService.portalConfigCreated".intern();
 
-  String PORTAL_CONFIG_REMOVED = "org.exoplatform.portal.config.DataStorage.portalConfigRemoved".intern();
+  String PORTAL_CONFIG_REMOVED = "org.exoplatform.portal.mop.service.LayoutService.portalConfigRemoved".intern();
 
-  String PORTAL_CONFIG_UPDATED = "org.exoplatform.portal.config.DataStorage.portalConfigUpdated".intern();
+  String PORTAL_CONFIG_UPDATED = "org.exoplatform.portal.mop.service.LayoutService.portalConfigUpdated".intern();
 
   /**
    * Create a PortalConfig in database <br>
@@ -76,8 +74,8 @@ public interface LayoutService extends DataStorage {
    * This method should load the PortalConfig object from db according to the
    * portalName
    *
-   * @param  portalName
-   * @return            {@link PortalConfig}
+   * @param portalName
+   * @return {@link PortalConfig}
    */
   PortalConfig getPortalConfig(String portalName);
 
@@ -85,17 +83,17 @@ public interface LayoutService extends DataStorage {
    * This method should load the PortalConfig object from db according to the
    * portalName and ownerType
    *
-   * @param  portalName
-   * @param  ownerType
-   * @return            {@link PortalConfig}
+   * @param portalName
+   * @param ownerType
+   * @return {@link PortalConfig}
    */
   PortalConfig getPortalConfig(String ownerType, String portalName);
 
   /**
    * Retrieves {@link PortalConfig} of designated {@link SiteKey}
    * 
-   * @param  siteKey {@link SiteKey}
-   * @return         null if not found, else {@link PortalConfig}
+   * @param siteKey {@link SiteKey}
+   * @return null if not found, else {@link PortalConfig}
    */
   PortalConfig getPortalConfig(SiteKey siteKey);
 
@@ -103,8 +101,8 @@ public interface LayoutService extends DataStorage {
    * This method should load the PortalConfig object from db according to the
    * siteId
    *
-   * @param  siteId
-   * @return            {@link PortalConfig}
+   * @param siteId
+   * @return {@link PortalConfig}
    */
   PortalConfig getPortalConfig(long siteId);
 
@@ -127,9 +125,9 @@ public interface LayoutService extends DataStorage {
    * This method should load the Page object from the database according to the
    * pageId
    *
-   * @param  pageId - String represent id of page, it must be valid pageId (3
-   *                  parts saparate by :: )
-   * @return        {@link Page}
+   * @param pageId - String represent id of page, it must be valid pageId (3
+   *          parts saparate by :: )
+   * @return {@link Page}
    */
   Page getPage(String pageId);
 
@@ -145,16 +143,16 @@ public interface LayoutService extends DataStorage {
   /**
    * Retrieves Page designated by its key
    * 
-   * @param  pageKey {@link PageKey}
-   * @return         {@link Page}
+   * @param pageKey {@link PageKey}
+   * @return {@link Page}
    */
   Page getPage(PageKey pageKey);
 
   /**
    * retrieves {@link PageContext} switch its key
    * 
-   * @param  pageKey {@link PageKey}
-   * @return         {@link PageContext}
+   * @param pageKey {@link PageKey}
+   * @return {@link PageContext}
    */
   PageContext getPageContext(PageKey pageKey);
 
@@ -214,8 +212,8 @@ public interface LayoutService extends DataStorage {
    * changes that occured during the save operation. <br>
    * Then broadcast PAGE_UPDATED event
    *
-   * @param  page the page to save
-   * @return      the list of model changes that occurred during the save
+   * @param page the page to save
+   * @return the list of model changes that occurred during the save
    */
   List<ModelChange> save(Page page);
 
@@ -223,7 +221,8 @@ public interface LayoutService extends DataStorage {
    * Saves a {@link PageContext} with its {@link PageState} in addition to the
    * layout defined in {@link Page} object
    * 
-   * @param pageContext {@link PageContext} with title, description and permissions
+   * @param pageContext {@link PageContext} with title, description and
+   *          permissions
    * @param page {@link Page} to save page layout and structure
    */
   void save(PageContext pageContext, Page page);
@@ -231,63 +230,53 @@ public interface LayoutService extends DataStorage {
   /**
    * Saves a {@link PageContext} with its {@link PageState}
    * 
-   * @param pageContext {@link PageContext} with title, description and permissions
+   * @param pageContext {@link PageContext} with title, description and
+   *          permissions
    */
   void save(PageContext pageContext);
 
   /**
    * Retrieved {@link Application} model switch its storage identifier
    * 
-   * @param  <S>                  can be of type {@link Portlet} only, see
-   *                                {@link ApplicationType}
-   * @param  applicationStorageId
-   * @return                      {@link Application}
+   * @param applicationStorageId
+   * @return {@link Application}
    */
-  <S> Application<S> getApplicationModel(String applicationStorageId);
+  Application getApplicationModel(String applicationStorageId);
 
   /**
    * Return contentId according to each state (transient, persistent, clone)
    * 
-   * @param  <S>   can be of type {@link Portlet} only, see
-   *                 {@link ApplicationType}
-   * @param  state
-   * @return       {@link ApplicationState} of type {@link Portlet}
+   * @param state
+   * @return {@link ApplicationState} of type {@link Portlet}
    */
-  <S> String getId(ApplicationState<S> state);
+  String getId(ApplicationState state);
 
   /**
    * Return content state. If can't find, return null
    * 
-   * @param  <S>   can be of type {@link Portlet} only, see
-   *                 {@link ApplicationType}
-   * @param  state - ApplicationState object
-   * @param  type  - ApplicationType object
-   * @return       {@link Portlet}
+   * @param state - ApplicationState object
+   * @return {@link Portlet}
    */
-  <S> S load(ApplicationState<S> state, ApplicationType<S> type);
+  Portlet load(ApplicationState state);
 
   /**
    * Save content state <br>
    * 
-   * @param  <S>         can be of type {@link Portlet} only, see
-   *                       {@link ApplicationType}
-   * @param  state       - ApplicationState object. It must be
-   *                       CloneApplicationState or PersistentApplicationState
-   *                       object
-   * @param  preferences - object to be saved
-   * @return             {@link ApplicationState} typed with {@link Portlet}
+   * @param state - ApplicationState object. It must be CloneApplicationState or
+   *          PersistentApplicationState object
+   * @param preferences - object to be saved
+   * @return {@link ApplicationState} typed with {@link Portlet}
    */
-  <S> ApplicationState<S> save(ApplicationState<S> state, S preferences);
+  ApplicationState save(ApplicationState state, Portlet preferences);
 
   /**
    * Return LazyPageList of object (sorted) which type and other info determined
    * in Query object
    * 
-   * @param  <T>            could be of type {@link Page} or
-   *                          {@link PortalConfig}
-   * @param  q              - Query object
-   * @param  sortComparator {@link Comparator} used for sorting results
-   * @return                {@link LazyPageList}
+   * @param <T> could be of type {@link Page} or {@link PortalConfig}
+   * @param q - Query object
+   * @param sortComparator {@link Comparator} used for sorting results
+   * @return {@link LazyPageList}
    */
   <T> LazyPageList<T> find(Query<T> q, Comparator<T> sortComparator);
 
@@ -295,11 +284,10 @@ public interface LayoutService extends DataStorage {
    * Return ListAccess, we can retrieved array of object (sorted) in database
    * through this.
    * 
-   * @param  <T>            could be of type {@link Page} or
-   *                          {@link PortalConfig}
-   * @param  q              - Query object
-   * @param  sortComparator - Comparator object, used to sort the result list
-   * @return                {@link LazyPageList}
+   * @param <T> could be of type {@link Page} or {@link PortalConfig}
+   * @param q - Query object
+   * @param sortComparator - Comparator object, used to sort the result list
+   * @return {@link LazyPageList}
    */
   <T> ListAccess<T> find2(Query<T> q, Comparator<T> sortComparator);
 
@@ -309,19 +297,19 @@ public interface LayoutService extends DataStorage {
    * /conf/portal/portal/sharedlayout-{siteName}.xml else if not found, retrieve
    * it from /conf/portal/portal/sharedlayout.xml
    * 
-   * @param  siteName
-   * @return          {@link Container}
+   * @param siteName
+   * @return {@link Container}
    */
   Container getSharedLayout(String siteName);
 
   /**
    * Retrieves all site type names with pagination.
    * 
-   * @param  siteType {@link SiteType}
-   * @param  offset   offset of the query
-   * @param  limit    limit of the list to fetch
-   * @return          {@link List} of corresponding site names, else empty list
-   *                  if not found
+   * @param siteType {@link SiteType}
+   * @param offset offset of the query
+   * @param limit limit of the list to fetch
+   * @return {@link List} of corresponding site names, else empty list if not
+   *         found
    */
   List<String> getSiteNames(SiteType siteType, int offset, int limit);
 
@@ -353,7 +341,7 @@ public interface LayoutService extends DataStorage {
   default InputStream getSiteBannerStream(String siteName) throws ObjectNotFoundException, IOException {
     throw new UnsupportedOperationException();
   }
-  
+
   /**
    * Retrieve default site banner as stream
    *
@@ -363,7 +351,7 @@ public interface LayoutService extends DataStorage {
   default InputStream getDefaultSiteBannerStream(String siteName) {
     throw new UnsupportedOperationException();
   }
-  
+
   /**
    * remove site banner
    *

@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.ModelStyle;
 
 import lombok.Data;
@@ -31,20 +30,15 @@ import lombok.EqualsAndHashCode;
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
- * @param <S> can be of type org.exoplatform.portal.pom.spi.portlet.Portlet
- *          only, see {@link ApplicationType}
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class ApplicationData<S> extends ComponentData {
+public class ApplicationData extends ComponentData {
 
   private static final long         serialVersionUID = -9136595444062927185L;
 
   /** . */
-  private final ApplicationType<S>  type;
-
-  /** . */
-  private final ApplicationState<S> state;
+  private final ApplicationState    state;
 
   /** . */
   private final String              id;
@@ -85,10 +79,9 @@ public class ApplicationData<S> extends ComponentData {
   /** . */
   private final List<String>        accessPermissions;
 
-  public ApplicationData(String storageId,
+  public ApplicationData(String storageId, // NOSONAR
                          String storageName,
-                         ApplicationType<S> type,
-                         ApplicationState<S> state,
+                         ApplicationState state,
                          String id,
                          String title,
                          String icon,
@@ -106,7 +99,6 @@ public class ApplicationData<S> extends ComponentData {
     super(storageId, storageName, cssStyle);
 
     //
-    this.type = type;
     this.state = state;
     this.id = id;
     this.title = title;

@@ -23,8 +23,6 @@
 
 package org.exoplatform.web.security;
 
-import org.gatein.wci.security.Credentials;
-
 import org.exoplatform.component.test.*;
 import org.exoplatform.container.PortalContainer;
 
@@ -38,7 +36,7 @@ public class TestSimpleGeneratorService extends AbstractKernelTest {
 
     protected void setUp() throws Exception {
         PortalContainer container = getContainer();
-        service = (SimpleGeneratorCookieTokenService) container.getComponentInstanceOfType(SimpleGeneratorCookieTokenService.class);
+        service = container.getComponentInstanceOfType(SimpleGeneratorCookieTokenService.class);
         Thread.sleep(1000); // for enough time initial database
         begin();
     }

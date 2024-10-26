@@ -20,37 +20,28 @@
 package org.exoplatform.portal.webui.application;
 
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 
 /**
- * Group the application state and the application id to form the state of a portlet.
+ * Group the application state and the application id to form the state of a
+ * portlet.
  *
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
- * @param <S> the application content state type
  */
-public class PortletState<S> {
+public class PortletState {
 
-    /** The application type. */
-    private final ApplicationType<S> applicationType;
+  /** The application state. */
+  private ApplicationState applicationState;
 
-    /** The application state. */
-    private ApplicationState<S> applicationState;
+  public PortletState(ApplicationState applicationState) {
+    this.applicationState = applicationState;
+  }
 
-    public PortletState(ApplicationState<S> applicationState, ApplicationType<S> applicationType) {
-        this.applicationState = applicationState;
-        this.applicationType = applicationType;
-    }
+  public ApplicationState getApplicationState() {
+    return applicationState;
+  }
 
-    public ApplicationType<S> getApplicationType() {
-        return applicationType;
-    }
-
-    public ApplicationState<S> getApplicationState() {
-        return applicationState;
-    }
-
-    public void setApplicationState(ApplicationState<S> applicationState) {
-        this.applicationState = applicationState;
-    }
+  public void setApplicationState(ApplicationState applicationState) {
+    this.applicationState = applicationState;
+  }
 }
