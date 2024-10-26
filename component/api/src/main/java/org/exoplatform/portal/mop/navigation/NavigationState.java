@@ -21,7 +21,6 @@ package org.exoplatform.portal.mop.navigation;
 
 import java.io.Serializable;
 
-
 /**
  * An immutable navigation state class.
  *
@@ -30,35 +29,39 @@ import java.io.Serializable;
  */
 public class NavigationState implements Serializable {
 
-    /** . */
-    private final Integer priority;
+  private static final long serialVersionUID = 7411651123958684692L;
 
-    public NavigationState(Integer priority) {
-        this.priority = priority;
-    }
+  /** . */
+  private final Integer     priority;
 
-    /**
-     * Returns the navigation priority.
-     *
-     * @return the navigation priority
-     */
-    public Integer getPriority() {
-        return priority;
-    }
+  public NavigationState(Integer priority) {
+    this.priority = priority;
+  }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof NavigationState)) return false;
+  /**
+   * Returns the navigation priority.
+   *
+   * @return the navigation priority
+   */
+  public Integer getPriority() {
+    return priority;
+  }
 
-        NavigationState that = (NavigationState) o;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o)
+      return true;
+    if (!(o instanceof NavigationState))
+      return false;
 
-        return priority != null ? priority.equals(that.priority) : that.priority == null;
+    NavigationState that = (NavigationState) o;
 
-    }
+    return priority != null ? priority.equals(that.priority) : that.priority == null;
 
-    @Override
-    public int hashCode() {
-        return priority != null ? priority.hashCode() : 0;
-    }
+  }
+
+  @Override
+  public int hashCode() {
+    return priority != null ? priority.hashCode() : 0;
+  }
 }

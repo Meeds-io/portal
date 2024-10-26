@@ -169,10 +169,6 @@
     <type>org.exoplatform.portal.config.UserPortalConfigService</type>
     <init-params>
       <value-param>
-        <name>create.user.portal</name>
-        <value>true</value>
-      </value-param>
-      <value-param>
         <name>default.import.mode</name>
         <value>merge</value>
       </value-param>
@@ -208,7 +204,7 @@
       <type>org.exoplatform.portal.mop.storage.listener.NodeDescriptionListener</type>
     </component-plugin>
     <component-plugin>
-      <name>org.exoplatform.portal.config.DataStorage.portalConfigUpdated</name>
+      <name>org.exoplatform.portal.mop.service.LayoutService.portalConfigUpdated</name>
       <set-method>addListener</set-method>
       <type>org.exoplatform.portal.config.MetaPortalConfigUpdateListener</type>
     </component-plugin>

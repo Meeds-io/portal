@@ -27,294 +27,191 @@ import org.exoplatform.portal.pom.data.ApplicationData;
 import org.exoplatform.portal.pom.data.MappedAttributes;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
 /**
  * May 13, 2004
  *
  * @author Tuan Nguyen
  * @version $Id: Portlet.java,v 1.7 2004/09/30 01:00:05 tuan08 Exp $
  **/
-public class Application<S> extends ModelObject implements Cloneable {
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+public class Application extends ModelObject implements Cloneable {
 
-    /** The application state. */
-    private ApplicationState<S> state;
+  private ApplicationState state;
 
-    private String id;
+  private String           id;
 
-    private String title;
+  private String           title;
 
-    private String icon;
+  private String           icon;
 
-    private String description;
+  private String           description;
 
-    private boolean showInfoBar;
+  private boolean          showInfoBar;
 
-    private boolean showApplicationState = true;
+  private boolean          showApplicationState = true;
 
-    private boolean showApplicationMode = true;
+  private boolean          showApplicationMode  = true;
 
-    private String theme;
+  private String           theme;
 
-    private Properties properties;
+  private Properties       properties;
 
-    private String[] accessPermissions;
+  private String[]         accessPermissions;
 
-    private boolean isModifiable;
+  public Application(ApplicationData data) {
+    super(data.getStorageId());
 
-    /** We cannot allow the type to change once the object is created. */
-    private final ApplicationType<S> type;
+    // For now here, need to make a real NAME and
+    // remove disturbing storage name
+    this.storageName = data.getStorageName();
 
-    public Application(ApplicationData<S> data) {
-        super(data.getStorageId());
+    //
+    this.state = data.getState();
+    this.id = data.getId();
+    this.title = data.getTitle();
+    this.icon = data.getIcon();
+    this.description = data.getDescription();
+    this.showInfoBar = data.isShowInfoBar();
+    this.showApplicationState = data.isShowApplicationState();
+    this.showApplicationMode = data.isShowApplicationMode();
+    this.theme = data.getTheme();
+    this.width = data.getWidth();
+    this.height = data.getHeight();
+    this.cssClass = data.getCssClass();
+    this.cssStyle = data.getCssStyle();
+    this.properties = new Properties(data.getProperties());
+    this.accessPermissions = data.getAccessPermissions().toArray(new String[data.getAccessPermissions().size()]);
+  }
 
-        // For now here, need to make a real NAME and
-        // remove disturbing storage name
-        this.storageName = data.getStorageName();
+  public Application(String storageId) {
+    super(storageId);
+  }
 
-        //
-        this.state = data.getState();
-        this.id = data.getId();
-        this.title = data.getTitle();
-        this.icon = data.getIcon();
-        this.description = data.getDescription();
-        this.showInfoBar = data.isShowInfoBar();
-        this.showApplicationState = data.isShowApplicationState();
-        this.showApplicationMode = data.isShowApplicationMode();
-        this.theme = data.getTheme();
-        this.width = data.getWidth();
-        this.height = data.getHeight();
-        this.cssClass = data.getCssClass();
-        this.cssStyle = data.getCssStyle();
-        this.properties = new Properties(data.getProperties());
-        this.accessPermissions = data.getAccessPermissions().toArray(new String[data.getAccessPermissions().size()]);
-        this.type = data.getType();
+  public String getProfiles() {
+    if (properties != null && properties.containsKey(MappedAttributes.PROFILES.getName())) {
+      return properties.get(MappedAttributes.PROFILES.getName());
     }
+    return null;
+  }
 
-    public Application(ApplicationType<S> type, String storageId) {
-        super(storageId);
+  public boolean getShowInfoBar() {
+    return showInfoBar;
+  }
 
-        //
-        this.type = type;
+  public void setShowInfoBar(boolean b) {
+    showInfoBar = b;
+  }
+
+  public boolean getShowApplicationState() {
+    return showApplicationState;
+  }
+
+  public void setShowApplicationState(boolean b) {
+    showApplicationState = b;
+  }
+
+  public boolean getShowApplicationMode() {
+    return showApplicationMode;
+  }
+
+  public void setShowApplicationMode(boolean b) {
+    showApplicationMode = b;
+  }
+
+  public Properties getProperties() {
+    if (properties == null) {
+      properties = new Properties();
     }
+    return properties;
+  }
 
-    public Application(ApplicationType<S> type) {
-        super();
-
-        //
-        this.type = type;
-    }
-
-    public ApplicationType<S> getType() {
-        return type;
-    }
-
-    public String getWidth() {
-        return width;
-    }
-
-    public void setWidth(String s) {
-        width = s;
-    }
-
-    public String getHeight() {
-        return height;
-    }
-
-    public String getProfiles() {
-      if (properties != null && properties.containsKey(MappedAttributes.PROFILES.getName())) {
-        return (String) properties.get(MappedAttributes.PROFILES.getName());
-      }
+  @Override
+  public String getCssClass() {
+    if (cssClass == null && cssStyle == null) {
       return null;
+    } else if (cssStyle == null) {
+      return cssClass;
+    } else if (cssClass == null) {
+      return cssStyle.getCssClass();
+    } else {
+      StringBuilder cssClasses = new StringBuilder();
+      cssClasses.append(cssStyle.getCssClass(cssClass));
+      cssClasses.append(" ");
+      cssClasses.append(cssClass);
+      return cssClasses.toString();
     }
+  }
 
-    public void setHeight(String s) {
-        height = s;
+  @Override
+  public ApplicationData build() {
+    return new ApplicationData(getStorageId(),
+                               getStorageName(),
+                               getState(),
+                               getId(),
+                               getTitle(),
+                               getIcon(),
+                               getDescription(),
+                               getShowInfoBar(),
+                               getShowApplicationState(),
+                               getShowApplicationMode(),
+                               getTheme(),
+                               getWidth(),
+                               getHeight(),
+                               getCssClass(),
+                               getCssStyle(),
+                               Utils.safeImmutableMap(properties),
+                               Utils.safeImmutableList(accessPermissions));
+  }
+
+  public static Application createPortletApplication(ApplicationData data) {
+    return new Application(data);
+  }
+
+  public static Application createPortletApplication(String storageId) {
+    return new Application(storageId);
+  }
+
+  public static Application createPortletApplication() {
+    return new Application();
+  }
+
+  @Override
+  public void checkStorage() throws ObjectNotFoundException {
+    if (!(this.state instanceof TransientApplicationState)) {
+      LayoutService layoutService = ExoContainerContext.getService(LayoutService.class);
+      String contentId = layoutService.getId(this.state);
+      if (contentId == null) {
+        throw new ObjectNotFoundException(String.format("Application not found with state %s",
+                                                        this.state));
+      }
     }
+  }
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String value) {
-        id = value;
-    }
-
-    public String[] getAccessPermissions() {
-        return accessPermissions;
-    }
-
-    public void setAccessPermissions(String[] accessPermissions) {
-        this.accessPermissions = accessPermissions;
-    }
-
-    public boolean isModifiable() {
-        return isModifiable;
-    }
-
-    public void setModifiable(boolean modifiable) {
-        isModifiable = modifiable;
-    }
-
-    public ApplicationState<S> getState() {
-        return state;
-    }
-
-    public void setState(ApplicationState<S> value) {
-        state = value;
-    }
-
-    public boolean getShowInfoBar() {
-        return showInfoBar;
-    }
-
-    public void setShowInfoBar(boolean b) {
-        showInfoBar = b;
-    }
-
-    public boolean getShowApplicationState() {
-        return showApplicationState;
-    }
-
-    public void setShowApplicationState(boolean b) {
-        showApplicationState = b;
-    }
-
-    public boolean getShowApplicationMode() {
-        return showApplicationMode;
-    }
-
-    public void setShowApplicationMode(boolean b) {
-        showApplicationMode = b;
-    }
-
-    public String getIcon() {
-        return icon;
-    }
-
-    public void setIcon(String value) {
-        icon = value;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String des) {
-        description = des;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String value) {
-        title = value;
-    }
-
-    public Properties getProperties() {
-        if (properties == null)
-            properties = new Properties();
-        return properties;
-    }
-
-    public void setProperties(Properties properties) {
-        this.properties = properties;
-    }
-
-    public String getTheme() {
-        return theme;
-    }
-
-    public void setTheme(String theme) {
-        this.theme = theme;
-    }
-
-    @Override
-    public String getCssClass() {
-      if (cssClass == null && cssStyle == null) {
-        return null;
-      } else if (cssStyle == null) {
-        return cssClass;
-      } else if (cssClass == null) {
-        return cssStyle.getCssClass();
+  @Override
+  public void resetStorage() throws ObjectNotFoundException {
+    if (!(this.state instanceof TransientApplicationState)) {
+      LayoutService layoutService = ExoContainerContext.getService(LayoutService.class);
+      Portlet preferences = layoutService.load(this.state);
+      String contentId = layoutService.getId(this.state);
+      if (contentId == null) {
+        throw new ObjectNotFoundException(String.format("Application wasn't found with state %s", this.state));
       } else {
-        StringBuilder cssClasses = new StringBuilder();
-        cssClasses.append(cssStyle.getCssClass(cssClass));
-        cssClasses.append(" ");
-        cssClasses.append(cssClass);
-        return cssClasses.toString();
+        this.state = new TransientApplicationState(contentId, preferences);
+        // No other application type is supported
       }
     }
+    super.resetStorage();
+  }
 
-    @Override
-    public ApplicationData build() {
-      return new ApplicationData<S>(getStorageId(),
-                                    getStorageName(),
-                                    getType(),
-                                    getState(),
-                                    getId(),
-                                    getTitle(),
-                                    getIcon(),
-                                    getDescription(),
-                                    getShowInfoBar(),
-                                    getShowApplicationState(),
-                                    getShowApplicationMode(),
-                                    getTheme(),
-                                    getWidth(),
-                                    getHeight(),
-                                    getCssClass(),
-                                    getCssStyle(),
-                                    Utils.safeImmutableMap(properties),
-                                    Utils.safeImmutableList(accessPermissions));
-    }
-
-    public static Application<Portlet> createPortletApplication(ApplicationData<Portlet> data) {
-        return new Application<>(data);
-    }
-
-    public static Application<Portlet> createPortletApplication(String storageId) {
-        return new Application<>(ApplicationType.PORTLET, storageId);
-    }
-
-    public static Application<Portlet> createPortletApplication() {
-        return new Application<>(ApplicationType.PORTLET);
-    }
-
-    @Override
-    public void checkStorage() throws ObjectNotFoundException {
-      if (!(this.state instanceof TransientApplicationState)) {
-        LayoutService dataStorage = ExoContainerContext.getService(LayoutService.class);
-        String contentId = dataStorage.getId(this.state);
-        if (contentId == null) {
-          throw new ObjectNotFoundException(String.format("Application of type %s with state %s",
-                                                          this.type,
-                                                          this.state));
-        }
-      }
-    }
-
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    @Override
-    public void resetStorage() throws ObjectNotFoundException {
-      if (!(this.state instanceof TransientApplicationState)) {
-        LayoutService dataStorage = ExoContainerContext.getService(LayoutService.class);
-        Portlet preferences = (Portlet) dataStorage.load(this.state, this.type);
-        String contentId = dataStorage.getId(this.state);
-        if (contentId == null) {
-          throw new ObjectNotFoundException(String.format("Application of type %s with state %s",
-                                                          this.type,
-                                                          this.state));
-        } else if (this.type == ApplicationType.PORTLET) {
-          this.state = new TransientApplicationState(contentId, preferences);
-        } else {
-          // No other application type is supported
-        }
-      }
-      super.resetStorage();
-    }
-
-    @Override
-    public Application clone() {
-      return new Application(build());
-    }
+  @Override
+  public Application clone() { // NOSONAR
+    return new Application(build());
+  }
 
 }

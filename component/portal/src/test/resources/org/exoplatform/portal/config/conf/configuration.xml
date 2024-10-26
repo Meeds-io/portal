@@ -37,10 +37,6 @@
           <name>initializing.failure.ignore</name>
           <value>true</value>
         </value-param>
-        <value-param>
-          <name>page.templates.location</name>
-          <value>classpath:/org/exoplatform/portal/config/conf/template/pages</value>
-        </value-param>
         <object-param>
           <name>site.templates.location</name>
           <object type="org.exoplatform.portal.config.SiteConfigTemplates">

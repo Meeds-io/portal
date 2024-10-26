@@ -19,9 +19,7 @@
 package org.exoplatform.portal.config.serialize;
 
 import org.exoplatform.portal.config.model.Application;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.pom.data.ApplicationData;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
 /**
  * We keep that subclass here to please JiBX crap.
@@ -29,17 +27,16 @@ import org.exoplatform.portal.pom.spi.portlet.Portlet;
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
-public class PortletApplication extends Application<Portlet> {
+public class PortletApplication extends Application {
 
-    public PortletApplication(ApplicationData<Portlet> preferencesApplicationData) {
-        super(preferencesApplicationData);
-    }
+  public PortletApplication(ApplicationData preferencesApplicationData) {
+    super(preferencesApplicationData);
+  }
 
-    public PortletApplication(ApplicationType<Portlet> preferencesApplicationType, String storageId) {
-        super(preferencesApplicationType, storageId);
-    }
+  public PortletApplication(String storageId) {
+    super(storageId);
+  }
 
-    public PortletApplication() {
-        super(ApplicationType.PORTLET);
-    }
+  public PortletApplication() {
+  }
 }

@@ -26,7 +26,7 @@ public abstract class AddOnPlugin extends BaseComponentPlugin {
 
     public abstract String getContainerName();
 
-    public abstract  List<Application<?>> getApplications();
+    public abstract  List<Application> getApplications();
 
     public abstract int getPriority();
 }

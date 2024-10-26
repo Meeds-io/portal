@@ -23,7 +23,7 @@ import org.gatein.portal.controller.resource.ResourceRequestHandler;
  *             using webapp context based URL instead of a centralized endpoint
  *             for all skins to define inside the monolith
  */
-@Deprecated
+@Deprecated(forRemoval = true, since = "7.0")
 public class SkinResourceRequestHandler extends WebRequestHandler {
 
     /** . */

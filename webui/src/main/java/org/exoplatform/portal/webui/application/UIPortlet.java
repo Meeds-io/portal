@@ -80,9 +80,9 @@ import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.application.UserProfileLifecycle;
 import org.exoplatform.portal.application.state.ContextualPropertyManager;
 import org.exoplatform.portal.config.NoSuchDataException;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.module.ModuleRegistry;
 import org.exoplatform.portal.mop.service.LayoutService;
+import org.exoplatform.portal.pc.ExoPortletState;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.portal.portlet.PortletExceptionHandleService;
 import org.exoplatform.portal.webui.application.UIPortletActionListener.ChangePortletModeActionListener;
@@ -133,7 +133,7 @@ import lombok.Setter;
   @EventConfig(phase = Phase.PROCESS, listeners = ServeResourceActionListener.class, csrfCheck = false),
   @EventConfig(phase = Phase.PROCESS, listeners = ProcessEventsActionListener.class, csrfCheck = false),
 })
-public class UIPortlet<S, C extends Serializable> extends UIApplication {
+public class UIPortlet extends UIApplication {
 
     protected static final Log LOG = ExoLogger.getLogger("portal:UIPortlet");
 
@@ -153,7 +153,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
     private String storageName;
 
     /** . */
-    private ModelAdapter<S, C> adapter;
+    private ModelAdapter adapter;
 
     /** . */
     private org.gatein.pc.api.Portlet producedOfferedPortlet;
@@ -165,7 +165,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
     private LocalizedString displayName;
 
     /** . */
-    private PortletState<S> state;
+    private PortletState state;
 
     /** . */
     private String applicationId;
@@ -231,12 +231,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
      * @return the skin identifier associated with this portlet or <code>null</code> if there isn't one
      */
     public String getSkinId() {
-        ApplicationType<S> type = state.getApplicationType();
-        if (type == ApplicationType.PORTLET) {
-            return applicationId;
-        } else {
-            return null;
-        }
+        return applicationId;
     }
 
     public String getId() {
@@ -820,7 +815,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
         // Window state
         invocation.setWindowState(org.gatein.pc.api.WindowState.create(getCurrentWindowState().toString()));
 
-        StatefulPortletContext<C> preferencesPortletContext = getPortletContext();
+        StatefulPortletContext<ExoPortletState> preferencesPortletContext = getPortletContext();
         if (preferencesPortletContext == null) {
             return null;
         }
@@ -860,27 +855,27 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
         PortletInvoker portletInvoker = getApplicationComponent(PortletInvoker.class);
 
         // Get marshalled version
-        StatefulPortletContext<C> updatedCtx = (StatefulPortletContext<C>) portletInvoker
+        StatefulPortletContext<ExoPortletState> updatedCtx = (StatefulPortletContext<ExoPortletState>) portletInvoker
                 .setProperties(portletContext, changes);
 
         //
-        C updateState = updatedCtx.getState();
+        ExoPortletState updateState = updatedCtx.getState();
 
         // Now save it
         update(updateState);
     }
 
-    public PortletState<S> getState() {
+    public PortletState getState() {
         return state;
     }
 
-    public void setState(PortletState<S> state) {
+    public void setState(PortletState state) {
         if (state != null) {
             try {
                 PortletInvoker portletInvoker = getApplicationComponent(PortletInvoker.class);
                 LayoutService layoutService = getApplicationComponent(LayoutService.class);
                 String applicationId = layoutService.getId(state.getApplicationState());
-                ModelAdapter<S, C> adapter = ModelAdapter.getAdapter(state.getApplicationType());
+                ModelAdapter adapter = ModelAdapter.getAdapter();
                 PortletContext producerOfferedPortletContext = adapter.getProducerOfferedPortletContext(applicationId);
 
                 ModuleRegistry moduleRegistry = getApplicationComponent(ModuleRegistry.class);
@@ -932,7 +927,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
      * @return the portlet context
      * @throws Exception any exception
      */
-    public StatefulPortletContext<C> getPortletContext() throws Exception {
+    public StatefulPortletContext<ExoPortletState> getPortletContext() throws Exception {
         WebuiRequestContext context = WebuiRequestContext.getCurrentInstance();
         ExoContainer container = context.getApplication().getApplicationServiceContainer();
         return adapter.getPortletContext(container, applicationId, state.getApplicationState());
@@ -944,7 +939,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
      * @param updateState the state update
      * @throws Exception any exception
      */
-    public void update(C updateState) throws Exception {
+    public void update(ExoPortletState updateState) throws Exception {
         WebuiRequestContext context = WebuiRequestContext.getCurrentInstance();
         ExoContainer container = context.getApplication().getApplicationServiceContainer();
         state.setApplicationState(adapter.update(container, updateState, state.getApplicationState()));
@@ -956,7 +951,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
      * @param modifiedContext
      * @throws Exception
      */
-    public C getModifiedState(PortletContext modifiedContext) throws Exception {
+    public ExoPortletState getModifiedState(PortletContext modifiedContext) throws Exception {
         return adapter.getStateFromModifiedContext(this.getPortletContext(), modifiedContext);
     }
 
@@ -966,7 +961,7 @@ public class UIPortlet<S, C extends Serializable> extends UIApplication {
      * @param clonedContext
      * @throws Exception
      */
-    public C getClonedState(PortletContext clonedContext) throws Exception {
+    public ExoPortletState getClonedState(PortletContext clonedContext) throws Exception {
         return adapter.getstateFromClonedContext(this.getPortletContext(), clonedContext);
     }
 

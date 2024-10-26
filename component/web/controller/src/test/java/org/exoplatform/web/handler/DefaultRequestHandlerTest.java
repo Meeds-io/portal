@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package org.exoplatform.portal.application;
+package org.exoplatform.web.handler;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.*;
@@ -36,6 +36,7 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.URIWriter;
+import org.exoplatform.web.handler.DefaultRequestHandler;
 import org.exoplatform.web.url.navigation.NavigationResource;
 import org.exoplatform.web.url.navigation.NodeURL;
 
@@ -148,15 +149,11 @@ public class DefaultRequestHandlerTest {
 
     try {
       when(request.getRemoteUser()).thenReturn("user");
-      when(portalConfigService.getUserPortalSites()).thenReturn(null);
+      when(portalConfigService.getUserPortalSites(request.getRemoteUser())).thenReturn(null);
       when(context.getResponse()).thenReturn(response);
       when(context.getRequest()).thenReturn(request);
 
-      when(response.encodeRedirectURL(anyString())).thenAnswer(new Answer<String>() {
-        public String answer(InvocationOnMock invocation) {
-          return invocation.getArgument(0, String.class);
-        }
-      });
+      when(response.encodeRedirectURL(anyString())).thenAnswer(invocation -> invocation.getArgument(0, String.class));
 
       DefaultRequestHandler defaultRequestHandler = new DefaultRequestHandler(portalConfigService);
       defaultRequestHandler.execute(context);

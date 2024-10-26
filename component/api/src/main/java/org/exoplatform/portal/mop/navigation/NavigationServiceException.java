@@ -25,36 +25,38 @@ package org.exoplatform.portal.mop.navigation;
  */
 public class NavigationServiceException extends RuntimeException {
 
-    /** . */
-    private final NavigationError error;
+  private static final long     serialVersionUID = -4242912942133026757L;
 
-    public NavigationServiceException(NavigationError error) {
-        super(error.toString());
-        this.error = error;
-    }
+  /** . */
+  private final NavigationError error;
 
-    public NavigationServiceException(NavigationError error, String message) {
-        super(message);
+  public NavigationServiceException(NavigationError error) {
+    super(error.toString());
+    this.error = error;
+  }
 
-        //
-        this.error = error;
-    }
+  public NavigationServiceException(NavigationError error, String message) {
+    super(message);
 
-    public NavigationServiceException(NavigationError error, String message, Throwable cause) {
-        super(message, cause);
+    //
+    this.error = error;
+  }
 
-        //
-        this.error = error;
-    }
+  public NavigationServiceException(NavigationError error, String message, Throwable cause) {
+    super(message, cause);
 
-    public NavigationServiceException(NavigationError error, Throwable cause) {
-        super(cause);
+    //
+    this.error = error;
+  }
 
-        //
-        this.error = error;
-    }
+  public NavigationServiceException(NavigationError error, Throwable cause) {
+    super(cause);
 
-    public NavigationError getError() {
-        return error;
-    }
+    //
+    this.error = error;
+  }
+
+  public NavigationError getError() {
+    return error;
+  }
 }

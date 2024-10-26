@@ -52,7 +52,7 @@ public class TestSiteDataImportInsert extends AbstractSiteDataImportTest {
         PortalConfig portal = layoutService.getPortalConfig("classic");
         Container layout = portal.getPortalLayout();
         assertEquals(1, layout.getChildren().size());
-        Application<Portlet> layoutPortlet = (Application<Portlet>) layout.getChildren().get(0);
+        Application layoutPortlet = (Application) layout.getChildren().get(0);
         assertEquals("site1/layout", layoutService.getId(layoutPortlet.getState()));
 
         //

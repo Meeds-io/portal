@@ -20,12 +20,10 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
-import org.gatein.api.common.Pagination;
-import org.gatein.api.page.PageQuery;
-import org.gatein.api.site.SiteType;
 
 import org.exoplatform.jpa.mock.AbstractInMemoryDAO;
 import org.exoplatform.portal.jdbc.entity.PageEntity;
+import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.dao.PageDAO;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.services.organization.mock.InMemoryListAccess;
@@ -37,30 +35,34 @@ public class InMemoryPageDAO extends AbstractInMemoryDAO<PageEntity> implements 
     return entities.values()
                    .stream()
                    .filter(page -> StringUtils.equals(pageKey.getName(), page.getName())
-                       && StringUtils.equals(pageKey.getSite().getName(), page.getOwnerId())
-                       && pageKey.getSite().getType().equals(page.getOwnerType()))
+                                   && StringUtils.equals(pageKey.getSite().getName(), page.getOwnerId())
+                                   && pageKey.getSite().getType().equals(page.getOwnerType()))
                    .findFirst()
                    .orElse(null);
   }
 
   @Override
-  public InMemoryListAccess<PageKey> findByQuery(PageQuery query) { // NOSONAR
-    Pagination pagination = query.getPagination();
+  public InMemoryListAccess<PageKey> findByQuery(SiteType siteType,
+                                                 String siteName,
+                                                 String name,
+                                                 int offset,
+                                                 int limit) { // NOSONAR
     Stream<PageKey> pagesStream = entities.values()
                                           .stream()
                                           .filter(page -> {
-                                            if (StringUtils.isNotBlank(query.getSiteName())
-                                                && !StringUtils.equals(query.getSiteName(), page.getOwnerId())) { // NOSONAR
+                                            if (StringUtils.isNotBlank(siteName)
+                                                && !StringUtils.equals(siteName, page.getOwnerId())) { // NOSONAR
                                               return false;
                                             }
-                                            if (query.getSiteType() != null // NOSONAR
-                                                && convertSiteType(query.getSiteType()) != page.getOwnerType()) {
+                                            if (siteType != null && siteType != page.getOwnerType()) {
                                               return false;
                                             }
-                                            if (query.getDisplayName() != null // NOSONAR
+                                            if (name != null // NOSONAR
                                                 && (page.getDisplayName() == null
-                                                    || !StringUtils.contains(page.getDisplayName().toLowerCase(),
-                                                                             query.getDisplayName().toLowerCase()))) {
+                                                    || (!StringUtils.contains(page.getDisplayName().toLowerCase(),
+                                                                              name.toLowerCase())
+                                                        && !StringUtils.contains(page.getName().toLowerCase(),
+                                                                                 name.toLowerCase())))) {
                                               return false;
                                             }
                                             return true;
@@ -68,12 +70,14 @@ public class InMemoryPageDAO extends AbstractInMemoryDAO<PageEntity> implements 
                                           .map(entity -> new PageKey(entity.getOwnerType(),
                                                                      entity.getOwnerId(),
                                                                      entity.getName()));
-    if (pagination != null && pagination.getLimit() > 0) {
-      pagesStream = pagesStream.limit((long) pagination.getOffset() + pagination.getLimit());
+    if (limit > 0) {
+      pagesStream = pagesStream.limit((long) offset + limit);
       List<PageKey> result = pagesStream.toList();
-      if (pagination.getOffset() > 0) {
-        result = result.size() > pagination.getOffset() ? result.subList(pagination.getOffset(), result.size())
-                                                        : Collections.emptyList();
+      if (offset > 0) {
+        result = result.size() > offset ? result.subList(
+                                                         offset,
+                                                         result.size()) :
+                                        Collections.emptyList();
       }
       return new InMemoryListAccess<>(result, new PageKey[0]);
     } else {
@@ -91,14 +95,4 @@ public class InMemoryPageDAO extends AbstractInMemoryDAO<PageEntity> implements 
     deleteAll(ownerPages);
   }
 
-  private org.exoplatform.portal.mop.SiteType convertSiteType(SiteType siteType) {
-    switch (siteType) {
-    case SITE:
-      return org.exoplatform.portal.mop.SiteType.PORTAL;
-    case SPACE:
-      return org.exoplatform.portal.mop.SiteType.GROUP;
-    default:
-      return org.exoplatform.portal.mop.SiteType.USER;
-    }
-  }
 }

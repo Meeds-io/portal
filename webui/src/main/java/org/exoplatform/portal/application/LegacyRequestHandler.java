@@ -20,11 +20,6 @@
 package org.exoplatform.portal.application;
 
 import java.util.Enumeration;
-import java.util.Locale;
-import java.util.ResourceBundle;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import org.exoplatform.portal.config.UserPortalConfig;
 import org.exoplatform.portal.config.UserPortalConfigService;
@@ -39,6 +34,9 @@ import org.exoplatform.web.url.MimeType;
 import org.exoplatform.web.url.URLFactoryService;
 import org.exoplatform.web.url.navigation.NavigationResource;
 import org.exoplatform.web.url.navigation.NodeURL;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * This handler resolves legacy request and redirect them to the new URL computed dynamically against the routing table.
@@ -104,12 +102,11 @@ public class LegacyRequestHandler extends WebRequestHandler {
         url.setResource(new NavigationResource(siteKey.getType(), siteKey.getName(), uri));
         url.setMimeType(MimeType.PLAIN);
 
-        Enumeration paraNames = request.getParameterNames();
+        Enumeration<String> paraNames = request.getParameterNames();
         while (paraNames.hasMoreElements()) {
-            String parameter = paraNames.nextElement().toString();
-            url.setQueryParameterValues(parameter, request.getParameterValues(parameter));
+          String parameter = paraNames.nextElement();
+          url.setQueryParameterValues(parameter, request.getParameterValues(parameter));
         }
-
         String s = url.toString();
 
         response.sendRedirect(response.encodeRedirectURL(s));

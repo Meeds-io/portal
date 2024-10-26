@@ -51,7 +51,7 @@ public class TestSiteDataImportMerge extends AbstractSiteDataImportTest {
         assertNotNull(portal);
         Container layout = portal.getPortalLayout();
         assertEquals(1, layout.getChildren().size());
-        Application<Portlet> layoutPortlet = (Application<Portlet>) layout.getChildren().get(0);
+        Application layoutPortlet = (Application) layout.getChildren().get(0);
         assertEquals("site2/layout", layoutService.getId(layoutPortlet.getState()));
 
         PageContext page1 = pageStorage.loadPage(PageKey.parse("portal::classic::page1"));

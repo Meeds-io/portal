@@ -23,11 +23,10 @@ import org.exoplatform.portal.mop.SiteFilter;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.importer.Status;
-import org.exoplatform.portal.pom.data.ModelDataStorage;
 import org.exoplatform.portal.pom.data.PortalData;
 import org.exoplatform.portal.pom.data.PortalKey;
 
-public interface SiteStorage extends ModelDataStorage {
+public interface SiteStorage {
 
   void create(PortalConfig config);
 

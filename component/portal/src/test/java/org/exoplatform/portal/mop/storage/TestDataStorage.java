@@ -23,12 +23,8 @@ import static org.junit.Assert.assertThrows;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.gatein.common.transaction.JTAUserTransactionLifecycleService;
 
@@ -37,12 +33,10 @@ import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
-import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.ModelObject;
 import org.exoplatform.portal.config.model.Page;
@@ -75,8 +69,6 @@ import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
-
-import junit.framework.AssertionFailedError;
 
 /**
  * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Nov
@@ -273,11 +265,11 @@ public class TestDataStorage extends AbstractKernelTest {
     container.setCssClass(cssClass);
     page.setChildren(new ArrayList<>(Collections.singletonList(container)));
 
-    Application<Portlet> application = new Application<>(ApplicationType.PORTLET);
+    Application application = new Application();
     application.setHeight(height);
     application.setWidth(width);
     application.setCssClass(cssClass);
-    application.setState(new TransientApplicationState<>("test/test",  null));
+    application.setState(new TransientApplicationState("test/test",  null));
     container.setChildren(new ArrayList<>(Collections.singletonList(application)));
 
     //
@@ -349,15 +341,15 @@ public class TestDataStorage extends AbstractKernelTest {
     page.setOwnerId(portal.getName());
     page.setName("foo");
 
-    Application<Portlet> application = new Application<>(ApplicationType.PORTLET);
-    application.setState(new TransientApplicationState<>("test/test",  null));
+    Application application = new Application();
+    application.setState(new TransientApplicationState("test/test",  null));
     page.setChildren(new ArrayList<>(Collections.singletonList(application)));
 
     pageService.savePage(new PageContext(page.getPageKey(), null));
     storage_.save(page);
 
     page = storage_.getPage(page.getPageKey());
-    application = ((Application<Portlet>)page.getChildren().get(0));
+    application = ((Application)page.getChildren().get(0));
     assertNotNull(application.getStorageId());
     application.resetStorage();
     assertNull(application.getStorageId());
@@ -365,7 +357,7 @@ public class TestDataStorage extends AbstractKernelTest {
 
     // Conserve reference of previously created application
     page = storage_.getPage(page.getPageKey());
-    Application<Portlet> storedApplication = ((Application<Portlet>)page.getChildren().get(0));
+    Application storedApplication = ((Application)page.getChildren().get(0));
 
     // Delete reference of application on page
     page.setChildren(new ArrayList<>());
@@ -377,22 +369,22 @@ public class TestDataStorage extends AbstractKernelTest {
 
   public void testChangingPortletThemeInPage() throws Exception {
     Page page;
-    Application<?> app;
+    Application app;
 
     page = storage_.getPage("portal::classic::homepage");
-    app = (Application<?>) page.getChildren().get(0);
+    app = (Application) page.getChildren().get(0);
     assertEquals(1, page.getChildren().size());
     app.setTheme("Theme1");
     storage_.save(page);
 
     page = storage_.getPage("portal::classic::homepage");
-    app = (Application<?>) page.getChildren().get(0);
+    app = (Application) page.getChildren().get(0);
     assertEquals("Theme1", app.getTheme());
     app.setTheme("Theme2");
     storage_.save(page);
 
     page = storage_.getPage("portal::classic::homepage");
-    app = (Application<?>) page.getChildren().get(0);
+    app = (Application) page.getChildren().get(0);
     assertEquals("Theme2", app.getTheme());
   }
 
@@ -425,10 +417,10 @@ public class TestDataStorage extends AbstractKernelTest {
     page.setOwnerType(PortalConfig.PORTAL_TYPE);
     page.setOwnerId("test");
     page.setName("testWindowMove3");
-    Application app1 = new Application(ApplicationType.PORTLET);
-    app1.setState(new TransientApplicationState<Portlet>());
-    Application app2 = new Application(ApplicationType.PORTLET);
-    app2.setState(new TransientApplicationState<Portlet>());
+    Application app1 = new Application();
+    app1.setState(new TransientApplicationState());
+    Application app2 = new Application();
+    app2.setState(new TransientApplicationState());
     Container parentOfApp2 = new Container();
     parentOfApp2.getChildren().add(app2);
 
@@ -516,16 +508,16 @@ public class TestDataStorage extends AbstractKernelTest {
   public void testWindowScopedPortletPreferences() throws Exception {
     Page page = new Page();
     page.setPageId("portal::test::foo");
-    TransientApplicationState<Portlet> state = new TransientApplicationState<Portlet>("web/BannerPortlet",
+    TransientApplicationState state = new TransientApplicationState("web/BannerPortlet",
                                                                                       new PortletBuilder().add("template", "bar")
                                                                                                           .build());
-    Application<Portlet> app = Application.createPortletApplication();
+    Application app = Application.createPortletApplication();
     app.setState(state);
     page.getChildren().add(app);
     pageService.savePage(new PageContext(page.getPageKey(), null));
     storage_.save(page);
     page = storage_.getPage(page.getPageId());
-    app = (Application<Portlet>) page.getChildren().get(0);
+    app = (Application) page.getChildren().get(0);
     assertEquals("web/BannerPortlet", storage_.getId(app.getState()));
   }
 
@@ -539,8 +531,8 @@ public class TestDataStorage extends AbstractKernelTest {
     String app3Id = container.getChildren().get(1).getStorageId();
 
     // Add an application
-    Application<Portlet> groovyApp = Application.createPortletApplication();
-    ApplicationState<Portlet> state = new TransientApplicationState<Portlet>("web/GroovyPortlet");
+    Application groovyApp = Application.createPortletApplication();
+    ApplicationState state = new TransientApplicationState("web/GroovyPortlet");
     groovyApp.setState(state);
     ((Container) page.getChildren().get(1)).getChildren().add(1, groovyApp);
 
@@ -592,14 +584,14 @@ public class TestDataStorage extends AbstractKernelTest {
     // Get cloned page
     Page page = storage_.getPage("portal::test::test5");
     assertEquals(2, page.getChildren().size());
-    Application<Portlet> banner1 = (Application<Portlet>) page.getChildren().get(0);
-    ApplicationState<Portlet> instanceId = banner1.getState();
+    Application banner1 = (Application) page.getChildren().get(0);
+    ApplicationState instanceId = banner1.getState();
 
     // Check instance id format
     assertEquals("web/BannerPortlet", storage_.getId(banner1.getState()));
 
     // Check state
-    Portlet pagePrefs = storage_.load(instanceId, ApplicationType.PORTLET);
+    Portlet pagePrefs = storage_.load(instanceId);
     assertEquals(new PortletBuilder().add("template", "par:/groovy/groovy/webui/component/UIBannerPortlet.gtmpl").build(),
                  pagePrefs);
 
@@ -610,14 +602,14 @@ public class TestDataStorage extends AbstractKernelTest {
 
     Page clone = storage_.getPage("portal::test::_test4");
     assertEquals(2, clone.getChildren().size());
-    banner1 = (Application<Portlet>) clone.getChildren().get(0);
+    banner1 = (Application) clone.getChildren().get(0);
     instanceId = banner1.getState();
 
     // Check instance id format
     assertEquals("web/BannerPortlet", storage_.getId(banner1.getState()));
 
     // Check state
-    pagePrefs = storage_.load(instanceId, ApplicationType.PORTLET);
+    pagePrefs = storage_.load(instanceId);
     assertEquals(new PortletBuilder().add("template", "par:/groovy/groovy/webui/component/UIBannerPortlet.gtmpl").build(),
                  pagePrefs);
 
@@ -626,7 +618,7 @@ public class TestDataStorage extends AbstractKernelTest {
     storage_.save(instanceId, pagePrefs);
 
     // Check that page prefs have changed
-    pagePrefs = storage_.load(instanceId, ApplicationType.PORTLET);
+    pagePrefs = storage_.load(instanceId);
     assertEquals(new PortletBuilder().add("template", "foo").build(), pagePrefs);
 
     // Now check the container
@@ -640,7 +632,7 @@ public class TestDataStorage extends AbstractKernelTest {
     pageService.savePage(srcPageContext);
 
     //
-    Application<Portlet> portlet = (Application<Portlet>) srcPage.getChildren().get(0);
+    Application portlet = (Application) srcPage.getChildren().get(0);
     portlet.setDescription("NewPortlet");
     ArrayList<ModelObject> modelObject = srcPage.getChildren();
     modelObject.set(0, portlet);
@@ -651,7 +643,7 @@ public class TestDataStorage extends AbstractKernelTest {
     PageKey dstKey = PageKey.parse(srcPage.getOwnerType() + "::" + srcPage.getOwnerId() + "::" + "_PageTest1234");
     PageContext dstPageContext = pageService.clone(srcPageContext.getKey(), dstKey);
     Page dstPage = storage_.getPage(dstKey.format());
-    Application<Portlet> portlet1 = (Application<Portlet>) dstPage.getChildren().get(0);
+    Application portlet1 = (Application) dstPage.getChildren().get(0);
 
     // Check src's edit permission and dst's edit permission
     assertNotNull(dstPageContext.getState().getEditPermission());
@@ -662,128 +654,28 @@ public class TestDataStorage extends AbstractKernelTest {
     assertEquals(portlet.getDescription(), portlet1.getDescription());
   }
 
-  public void testGetAllPortalNames() throws Exception {
-    testGetAllSiteNames("portal", "getAllPortalNames");
-  }
-
-  public void testGetAllGroupNames() throws Exception {
-    testGetAllSiteNames("group", "getAllGroupNames");
-  }
-
-  private void testGetAllSiteNames(String siteType, final String methodName) throws Exception {
-    final List<String> names = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-
-    // Create new portal
-    storage_.create(new PortalConfig(siteType, "testGetAllSiteNames"));
-    restartTransaction();
-
-    // Test during tx we see the good names
-    List<String> transientNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-    assertTrue("Was expecting " + transientNames + " to contain " + names, transientNames.containsAll(names));
-    transientNames.removeAll(names);
-    assertEquals(1, transientNames.size());
-    assertEquals("testGetAllSiteNames", transientNames.get(0));
-
-    // Test we have not seen anything yet outside of tx
-    final CountDownLatch addSync = new CountDownLatch(1);
-    final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
-    new Thread() {
-      @Override
-      public void run() {
-        ExoContainerContext.setCurrentContainer(getContainer());
-        begin();
-        try {
-          List<String> isolatedNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-          isolatedNames.removeAll(names);
-          assertEquals(Collections.singletonList("testGetAllSiteNames"), isolatedNames);
-        } catch (Throwable t) {
-          error.set(t);
-        } finally {
-          addSync.countDown();
-          end();
-        }
-      }
-    }.start();
-
-    //
-    addSync.await();
-    if (error.get() != null) {
-      AssertionFailedError afe = new AssertionFailedError();
-      afe.initCause(error.get());
-      throw afe;
-    }
-
-    List<String> afterNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-    assertTrue(afterNames.containsAll(names));
-    afterNames.removeAll(names);
-    assertEquals(Collections.singletonList("testGetAllSiteNames"), afterNames);
-
-    // Then we remove the newly created portal
-    storage_.remove(new PortalConfig(siteType, "testGetAllSiteNames"));
-
-    transientNames.clear();
-    transientNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-    assertEquals(names, transientNames);
-
-    // Test we have not seen anything yet outside of tx
-    error.set(null);
-    final CountDownLatch removeSync = new CountDownLatch(1);
-    new Thread() {
-      public void run() {
-        ExoContainerContext.setCurrentContainer(getContainer());
-        begin();
-        try {
-          List<String> isolatedNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-          assertTrue("Was expecting " + isolatedNames + " to contain " + names, isolatedNames.containsAll(names));
-          isolatedNames.removeAll(names);
-          assertTrue(isolatedNames.isEmpty());
-        } catch (Throwable t) {
-          error.set(t);
-        } finally {
-          removeSync.countDown();
-          end();
-        }
-      }
-    }.start();
-
-    //
-    removeSync.await();
-    if (error.get() != null) {
-      AssertionFailedError afe = new AssertionFailedError();
-      afe.initCause(error.get());
-      throw afe;
-    }
-
-    //
-    restartTransaction();
-
-    // Now test it is still removed
-    afterNames = (List<String>) storage_.getClass().getMethod(methodName).invoke(storage_);
-    assertEquals(new HashSet<String>(names), new HashSet<String>(afterNames));
-  }
-
   public void testSiteScopedPreferences() throws Exception {
     Page page = storage_.getPage("portal::test::test4");
-    Application<Portlet> app = (Application<Portlet>) page.getChildren().get(0);
-    PersistentApplicationState<Portlet> state = (PersistentApplicationState) app.getState();
+    Application app = (Application) page.getChildren().get(0);
+    PersistentApplicationState state = (PersistentApplicationState) app.getState();
 
     //
-    Portlet prefs = storage_.load(state, ApplicationType.PORTLET);
+    Portlet prefs = storage_.load(state);
 
     //
     prefs.setValue("template", "someanothervalue");
     storage_.save(state, prefs);
 
     //
-    prefs = storage_.load(state, ApplicationType.PORTLET);
+    prefs = storage_.load(state);
     assertNotNull(prefs);
     assertEquals(new PortletBuilder().add("template", "someanothervalue").build(), prefs);
   }
 
   public void testNullPreferenceValue() throws Exception {
     Page page = storage_.getPage("portal::test::test4");
-    Application<Portlet> app = (Application<Portlet>) page.getChildren().get(0);
-    PersistentApplicationState<Portlet> state = (PersistentApplicationState) app.getState();
+    Application app = (Application) page.getChildren().get(0);
+    PersistentApplicationState state = (PersistentApplicationState) app.getState();
 
     //
     Portlet prefs = new Portlet();
@@ -795,7 +687,7 @@ public class TestDataStorage extends AbstractKernelTest {
     storage_.save(state, prefs);
 
     //
-    prefs = storage_.load(state, ApplicationType.PORTLET);
+    prefs = storage_.load(state);
     assertNotNull(prefs);
     assertEquals(new PortletBuilder().add("template", (String) null).build(), prefs);
   }
@@ -804,31 +696,6 @@ public class TestDataStorage extends AbstractKernelTest {
     PortalConfig pConfig = storage_.getPortalConfig(PortalConfig.PORTAL_TYPE, "classic");
     assertNotNull(pConfig);
     assertNotNull("The Group layout of " + pConfig.getName() + " is null", pConfig.getPortalLayout());
-    
-    String groupName = "groupTest2";
-    GroupHandler groupHandler = org.getGroupHandler();
-    Group group = groupHandler.createGroupInstance();
-    group.setGroupName(groupName);
-    group.setDescription("this is a group for test");
-    groupHandler.addChild(null, group, true);
-
-    pConfig = storage_.getPortalConfig(PortalConfig.GROUP_TYPE, "/groupTest2");
-    assertNotNull(pConfig);
-    assertNotNull("The Group layout of " + pConfig.getName() + " is null", pConfig.getPortalLayout());
-    assertTrue(pConfig.getPortalLayout().getChildren() != null && pConfig.getPortalLayout().getChildren().size() > 1);
-    pConfig.getPortalLayout().getChildren().clear();
-    storage_.save(pConfig);
-
-    pConfig = storage_.getPortalConfig(PortalConfig.GROUP_TYPE, "/groupTest2");
-    assertNotNull(pConfig);
-    assertNotNull("The Group layout of " + pConfig.getName() + " is null", pConfig.getPortalLayout());
-    assertTrue(pConfig.getPortalLayout().getChildren() != null && pConfig.getPortalLayout().getChildren().size() == 0);
-    
-    groupHandler.removeGroup(group, false);
-
-    pConfig = storage_.getPortalConfig(PortalConfig.USER_TYPE, "root");
-    assertNotNull(pConfig);
-    assertNotNull("The User layout of " + pConfig.getName() + " is null", pConfig.getPortalLayout());
   }
 
   public void testGroupLayout() throws Exception {
@@ -845,9 +712,10 @@ public class TestDataStorage extends AbstractKernelTest {
     group = groupHandler.findGroupById("/groupTest");
     assertNotNull(group);
 
-    PortalConfig pConfig = storage_.getPortalConfig(PortalConfig.GROUP_TYPE, "/groupTest");
+    PortalConfig pConfig = new PortalConfig(PortalConfig.GROUP_TYPE, "/groupTest");
+    storage_.create(pConfig);
+    pConfig = storage_.getPortalConfig(PortalConfig.GROUP_TYPE, "/groupTest");
     assertNotNull("the Group's PortalConfig is not null", pConfig);
-    assertTrue(pConfig.getPortalLayout().getChildren() == null || pConfig.getPortalLayout().getChildren().size() == 4);
 
     /**
      * We need to remove the /groupTest from the groupHandler as the handler is
@@ -873,45 +741,6 @@ public class TestDataStorage extends AbstractKernelTest {
     groupHandler.removeGroup(group, false);
     group = groupHandler.findGroupById("/groupSite");
     assertNull(group);
-  }
-
-  public void testGroupNavigation() throws Exception {
-    GroupHandler groupHandler = org.getGroupHandler();
-    Group group = groupHandler.createGroupInstance();
-    group.setGroupName("groupTest");
-    group.setLabel("testGroupNavigation");
-
-    groupHandler.addChild(null, group, true);
-
-    SiteKey key = SiteKey.group(group.getId());
-    navService.saveNavigation(new NavigationContext(key, new NavigationState(0)));
-    assertNotNull(navService.loadNavigation(key));
-
-    // Remove group
-    groupHandler.removeGroup(group, true);
-
-    // Group navigations is removed after remove group
-    assertNull(navService.loadNavigation(key));
-  }
-
-  public void testUserLayout() throws Exception {
-    UserHandler userHandler = org.getUserHandler();
-    User user = userHandler.findUserByName("testing");
-    assertNull(user);
-
-    user = userHandler.createUserInstance("testing");
-    user.setEmail("testing@gmaild.com");
-    user.setFirstName("test firstname");
-    user.setLastName("test lastname");
-    user.setPassword("123456");
-
-    userHandler.createUser(user, true);
-
-    user = userHandler.findUserByName("testing");
-    assertNotNull(user);
-
-    PortalConfig pConfig = storage_.getPortalConfig(PortalConfig.USER_TYPE, "testing");
-    assertNotNull("the User's PortalConfig is not null", pConfig);
   }
 
   public void testJTA() throws Exception {

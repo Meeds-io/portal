@@ -39,7 +39,12 @@ import org.gatein.api.site.SiteId;
 
 /**
  * @author <a href="mailto:nscavell@redhat.com">Nick Scavelli</a>
+ * @deprecated should be removed since the Portal API is defined using Service
+ *             Layers instead of contextual API which doesn't help to get
+ *             stateless mode. This is kept for now until removing WebUI
+ *             and ecms from eXo addons
  */
+@Deprecated(forRemoval = true, since = "7.0")
 public class PortalRequestImpl extends PortalRequest {
     private final PortalRequestContext context;
     private final User user;

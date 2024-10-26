@@ -27,16 +27,18 @@ import lombok.Setter;
 @Getter
 public class ApplicationBackgroundStyle implements Serializable {
 
-  private String backgroundColor;
+  private static final long serialVersionUID = -4885666133518371914L;
 
-  private String backgroundImage;
+  private String            backgroundColor;
 
-  private String backgroundEffect;
+  private String            backgroundImage;
 
-  private String backgroundPosition;
+  private String            backgroundEffect;
 
-  private String backgroundSize;
+  private String            backgroundPosition;
 
-  private String backgroundRepeat;
+  private String            backgroundSize;
+
+  private String            backgroundRepeat;
 
 }

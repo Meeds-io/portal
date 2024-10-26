@@ -20,59 +20,59 @@ import java.io.Serializable;
 
 /**
  * Saves some settings linked to a scope.
- * 
- * @LevelAPI Experimental
  */
 public class Scope implements Cloneable, Serializable {
+
+  private static final long serialVersionUID = 4408914199911160397L;
 
   /**
    * Settings of portlets or gadgets.
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope WINDOWS = new Scope("WINDOWS", null);
+  public static final Scope WINDOWS          = new Scope("WINDOWS", null);
 
   /**
    * Settings of pages.
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope PAGE = new Scope("PAGE", null);
+  public static final Scope PAGE             = new Scope("PAGE", null);
 
   /**
    * Settings of spaces.
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope SPACE = new Scope("SPACE", null);
+  public static final Scope SPACE            = new Scope("SPACE", null);
 
   /**
    * Settings of sites.
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope SITE = new Scope("SITE", null);
+  public static final Scope SITE             = new Scope("SITE", null);
 
   /**
    * Settings of the entire portal (and all its sites).
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope PORTAL = new Scope("PORTAL", null);
+  public static final Scope PORTAL           = new Scope("PORTAL", null);
 
   /**
    * Settings of an application, like Forum, Content, or Social.
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope APPLICATION = new Scope("APPLICATION", null);
+  public static final Scope APPLICATION      = new Scope("APPLICATION", null);
 
   /**
    * Settings of the whole eXo Platform (all sites and portals).
    * 
    * @LevelAPI Experimental
    */
-  public static final Scope GLOBAL = new Scope("GLOBAL", null);
+  public static final Scope GLOBAL           = new Scope("GLOBAL", null);
 
   private String            id;
 
@@ -84,12 +84,7 @@ public class Scope implements Cloneable, Serializable {
   }
 
   public Scope id(String id) {
-    Scope result = null;
-    try {
-      result = (Scope) this.clone();
-    } catch (CloneNotSupportedException e) {
-      throw new RuntimeException(e);
-    }
+    Scope result = this.clone();
     result.id = id;
     return result;
   }
@@ -104,8 +99,10 @@ public class Scope implements Cloneable, Serializable {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
+      return false;
 
     Scope that = (Scope) o;
     return that.hashCode() == this.hashCode();
@@ -116,5 +113,10 @@ public class Scope implements Cloneable, Serializable {
     int result = id != null ? id.hashCode() : 0;
     result = 31 * result + (name != null ? name.hashCode() : 0);
     return result;
+  }
+
+  @Override
+  public Scope clone() { // NOSONAR
+    return new Scope(name, id);
   }
 }

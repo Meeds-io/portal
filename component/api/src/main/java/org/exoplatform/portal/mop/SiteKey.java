@@ -24,103 +24,76 @@ import java.io.Serializable;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.page.PageKey;
 
+import lombok.Data;
+
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
+@Data
 public final class SiteKey implements Serializable {
 
-    public static SiteKey portal(String name) {
-        return new SiteKey(SiteType.PORTAL, name);
+  private static final long serialVersionUID = -33198391360501633L;
+
+  private final SiteType    type;
+
+  private final String      name;
+
+  public SiteKey(SiteType type, String name) {
+    if (type == null) {
+      throw new NullPointerException("No null type can be provided");
+    }
+    if (name == null) {
+      throw new NullPointerException("No null name can be provided");
     }
 
-    public static SiteKey group(String name) {
-        return new SiteKey(SiteType.GROUP, name);
+    //
+    this.type = type;
+    this.name = name;
+  }
+
+  public SiteKey(String type, String name) {
+    if (PortalConfig.PORTAL_TYPE.equalsIgnoreCase(type)) {
+      this.type = SiteType.PORTAL;
+    } else if (PortalConfig.GROUP_TYPE.equalsIgnoreCase(type)) {
+      this.type = SiteType.GROUP;
+    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(type)) {
+      this.type = SiteType.GROUP_TEMPLATE;
+    } else if (PortalConfig.SPACE_TYPE.equalsIgnoreCase(type)) {
+      this.type = SiteType.SPACE;
+    } else if (PortalConfig.USER_TYPE.equalsIgnoreCase(type)) {
+      this.type = SiteType.USER;
+    } else {
+      throw new NullPointerException("No null name can be provided");
     }
+    this.name = name;
+  }
 
-    public static SiteKey user(String name) {
-        return new SiteKey(SiteType.USER, name);
-    }
+  public static SiteKey portal(String name) {
+    return new SiteKey(SiteType.PORTAL, name);
+  }
 
-    public static SiteKey space(String name) {
-      return new SiteKey(SiteType.SPACE, name);
-    }
+  public static SiteKey group(String name) {
+    return new SiteKey(SiteType.GROUP, name);
+  }
 
-    /** . */
-    private final SiteType type;
+  public static SiteKey user(String name) {
+    return new SiteKey(SiteType.USER, name);
+  }
 
-    /** . */
-    private final String name;
+  public static SiteKey space(String name) {
+    return new SiteKey(SiteType.SPACE, name);
+  }
 
-    public SiteKey(SiteType type, String name) {
-        if (type == null) {
-            throw new NullPointerException("No null type can be provided");
-        }
-        if (name == null) {
-            throw new NullPointerException("No null name can be provided");
-        }
+  public static SiteKey groupTemplate(String name) {
+    return new SiteKey(SiteType.GROUP_TEMPLATE, name);
+  }
 
-        //
-        this.type = type;
-        this.name = name;
-    }
+  public String getTypeName() {
+    return type.getName();
+  }
 
-    // This will be used for transition in usage from PortalKey and SiteKey
-    public SiteKey(String type, String name) {
-        if (PortalConfig.PORTAL_TYPE.equalsIgnoreCase(type)) {
-            this.type = SiteType.PORTAL;
-        } else if (PortalConfig.GROUP_TYPE.equalsIgnoreCase(type)) {
-            this.type = SiteType.GROUP;
-        } else if (PortalConfig.SPACE_TYPE.equalsIgnoreCase(type)) {
-          this.type = SiteType.SPACE;
-        } else if (PortalConfig.USER_TYPE.equalsIgnoreCase(type)) {
-          this.type = SiteType.USER;
-        } else {
-            throw new NullPointerException("No null name can be provided");
-        }
-
-        this.name = name;
-    }
-
-    public SiteType getType() {
-        return type;
-    }
-
-    public String getTypeName() {
-        return type.getName();
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public PageKey page(String name) {
-        return new PageKey(this, name);
-    }
-
-    @Override
-    public int hashCode() {
-        return name.hashCode() ^ type.getName().hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-
-        // We need to use class equality here
-        if (obj != null && getClass().equals(obj.getClass())) {
-            SiteKey that = (SiteKey) obj;
-            return type.getName().equals(that.type.getName()) && name.equals(that.name);
-        }
-
-        //
-        return false;
-    }
-
-    @Override
-    public String toString() {
-        return "SiteKey[type=" + type.toString() + ",name=" + name + "]";
-    }
+  public PageKey page(String name) {
+    return new PageKey(this, name);
+  }
 }
