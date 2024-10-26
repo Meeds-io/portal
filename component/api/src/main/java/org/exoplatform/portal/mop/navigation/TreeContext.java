@@ -229,4 +229,5 @@ class TreeContext<N> implements Scope.Visitor, NodeChangeListener<NodeContext<N>
     public void onRemove(NodeContext<N> target, NodeContext<N> parent) {
         throw new UnsupportedOperationException();
     }
+
 }

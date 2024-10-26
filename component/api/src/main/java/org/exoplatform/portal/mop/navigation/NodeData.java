@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.mop.SiteKey;
@@ -39,28 +40,28 @@ public class NodeData implements Serializable {
   private static final long serialVersionUID = 5801881702083669782L;
 
   /** . */
-  final String              parentId;
+  String                    parentId;
 
   /** . */
-  final String              id;
+  String                    id;
 
   /** . */
-  final SiteKey             siteKey;
+  SiteKey                   siteKey;
 
   /** . */
-  final String              name;
+  String                    name;
 
   /** . */
-  final NodeState           state;
+  NodeState                 state;
 
   /** . */
-  final String[]            children;
+  String[]                  children;
 
   /** . */
-  final String              target;
+  String                    target;
 
   /** . */
-  final long                updatedDate;
+  long                      updatedDate;
 
   public NodeData(String parentId,
                   String id,
@@ -193,5 +194,9 @@ public class NodeData implements Serializable {
   @Override
   public String toString() {
     return "NodeData[id=" + id + ",name=" + name + ",state=" + state + ",children=" + Arrays.asList(children) + "]";
+  }
+
+  public void resetStorage() {
+    id = null;
   }
 }

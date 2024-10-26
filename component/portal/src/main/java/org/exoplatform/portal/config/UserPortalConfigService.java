@@ -36,6 +36,7 @@ import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.ComponentPlugin;
@@ -197,6 +198,14 @@ public class UserPortalConfigService implements Startable {
       return null;
     }
     return new UserPortalConfig(portal, this, portalName, accessUser, locale);
+  }
+
+  public void createSiteFromTemplate(SiteKey siteKey,
+                                     SiteKey siteTemplateKey,
+                                     String permission) throws ObjectNotFoundException {
+    layoutService.savePortalFromTemplate(siteKey, siteTemplateKey, permission);
+    layoutService.savePagesFromTemplate(siteKey, siteTemplateKey, permission);
+    navigationService.saveNavigationFromTemplate(siteKey, siteTemplateKey);
   }
 
   /**

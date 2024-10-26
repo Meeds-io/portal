@@ -23,12 +23,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
@@ -52,6 +55,7 @@ import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteFilter;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.Utils;
 import org.exoplatform.portal.mop.importer.Status;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
@@ -67,6 +71,8 @@ import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+
+import lombok.SneakyThrows;
 
 public class LayoutServiceImpl implements LayoutService {
 
@@ -110,6 +116,62 @@ public class LayoutServiceImpl implements LayoutService {
   public void create(PortalConfig config) {
     siteStorage.create(config);
     broadcastEvent(PORTAL_CONFIG_CREATED, config);
+  }
+
+  @Override
+  public void savePortalFromTemplate(SiteKey siteKey,
+                                     SiteKey siteTemplateKey,
+                                     String permission) throws ObjectNotFoundException {
+    PortalConfig templatePortalConfig = getPortalConfig(siteTemplateKey);
+    if (templatePortalConfig == null) {
+      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", siteTemplateKey));
+    }
+    boolean exists = getPortalConfig(siteKey) != null;
+    PortalConfig portalConfig = templatePortalConfig.clone();
+    portalConfig.resetStorage();
+    portalConfig.setType(siteKey.getTypeName());
+    portalConfig.setName(siteKey.getName());
+    portalConfig.setBannerFileId(0);
+    if (StringUtils.isNotBlank(permission)) {
+      portalConfig.setAccessPermissions(getPermissionsFromTemplate(portalConfig.getAccessPermissions(), permission));
+      portalConfig.setEditPermission(getPermissionFromTemplate(portalConfig.getEditPermission(), permission));
+      applyPermissionTemplate(portalConfig.getPortalLayout(), permission);
+    }
+    if (exists) {
+      siteStorage.save(portalConfig.build());
+    } else {
+      siteStorage.create(portalConfig.build());
+    }
+    broadcastEvent(PORTAL_CONFIG_CREATED, portalConfig);
+  }
+
+  @Override
+  public void savePagesFromTemplate(SiteKey siteKey,
+                                    SiteKey siteTemplateKey,
+                                    String permission) throws ObjectNotFoundException {
+    List<PageContext> pages = findPages(siteTemplateKey);
+    if (CollectionUtils.isEmpty(pages)) {
+      return;
+    }
+    pages.stream().map(PageContext::getKey).forEach(pageKey -> savePageFromTemplate(siteKey, pageKey, permission));
+  }
+
+  @Override
+  @SneakyThrows
+  public void savePageFromTemplate(SiteKey siteKey, PageKey pageTemplateKey, String permission) {
+    Page page = getPage(pageTemplateKey);
+    page = new Page(page.build());
+    page.resetStorage();
+    page.setOwnerType(siteKey.getTypeName());
+    page.setOwnerId(siteKey.getName());
+    if (StringUtils.isNotBlank(permission)) {
+      page.setAccessPermissions(getPermissionsFromTemplate(page.getAccessPermissions(), permission));
+      page.setEditPermission(getPermissionFromTemplate(page.getEditPermission(), permission));
+      applyPermissionTemplate(page, permission);
+    }
+    pageStorage.savePage(new PageContext(page.getPageKey(), Utils.toPageState(page)));
+    pageStorage.save(page.build());
+    broadcastEvent(PAGE_CREATED, page);
   }
 
   @Override
@@ -510,4 +572,29 @@ public class LayoutServiceImpl implements LayoutService {
       LOG.warn("Error when broadcasting notification " + eventName + " for " + data, e);
     }
   }
+
+  private void applyPermissionTemplate(ModelObject model, String permission) {
+    if (model instanceof Container container) {
+      container.setAccessPermissions(getPermissionsFromTemplate(container.getAccessPermissions(), permission));
+      if (CollectionUtils.isNotEmpty(container.getChildren())) {
+        container.getChildren().forEach(c -> applyPermissionTemplate(c, permission));
+      }
+    } else if (model instanceof Application application) {
+      application.setAccessPermissions(getPermissionsFromTemplate(application.getAccessPermissions(), permission));
+    }
+  }
+
+  private String[] getPermissionsFromTemplate(String[] accessPermissions, String permission) {
+    if (ArrayUtils.isEmpty(accessPermissions)) {
+      return accessPermissions;
+    }
+    return Arrays.stream(accessPermissions)
+                 .map(p -> getPermissionFromTemplate(p, permission))
+                 .toArray(String[]::new);
+  }
+
+  private String getPermissionFromTemplate(String selectedPermission, String permission) {
+    return selectedPermission.replace("@owner_id@", permission);
+  }
+
 }
