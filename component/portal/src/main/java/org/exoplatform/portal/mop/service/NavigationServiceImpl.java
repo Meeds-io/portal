@@ -18,13 +18,19 @@
  */
 package org.exoplatform.portal.mop.service;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.State;
 import org.exoplatform.portal.mop.navigation.GenericScope;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationData;
@@ -47,12 +53,16 @@ public class NavigationServiceImpl implements NavigationService {
 
   private final NodeManager nodeManager;
 
+  final DescriptionService  descriptionService;
+
   final ListenerService     listenerService;
 
   final NavigationStorage   navigationStorage;
 
-  public NavigationServiceImpl(ListenerService listenerService,
+  public NavigationServiceImpl(DescriptionService descriptionService,
+                               ListenerService listenerService,
                                NavigationStorage navigationStorage) {
+    this.descriptionService = descriptionService;
     this.listenerService = listenerService;
     this.navigationStorage = navigationStorage;
     this.nodeManager = new NodeManager(navigationStorage);
@@ -74,6 +84,59 @@ public class NavigationServiceImpl implements NavigationService {
       notify(EventType.NAVIGATION_CREATED, navigation.getKey());
     } else {
       notify(EventType.NAVIGATION_UPDATED, navigation.getKey());
+    }
+  }
+
+  @Override
+  @SuppressWarnings("rawtypes")
+  public void saveNavigationFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey) throws ObjectNotFoundException {
+    NavigationContext navigationTemplateContext = loadNavigation(siteTemplateKey);
+    navigationStorage.saveNavigation(siteKey, navigationTemplateContext.getState());
+    NavigationContext navigationContext = loadNavigation(siteKey);
+    NodeContext rootTemplate = loadNode(NodeModel.SELF_MODEL,
+                                        navigationTemplateContext,
+                                        Scope.ALL,
+                                        null);
+    NodeContext root = loadNode(NodeModel.SELF_MODEL,
+                                navigationContext,
+                                Scope.ALL,
+                                null);
+    cloneNodes(rootTemplate, root, siteKey);
+    notify(EventType.NAVIGATION_CREATED, siteKey);
+  }
+
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  public void cloneNodes(NodeContext src, NodeContext dest, SiteKey siteKey) {
+    if (src == null || src.getNodeCount() == 0) {
+      return;
+    }
+
+    List<?> nodes = new ArrayList<>(src.getNodes());
+    Long previousId = null;
+    for (int i = 0; i < nodes.size(); i++) {
+      NodeContext<NodeContext> sourceChild = (NodeContext<NodeContext>) nodes.get(i);
+      NodeState state = sourceChild.getData().getState();
+      NodeData[] nodeDatas = createNode(Long.parseLong(dest.getId()),
+                                        previousId,
+                                        sourceChild.getName(),
+                                        new NodeState(state.getLabel(),
+                                                      state.getIcon(),
+                                                      state.getStartPublicationTime(),
+                                                      state.getEndPublicationTime(),
+                                                      state.getVisibility(),
+                                                      state.getPageRef() == null ? null :
+                                                                                 siteKey.page(state.getPageRef().getName()),
+                                                      siteKey,
+                                                      state.getTarget(),
+                                                      System.currentTimeMillis()));
+      NodeData nodeData = nodeDatas[1];
+      Map<Locale, State> descriptions = descriptionService.getDescriptions(sourceChild.getId());
+      descriptionService.setDescriptions(nodeData.getId(), descriptions);
+      previousId = Long.parseLong(nodeData.getId());
+      if (sourceChild.getNodeCount() > 0) {
+        NodeContext destinationChild = loadNodeById(NodeModel.SELF_MODEL, nodeData.getId(), Scope.ALL, null);
+        cloneNodes(sourceChild, destinationChild, siteKey);
+      }
     }
   }
 
@@ -106,11 +169,13 @@ public class NavigationServiceImpl implements NavigationService {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public NodeContext<NodeContext<?>> loadNode(SiteKey siteKey) {
     return loadNode(siteKey, null);
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public NodeContext<NodeContext<?>> loadNode(SiteKey siteKey, String navUri) {
     if (siteKey == null) {
       return null;

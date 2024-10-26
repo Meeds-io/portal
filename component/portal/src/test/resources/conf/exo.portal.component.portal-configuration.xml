@@ -91,6 +91,11 @@
   </component>
 
   <component>
+    <key>org.exoplatform.portal.mop.service.DescriptionService</key>
+    <type>org.exoplatform.portal.mop.service.DescriptionServiceImpl</type>
+  </component>
+
+  <component>
      <type>org.exoplatform.services.rest.impl.ResourceBinder</type>
   </component>
 

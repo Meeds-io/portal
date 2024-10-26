@@ -25,6 +25,7 @@ import java.util.Collections;
 
 import org.apache.commons.lang3.StringUtils;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
@@ -310,6 +311,12 @@ public class PortalConfig extends ModelObject implements Cloneable {
                           displayed,
                           displayOrder,
                           bannerFileId);
+  }
+
+  @Override
+  public void resetStorage() throws ObjectNotFoundException {
+    super.resetStorage();
+    getPortalLayout().resetStorage();
   }
 
   public void useMetaPortalLayout() {
