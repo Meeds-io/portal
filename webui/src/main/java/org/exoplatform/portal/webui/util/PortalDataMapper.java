@@ -51,13 +51,12 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 
-@SuppressWarnings({ "rawtypes", "unchecked" })
 public class PortalDataMapper {
 
   protected static final Log log = ExoLogger.getLogger("portal:PortalDataMapper");
 
-  private static <S> void toUIPortlet(UIPortlet<S, ?> uiPortlet, Application<S> model) {
-    PortletState<S> portletState = new PortletState<>(model.getState(), model.getType());
+  private static void toUIPortlet(UIPortlet uiPortlet, Application model) {
+    PortletState portletState = new PortletState(model.getState());
     uiPortlet.setWidth(model.getWidth());
     uiPortlet.setHeight(model.getHeight());
     uiPortlet.setState(portletState);

@@ -22,6 +22,7 @@ package org.exoplatform.portal.mop.navigation;
 import java.util.Map;
 
 import org.exoplatform.commons.utils.Safe;
+import org.exoplatform.portal.mop.storage.NavigationStorage;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
@@ -29,13 +30,13 @@ import org.exoplatform.commons.utils.Safe;
 public class NodeManager {
 
     /** . */
-    private final NodeStore store;
+    private final NavigationStorage store;
 
-    public NodeManager(NodeStore store) {
+    public NodeManager(NavigationStorage store) {
         this.store = store;
     }
 
-    public NodeStore getStore() {
+    public NavigationStorage getStore() {
         return store;
     }
 
@@ -46,7 +47,7 @@ public class NodeManager {
             NodeChangeListener<NodeContext<N>> listener) {
       NodeData data = store.loadNode(Safe.parseLong(nodeId));
       if (data != null) {
-        NodeContext<N> context = new NodeContext<N>(model, data);
+        NodeContext<N> context = new NodeContext<>(model, data);
         updateNode(context, scope, listener);
         return context;
       } else {
@@ -59,7 +60,7 @@ public class NodeManager {
     }
 
     public <L, N> void diff(NodeAdapter<L, N> adapter, N node, NodeContext<N> context) {
-        TreeDiff<L, N> diff = new TreeDiff<L, N>(node, context, adapter);
+        TreeDiff<L, N> diff = new TreeDiff<>(node, context, adapter);
         diff.perform();
     }
 
@@ -156,7 +157,7 @@ public class NodeManager {
         NodeChangeQueue<NodeContext<N>> changes = tree.getChanges();
 
         //
-        NodeChangeListener<NodeContext<N>> merger = new TreeMerge<N>(rebased, rebased);
+        NodeChangeListener<NodeContext<N>> merger = new TreeMerge<>(rebased, rebased);
 
         //
         if (changes != null) {
@@ -179,7 +180,7 @@ public class NodeManager {
         TreeContext<N> rebased = rebase(tree, tree.origin());
 
         //
-        NodePersister<N> persister = new NodePersister<N>(store);
+        NodePersister<N> persister = new NodePersister<>(store);
 
         //
         NodeChangeQueue<NodeContext<N>> changes = rebased.getChanges();

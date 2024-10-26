@@ -29,8 +29,12 @@ import org.exoplatform.web.WebRequestHandler;
 
 /**
  * @author <a href="mailto:phuong.vu@exoplatform.com">Vu Viet Phuong</a>
+ * @deprecated not needed anymore since the resources will be served directly
+ *             from Web Archives using {@link ResourceRequestFilter}
  */
+@Deprecated(forRemoval = true, since = "7.0")
 public class StaticResourceRequestHandler extends WebRequestHandler {
+
     @Override
     public String getHandlerName() {
         return "staticResource";

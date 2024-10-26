@@ -18,9 +18,7 @@ package org.exoplatform.portal.mop.storage;
 import java.util.Locale;
 import java.util.Map;
 
-import org.exoplatform.portal.mop.description.DescriptionService;
-
-public interface DescriptionStorage extends DescriptionService {
+public interface DescriptionStorage {
 
   /**
    * <p>

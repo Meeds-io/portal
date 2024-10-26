@@ -5,24 +5,21 @@ import java.util.List;
 
 import jakarta.persistence.EntityTransaction;
 
-import org.gatein.api.common.Pagination;
-
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
 import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
-import org.exoplatform.portal.mop.dao.WindowDAO;
 
 public class WindowDAOTest extends AbstractDAOTest {
-  private WindowDAO windowDAO;
-  
+  private WindowDAO         windowDAO;
+
   private EntityTransaction transaction;
-  
+
   @Override
-  protected void setUp() throws Exception {    
+  protected void setUp() throws Exception {
     begin();
     super.setUp();
     this.windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
-    
+
     EntityManagerService managerService = getContainer().getComponentInstanceOfType(EntityManagerService.class);
     transaction = managerService.getEntityManager().getTransaction();
     transaction.begin();
@@ -36,24 +33,24 @@ public class WindowDAOTest extends AbstractDAOTest {
     super.tearDown();
     end();
   }
-  
+
   public void testCreateContainer() {
     WindowEntity entity = createInstance("content1", AppType.PORTLET);
     windowDAO.create(entity);
     restartTransaction();
-    
+
     WindowEntity result = windowDAO.find(entity.getId());
     assertNotNull(result);
     assertContainer(entity, result);
   }
-  
+
   public void testFindByIds() {
     WindowEntity entity1 = createInstance("content1", AppType.PORTLET);
     windowDAO.create(entity1);
     WindowEntity entity2 = createInstance("content2", AppType.PORTLET);
     windowDAO.create(entity2);
     restartTransaction();
-    
+
     List<WindowEntity> results = windowDAO.findByIds(Arrays.asList(entity1.getId(), entity2.getId()));
     assertEquals(2, results.size());
   }
@@ -70,13 +67,14 @@ public class WindowDAOTest extends AbstractDAOTest {
     restartTransaction();
 
     List<Long> results = windowDAO.findIdsByContentIds(Arrays.asList(toDeleteContentId, "App2/toNotDeletePortlet2"),
-                                                       new Pagination(0, 10));
+                                                       0,
+                                                       10);
     assertEquals(6, results.size());
 
     windowDAO.deleteByContentId(toDeleteContentId);
-    results = windowDAO.findIdsByContentIds(Arrays.asList(toDeleteContentId), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(toDeleteContentId), 0, 10);
     assertEquals(0, results.size());
-    results = windowDAO.findIdsByContentIds(Arrays.asList(toDeleteContentId, "App2/toNotDeletePortlet2"), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(toDeleteContentId, "App2/toNotDeletePortlet2"), 0, 10);
     assertEquals(1, results.size());
   }
 
@@ -92,26 +90,28 @@ public class WindowDAOTest extends AbstractDAOTest {
     windowDAO.create(createInstance("App2/toNotUpdatePortlet2", AppType.PORTLET));
     restartTransaction();
 
-    List<Long> results = windowDAO.findIdsByContentIds(Arrays.asList(newContentId), new Pagination(0, 10));
+    List<Long> results = windowDAO.findIdsByContentIds(Arrays.asList(newContentId), 0, 10);
     assertEquals(0, results.size());
 
     results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId, "App2/toNotUpdatePortlet2"),
-                                            new Pagination(0, 10));
+                                            0,
+                                            10);
     assertEquals(6, results.size());
 
     windowDAO.updateContentId(oldContentId, newContentId);
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId), 0, 10);
     assertEquals(0, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId, "App2/toNotUpdatePortlet2"), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId, "App2/toNotUpdatePortlet2"), 0, 10);
     assertEquals(1, results.size());
 
     results = windowDAO.findIdsByContentIds(Arrays.asList(oldContentId, newContentId, "App2/toNotUpdatePortlet2"),
-                                            new Pagination(0, 10));
+                                            0,
+                                            10);
     assertEquals(6, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList(newContentId), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(newContentId), 0, 10);
     assertEquals(5, results.size());
   }
 
@@ -122,30 +122,29 @@ public class WindowDAOTest extends AbstractDAOTest {
     windowDAO.create(entity2);
     restartTransaction();
 
-    List<Long> results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet1"), new Pagination(0, 10));
+    List<Long> results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet1"), 0, 10);
     assertEquals(1, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("app1/portlet1", "app2/portlet2"), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList("app1/portlet1", "app2/portlet2"), 0, 10);
     assertEquals(0, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), 0, 10);
     assertEquals(2, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), new Pagination(0, 1));
+    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), 0, 1);
     assertEquals(1, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), new Pagination(0, 1).getNext());
+    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), 1, 1);
     assertEquals(1, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"),
-                                            new Pagination(0, 1).getNext().getNext());
+    results = windowDAO.findIdsByContentIds(Arrays.asList("App1/portlet1", "App2/portlet2"), 2, 1);
     assertEquals(0, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList(), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList(), 0, 10);
     assertNotNull(results);
     assertEquals(0, results.size());
 
-    results = windowDAO.findIdsByContentIds(Arrays.asList("app1"), new Pagination(0, 10));
+    results = windowDAO.findIdsByContentIds(Arrays.asList("app1"), 0, 10);
     assertNotNull(results);
     assertEquals(0, results.size());
   }
@@ -168,7 +167,7 @@ public class WindowDAOTest extends AbstractDAOTest {
     entity.setWidth("testWidth");
     return entity;
   }
-  
+
   private void assertContainer(WindowEntity expected, WindowEntity result) {
     assertEquals(expected.getDescription(), result.getDescription());
     assertEquals(expected.getHeight(), result.getHeight());

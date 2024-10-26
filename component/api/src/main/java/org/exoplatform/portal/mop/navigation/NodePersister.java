@@ -19,9 +19,13 @@
 
 package org.exoplatform.portal.mop.navigation;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import org.exoplatform.commons.utils.Safe;
+import org.exoplatform.portal.mop.storage.NavigationStorage;
 
 /**
 * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
@@ -35,12 +39,12 @@ class NodePersister<N> extends NodeChangeListener.Base<NodeContext<N>> {
     final Set<String> toUpdate;
 
     /** . */
-    private final NodeStore persistence;
+    private final NavigationStorage persistence;
 
-    NodePersister(NodeStore persistence) {
+    NodePersister(NavigationStorage persistence) {
         this.persistence = persistence;
-        this.toPersist = new HashMap<String, String>();
-        this.toUpdate = new HashSet<String>();
+        this.toPersist = new HashMap<>();
+        this.toUpdate = new HashSet<>();
     }
 
     @Override
@@ -116,6 +120,7 @@ class NodePersister<N> extends NodeChangeListener.Base<NodeContext<N>> {
         toUpdate.add(to.handle);
     }
 
+    @Override
     public void onRename(NodeContext<N> target, NodeContext<N> parent, String name) throws HierarchyException {
 
         NodeData[] result = persistence.renameNode(Safe.parseLong(target.data.id), Safe.parseLong(parent.data.id), name);

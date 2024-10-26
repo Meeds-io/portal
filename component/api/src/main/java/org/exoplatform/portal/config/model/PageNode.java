@@ -60,25 +60,6 @@ public class PageNode extends PageNodeContainer {
     /** . */
     private long updatedDate;
 
-    public PageNode() {
-    }
-
-    /**
-     * Always returns {@code null} as there is no <code>&lt;uri&gt;</code> since gatein_objects_1_4.
-     * @return
-     */
-    public String getUri() {
-        return null;
-    }
-
-    /**
-     * Ignored but still here for backwards compatibility
-     *
-     * @param s ignored
-     */
-    public void setUri(String s) {
-    }
-
     public I18NString getLabels() {
         return labels;
     }

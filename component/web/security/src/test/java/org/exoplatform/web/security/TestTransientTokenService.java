@@ -18,8 +18,6 @@
  */
 package org.exoplatform.web.security;
 
-import org.gatein.wci.security.Credentials;
-
 import org.exoplatform.component.test.*;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.web.security.security.TransientTokenService;
@@ -33,10 +31,11 @@ import org.exoplatform.web.security.security.TransientTokenService;
 @ConfiguredBy({ @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.security-configuration-local.xml") })
 public class TestTransientTokenService extends AbstractTokenServiceTest<TransientTokenService> {
 
+    @Override
     public void setUp() throws Exception {
         super.setUp();
         PortalContainer container = getContainer();
-        service = (TransientTokenService) container.getComponentInstanceOfType(TransientTokenService.class);
+        service = container.getComponentInstanceOfType(TransientTokenService.class);
     }
 
     @Override

@@ -24,48 +24,48 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
 public class ExoPortletState implements Serializable {
 
-    /** . */
-    private final String portletId;
+  private static final long                   serialVersionUID = -6281095288237675907L;
 
-    /** . */
-    private final HashMap<String, List<String>> state;
+  /** . */
+  private final String                        portletId;
 
-    public ExoPortletState(String portletId) {
-        this.portletId = portletId;
-        this.state = new HashMap<String, List<String>>();
+  /** . */
+  private final HashMap<String, List<String>> state;
+
+  public ExoPortletState(String portletId) {
+    this.portletId = portletId;
+    this.state = new HashMap<>();
+  }
+
+  public String getPortletId() {
+    return portletId;
+  }
+
+  public Map<String, List<String>> getState() {
+    return state;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof ExoPortletState that) {
+      return portletId.equals(that.portletId) && state.equals(that.state);
     }
+    return false;
+  }
 
-    public String getPortletId() {
-        return portletId;
-    }
+  @Override
+  public int hashCode() {
+    return portletId.hashCode() ^ state.hashCode();
+  }
 
-    public Map<String, List<String>> getState() {
-        return state;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof ExoPortletState) {
-            ExoPortletState that = (ExoPortletState) obj;
-            return portletId.equals(that.portletId) && state.equals(that.state);
-        }
-        return false;
-    }
-
-    @Override
-    public int hashCode() {
-        return portletId.hashCode() ^ state.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return "ExoPortletState[portletId=" + portletId + ",state=" + state + "]";
-    }
+  @Override
+  public String toString() {
+    return "ExoPortletState[portletId=" + portletId + ",state=" + state + "]";
+  }
 }

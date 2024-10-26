@@ -17,11 +17,15 @@ import org.exoplatform.portal.mop.SiteType;
 
 public class DynamicPortalLayoutMatcherPluginTest {
 
-  private static final String PORTAL_SITE_NAME = "testPortal";
+  private static final String NON_EXISTING_PATH = "NonExistingPath";
 
-  private static final String GROUP_SITE_NAME  = "testGroup";
+  private static final String EXISTING_PATH     = "ExistingPath";
 
-  private static final String USER_SITE_NAME   = "testUser";
+  private static final String PORTAL_SITE_NAME  = "testPortal";
+
+  private static final String GROUP_SITE_NAME   = "testGroup";
+
+  private static final String USER_SITE_NAME    = "testUser";
 
   private InputStream         portalLayoutInputStream;
 
@@ -58,7 +62,7 @@ public class DynamicPortalLayoutMatcherPluginTest {
   }
 
   @Test
-  public void testPluginInit() {
+  public void testPluginInit() throws Exception {
     DynamicPortalLayoutMatcher matcher = mock(DynamicPortalLayoutMatcher.class);
 
     DynamicPortalLayoutMatcherPlugin dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
@@ -73,45 +77,37 @@ public class DynamicPortalLayoutMatcherPluginTest {
 
     dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
                                                   true,
-                                                  "NonExistingPath",
+                                                  NON_EXISTING_PATH,
                                                   matcher);
     dynamicPortalLayoutMatcherPlugin.init(configurationManager);
     assertFalse(dynamicPortalLayoutMatcherPlugin.isEnabled());
     assertTrue(dynamicPortalLayoutMatcherPlugin.isInitialized());
     assertNull(dynamicPortalLayoutMatcherPlugin.getLayoutTemplate());
 
-    try {
-      when(configurationManager.getInputStream("NonExistingPath")).thenThrow(new IllegalStateException("Just Testing, no bug !") {
-        private static final long serialVersionUID = -3930575563406989213L;
+    when(configurationManager.getInputStream(NON_EXISTING_PATH)).thenThrow(new IllegalStateException("Just Testing, no bug !") {
+      private static final long serialVersionUID = -3930575563406989213L;
 
-        @Override
-        public StackTraceElement[] getStackTrace() {
-          return new StackTraceElement[0];
-        }
-      });
-    } catch (Exception e) {
-      throw new AssertionError("Error while mocking configurationManager", e);
-    }
+      @Override
+      public StackTraceElement[] getStackTrace() {
+        return new StackTraceElement[0];
+      }
+    });
 
     dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
                                                   true,
-                                                  "NonExistingPath",
+                                                  NON_EXISTING_PATH,
                                                   matcher);
     dynamicPortalLayoutMatcherPlugin.init(configurationManager);
     assertFalse(dynamicPortalLayoutMatcherPlugin.isEnabled());
     assertTrue(dynamicPortalLayoutMatcherPlugin.isInitialized());
     assertNull(dynamicPortalLayoutMatcherPlugin.getLayoutTemplate());
 
-    try {
-      reset(configurationManager);
-      when(configurationManager.getInputStream(eq("ExistingPath"))).thenReturn(getPortalLayoutInputStream());
-    } catch (Exception e) {
-      throw new AssertionError("Error while mocking configurationManager", e);
-    }
+    reset(configurationManager);
+    when(configurationManager.getInputStream(eq(EXISTING_PATH))).thenReturn(getPortalLayoutInputStream());
 
     dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
                                                   true,
-                                                  "ExistingPath",
+                                                  EXISTING_PATH,
                                                   matcher);
     dynamicPortalLayoutMatcherPlugin.init(configurationManager);
     assertTrue(dynamicPortalLayoutMatcherPlugin.isEnabled());
@@ -126,12 +122,12 @@ public class DynamicPortalLayoutMatcherPluginTest {
     DynamicPortalLayoutMatcher matcher = mock(DynamicPortalLayoutMatcher.class);
     DynamicPortalLayoutMatcherPlugin dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
                                                                                    true,
-                                                                                   "ExistingPath",
+                                                                                   EXISTING_PATH,
                                                                                    matcher);
     ConfigurationManager configurationManager = mock(ConfigurationManager.class);
     try {
       reset(configurationManager);
-      when(configurationManager.getInputStream(eq("ExistingPath"))).thenReturn(getPortalLayoutInputStream());
+      when(configurationManager.getInputStream(eq(EXISTING_PATH))).thenReturn(getPortalLayoutInputStream());
     } catch (Exception e) {
       throw new AssertionError("Error while mocking configurationManager", e);
     }
@@ -176,11 +172,11 @@ public class DynamicPortalLayoutMatcherPluginTest {
 
     dynamicPortalLayoutMatcherPlugin = mockPlugin(true,
                                                   false,
-                                                  "ExistingPath",
+                                                  EXISTING_PATH,
                                                   matcher);
     try {
       reset(configurationManager);
-      when(configurationManager.getInputStream(eq("ExistingPath"))).thenReturn(getPortalLayoutInputStream());
+      when(configurationManager.getInputStream(eq(EXISTING_PATH))).thenReturn(getPortalLayoutInputStream());
     } catch (Exception e) {
       throw new AssertionError("Error while mocking configurationManager", e);
     }

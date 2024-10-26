@@ -88,9 +88,6 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     private List<SiteConfigTemplates> templateConfigs;
 
     /** . */
-    private String pageTemplatesLocation_;
-
-    /** . */
     private String metaPortal;
 
     /**
@@ -145,11 +142,7 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
         this.userAcl = userACL;
         this.localeConfigService = localeConfigService;
 
-        ValueParam valueParam = params.getValueParam("page.templates.location");
-        if (valueParam != null)
-            pageTemplatesLocation_ = valueParam.getValue();
-
-        valueParam = params.getValueParam("meta.portal");
+        ValueParam valueParam = params.getValueParam("meta.portal");
         if (valueParam != null) {
             metaPortal = valueParam.getValue();
         } else {
@@ -305,15 +298,6 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
         return defaultPortalTemplate;
     }
 
-    /**
-     * @return configured default portal
-     * @deprecated notion of 'default' portal doesn't exist anymore
-     */
-    @Deprecated(forRemoval = true, since = "1.5.0")
-    String getDefaultPortal() {
-      return getMetaPortal();
-    }
-
     String getMetaPortal() {
       return metaPortal;
     }
@@ -349,73 +333,6 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
             List<SiteConfigTemplates> result = new ArrayList<>(templateConfigs);
             result.addAll(other.templateConfigs);
             this.templateConfigs = Collections.unmodifiableList(result);
-        }
-    }
-
-    /**
-     * This is used to delete an already loaded NewPortalConfigListener(s)
-     *
-     * @param other
-     */
-    public void deleteListenerElements(NewPortalConfigListener other) {
-        if (configs == null) {
-            log.warn("No Portal configurations was loaded, nothing to delete !");
-        } else if (other.configs != null && !other.configs.isEmpty()) {
-            List<NewPortalConfig> result = new ArrayList<NewPortalConfig>(configs);
-            for (NewPortalConfig newPortalConfigToDelete : other.configs) {
-                int i = 0;
-                while (i < result.size()) {
-                    NewPortalConfig newPortalConfig = result.get(i);
-                    if (newPortalConfigToDelete.getOwnerType().equals(newPortalConfig.getOwnerType())) {
-                        for (String owner : newPortalConfigToDelete.getPredefinedOwner()) {
-                            newPortalConfig.getPredefinedOwner().remove(owner);
-                        }
-                    }
-                    // if the configuration has no owner definitions, then delete it
-                    if (newPortalConfig.getPredefinedOwner().size() == 0) {
-                        result.remove(newPortalConfig);
-                    } else {
-                        i++;
-                    }
-                }
-            }
-            this.configs = Collections.unmodifiableList(result);
-        }
-
-        if (templateConfigs == null) {
-            log.warn("No Portal templates configurations was loaded, nothing to delete !");
-        } else if (other.templateConfigs != null && !other.templateConfigs.isEmpty()) {
-            List<SiteConfigTemplates> result = new ArrayList<>(templateConfigs);
-            deleteSiteConfigTemplates(other, result, PortalConfig.PORTAL_TYPE);
-            deleteSiteConfigTemplates(other, result, PortalConfig.GROUP_TYPE);
-            deleteSiteConfigTemplates(other, result, PortalConfig.USER_TYPE);
-            this.templateConfigs = Collections.unmodifiableList(result);
-        }
-    }
-
-    private void deleteSiteConfigTemplates(NewPortalConfigListener other, List<SiteConfigTemplates> result, String templateType) {
-        for (SiteConfigTemplates siteConfigTemplatesToDelete : other.templateConfigs) {
-            Set<String> portalTemplatesToDelete = siteConfigTemplatesToDelete.getTemplates(templateType);
-            if (portalTemplatesToDelete != null && portalTemplatesToDelete.size() > 0) {
-                int i = 0;
-                while (i < result.size()) {
-                    SiteConfigTemplates siteConfigTemplates = result.get(i);
-                    Set<String> portalTemplates = siteConfigTemplates.getTemplates(templateType);
-                    if (portalTemplatesToDelete != null && portalTemplatesToDelete.size() > 0) {
-                        portalTemplates.removeAll(portalTemplatesToDelete);
-                    }
-                    if ((siteConfigTemplates.getTemplates(PortalConfig.PORTAL_TYPE) == null || siteConfigTemplates
-                            .getTemplates(PortalConfig.PORTAL_TYPE).size() == 0)
-                            && (siteConfigTemplates.getTemplates(PortalConfig.GROUP_TYPE) == null || siteConfigTemplates
-                                    .getTemplates(PortalConfig.GROUP_TYPE).size() == 0)
-                            && (siteConfigTemplates.getTemplates(PortalConfig.USER_TYPE) == null || siteConfigTemplates
-                                    .getTemplates(PortalConfig.USER_TYPE).size() == 0)) {
-                        result.remove(siteConfigTemplates);
-                    } else {
-                        i++;
-                    }
-                }
-            }
         }
     }
 
@@ -649,15 +566,6 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
             log.debug("Could not get file " + s + " will return null instead");
         }
         return content;
-    }
-
-    public Page createPageFromTemplate(String ownerType, String owner, String temp) throws Exception {
-        String path = pageTemplatesLocation_ + "/" + temp + "/page.xml";
-        path = fixPath(path);
-        try (InputStream is = cmanager_.getInputStream(path)) {
-          String xml = IOUtil.getStreamContentAsString(is);
-          return fromXML(ownerType, owner, xml, Page.class).getObject();
-        }
     }
 
     public String getTemplateConfig(String type, String name) {

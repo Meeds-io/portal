@@ -1,7 +1,5 @@
 package org.exoplatform.portal.mop.dao;
 
-import org.gatein.api.page.PageQuery;
-
 import org.exoplatform.portal.jdbc.entity.PageEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.mop.PageType;
@@ -55,14 +53,8 @@ public class PageDAOTest extends AbstractDAOTest {
     PageEntity page2 = createInstance("portal::b::c2", "Efg Hik", null);
     pageDAO.create(page2);    
     restartTransaction();
-        
-    PageQuery.Builder query1 = new PageQuery.Builder();    
-    query1.withSiteType(org.gatein.api.site.SiteType.SITE).withSiteName("b").withDisplayName("ef");
-    assertEquals(2, pageDAO.findByQuery(query1.build()).getSize());
-    
-    PageQuery.Builder query2 = new PageQuery.Builder();
-    query2.withSiteType(org.gatein.api.site.SiteType.SITE).withSiteName("b").withDisplayName("hik");
-    assertEquals(1, pageDAO.findByQuery(query2.build()).getSize());
+    assertEquals(2, pageDAO.findByQuery(SiteType.PORTAL, "b", "ef", 0, 0).getSize());
+    assertEquals(1, pageDAO.findByQuery(SiteType.PORTAL, "b", "hik", 0, 0).getSize());
   }
 
   public <T> T getService(Class<T> clazz) {

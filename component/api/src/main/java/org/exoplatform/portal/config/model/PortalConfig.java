@@ -28,12 +28,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
+import lombok.EqualsAndHashCode;
+
 /**
  * May 13, 2004
  *
  * @author Tuan Nguyen
  * @version $Id: PortalConfig.java,v 1.7 2004/08/06 03:02:29 tuan08 Exp $
  **/
+@EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
   public static final String    USER_TYPE      = SiteType.USER.getName();
@@ -43,6 +46,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
   public static final String    PORTAL_TYPE    = SiteType.PORTAL.getName();
 
   public static final String    SPACE_TYPE     = SiteType.SPACE.getName();
+
+  public static final String    GROUP_TEMPLATE = SiteType.GROUP_TEMPLATE.getName();
 
   public static final Container DEFAULT_LAYOUT = initDefaultLayout();
 

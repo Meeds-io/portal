@@ -94,9 +94,9 @@ public class TestJIBXXmlMapping extends TestCase {
         IBindingFactory bfact = BindingDirectory.getFactory(PortalConfig.class);
         IUnmarshallingContext uctx = bfact.createUnmarshallingContext();
         @SuppressWarnings("unchecked")
-        Application<Portlet> app = (Application<Portlet>) uctx.unmarshalDocument(new FileInputStream(
+        Application app = (Application) uctx.unmarshalDocument(new FileInputStream(
                 "src/test/resources/jibx/portlet-application.xml"), null);
-        TransientApplicationState<Portlet> portletState = (TransientApplicationState<Portlet>) app.getState();
+        TransientApplicationState portletState = (TransientApplicationState) app.getState();
         assertNotNull(portletState);
         assertEquals("web/BannerPortlet", portletState.getContentId());
         Portlet preferences = (Portlet) portletState.getContentState();

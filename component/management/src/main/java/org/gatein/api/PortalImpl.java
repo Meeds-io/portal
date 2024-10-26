@@ -57,7 +57,12 @@ import org.exoplatform.services.security.*;
  * @author <a href="mailto:chris.laprun@jboss.com">Chris Laprun</a>
  * @author <a href="mailto:nscavell@redhat.com">Nick Scavelli</a>
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
+ * @deprecated should be removed since the Portal API is defined using Service
+ *             Layers instead of contextual API which doesn't help to get
+ *             stateless mode. This is kept for now until removing WebUI
+ *             and ecms from eXo addons
  */
+@Deprecated(forRemoval = true, since = "7.0")
 public class PortalImpl implements Portal {
 
   private static final Query<PortalConfig> SITES      = new Query<>(

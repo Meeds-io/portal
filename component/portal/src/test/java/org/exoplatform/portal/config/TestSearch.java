@@ -23,7 +23,6 @@ import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.page.PageContext;
-import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.storage.PageStorage;
 
 /**
@@ -33,15 +32,11 @@ import org.exoplatform.portal.mop.storage.PageStorage;
 public class TestSearch extends AbstractConfigTest {
 
   /** . */
-  private LayoutService layoutService;
-
-  /** . */
   private PageStorage pageStorage;
 
   @Override
   public void setUp() throws Exception {
     super.setUp();
-    layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
     pageStorage = getContainer().getComponentInstanceOfType(PageStorage.class);
   }
 
@@ -94,10 +89,6 @@ public class TestSearch extends AbstractConfigTest {
     res = pageStorage.findPages(0, 10, null, "test", null, null);
     int pageNum = res.getSize();
     assertTrue(pageNum > 0);
-
-    // Test trim ownerID
-    res = pageStorage.findPages(0, 10, null, "   test   ", null, null);
-    assertEquals(pageNum, res.getSize());
 
     // This should returns all pages
     res = pageStorage.findPages(0, 10, null, null, null, null);

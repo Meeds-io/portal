@@ -63,7 +63,6 @@ public class JibxPropertiesMapper implements IMarshaller, IUnmarshaller, IAliasa
         marshallName = name;
     }
 
-    @SuppressWarnings("unused")
     public boolean isExtension(String index) {
         return false;
     }
@@ -87,8 +86,8 @@ public class JibxPropertiesMapper implements IMarshaller, IUnmarshaller, IAliasa
         Iterator<Map.Entry<String, String>> iter = map.entrySet().iterator();
         while (iter.hasNext()) {
             Map.Entry<String, String> entry = iter.next();
-            String key = entry.getKey().toString();
-            String value = entry.getValue().toString();
+            String key = entry.getKey();
+            String value = entry.getValue();
             if (key == null || value == null)
                 continue;
             ctx.startTagAttributes(marshallIndex, ENTRY_ELEMENT_NAME);
@@ -105,7 +104,6 @@ public class JibxPropertiesMapper implements IMarshaller, IUnmarshaller, IAliasa
         return ctx.isAt(marshalURI, marshallName);
     }
 
-    @SuppressWarnings("unchecked")
     public Object unmarshal(Object obj, IUnmarshallingContext ictx) throws JiBXException {
         UnmarshallingContext ctx = (UnmarshallingContext) ictx;
         if (!ctx.isAt(marshalURI, marshallName))

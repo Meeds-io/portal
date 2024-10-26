@@ -13,16 +13,13 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 
-import org.gatein.api.common.Pagination;
-import org.gatein.api.page.PageQuery;
-import org.gatein.api.site.SiteType;
-
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.persistence.impl.EntityManagerHolder;
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.portal.jdbc.entity.PageEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.page.PageKey;
 
 public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
@@ -62,8 +59,8 @@ public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
   }
 
   @Override
-  public ListAccess<PageKey> findByQuery(PageQuery query) {
-    TypedQuery<PageKey> q = buildQuery(query);
+  public ListAccess<PageKey> findByQuery(SiteType siteType, String siteName, String name, int offset, int limit) {
+    TypedQuery<PageKey> q = buildQuery(siteName, siteType, name, offset, limit);
     final List<PageKey> results = q.getResultList();
 
     return new ListAccess<PageKey>() {
@@ -83,7 +80,7 @@ public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
     };
   }
 
-  public TypedQuery<PageKey> buildQuery(PageQuery query) {
+  public TypedQuery<PageKey> buildQuery(String siteName, SiteType siteType, String name, int offset, int limit) {
     EntityManager em = EntityManagerHolder.get();
     CriteriaBuilder cb = em.getCriteriaBuilder();
     CriteriaQuery<PageKey> criteria = cb.createQuery(PageKey.class);
@@ -96,18 +93,15 @@ public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
     List<Predicate> andPredicates = new LinkedList<>();
     List<Predicate> orPredicates = new LinkedList<>();
 
-    if (query.getSiteType() != null && query.getSiteName() != null) {
-      if (query.getSiteType() != null) {
-        andPredicates.add(cb.equal(join.get(SITE_TYPE), convertSiteType(query.getSiteType())));
-      }
-      if (query.getSiteName() != null) {
-        andPredicates.add(cb.equal(join.get(NAME), query.getSiteName()));
-      }
+    if (siteType != null) {
+      andPredicates.add(cb.equal(join.get(SITE_TYPE), siteType));
     }
-
-    if (query.getDisplayName() != null) {
-      orPredicates.add(cb.like(cb.lower(pageEntity.get(DISPLAY_NAME)), "%" + query.getDisplayName().toLowerCase() + "%"));
-      orPredicates.add(cb.like(cb.lower(pageEntity.get(NAME)), "%" + query.getDisplayName().toLowerCase() + "%"));
+    if (siteName != null) {
+      andPredicates.add(cb.equal(join.get(NAME), siteName));
+    }
+    if (name != null) {
+      orPredicates.add(cb.like(cb.lower(pageEntity.get(DISPLAY_NAME)), "%" + name.toLowerCase() + "%"));
+      orPredicates.add(cb.like(cb.lower(pageEntity.get(NAME)), "%" + name.toLowerCase() + "%"));
     }
 
     if (!orPredicates.isEmpty()) {
@@ -119,24 +113,13 @@ public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
 
     //
     TypedQuery<PageKey> typedQuery = em.createQuery(select);
-    Pagination pagination = query.getPagination();
-    if (pagination != null && pagination.getLimit() > 0) {
+    if (limit > 0) {
       select.orderBy(cb.desc(join.get(SITE_TYPE)), cb.asc(join.get(NAME)), cb.asc(pageEntity.get(NAME)));
-      typedQuery.setFirstResult(pagination.getOffset());
-      typedQuery.setMaxResults(pagination.getLimit());
+      typedQuery.setFirstResult(offset);
+      typedQuery.setMaxResults(limit);
     }
     //
     return typedQuery;
   }
 
-  private org.exoplatform.portal.mop.SiteType convertSiteType(SiteType siteType) {
-    switch (siteType) {
-    case SITE:
-      return org.exoplatform.portal.mop.SiteType.PORTAL;
-    case SPACE:
-      return org.exoplatform.portal.mop.SiteType.GROUP;
-    default:
-      return org.exoplatform.portal.mop.SiteType.USER;
-    }
-  }
 }

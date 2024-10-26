@@ -34,7 +34,12 @@ import org.gatein.api.site.SiteId;
 
 /**
  * @author <a href="mailto:nscavell@redhat.com">Nick Scavelli</a>
+ * @deprecated should be removed since the Portal API is defined using Service
+ *             Layers instead of contextual API which doesn't help to get
+ *             stateless mode. This is kept for now until removing ecms from
+ *             eXo addons
  */
+@Deprecated(forRemoval = true, since = "7.0")
 public class PageImpl implements Page, Serializable {
 
     private static final long serialVersionUID = 4541337067269269259L;

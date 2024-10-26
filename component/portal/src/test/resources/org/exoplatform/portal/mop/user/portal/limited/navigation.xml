@@ -28,14 +28,12 @@
 
     <!-- Node with /platform/administrator permission -->
     <node>
-      <uri>foo</uri>
       <name>foo</name>
       <page-reference>portal::limited::foo</page-reference>
     </node>
 
     <!-- Node SYSTEM with /platform/user permission -->
     <node>
-      <uri>bar</uri>
       <name>bar</name>
       <visibility>SYSTEM</visibility>
       <page-reference>portal::limited::bar</page-reference>
@@ -43,7 +41,6 @@
 
     <!-- Node with everyone permission -->
     <node>
-      <uri>bit</uri>
       <name>bit</name>
       <page-reference>portal::limited::bit</page-reference>
     </node>
