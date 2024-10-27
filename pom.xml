@@ -37,7 +37,7 @@
   <name>Meeds - Portal</name>
 
   <properties>
-    <io.meeds.depmgt.version>23.x-meed-SNAPSHOT</io.meeds.depmgt.version>
+    <io.meeds.depmgt.version>23.0-meed-20241027</io.meeds.depmgt.version>
     <io.meeds.kernel.release.version>7.0.0-M10</io.meeds.kernel.release.version>
     <io.meeds.core.release.version>7.0.0-M10</io.meeds.core.release.version>
     <io.meeds.ws.release.version>7.0.0-M10</io.meeds.ws.release.version>
