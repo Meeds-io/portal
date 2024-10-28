@@ -200,12 +200,17 @@ public class UserPortalConfigService implements Startable {
     return new UserPortalConfig(portal, this, portalName, accessUser, locale);
   }
 
-  public void createSiteFromTemplate(SiteKey siteKey,
-                                     SiteKey siteTemplateKey,
+  public void createSiteFromTemplate(SiteKey sourceSiteTemplate,
+                                     SiteKey targetSiteKey) throws ObjectNotFoundException {
+    createSiteFromTemplate(sourceSiteTemplate, targetSiteKey, null);
+  }
+
+  public void createSiteFromTemplate(SiteKey sourceSiteTemplate,
+                                     SiteKey targetSiteKey,
                                      String permission) throws ObjectNotFoundException {
-    layoutService.savePortalFromTemplate(siteKey, siteTemplateKey, permission);
-    layoutService.savePagesFromTemplate(siteKey, siteTemplateKey, permission);
-    navigationService.saveNavigationFromTemplate(siteKey, siteTemplateKey);
+    layoutService.savePortalFromTemplate(sourceSiteTemplate, targetSiteKey, permission);
+    layoutService.savePagesFromTemplate(sourceSiteTemplate, targetSiteKey, permission);
+    navigationService.saveNavigationFromTemplate(sourceSiteTemplate, targetSiteKey);
   }
 
   /**
