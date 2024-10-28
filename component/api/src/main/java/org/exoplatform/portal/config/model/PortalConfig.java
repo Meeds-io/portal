@@ -124,6 +124,14 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.bannerFileId = data.getBannerFileId();
   }
 
+  public long getId() {
+    if (StringUtils.contains(storageId, "_")) {
+      return Long.parseLong(storageId.split("_")[1]);
+    } else {
+      return 0;
+    }
+  }
+
   public String getType() {
     return type;
   }
