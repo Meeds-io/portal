@@ -119,18 +119,18 @@ public class LayoutServiceImpl implements LayoutService {
   }
 
   @Override
-  public void savePortalFromTemplate(SiteKey siteKey,
-                                     SiteKey siteTemplateKey,
+  public void savePortalFromTemplate(SiteKey sourceSiteTemplate,
+                                     SiteKey targetSiteKey,
                                      String permission) throws ObjectNotFoundException {
-    PortalConfig templatePortalConfig = getPortalConfig(siteTemplateKey);
+    PortalConfig templatePortalConfig = getPortalConfig(sourceSiteTemplate);
     if (templatePortalConfig == null) {
-      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", siteTemplateKey));
+      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", sourceSiteTemplate));
     }
-    boolean exists = getPortalConfig(siteKey) != null;
+    boolean exists = getPortalConfig(targetSiteKey) != null;
     PortalConfig portalConfig = templatePortalConfig.clone();
     portalConfig.resetStorage();
-    portalConfig.setType(siteKey.getTypeName());
-    portalConfig.setName(siteKey.getName());
+    portalConfig.setType(targetSiteKey.getTypeName());
+    portalConfig.setName(targetSiteKey.getName());
     portalConfig.setBannerFileId(0);
     if (StringUtils.isNotBlank(permission)) {
       portalConfig.setAccessPermissions(getPermissionsFromTemplate(portalConfig.getAccessPermissions(), permission));
@@ -146,24 +146,25 @@ public class LayoutServiceImpl implements LayoutService {
   }
 
   @Override
-  public void savePagesFromTemplate(SiteKey siteKey,
-                                    SiteKey siteTemplateKey,
+  public void savePagesFromTemplate(SiteKey sourceSiteTemplate,
+                                    SiteKey targetSiteKey,
                                     String permission) throws ObjectNotFoundException {
-    List<PageContext> pages = findPages(siteTemplateKey);
-    if (CollectionUtils.isEmpty(pages)) {
-      return;
+    List<PageContext> sourceTemplatePages = findPages(sourceSiteTemplate);
+    if (CollectionUtils.isNotEmpty(sourceTemplatePages)) {
+      sourceTemplatePages.stream().map(PageContext::getKey).forEach(k -> savePageFromTemplate(k, targetSiteKey, permission));
     }
-    pages.stream().map(PageContext::getKey).forEach(pageKey -> savePageFromTemplate(siteKey, pageKey, permission));
   }
 
   @Override
   @SneakyThrows
-  public void savePageFromTemplate(SiteKey siteKey, PageKey pageTemplateKey, String permission) {
-    Page page = getPage(pageTemplateKey);
+  public void savePageFromTemplate(PageKey sourcePageTemplateKey,
+                                   SiteKey targetSiteKey,
+                                   String permission) {
+    Page page = getPage(sourcePageTemplateKey);
     page = new Page(page.build());
     page.resetStorage();
-    page.setOwnerType(siteKey.getTypeName());
-    page.setOwnerId(siteKey.getName());
+    page.setOwnerType(targetSiteKey.getTypeName());
+    page.setOwnerId(targetSiteKey.getName());
     if (StringUtils.isNotBlank(permission)) {
       page.setAccessPermissions(getPermissionsFromTemplate(page.getAccessPermissions(), permission));
       page.setEditPermission(getPermissionFromTemplate(page.getEditPermission(), permission));

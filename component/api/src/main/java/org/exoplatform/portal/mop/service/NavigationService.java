@@ -234,10 +234,11 @@ public interface NavigationService {
   public void updateNode(Long nodeId, NodeState state);
 
   /**
-   * @param siteKey {@link SiteKey} to create
-   * @param siteTemplateKey {@link SiteKey} of template
+   * @param sourceSiteTemplate {@link SiteKey} of template
+   * @param targetSiteKey {@link SiteKey} to create
    * @throws ObjectNotFoundException when Site Template isn't found
    */
-  void saveNavigationFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey) throws ObjectNotFoundException;
+  void saveNavigationFromTemplate(SiteKey sourceSiteTemplate,
+                                  SiteKey targetSiteKey) throws ObjectNotFoundException;
 
 }
