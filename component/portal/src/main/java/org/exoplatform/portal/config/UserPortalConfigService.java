@@ -60,6 +60,7 @@ import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
+import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.security.ConversationState;
@@ -77,6 +78,8 @@ import lombok.Synchronized;
  * PortalConfig, Page config and Navigation config for a given user.
  */
 public class UserPortalConfigService implements Startable {
+
+  public static final String      SITE_TEMPLATE_INSTANTIATED     = "site.template.instantiated";
 
   private static final Log        LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
 
@@ -97,6 +100,8 @@ public class UserPortalConfigService implements Startable {
   private UserACL                 userAcl;
 
   private SettingService          settingService;
+
+  private ListenerService         listenerService;
 
   private NavigationService       navigationService;
 
@@ -123,10 +128,12 @@ public class UserPortalConfigService implements Startable {
   public UserPortalConfigService(LayoutService layoutService,
                                  NavigationService navigationService,
                                  SettingService settingService,
+                                 ListenerService listenerService,
                                  UserACL userAcl,
                                  InitParams params) {
     this.layoutService = layoutService;
     this.settingService = settingService;
+    this.listenerService = listenerService;
     this.userAcl = userAcl;
     this.navigationService = navigationService;
     this.defaultImportMode =
@@ -211,6 +218,7 @@ public class UserPortalConfigService implements Startable {
     layoutService.savePortalFromTemplate(sourceSiteTemplate, targetSiteKey, permission);
     layoutService.savePagesFromTemplate(sourceSiteTemplate, targetSiteKey, permission);
     navigationService.saveNavigationFromTemplate(sourceSiteTemplate, targetSiteKey);
+    listenerService.broadcast(SITE_TEMPLATE_INSTANTIATED, sourceSiteTemplate, targetSiteKey);
   }
 
   /**
