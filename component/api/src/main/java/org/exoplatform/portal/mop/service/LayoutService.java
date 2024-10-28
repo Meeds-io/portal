@@ -363,44 +363,48 @@ public interface LayoutService {
   }
 
   /**
-   * @param siteKey {@link SiteKey} to create
-   * @param siteTemplateKey {@link SiteKey} of template
+   * @param sourceSiteTemplate {@link SiteKey} of template
+   * @param targetSiteKey {@link SiteKey} to create
    */
-  default void savePortalFromTemplate(SiteKey siteKey,
-                                      SiteKey siteTemplateKey) throws ObjectNotFoundException {
-    savePortalFromTemplate(siteKey, siteTemplateKey, null);
+  default void savePortalFromTemplate(SiteKey sourceSiteTemplate,
+                                      SiteKey targetSiteKey) throws ObjectNotFoundException {
+    savePortalFromTemplate(sourceSiteTemplate, targetSiteKey, null);
   }
 
   /**
-   * @param siteKey {@link SiteKey} to create
-   * @param siteTemplateKey {@link SiteKey} of template
+   * @param sourceSiteTemplate {@link SiteKey} of template
+   * @param targetSiteKey {@link SiteKey} to create
    * @param permission Permission to use to change pattern "@owenr@" if existing
    *          in pages and portal layouts
    */
-  default void savePortalFromTemplate(SiteKey siteKey,
-                                      SiteKey siteTemplateKey,
+  default void savePortalFromTemplate(SiteKey sourceSiteTemplate,
+                                      SiteKey targetSiteKey,
                                       String permission) throws ObjectNotFoundException {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * @param siteKey destination Site Key
-   * @param siteTemplateKey {@link SiteKey} of template
+   * @param sourceSiteTemplate {@link SiteKey} of template
+   * @param targetSiteKey {@link SiteKey} to create
    * @param permission Permission to use to change pattern "@owenr@" if existing
    *          in pages and portal layouts
    * @throws ObjectNotFoundException
    */
-  default void savePagesFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey, String permission) throws ObjectNotFoundException {
+  default void savePagesFromTemplate(SiteKey sourceSiteTemplate,
+                                     SiteKey targetSiteKey,
+                                     String permission) throws ObjectNotFoundException {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * @param siteKey destination Site Key
-   * @param pageTemplateKey Site template's Page Key
+   * @param sourcePageTemplateKey Site template's Page Key
+   * @param targetSiteKey destination Site Key
    * @param permission Permission to use to change pattern "@owenr@" if existing
    *          in pages and portal layouts
    */
-  default void savePageFromTemplate(SiteKey siteKey, PageKey pageTemplateKey, String permission) throws ObjectNotFoundException {
+  default void savePageFromTemplate(PageKey sourcePageTemplateKey,
+                                    SiteKey targetSiteKey,
+                                    String permission) throws ObjectNotFoundException {
     throw new UnsupportedOperationException();
   }
 
