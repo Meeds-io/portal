@@ -45,9 +45,12 @@ public class UISharedLayout extends UIContainer {
 
   public boolean isShowSharedLayout(PortalRequestContext requestContext) {
     boolean showSharedLayout = !requestContext.isHideSharedLayout() && (Util.getUIPage() == null || !Util.getUIPage().isHideSharedLayout());
-    if (requestContext.getUserPortalConfig() != null && requestContext.getUserPortalConfig().getPortalConfig() != null) {
-      showSharedLayout = showSharedLayout && (requestContext.getSiteType() != SiteType.PORTAL
-                                              || requestContext.getUserPortalConfig().getPortalConfig().isDisplayed());
+    if (requestContext.getUserPortalConfig() != null 
+        && requestContext.getUserPortalConfig().getPortalConfig() != null) {
+      showSharedLayout = showSharedLayout
+                         && requestContext.getSiteType() != SiteType.GROUP_TEMPLATE
+                         && (requestContext.getSiteType() != SiteType.PORTAL
+                             || requestContext.getUserPortalConfig().getPortalConfig().isDisplayed());
     }
     return showSharedLayout;
   }
