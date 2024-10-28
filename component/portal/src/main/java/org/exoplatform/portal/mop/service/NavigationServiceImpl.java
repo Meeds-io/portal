@@ -89,10 +89,11 @@ public class NavigationServiceImpl implements NavigationService {
 
   @Override
   @SuppressWarnings("rawtypes")
-  public void saveNavigationFromTemplate(SiteKey siteKey, SiteKey siteTemplateKey) throws ObjectNotFoundException {
-    NavigationContext navigationTemplateContext = loadNavigation(siteTemplateKey);
-    navigationStorage.saveNavigation(siteKey, navigationTemplateContext.getState());
-    NavigationContext navigationContext = loadNavigation(siteKey);
+  public void saveNavigationFromTemplate(SiteKey sourceSiteTemplate,
+                                         SiteKey targetSiteKey) throws ObjectNotFoundException {
+    NavigationContext navigationTemplateContext = loadNavigation(sourceSiteTemplate);
+    navigationStorage.saveNavigation(targetSiteKey, navigationTemplateContext.getState());
+    NavigationContext navigationContext = loadNavigation(targetSiteKey);
     NodeContext rootTemplate = loadNode(NodeModel.SELF_MODEL,
                                         navigationTemplateContext,
                                         Scope.ALL,
@@ -101,8 +102,8 @@ public class NavigationServiceImpl implements NavigationService {
                                 navigationContext,
                                 Scope.ALL,
                                 null);
-    cloneNodes(rootTemplate, root, siteKey);
-    notify(EventType.NAVIGATION_CREATED, siteKey);
+    cloneNodes(rootTemplate, root, targetSiteKey);
+    notify(EventType.NAVIGATION_CREATED, targetSiteKey);
   }
 
   @SuppressWarnings({ "unchecked", "rawtypes" })

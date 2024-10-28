@@ -169,10 +169,10 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     SiteKey groupSiteKey = SiteKey.group(groupId);
     SiteKey templateSiteKey = SiteKey.groupTemplate(siteTemplate);
     assertThrows(ObjectNotFoundException.class,
-                 () -> userPortalConfigService.createSiteFromTemplate(groupSiteKey,
-                                                                      SiteKey.groupTemplate("classic2"),
+                 () -> userPortalConfigService.createSiteFromTemplate(SiteKey.groupTemplate("NotExistingTemplate"),
+                                                                      groupSiteKey,
                                                                       permission));
-    userPortalConfigService.createSiteFromTemplate(groupSiteKey, templateSiteKey, permission);
+    userPortalConfigService.createSiteFromTemplate(templateSiteKey, groupSiteKey, permission);
 
     PortalConfig portalConfig = layoutService.getPortalConfig(groupSiteKey);
     assertNotNull(portalConfig);
@@ -235,6 +235,81 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     assertEquals("test", data.getName());
     assertEquals("Test", state.getLabel());
     assertEquals(groupSiteKey.page("test"), state.getPageRef());
+  }
+
+  @SneakyThrows
+  public void testDuplicateSiteTemplate() {
+    String siteTemplate = "classic";
+    String targetSiteTemplate = "classic2";
+
+    String accessPermission = "member:@owner_id@";
+    String editPermission = "manager:@owner_id@";
+
+    SiteKey sourceTemplateSiteKey = SiteKey.groupTemplate(siteTemplate);
+    SiteKey targetTemplateSiteKey = SiteKey.groupTemplate(targetSiteTemplate);
+    PortalConfig sourcePortalConfig = layoutService.getPortalConfig(sourceTemplateSiteKey);
+    assertNotNull(sourcePortalConfig);
+
+    userPortalConfigService.createSiteFromTemplate(sourceTemplateSiteKey, targetTemplateSiteKey);
+
+    PortalConfig targetPortalConfig = layoutService.getPortalConfig(targetTemplateSiteKey);
+    assertNotNull(targetPortalConfig);
+    assertEquals(1, targetPortalConfig.getAccessPermissions().length);
+    assertEquals(sourcePortalConfig.getAccessPermissions()[0], targetPortalConfig.getAccessPermissions()[0]);
+    assertEquals(sourcePortalConfig.getEditPermission(), targetPortalConfig.getEditPermission());
+    assertEquals(sourcePortalConfig.getDisplayOrder(), targetPortalConfig.getDisplayOrder());
+    assertEquals(sourcePortalConfig.isDefaultLayout(), targetPortalConfig.isDefaultLayout());
+    assertEquals(sourcePortalConfig.isDisplayed(), targetPortalConfig.isDisplayed());
+    assertEquals(sourcePortalConfig.getLabel(), targetPortalConfig.getLabel());
+    assertEquals(sourcePortalConfig.getDescription(), targetPortalConfig.getDescription());
+    assertEquals(targetTemplateSiteKey.getName(), targetPortalConfig.getName());
+    assertEquals(targetTemplateSiteKey.getTypeName(), targetPortalConfig.getType());
+    assertNotNull(targetPortalConfig.getPortalLayout());
+    assertNotNull(targetPortalConfig.getPortalLayout().getChildren());
+    assertEquals(2, targetPortalConfig.getPortalLayout().getChildren().size());
+    assertEquals(Application.class, targetPortalConfig.getPortalLayout().getChildren().get(0).getClass());
+    assertEquals(PageBody.class, targetPortalConfig.getPortalLayout().getChildren().get(1).getClass());
+    assertEquals(((Application) sourcePortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0],
+                 ((Application) targetPortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0]);
+
+    List<PageContext> pages = layoutService.findPages(targetTemplateSiteKey);
+    assertNotNull(pages);
+    assertEquals(3, pages.size());
+
+    PageContext pageContext = pages.stream().filter(p -> p.getKey().getName().equals("homepage")).findFirst().orElseThrow();
+    assertEquals(accessPermission, pageContext.getState().getAccessPermissions().get(0));
+    assertEquals(editPermission, pageContext.getState().getEditPermission());
+    assertEquals("Home Page", pageContext.getState().getDisplayName());
+
+    Page page = layoutService.getPage(pageContext.getKey());
+    assertNotNull(page);
+    assertEquals(1, page.getChildren().size());
+    assertEquals(accessPermission, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
+
+    NavigationContext navigation = navigationService.loadNavigation(targetTemplateSiteKey);
+    assertNotNull(navigation);
+
+    NodeContext<NodeContext<Object>> rootNode = navigationService.loadNode(targetTemplateSiteKey);
+    assertNotNull(rootNode);
+    assertEquals(2, rootNode.getNodeCount());
+    NodeData data = rootNode.get(0).getData();
+    NodeState state = rootNode.get(0).getState();
+    assertEquals("home", data.getName());
+    assertEquals("Home", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("homepage"), state.getPageRef());
+    assertEquals(1, rootNode.get(0).getNodeCount());
+
+    data = rootNode.get(0).get(0).getData();
+    state = rootNode.get(0).get(0).getState();
+    assertEquals("testSubNode", data.getName());
+    assertEquals("Sub Node", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("testSubNode"), state.getPageRef());
+
+    data = rootNode.get(1).getData();
+    state = rootNode.get(1).getState();
+    assertEquals("test", data.getName());
+    assertEquals("Test", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("test"), state.getPageRef());
   }
 
   public void testComputePortalSitePath() {
