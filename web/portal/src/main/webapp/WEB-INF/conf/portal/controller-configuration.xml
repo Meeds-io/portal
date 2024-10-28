@@ -167,6 +167,11 @@
       <type>org.exoplatform.portal.application.PortalRequestHandler</type>
     </component-plugin>
     <component-plugin>
+      <name>PortalTemplateRequestHandler</name>
+      <set-method>register</set-method>
+      <type>org.exoplatform.portal.application.PortalTemplateRequestHandler</type>
+    </component-plugin>
+    <component-plugin>
       <name>ScriptRequestHandler</name>
       <set-method>register</set-method>
       <type>org.gatein.portal.controller.resource.ResourceRequestHandler</type>
