@@ -129,9 +129,11 @@ public class Util {
             case GROUP:
                 return new SiteId(new Group(siteKey.getName()));
             case USER:
-                return new SiteId(new User(siteKey.getName()));
+              return new SiteId(new User(siteKey.getName()));
+            case GROUP_TEMPLATE:
+                return new SiteId(siteKey.getName());
             default:
-                throw new AssertionError();
+              throw new IllegalArgumentException("Unexpected value: " + siteKey.getType());
         }
     }
 

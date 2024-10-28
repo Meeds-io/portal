@@ -58,28 +58,32 @@ import jakarta.servlet.http.HttpServletResponse;
 @SuppressWarnings("rawtypes")
 public class PortalRequestHandler extends WebRequestHandler {
 
-  protected static final Log                    LOG               = ExoLogger.getLogger("portal:PortalRequestHandler");
+  public static final String                      HANDLER_NAME                 = "portal";
+
+  protected static final Log                      LOG                          =
+                                                      ExoLogger.getLogger("portal:PortalRequestHandler");
 
   /** . */
-  public static final QualifiedName             REQUEST_PATH      = QualifiedName.create("gtn", "path");
+  public static final QualifiedName               REQUEST_PATH                 = QualifiedName.create("gtn", "path");
 
   /** . */
-  public static final QualifiedName             REQUEST_SITE_TYPE = QualifiedName.create("gtn", "sitetype");
+  public static final QualifiedName               REQUEST_SITE_TYPE            = QualifiedName.create("gtn", "sitetype");
 
   /** . */
-  public static final QualifiedName             REQUEST_SITE_NAME = QualifiedName.create("gtn", "sitename");
+  public static final QualifiedName               REQUEST_SITE_NAME            = QualifiedName.create("gtn", "sitename");
 
   /** . */
-  public static final QualifiedName             LANG              = QualifiedName.create("gtn", "lang");
+  public static final QualifiedName               LANG                         = QualifiedName.create("gtn", "lang");
 
-  private static final PortalApplicationFactory APPP_ROVIDER      = ServiceLoader.load(PortalApplicationFactory.class)
-                                                                                 .findFirst()
-                                                                                 .orElse(null);
+  protected static final PortalApplicationFactory APPP_ROVIDER                 =
+                                                               ServiceLoader.load(PortalApplicationFactory.class)
+                                                                            .findFirst()
+                                                                            .orElse(null);
 
-  private static final String                   PORTAL_PUBLIC_PAGE_NOT_FOUND = "/portal/public/page-not-found";
+  protected static final String                   PORTAL_PUBLIC_PAGE_NOT_FOUND = "/portal/public/page-not-found";
 
   public String getHandlerName() {
-    return "portal";
+    return HANDLER_NAME;
   }
 
   /**
@@ -137,8 +141,17 @@ public class PortalRequestHandler extends WebRequestHandler {
       return true;
     }
 
+    return processRequest(controllerContext, req, requestLocale, requestSiteName, requestSiteType, requestPath);
+  }
+
+  protected boolean processRequest(ControllerContext controllerContext, // NOSONAR
+                                   HttpServletRequest request,
+                                   Locale requestLocale,
+                                   String requestSiteName,
+                                   String requestSiteType,
+                                   String requestPath) throws Exception {
     UserPortalConfigService portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class);
-    requestPath = computeRequestPath(requestPath, requestSiteName, requestSiteType, portalConfigService, req);
+    requestPath = computeRequestPath(requestPath, requestSiteName, requestSiteType, portalConfigService, request);
     PortalApplication app = controllerContext.getController().getApplication(PortalApplication.PORTAL_APPLICATION_ID);
     PortalRequestContext context = new PortalRequestContext(app,
                                                             controllerContext,
@@ -152,16 +165,17 @@ public class PortalRequestHandler extends WebRequestHandler {
         if (persistentPortalConfig == null
             || StringUtils.equals(persistentPortalConfig.getName(), portalConfigService.getGlobalPortal())) {
           return false;
-        } else if (req.getRemoteUser() == null) {
+        } else if (request.getRemoteUser() == null) {
           context.requestAuthenticationLogin();
         } else {
           String metaPageNotFound = "/portal/" + portalConfigService.getMetaPortal() + "/page-not-found";
-          if (!StringUtils.equals(req.getRequestURI(), metaPageNotFound)) {
-            if (StringUtils.equals(req.getRequestURI(), PORTAL_PUBLIC_PAGE_NOT_FOUND)) {
-              // In case page-not-found can't be displayed in 'public' or 'meta' sites
+          if (!StringUtils.equals(request.getRequestURI(), metaPageNotFound)) {
+            if (StringUtils.equals(request.getRequestURI(), PORTAL_PUBLIC_PAGE_NOT_FOUND)) {
+              // In case page-not-found can't be displayed in 'public' or 'meta'
+              // sites
               // If logged in => redirect to /
               // If Anonymous => redirect to Login page
-              if (StringUtils.isNotBlank(req.getRemoteUser())) {
+              if (StringUtils.isNotBlank(request.getRemoteUser())) {
                 context.sendRedirect("/");
               } else {
                 context.requestAuthenticationLogin();
@@ -212,7 +226,7 @@ public class PortalRequestHandler extends WebRequestHandler {
   @SuppressWarnings("unchecked")
   protected void processRequest(PortalRequestContext context, PortalApplication app) throws Exception {
     RequestContext.setCurrentInstance(context);
-    PortalRequestImpl.createInstance(context);
+    createPortalRequestInstance(context);
     List<ApplicationLifecycle> lifecycles = app.getApplicationLifecycle();
     try {
       if (context.getResponse() instanceof PortalHttpServletResponseWrapper responseWrapper) {
@@ -287,7 +301,7 @@ public class PortalRequestHandler extends WebRequestHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private void startRequestPhaseLifecycle(PortalApplication app,
+  protected void startRequestPhaseLifecycle(PortalApplication app,
                                           PortalRequestContext context,
                                           List<ApplicationLifecycle> lifecycles,
                                           Phase phase) {
@@ -298,17 +312,17 @@ public class PortalRequestHandler extends WebRequestHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private void endRequestPhaseLifecycle(PortalApplication app,
-                                        PortalRequestContext context,
-                                        List<ApplicationLifecycle> lifecycles,
-                                        Phase phase) {
+  protected void endRequestPhaseLifecycle(PortalApplication app,
+                                          PortalRequestContext context,
+                                          List<ApplicationLifecycle> lifecycles,
+                                          Phase phase) {
     for (ApplicationLifecycle lifecycle : lifecycles) {
       if (lifecycle instanceof ApplicationRequestPhaseLifecycle applicationRequestPhaseLifecycle)
         applicationRequestPhaseLifecycle.onEndRequestPhase(app, context, phase);
     }
   }
 
-  private String computeRequestPath(String path,
+  protected String computeRequestPath(String path,
                                     String portalName,
                                     String requestSiteType,
                                     UserPortalConfigService portalConfigService,
@@ -323,12 +337,20 @@ public class PortalRequestHandler extends WebRequestHandler {
     return portalConfigService.getFirstAllowedPageNode(portalName, requestSiteType, path, context);
   }
 
-  private Locale getRequestLocale(ControllerContext controllerContext) {
+  protected Locale getRequestLocale(ControllerContext controllerContext) {
     String lang = controllerContext.getParameter(LANG);
     if (StringUtils.isBlank(lang)) {
       return null;
     } else {
       return I18N.parseTagIdentifier(lang);
+    }
+  }
+
+  private void createPortalRequestInstance(PortalRequestContext context) {
+    try {
+      PortalRequestImpl.createInstance(context);
+    } catch (Exception e) {
+      LOG.warn("Error while instanciating deprecated 'PortalRequestImpl'. continue processing request", e);
     }
   }
 
