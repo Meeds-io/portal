@@ -17,11 +17,12 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package org.exoplatform.portal.application;
+package io.meeds.portal.web.handler;
 
 import java.util.Locale;
 
 import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.portal.application.PortalRequestHandler;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.service.LayoutService;

@@ -292,18 +292,6 @@
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>portal.component.web.api</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>portal.component.web.api</artifactId>
-        <type>test-jar</type>
-        <version>${project.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>${project.groupId}</groupId>
         <artifactId>portal.component.web.resources</artifactId>
         <version>${project.version}</version>
       </dependency>
