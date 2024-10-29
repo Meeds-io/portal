@@ -42,10 +42,6 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>portal.component.web.resources</artifactId>
     </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>portal.component.web.api</artifactId>
-    </dependency>
 
     <!-- Captcha -->
     <dependency>
