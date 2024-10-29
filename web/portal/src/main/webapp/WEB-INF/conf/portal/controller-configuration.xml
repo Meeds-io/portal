@@ -159,7 +159,7 @@
     <component-plugin>
       <name>PermanentLinkRequestHandler</name>
       <set-method>register</set-method>
-      <type>io.meeds.portal.permlink.web.PermanentLinkRequestHandler</type>
+      <type>io.meeds.portal.web.handler.PermanentLinkRequestHandler</type>
     </component-plugin>
     <component-plugin>
       <name>PortalRequestHandler</name>
@@ -169,7 +169,7 @@
     <component-plugin>
       <name>PortalTemplateRequestHandler</name>
       <set-method>register</set-method>
-      <type>org.exoplatform.portal.application.PortalTemplateRequestHandler</type>
+      <type>io.meeds.portal.web.handler.PortalTemplateRequestHandler</type>
     </component-plugin>
     <component-plugin>
       <name>ScriptRequestHandler</name>

@@ -24,13 +24,12 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import jakarta.servlet.http.HttpServletRequest;
-
 import org.apache.commons.lang3.StringUtils;
+import org.gatein.common.io.UndeclaredIOException;
+
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.application.PortalRequestHandler;
-import org.exoplatform.portal.application.PortalTemplateRequestHandler;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
@@ -39,10 +38,13 @@ import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.WebAppController;
 import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.URIWriter;
+import org.exoplatform.web.security.csrf.CSRFTokenUtil;
 import org.exoplatform.web.url.PortalURL;
 import org.exoplatform.web.url.URLContext;
-import org.exoplatform.web.security.csrf.CSRFTokenUtil;
-import org.gatein.common.io.UndeclaredIOException;
+
+import io.meeds.portal.web.handler.PortalTemplateRequestHandler;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
