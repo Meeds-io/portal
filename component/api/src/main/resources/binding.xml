@@ -236,6 +236,7 @@
     <value name="visibility" field="visibility" usage="optional" default="DISPLAYED"/>
     <value name="page-reference" field="pageReference" usage="optional"
            deserializer="org.exoplatform.portal.config.serialize.JibxStringSerialize.deserializeString"/>
+    <value name="insertion-index" field="order" usage="optional" default="-1" />
     <collection get-method="getNodes" set-method="setNodes" usage="optional"
                 item-type="org.exoplatform.portal.config.model.PageNode"/>
   </mapping>

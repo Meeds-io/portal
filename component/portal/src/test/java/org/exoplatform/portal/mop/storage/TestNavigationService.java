@@ -43,7 +43,7 @@ import org.exoplatform.portal.pom.data.PortalData;
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
         @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.portal-configuration.xml"),
         @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/test.navigation.configuration.xml") })
-public class TestJDBCNavigationService extends AbstractKernelTest {
+public class TestNavigationService extends AbstractKernelTest {
   
     /** . */
     protected NavigationService  service;

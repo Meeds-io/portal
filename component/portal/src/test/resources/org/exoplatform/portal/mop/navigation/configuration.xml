@@ -33,10 +33,6 @@
           <name>meta.portal</name>
           <value>classic</value>
         </value-param>
-        <value-param>
-          <name>initializing.failure.ignore</name>
-          <value>true</value>
-        </value-param>
         <object-param>
           <name>site.templates.location</name>
           <object type="org.exoplatform.portal.config.SiteConfigTemplates">
