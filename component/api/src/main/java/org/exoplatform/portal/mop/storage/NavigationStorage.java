@@ -33,7 +33,9 @@ public interface NavigationStorage {
    */
   NodeData[] loadNodes(String pageRef);
 
-  NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state);
+  default NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state) {
+    return createNode(parentId, previousId, name, state, null);
+  }
 
   NodeData destroyNode(Long targetId);
 
@@ -50,5 +52,7 @@ public interface NavigationStorage {
   boolean destroyNavigation(NavigationData data);
 
   boolean destroyNavigation(SiteKey siteKey);
+
+  NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state, Integer index);
 
 }

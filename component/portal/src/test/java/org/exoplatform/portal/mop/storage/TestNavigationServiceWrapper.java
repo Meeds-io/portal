@@ -48,7 +48,7 @@ import org.exoplatform.services.listener.ListenerService;
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/mop/navigation/configuration.xml")})
-public class TestJDBCNavigationServiceWrapper extends AbstractKernelTest {
+public class TestNavigationServiceWrapper extends AbstractKernelTest {
 
     /** . */
     private NavigationService navigationService;

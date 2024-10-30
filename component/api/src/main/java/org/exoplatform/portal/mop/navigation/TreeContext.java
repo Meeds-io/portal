@@ -131,9 +131,11 @@ class TreeContext<N> implements Scope.Visitor, NodeChangeListener<NodeContext<N>
         } else if (change instanceof NodeChange.Created<?>) {
             NodeChange.Created<NodeContext<N>> added = (NodeChange.Created<NodeContext<N>>) change;
             if (added.previous != null) {
-                added.previous.insertAfter(added.target);
+              added.previous.insertAfter(added.target);
+            } else if (added.parent.getSize() > 0) {
+              added.parent.get(0).insertBefore(added.target);
             } else {
-                added.parent.insertAt(0, added.target);
+              added.parent.insertFirst(added.target);
             }
         } else if (change instanceof NodeChange.Moved<?>) {
             NodeChange.Moved<NodeContext<N>> moved = (NodeChange.Moved<NodeContext<N>>) change;
