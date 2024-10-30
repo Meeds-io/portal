@@ -24,7 +24,6 @@
 package org.exoplatform.services.organization.idm;
 
 import java.io.Serializable;
-import java.security.PrivilegedAction;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -40,14 +39,12 @@ import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.PropertiesParam;
 import org.exoplatform.container.xml.Property;
-import org.exoplatform.services.database.HibernateService;
-import org.exoplatform.services.database.ObjectQuery;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-public class CustomHibernateServiceImpl implements HibernateService, ComponentRequestLifecycle {
+public class IdmHibernateService implements ComponentRequestLifecycle {
 
-  private static final Log          LOG          = ExoLogger.getLogger(CustomHibernateServiceImpl.class);
+  private static final Log          LOG          = ExoLogger.getLogger(IdmHibernateService.class);
 
   public static final String        AUTO_DIALECT = "AUTO";
 
@@ -57,7 +54,7 @@ public class CustomHibernateServiceImpl implements HibernateService, ComponentRe
 
   private SessionFactory            sessionFactory_;
 
-  public CustomHibernateServiceImpl(InitParams initParams) {
+  public IdmHibernateService(InitParams initParams) {
     threadLocal_ = new ThreadLocal<Session>();
     PropertiesParam param = initParams.getPropertiesParam("hibernate.properties");
     conf_ = new IdmHibernateConfiguration();
@@ -167,18 +164,6 @@ public class CustomHibernateServiceImpl implements HibernateService, ComponentRe
     Session session = openSession();
     Object obj = session.get(clazz, id);
     return obj;
-  }
-
-  public Object findOne(ObjectQuery q) throws Exception {
-    Session session = openSession();
-    List<?> l = session.createQuery(q.getHibernateQuery()).list();
-    if (l.size() == 0) {
-      return null;
-    } else if (l.size() > 1) {
-      throw new Exception("Expect only one object but found" + l.size());
-    } else {
-      return l.get(0);
-    }
   }
 
   public Object create(Object obj) throws Exception {

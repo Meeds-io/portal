@@ -56,8 +56,6 @@ public class Config {
 
     private boolean useCache = true;
 
-    private boolean useJTA = false;
-
     private boolean sortGroups = true;
 
     private boolean sortMemberships = true;
@@ -298,14 +296,6 @@ public class Config {
 
     public void setIgnoreMappedMembershipTypeGroupList(List<String> ignoreMappedMembershipTypeGroupList) {
         this.ignoreMappedMembershipTypeGroupList = ignoreMappedMembershipTypeGroupList;
-    }
-
-    public boolean isUseJTA() {
-        return useJTA;
-    }
-
-    public void setUseJTA(boolean useJTA) {
-        this.useJTA = useJTA;
     }
 
     public String getSlashReplacement() {

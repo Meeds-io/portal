@@ -26,8 +26,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Random;
 
-import org.gatein.common.transaction.JTAUserTransactionLifecycleService;
-
 import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
@@ -67,8 +65,6 @@ import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.User;
-import org.exoplatform.services.organization.UserHandler;
 
 /**
  * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Nov
@@ -77,7 +73,6 @@ import org.exoplatform.services.organization.UserHandler;
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.portal-configuration-local.xml"),
-  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.settings-configuration-local-jta.xml"),
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/mop/navigation/configuration.xml"),
 })
 public class TestDataStorage extends AbstractKernelTest {
@@ -103,8 +98,6 @@ public class TestDataStorage extends AbstractKernelTest {
   /** . */
   private OrganizationService                org;
 
-  private JTAUserTransactionLifecycleService jtaUserTransactionLifecycleService;
-
   public TestDataStorage(String name) {
     super(name);
   }
@@ -127,7 +120,6 @@ public class TestDataStorage extends AbstractKernelTest {
     events = new LinkedList<Event>();
     listenerService = (ListenerService) container.getComponentInstanceOfType(ListenerService.class);
     org = container.getComponentInstanceOfType(OrganizationService.class);
-    jtaUserTransactionLifecycleService = container.getComponentInstanceOfType(JTAUserTransactionLifecycleService.class);
 
     //
     listenerService.addListener(EventType.PAGE_CREATED, listener);
@@ -741,26 +733,6 @@ public class TestDataStorage extends AbstractKernelTest {
     groupHandler.removeGroup(group, false);
     group = groupHandler.findGroupById("/groupSite");
     assertNull(group);
-  }
-
-  public void testJTA() throws Exception {
-    jtaUserTransactionLifecycleService.beginJTATransaction();
-
-    Page page = new Page();
-    page.setPageId("portal::test::searchedpage2");
-    pageService.savePage(new PageContext(page.getPageKey(), null));
-
-    PageContext pageContext = pageService.loadPage(page.getPageKey());
-    pageContext.setState(pageContext.getState().builder().displayName("Juuu2 Ziii2").build());
-    pageService.savePage(pageContext);
-
-    assertPageFound(0, 10, null, null, null, "Juuu2 Ziii2", "portal::test::searchedpage2");
-    jtaUserTransactionLifecycleService.finishJTATransaction();
-
-    jtaUserTransactionLifecycleService.beginJTATransaction();
-    pageService.destroyPage(pageContext.getKey());
-    assertPageNotFound(0, 10, null, null, null, "Juuu2 Ziii2");
-    jtaUserTransactionLifecycleService.finishJTATransaction();
   }
 
   protected void createSite(SiteType type, String siteName) throws Exception {

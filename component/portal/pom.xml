@@ -85,16 +85,6 @@
       <groupId>com.github.sommeri</groupId>
       <artifactId>less4j</artifactId>
     </dependency>
-
-    <dependency>
-      <groupId>io.meeds.kernel</groupId>
-      <artifactId>exo.kernel.component.ext.cache.impl.infinispan.v8</artifactId>
-      <!--
-        Make it here provided to avoid transitive dependency for test scope
-        and is added in portal.web.portal for runtime usage
-       -->
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <build>
