@@ -27,6 +27,9 @@ import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.page.PageKey;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
  * @author <a href="mailto:ppalaga@redhat.com">Peter Palaga</a>
  *
@@ -59,6 +62,10 @@ public class PageNode extends PageNodeContainer {
 
     /** . */
     private long updatedDate;
+
+    @Getter
+    @Setter
+    private int      order      = -1;
 
     public I18NString getLabels() {
         return labels;

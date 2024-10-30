@@ -623,7 +623,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
             outputBundled.merge(temp);
             continue;
           }
-          LOG.warn("Cannot load and merge the bundle: " + name[i]);
+          LOG.debug("Ignore merging resource bundle {} from Class Loader {}", name[i], cl.getClass().getName());
         }
         outputBundled.resolveDependencies();
       } catch (Exception ex) {

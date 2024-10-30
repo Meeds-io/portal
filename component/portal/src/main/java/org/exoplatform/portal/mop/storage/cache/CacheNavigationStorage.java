@@ -61,9 +61,9 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
   }
 
   @Override
-  public NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state) {
+  public NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state, Integer index) {
     try {
-      return super.createNode(parentId, previousId, name, state);
+      return super.createNode(parentId, previousId, name, state, index);
     } finally {
       this.nodeFutureCache.remove(parentId);
     }
