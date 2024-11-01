@@ -19,6 +19,7 @@
 
 package org.exoplatform.portal.application;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.ServiceLoader;
@@ -159,41 +160,34 @@ public class PortalRequestHandler extends WebRequestHandler {
                                                             requestSiteName,
                                                             requestPath,
                                                             requestLocale);
+    String metaPortal = portalConfigService.getMetaPortal();
     try {
       PortalConfig persistentPortalConfig = context.getDynamicPortalConfig();
       if (context.getUserPortalConfig() == null) {
         if (persistentPortalConfig == null
             || StringUtils.equals(persistentPortalConfig.getName(), portalConfigService.getGlobalPortal())) {
           return false;
-        } else if (request.getRemoteUser() == null) {
+        } else if (context.getRemoteUser() == null) {
           context.requestAuthenticationLogin();
+          return true;
         } else {
-          String metaPageNotFound = "/portal/" + portalConfigService.getMetaPortal() + "/page-not-found";
-          if (!StringUtils.equals(request.getRequestURI(), metaPageNotFound)) {
-            if (StringUtils.equals(request.getRequestURI(), PORTAL_PUBLIC_PAGE_NOT_FOUND)) {
-              // In case page-not-found can't be displayed in 'public' or 'meta'
-              // sites
-              // If logged in => redirect to /
-              // If Anonymous => redirect to Login page
-              if (StringUtils.isNotBlank(request.getRemoteUser())) {
-                context.sendRedirect("/");
-              } else {
-                context.requestAuthenticationLogin();
-              }
-            } else {
-              context.sendRedirect(metaPageNotFound);
-            }
-          } else {
-            context.sendRedirect(PORTAL_PUBLIC_PAGE_NOT_FOUND);
-          }
+          sendToNotFoundPage(context, metaPortal);
+          return true;
         }
       } else if (persistentPortalConfig != null
                  && StringUtils.equals(persistentPortalConfig.getName(), portalConfigService.getGlobalPortal())) {
         return false;
       } else {
         processRequest(context, app);
+        if (context.getUiPage() == null) {
+          if (context.getRemoteUser() == null) {
+            context.requestAuthenticationLogin();
+          } else {
+            sendToNotFoundPage(context, metaPortal);
+          }
+        }
+        return true;
       }
-      return true;
     } finally {
       context.onRequestEnd();
     }
@@ -343,6 +337,27 @@ public class PortalRequestHandler extends WebRequestHandler {
       return null;
     } else {
       return I18N.parseTagIdentifier(lang);
+    }
+  }
+
+  private void sendToNotFoundPage(PortalRequestContext context, String metaPortal) throws IOException, Exception {
+    String metaPageNotFound = "/portal/" + metaPortal + "/page-not-found";
+    if (!StringUtils.equals(context.getRequest().getRequestURI(), metaPageNotFound)) {
+      if (StringUtils.equals(context.getRequest().getRequestURI(), PORTAL_PUBLIC_PAGE_NOT_FOUND)) {
+        // In case page-not-found can't be displayed in 'public' or 'meta'
+        // sites
+        // If logged in => redirect to /
+        // If Anonymous => redirect to Login page
+        if (StringUtils.isNotBlank(context.getRemoteUser())) {
+          context.sendRedirect("/");
+        } else {
+          context.requestAuthenticationLogin();
+        }
+      } else {
+        context.sendRedirect(metaPageNotFound);
+      }
+    } else {
+      context.sendRedirect(PORTAL_PUBLIC_PAGE_NOT_FOUND);
     }
   }
 
