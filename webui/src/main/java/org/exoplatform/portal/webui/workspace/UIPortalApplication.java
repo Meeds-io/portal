@@ -1208,7 +1208,9 @@ public class UIPortalApplication extends UIApplication {
         uiWorkingWorkspace.findComponentOfType(uiPortlets, UIPortlet.class);
       } else {
         UIPage currentPage = getCurrentPage();
-        if (!requestContext.isMaximizePortlet() && !currentPage.isShowMaxWindow()) {
+        if (currentPage == null) {
+          return Collections.emptyList();
+        } else if (!requestContext.isMaximizePortlet() && !currentPage.isShowMaxWindow()) {
           getCurrentSite().findComponentOfType(uiPortlets, UIPortlet.class);
         } else {
           currentPage.findComponentOfType(uiPortlets, UIPortlet.class);
