@@ -377,7 +377,7 @@ public class LoginHandler extends JspBasedWebHandler {
     List<String> additionalCSSModules = Collections.singletonList("portal/login");
 
     super.prepareDispatch(controllerContext,
-                          "PORTLET/social-portlet/Login",
+                          "PORTLET/social/Login",
                           additionalJSModules,
                           additionalCSSModules,
                           params -> extendUIParameters(controllerContext, status, params));

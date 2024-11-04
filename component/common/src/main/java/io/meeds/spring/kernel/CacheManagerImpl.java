@@ -104,12 +104,12 @@ public class CacheManagerImpl implements CacheManager {
 
         @Override
         public void put(Object key, Object value) {
-          cacheInstance.put((Serializable) key, value);
+          cacheInstance.put(getSerializableKey(key), value);
         }
 
         @Override
         public void evict(Object key) {
-          cacheInstance.remove((Serializable) key);
+          cacheInstance.remove(getSerializableKey(key));
         }
 
         @Override
@@ -119,7 +119,16 @@ public class CacheManagerImpl implements CacheManager {
 
         @Override
         protected Object lookup(Object key) {
+          key = getSerializableKey(key);
           return cacheInstance.get((Serializable) key);
+        }
+
+        private Serializable getSerializableKey(Object key) {
+          if (key instanceof Serializable serializable) {
+            return serializable;
+          } else {
+            return key.hashCode();
+          }
         }
 
       };

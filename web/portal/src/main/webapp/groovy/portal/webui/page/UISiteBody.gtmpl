@@ -10,7 +10,7 @@
              class="v-application transparent v-application--is-ltr theme--light singlePageApplication"
              id="PageNotFound">
             <script type="text/javascript">
-              require(['PORTLET/social-portlet/PageNotFound'],
+              require(['PORTLET/social/PageNotFound'],
                   app => app.init()
               );
             </script>

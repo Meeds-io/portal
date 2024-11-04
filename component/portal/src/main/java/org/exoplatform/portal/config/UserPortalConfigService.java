@@ -70,7 +70,6 @@ import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
-import org.exoplatform.portal.mop.user.UserPortalContext;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.Group;
@@ -305,23 +304,6 @@ public class UserPortalConfigService implements Startable {
     }
 
     /**
-     * @param portalName the portal name
-     * @param accessUser the user name
-     * @param userPortalContext
-     * @return the config
-     * @deprecated the method
-     *             {@link #getUserPortalConfig(String, String, java.util.Locale)}
-     *             or {@link #getUserPortalConfig(String, String)} should be
-     *             used instead
-     */
-    @Deprecated(forRemoval = true, since = "7.0")
-    public UserPortalConfig getUserPortalConfig(String portalName, String accessUser, UserPortalContext userPortalContext) {
-      boolean noSpecificLocale = userPortalContext == null || userPortalContext.getUserLocale() == null;
-      return noSpecificLocale ? getUserPortalConfig(portalName, accessUser) :
-                              getUserPortalConfig(portalName, accessUser, userPortalContext.getUserLocale());
-    }
-
-    /**
      * Compute and returns the list that the specified user can manage. If the user is root then all existing groups are
      * returned otherwise the list is computed from the groups in which the user has a configured membership. The membership is
      * configured from the value returned by UserACL#getMakableMT
@@ -373,7 +355,7 @@ public class UserPortalConfigService implements Startable {
      * @return true or false
      * @throws Exception any exception
      */
-    public boolean hasMakableNavigations(String remoteUser, boolean withSite) throws Exception{
+    public boolean hasMakableNavigations(String remoteUser, boolean withSite) throws Exception {
         Collection<Group> groups;
         boolean hasNav = false;
         if (remoteUser == null) {
@@ -409,9 +391,8 @@ public class UserPortalConfigService implements Startable {
      * </ul>
      *
      * @param userName the user name
-     * @throws Exception a nasty exception
      */
-    public void createUserSite(String userName) throws Exception {
+    public void createUserSite(String userName) {
         // Create the portal using default template
         createUserPortalConfig(PortalConfig.USER_TYPE, userName, getDefaultUserSiteTemplate());
 
@@ -441,9 +422,8 @@ public class UserPortalConfigService implements Startable {
      * </ul>
      *
      * @param groupId the group id
-     * @throws Exception a nasty exception
      */
-    public void createGroupSite(String groupId) throws Exception {
+    public void createGroupSite(String groupId) {
         // Create the portal using default template
         createUserPortalConfig(PortalConfig.GROUP_TYPE, groupId, getDefaultGroupSiteTemplate());
 
@@ -462,32 +442,49 @@ public class UserPortalConfigService implements Startable {
      * @param siteType the site type
      * @param siteName the Site name
      * @param template the template to use
-     * @throws Exception any exception
      */
-    public void createUserPortalConfig(String siteType, String siteName, String template) throws Exception {
-        NewPortalConfig portalConfig = null;
-        if (StringUtils.isBlank(template)) {
-          portalConfig = new NewPortalConfig();
-          portalConfig.setUseMetaPortalLayout(true);
-        } else {
-          String templatePath = newPortalConfigListener_.getTemplateConfig(siteType, template);
-          portalConfig = new NewPortalConfig(templatePath);
-          portalConfig.setTemplateName(template);
-        }
+    public void createUserPortalConfig(String siteType, String siteName, String template) {
+      NewPortalConfig portalConfig = null;
+      if (StringUtils.isBlank(template)) {
+        portalConfig = new NewPortalConfig();
+        portalConfig.setUseMetaPortalLayout(true);
+      } else {
+        String templatePath = newPortalConfigListener_.getTemplateConfig(siteType, template);
+        portalConfig = new NewPortalConfig(templatePath);
+        portalConfig.setTemplateName(template);
+      }
 
-        portalConfig.setOwnerType(siteType);
-        newPortalConfigListener_.createPortalConfig(portalConfig, siteName);
-        newPortalConfigListener_.createPage(portalConfig, siteName);
-        newPortalConfigListener_.createPageNavigation(portalConfig, siteName);
+      portalConfig.setOwnerType(siteType);
+      newPortalConfigListener_.createPortalConfig(portalConfig, siteName);
+      newPortalConfigListener_.createPage(portalConfig, siteName);
+      newPortalConfigListener_.createPageNavigation(portalConfig, siteName);
+    }
+
+    /**
+     * This method should create a the portal config, pages and navigation
+     * according to the template name.
+     *
+     * @param siteType the site type
+     * @param siteName the Site name
+     * @param template the template to use
+     * @param templatePath the template path to use
+     */
+    public void createUserPortalConfig(String siteType, String siteName, String template, String templatePath) {
+      NewPortalConfig portalConfigPlugin = new NewPortalConfig(templatePath);
+      portalConfigPlugin.setTemplateName(template);
+      portalConfigPlugin.setOwnerType(siteType);
+
+      newPortalConfigListener_.createPortalConfig(portalConfigPlugin, siteName);
+      newPortalConfigListener_.createPage(portalConfigPlugin, siteName);
+      newPortalConfigListener_.createPageNavigation(portalConfigPlugin, siteName);
     }
 
     /**
      * This method removes the PortalConfig, Page and PageNavigation that belong to the portal in the database.
      *
      * @param portalName the portal name
-     * @throws Exception any exception
      */
-    public void removeUserPortalConfig(String portalName) throws Exception {
+    public void removeUserPortalConfig(String portalName) {
         removeUserPortalConfig(PortalConfig.PORTAL_TYPE, portalName);
     }
 
@@ -496,9 +493,8 @@ public class UserPortalConfigService implements Startable {
      *
      * @param ownerType the owner type
      * @param ownerId the portal name
-     * @throws Exception any exception
      */
-    public void removeUserPortalConfig(String ownerType, String ownerId) throws Exception {
+    public void removeUserPortalConfig(String ownerType, String ownerId) {
         PortalConfig config = layoutService.getPortalConfig(ownerType, ownerId);
         if (config != null) {
             layoutService.remove(config);
@@ -629,7 +625,7 @@ public class UserPortalConfigService implements Startable {
       return rootNode != null ? rootNode.getChildren() : Collections.emptyList();
     }
 
-    public UserNode getPortalSiteRootNode(String siteName,String siteType, HttpServletRequest context) throws Exception {
+    public UserNode getPortalSiteRootNode(String siteName,String siteType, HttpServletRequest context) {
       UserPortalConfig userPortalConfig = null;
       String username = context.getRemoteUser();
       if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
@@ -672,7 +668,7 @@ public class UserPortalConfigService implements Startable {
       return userNode;
     }
 
-    public String getFirstAllowedPageNode(String portalName, String portalType, String nodePath, HttpServletRequest context) throws Exception {
+    public String getFirstAllowedPageNode(String portalName, String portalType, String nodePath, HttpServletRequest context) {
       UserNode targetUserNode = getPortalSiteRootNode(portalName, portalType, context);
       if (targetUserNode == null) {
         return nodePath;
@@ -827,10 +823,6 @@ public class UserPortalConfigService implements Startable {
 
     public Set<String> getPortalTemplates() {
         return newPortalConfigListener_.getTemplateConfigs(PortalConfig.PORTAL_TYPE);
-    }
-
-    public PortalConfig getPortalConfigFromTemplate(String templateName) {
-        return newPortalConfigListener_.getPortalConfigFromTemplate(PortalConfig.PORTAL_TYPE, templateName);
     }
 
     public <T> T getConfig(String portalType,

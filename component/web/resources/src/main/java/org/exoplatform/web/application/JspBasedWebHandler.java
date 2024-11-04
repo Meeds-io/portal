@@ -104,7 +104,7 @@ public abstract class JspBasedWebHandler extends WebRequestHandler {
 
     JavascriptManager javascriptManager = new JavascriptManager(javascriptConfigService);
     javascriptManager.loadScriptResource(ResourceScope.SHARED, "bootstrap");
-    javascriptManager.loadScriptResource(ResourceScope.PORTLET, "social-portlet/Login");
+    javascriptManager.loadScriptResource(ResourceScope.PORTLET, "social/Login");
 
     JSONObject params = new JSONObject();
 

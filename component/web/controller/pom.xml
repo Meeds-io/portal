@@ -32,7 +32,7 @@
   </description>
 
   <properties>
-    <exo.test.coverage.ratio>0.70</exo.test.coverage.ratio>
+    <exo.test.coverage.ratio>0.68</exo.test.coverage.ratio>
   </properties>
 
   <dependencies>

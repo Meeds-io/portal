@@ -397,6 +397,7 @@ public class UserPortalImpl implements UserPortal {
     scope.resolve();
 
     //
+    UserNode globalUserNode = null;
     if (scope.score > 0) {
       UserNode ret = scope.userNode;
       if (ret != null && !StringUtils.equals(scope.userNode.getURI(), ret.getURI())) {
@@ -407,10 +408,16 @@ public class UserPortalImpl implements UserPortal {
       }
       if (ret != null) {
         ret.owner.filterConfig.path = null;
+        if (!segments[segments.length - 1].equals(ret.getName())) {
+          globalUserNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
+          if (globalUserNode != null && segments[segments.length - 1].equals(globalUserNode.getName())) {
+            ret = globalUserNode;
+          }
+        }
+        return ret;
       }
-      return ret;
     }
-    return getGlobalUserNode(filterConfig, navigation.getKey(), segments);
+    return globalUserNode == null ? getGlobalUserNode(filterConfig, navigation.getKey(), segments) : globalUserNode;
   }
 
   @Override
@@ -559,9 +566,6 @@ public class UserPortalImpl implements UserPortal {
   }
 
   protected UserNode getGlobalUserNode(UserNodeFilterConfig filterConfig, SiteKey siteKey, String[] segments) {
-    if (siteKey.getType() != SiteType.PORTAL) {
-      return null;
-    }
     UserNavigation globalNavigation = getNavigation(SiteKey.portal(this.service.getGlobalPortal()));
     if (globalNavigation != null) {
       MatchingScope globalScope = new MatchingScope(globalNavigation, filterConfig, segments);

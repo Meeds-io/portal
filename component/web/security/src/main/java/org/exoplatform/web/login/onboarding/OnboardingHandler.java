@@ -238,7 +238,7 @@ public class OnboardingHandler extends JspBasedWebHandler {
     request.getSession().removeAttribute(NAME);
 
     super.prepareDispatch(controllerContext,
-                          "PORTLET/social-portlet/InternalOnboarding",
+                          "PORTLET/social/InternalOnboarding",
                           Collections.emptyList(),
                           Collections.singletonList("portal/login"),
                           params -> extendApplicationParameters(params, parameters));

@@ -31,13 +31,10 @@ import org.exoplatform.portal.config.NoSuchDataException;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.util.Util;
-import org.exoplatform.portal.webui.workspace.UIMaskWorkspace;
 import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.portal.webui.workspace.UIWorkingWorkspace;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.web.application.ApplicationMessage;
-import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.event.Event;
 import org.exoplatform.webui.event.Event.Phase;
@@ -532,7 +529,7 @@ public class UIPortletActionListener {
             javax.portlet.Event event) {
         log.trace("Process Event: " + event.getName() + " for portlet: " + uiPortlet.getState());
         try {
-            PortalRequestContext context = (PortalRequestContext) WebuiRequestContext.getCurrentInstance();
+            PortalRequestContext context = PortalRequestContext.getCurrentInstance();
 
             //
             EventInvocation eventInvocation = uiPortlet.create(EventInvocation.class, context);
