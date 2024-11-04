@@ -19,74 +19,49 @@
 
 package org.exoplatform.portal.config.model;
 
-import lombok.ToString;
+import org.exoplatform.portal.pom.spi.portlet.Portlet;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * The transient state of an application when it has not yet been stored in the database.
+ * The transient state of an application when it has not yet been stored in the
+ * database.
  *
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
-@ToString
-public class TransientApplicationState<S> extends ApplicationState<S> {
+@Data
+@NoArgsConstructor
+public class TransientApplicationState implements ApplicationState {
 
-    /** The owner type. */
-    private String contentId;
+  private static final long serialVersionUID = 3687244236805541930L;
 
-    /** The owner type. */
-    private String ownerType;
+  /** The owner type. */
+  private String  contentId;
 
-    /** The owner id. */
-    private String ownerId;
+  /** The owner type. */
+  private String  ownerType;
 
-    /** The content state. */
-    private S contentState;
+  /** The owner id. */
+  private String  ownerId;
 
-    public TransientApplicationState(String contentId) {
-        this.contentId = contentId;
-    }
+  /** The content state. */
+  private Portlet contentState;
 
-    public TransientApplicationState(String contentId, S contentState) {
-        this.contentId = contentId;
-        this.contentState = contentState;
-    }
+  public TransientApplicationState(String contentId) {
+    this.contentId = contentId;
+  }
 
-    public TransientApplicationState(String contentId, S contentState, String ownerType, String ownerId) {
-        this.contentId = contentId;
-        this.contentState = contentState;
-        this.ownerType = ownerType;
-        this.ownerId = ownerId;
-    }
+  public TransientApplicationState(String contentId, Portlet contentState) {
+    this.contentId = contentId;
+    this.contentState = contentState;
+  }
 
-    public TransientApplicationState() {
-        this.contentState = null;
-    }
-
-    public String getContentId() {
-        return contentId;
-    }
-
-    public S getContentState() {
-        return contentState;
-    }
-
-    public void setContentState(S contentState) {
-        this.contentState = contentState;
-    }
-
-    public String getOwnerType() {
-        return ownerType;
-    }
-
-    public void setOwnerType(String ownerType) {
-        this.ownerType = ownerType;
-    }
-
-    public String getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(String ownerId) {
-        this.ownerId = ownerId;
-    }
+  public TransientApplicationState(String contentId, Portlet contentState, String ownerType, String ownerId) {
+    this.contentId = contentId;
+    this.contentState = contentState;
+    this.ownerType = ownerType;
+    this.ownerId = ownerId;
+  }
 }

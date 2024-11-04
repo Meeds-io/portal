@@ -59,19 +59,9 @@
     <key>org.exoplatform.portal.mop.storage.SiteStorage</key>
     <type>org.exoplatform.portal.mop.storage.mock.InMemorySiteStorage</type>
   </component>
-  <!-- Legacy, kept for backward compatibility -->
-  <component>
-    <key>org.exoplatform.portal.pom.data.ModelDataStorage</key>
-    <type>org.exoplatform.portal.mop.storage.mock.InMemorySiteStorage</type>
-  </component>
 
   <component>
     <key>org.exoplatform.portal.mop.storage.NavigationStorage</key>
-    <type>org.exoplatform.portal.mop.storage.cache.CacheNavigationStorage</type>
-  </component>
-  <!-- Legacy, kept for backward compatibility -->
-  <component>
-    <key>org.exoplatform.portal.mop.navigation.NavigationStore</key>
     <type>org.exoplatform.portal.mop.storage.cache.CacheNavigationStorage</type>
   </component>
 
@@ -79,19 +69,9 @@
     <key>org.exoplatform.portal.mop.storage.PageStorage</key>
     <type>org.exoplatform.portal.mop.storage.cache.CachePageStorage</type>
   </component>
-  <!-- Legacy, kept for backward compatibility -->
-  <component>
-    <key>org.exoplatform.portal.mop.page.PageService</key>
-    <type>org.exoplatform.portal.mop.storage.cache.CachePageStorage</type>
-  </component>
 
   <component>
     <key>org.exoplatform.portal.mop.storage.DescriptionStorage</key>
-    <type>org.exoplatform.portal.mop.storage.cache.CacheDescriptionStorage</type>
-  </component>
-  <!-- Legacy, kept for backward compatibility -->
-  <component>
-    <key>org.exoplatform.portal.mop.description.DescriptionService</key>
     <type>org.exoplatform.portal.mop.storage.cache.CacheDescriptionStorage</type>
   </component>
 
@@ -104,20 +84,15 @@
     <key>org.exoplatform.portal.mop.service.LayoutService</key>
     <type>org.exoplatform.portal.mop.service.LayoutServiceImpl</type>
   </component>
-  <!-- Legacy, kept for backward compatibility -->
-  <component>
-    <key>org.exoplatform.portal.config.DataStorage</key>
-    <type>org.exoplatform.portal.mop.service.LayoutServiceImpl</type>
-  </component>
 
   <component>
     <key>org.exoplatform.portal.mop.service.NavigationService</key>
     <type>org.exoplatform.portal.mop.service.NavigationServiceImpl</type>
   </component>
-  <!-- Legacy, kept for backward compatibility -->
+
   <component>
-    <key>org.exoplatform.portal.mop.navigation.NavigationService</key>
-    <type>org.exoplatform.portal.mop.service.NavigationServiceImpl</type>
+    <key>org.exoplatform.portal.mop.service.DescriptionService</key>
+    <type>org.exoplatform.portal.mop.service.DescriptionServiceImpl</type>
   </component>
 
   <component>
@@ -228,14 +203,6 @@
                   <name>meta.portal</name>
                   <value>classic</value>
               </value-param>
-              <value-param>
-                  <name>page.templates.location</name>
-                  <value>classpath:/portal/template/pages</value>
-              </value-param>
-              <value-param>
-                  <name>initializing.failure.ignore</name>
-                  <value>true</value>
-              </value-param>
               <object-param>
                   <name>portal.configuration</name>
                   <object type="org.exoplatform.portal.config.NewPortalConfig">
@@ -254,25 +221,6 @@
           </init-params>
       </component-plugin>
     </component-plugins>
-    <init-params>
-      <value-param>
-        <name>create.user.portal</name>
-        <value>false</value>
-      </value-param>
-      <value-param>
-        <name>destroy.user.portal</name>
-        <value>false</value>
-      </value-param>
-      <value-param>
-        <name>default.import.mode</name>
-        <value>conserve</value>
-      </value-param>
-      <value-param>
-        <name>global.portal</name>
-        <description>System site name that defines generic pages</description>
-        <value>global</value>
-      </value-param>
-    </init-params>
   </component>
 
   <component>
@@ -336,21 +284,9 @@
   <external-component-plugins>
     <target-component>org.exoplatform.services.organization.OrganizationService</target-component>
     <component-plugin>
-      <name>user.portal.config.listener</name>
-      <set-method>addListenerPlugin</set-method>
-      <type>org.exoplatform.portal.config.UserPortalConfigListener</type>
-    </component-plugin>
-    <component-plugin>
       <name>group.portal.config.listener</name>
       <set-method>addListenerPlugin</set-method>
       <type>org.exoplatform.portal.config.GroupPortalConfigListener</type>
-      <init-params>
-        <value-param>
-          <name>group.name.pattern</name>
-          <description>The group name pattern</description>
-          <value>/groupTest</value>
-        </value-param>
-      </init-params>
     </component-plugin>
   </external-component-plugins>
 

@@ -25,10 +25,9 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-import org.exoplatform.portal.mop.navigation.NodeContext;
-import org.exoplatform.portal.mop.navigation.NodeModel;
+import org.junit.Assert;
 
-import junit.framework.Assert;
+import org.exoplatform.portal.mop.service.NavigationService;
 
 /**
  * Represents a navigation node.

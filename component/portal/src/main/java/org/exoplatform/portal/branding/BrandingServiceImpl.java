@@ -61,12 +61,12 @@ import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.LocaleConfigService;
-import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.upload.UploadResource;
 import org.exoplatform.upload.UploadService;
 
@@ -181,6 +181,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private ListenerService      listenerService;
 
+  private UserACL              userAcl;
+
   private String               defaultCompanyName                = "";
 
   private String               defaultSiteName                   = "";
@@ -228,6 +230,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                              UploadService uploadService,
                              LocaleConfigService localeConfigService,
                              ListenerService listenerService,
+                             UserACL userAcl,
                              InitParams initParams) {
     this.container = container;
     this.configurationManager = configurationManager;
@@ -236,6 +239,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     this.uploadService = uploadService;
     this.localeConfigService = localeConfigService;
     this.listenerService = listenerService;
+    this.userAcl = userAcl;
 
     this.loadLanguages();
     this.loadInitParams(initParams);
@@ -481,7 +485,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         if (imageId != null) {
           this.favicon = retrieveStoredBrandingFile(imageId, new Favicon());
         } else {
-          this.favicon = retrieveDefaultBrandingFile(defaultConfiguredFaviconPath, new Favicon(), FAVICON_NAME, BRANDING_FAVICON_ID_SETTING_KEY);
+          this.favicon = retrieveDefaultBrandingFile(defaultConfiguredFaviconPath,
+                                                     new Favicon(),
+                                                     FAVICON_NAME,
+                                                     BRANDING_FAVICON_ID_SETTING_KEY);
         }
       } catch (Exception e) {
         LOG.warn("Error retrieving favicon", e);
@@ -498,7 +505,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         if (imageId != null) {
           this.loginBackground = retrieveStoredBrandingFile(imageId, new Background());
         } else if (StringUtils.isNotBlank(defaultConfiguredLoginBgPath)) {
-          this.loginBackground = retrieveDefaultBrandingFile(defaultConfiguredLoginBgPath, new Background(), LOGIN_BACKGROUND_NAME, BRANDING_LOGIN_BG_ID_SETTING_KEY);
+          this.loginBackground = retrieveDefaultBrandingFile(defaultConfiguredLoginBgPath,
+                                                             new Background(),
+                                                             LOGIN_BACKGROUND_NAME,
+                                                             BRANDING_LOGIN_BG_ID_SETTING_KEY);
         } else {
           this.loginBackground = new Background();
         }
@@ -935,7 +945,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @SneakyThrows
-  private FileItem updateBrandingFileByInputStream(InputStream inputStream, String fileName, String settingKey)  {
+  private FileItem updateBrandingFileByInputStream(InputStream inputStream, String fileName, String settingKey) {
     int size = inputStream.available();
     FileItem fileItem = new FileItem(0l,
                                      fileName,
@@ -943,7 +953,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                                      FILE_API_NAME_SPACE,
                                      size,
                                      new Date(),
-                                     getCurrentUserId(),
+                                     userAcl.getSuperUser(),
                                      false,
                                      inputStream);
     fileItem = fileService.writeFile(fileItem);
@@ -1020,14 +1030,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
   }
 
-  private String getCurrentUserId() {
-    ConversationState conversationState = ConversationState.getCurrent();
-    if (conversationState != null && conversationState.getIdentity() != null) {
-      return conversationState.getIdentity().getUserId();
-    }
-    return null;
-  }
-
   private <T extends BrandingFile> T retrieveStoredBrandingFile(long imageId, T brandingFile) throws FileStorageException {
     FileItem fileItem = fileService.getFile(imageId);
     if (fileItem != null) {
@@ -1039,7 +1041,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return brandingFile;
   }
 
-  private <T extends BrandingFile> T retrieveDefaultBrandingFile(String imagePath, T brandingFile, String fileName, String settingKey) throws IOException {
+  private <T extends BrandingFile> T retrieveDefaultBrandingFile(String imagePath,
+                                                                 T brandingFile,
+                                                                 String fileName,
+                                                                 String settingKey) throws IOException {
     if (StringUtils.isNotBlank(imagePath)) {
       byte[] bytes = null;
       long lastModified = DEFAULT_LAST_MODIFED;

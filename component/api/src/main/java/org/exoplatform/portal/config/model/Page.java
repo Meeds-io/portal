@@ -27,13 +27,16 @@ import org.exoplatform.portal.pom.config.Utils;
 import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.PageData;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * May 13, 2004
  **/
+@EqualsAndHashCode(callSuper = true)
 public class Page extends Container {
+
   public static final String DEFAULT_PAGE     = "Default";
 
   private PageKey            pageKey;

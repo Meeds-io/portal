@@ -27,6 +27,9 @@ import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.page.PageKey;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
  * @author <a href="mailto:ppalaga@redhat.com">Peter Palaga</a>
  *
@@ -60,24 +63,9 @@ public class PageNode extends PageNodeContainer {
     /** . */
     private long updatedDate;
 
-    public PageNode() {
-    }
-
-    /**
-     * Always returns {@code null} as there is no <code>&lt;uri&gt;</code> since gatein_objects_1_4.
-     * @return
-     */
-    public String getUri() {
-        return null;
-    }
-
-    /**
-     * Ignored but still here for backwards compatibility
-     *
-     * @param s ignored
-     */
-    public void setUri(String s) {
-    }
+    @Getter
+    @Setter
+    private int      order      = -1;
 
     public I18NString getLabels() {
         return labels;

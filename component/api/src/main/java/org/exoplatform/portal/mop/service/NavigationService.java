@@ -15,6 +15,7 @@
  */
 package org.exoplatform.portal.mop.service;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NodeChangeListener;
@@ -24,14 +25,14 @@ import org.exoplatform.portal.mop.navigation.NodeModel;
 import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.navigation.Scope;
 
-public interface NavigationService extends org.exoplatform.portal.mop.navigation.NavigationService {
+public interface NavigationService {
 
   /**
    * Find and returns a navigation, if no such site exist, null is returned
    * instead.
    *
-   * @param  key the navigation key
-   * @return     the matching navigation
+   * @param key the navigation key
+   * @return the matching navigation
    */
   NavigationContext loadNavigation(SiteKey key);
 
@@ -47,16 +48,16 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
   /**
    * Delete a navigation for a given site
    *
-   * @param  navigation the navigation
-   * @return            true if the navigation was destroyed
+   * @param navigation the navigation
+   * @return true if the navigation was destroyed
    */
   boolean destroyNavigation(NavigationContext navigation);
 
   /**
    * Delete a navigation for a given site
    *
-   * @param  siteKey {@link SiteKey}
-   * @return         true if the navigation was destroyed
+   * @param siteKey {@link SiteKey}
+   * @return true if the navigation was destroyed
    */
   boolean destroyNavigation(SiteKey siteKey);
 
@@ -64,12 +65,12 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
    * Load a navigation node from a specified navigation. The returned context
    * will be the root node of the navigation.
    *
-   * @param  model      the node model
-   * @param  navigation the navigation
-   * @param  scope      the scope
-   * @param  listener   the optional listener
-   * @param  <N>        the node generic type
-   * @return            the loaded node
+   * @param model the node model
+   * @param navigation the navigation
+   * @param scope the scope
+   * @param listener the optional listener
+   * @param <N> the node generic type
+   * @return the loaded node
    */
   <N> NodeContext<N> loadNode(NodeModel<N> model,
                               NavigationContext navigation,
@@ -99,12 +100,12 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
   /**
    * Load a navigation node from a specified navigation by its id
    *
-   * @param  model    the node model
-   * @param  nodeId   the node id
-   * @param  scope    the scope
-   * @param  listener the optional listener
-   * @param  <N>      the node generic type
-   * @return          the loaded node
+   * @param model the node model
+   * @param nodeId the node id
+   * @param scope the scope
+   * @param listener the optional listener
+   * @param <N> the node generic type
+   * @return the loaded node
    */
   default <N> NodeContext<N> loadNodeById(NodeModel<N> model, // NOSONAR
                                           String nodeId,
@@ -121,7 +122,7 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
    * however it can lead to a failure.
    * </p>
    *
-   * @param context  the context to save
+   * @param context the context to save
    * @param listener the optional listener
    */
   <N> void saveNode(NodeContext<N> context, NodeChangeListener<NodeContext<N>> listener);
@@ -150,10 +151,10 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
    * tree.
    * </p>
    *
-   * @param context  the context to update
-   * @param scope    the optional scope
+   * @param context the context to update
+   * @param scope the optional scope
    * @param listener the optional node change listener
-   * @param <N>      the node generic type
+   * @param <N> the node generic type
    */
   <N> void updateNode(NodeContext<N> context, Scope scope, NodeChangeListener<NodeContext<N>> listener);
 
@@ -182,11 +183,11 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
    * be attempted, however it could fail and lead to a non resolvable situation.
    * </p>
    *
-   * @param context  the context to rebase
-   * @param scope    the optional scope
+   * @param context the context to rebase
+   * @param scope the optional scope
    * @param listener the option node change listener @throws
-   *                   NullPointerException if the context argument is null
-   * @param <N>      the node generic type
+   *          NullPointerException if the context argument is null
+   * @param <N> the node generic type
    */
   <N> void rebaseNode(NodeContext<N> context, Scope scope, NodeChangeListener<NodeContext<N>> listener);
 
@@ -231,5 +232,13 @@ public interface NavigationService extends org.exoplatform.portal.mop.navigation
    * @param state node state
    */
   public void updateNode(Long nodeId, NodeState state);
+
+  /**
+   * @param sourceSiteTemplate {@link SiteKey} of template
+   * @param targetSiteKey {@link SiteKey} to create
+   * @throws ObjectNotFoundException when Site Template isn't found
+   */
+  void saveNavigationFromTemplate(SiteKey sourceSiteTemplate,
+                                  SiteKey targetSiteKey) throws ObjectNotFoundException;
 
 }

@@ -27,6 +27,8 @@ import java.util.Collection;
  */
 public class I18NString extends I18NValue<String, LocalizedString> {
 
+    private static final long serialVersionUID = -3474204421875101015L;
+
     public static I18NString create() {
         return new I18NString();
     }

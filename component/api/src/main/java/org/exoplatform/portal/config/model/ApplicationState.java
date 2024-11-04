@@ -16,18 +16,15 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-
 package org.exoplatform.portal.config.model;
 
 import java.io.Serializable;
-
 
 /**
  * The state of an application which can be either transient of persistent.
  *
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
- * @param <S> the content state type
  */
-public abstract class ApplicationState<S> implements Serializable {
+public interface ApplicationState extends Serializable {
 }

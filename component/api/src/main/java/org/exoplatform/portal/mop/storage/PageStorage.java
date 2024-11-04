@@ -26,15 +26,14 @@ import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageData;
 import org.exoplatform.portal.mop.page.PageKey;
-import org.exoplatform.portal.mop.page.PageService;
 
-public interface PageStorage extends PageService {
+public interface PageStorage {
 
   /**
    * Find and returns a page, if no such page exist, null is returned.
    *
-   * @param  key the page key
-   * @return     the matching page
+   * @param key the page key
+   * @return the matching page
    */
   PageContext loadPage(PageKey key);
 
@@ -44,34 +43,33 @@ public interface PageStorage extends PageService {
    * Create, update a page. When the page state is not null, the page will be
    * created or updated depending on whether or not the page already exists.
    *
-   * @param  page the page
-   * @return      true if the page is not already existed, otherwise return
-   *              false.
+   * @param page the page
+   * @return true if the page is not already existed, otherwise return false.
    */
   boolean savePage(PageContext page);
 
   /**
    * Destroy a page.
    *
-   * @param  key the page key
-   * @return     true when the page was destroyed
+   * @param key the page key
+   * @return true when the page was destroyed
    */
   boolean destroyPage(PageKey key);
 
   /**
    * Deletes Pages of a given site
    * 
-   * @param  siteKey {@link SiteKey}
-   * @return         true if deleted, else false
+   * @param siteKey {@link SiteKey}
+   * @return true if deleted, else false
    */
   boolean destroyPages(SiteKey siteKey);
 
   /**
    * Clone a page.
    *
-   * @param  src the source key
-   * @param  dst the destination key
-   * @return     the cloned page
+   * @param src the source key
+   * @param dst the destination key
+   * @return the cloned page
    */
   PageContext clone(PageKey src, PageKey dst);
 
@@ -80,13 +78,13 @@ public interface PageStorage extends PageService {
    * <code>siteName</code>, <code>pageName</code> and <code>title</code>
    * criterions.
    *
-   * @param  offset    the query offset
-   * @param  limit     the query limit
-   * @param  siteType  the site type
-   * @param  siteName  the site name
-   * @param  pageName  the page name
-   * @param  pageTitle the page title
-   * @return           the query result
+   * @param offset the query offset
+   * @param limit the query limit
+   * @param siteType the site type
+   * @param siteName the site name
+   * @param pageName the page name
+   * @param pageTitle the page title
+   * @return the query result
    */
   QueryResult<PageContext> findPages(int offset,
                                      int limit,
@@ -109,8 +107,8 @@ public interface PageStorage extends PageService {
   /**
    * Retrieves page data switch given key
    * 
-   * @param  key {@link org.exoplatform.portal.pom.data.PageKey}
-   * @return     {@link PageData}
+   * @param key {@link org.exoplatform.portal.pom.data.PageKey}
+   * @return {@link PageData}
    */
   org.exoplatform.portal.pom.data.PageData getPage(org.exoplatform.portal.pom.data.PageKey key);
 

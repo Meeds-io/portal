@@ -85,7 +85,7 @@ public class NavigationStorageImpl implements NavigationStorage {
   }
 
   @Override
-  public NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state) {
+  public NodeData[] createNode(Long parentId, Long previousId, String name, NodeState state, Integer index) {
     NodeEntity parent = null;
     if (parentId != null) {
       parent = nodeDAO.find(parentId);
@@ -101,14 +101,21 @@ public class NavigationStorageImpl implements NavigationStorage {
     target.setParent(parent);
     if (parent != null) {
       List<NodeEntity> children = parent.getChildren();
-      int i;
-      for (i = 0; i < children.size(); i++) {
-        if (children.get(i).getId().equals(prev)) {
-          i += 1;
-          break;
+      if (prev == null
+          && index != null
+          && index.intValue() < children.size()
+          && index.intValue() >= 0) {
+        children.add(index, target);
+      } else {
+        int i;
+        for (i = 0; i < children.size(); i++) {
+          if (children.get(i).getId().equals(prev)) {
+            i += 1;
+            break;
+          }
         }
+        children.add(i, target);
       }
-      children.add(i, target);
       parent.setChildren(children);
       parent.setUpdatedDate(System.currentTimeMillis());
       target = nodeDAO.create(target);

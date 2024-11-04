@@ -127,6 +127,7 @@ public class NavigationFragmentImporter {
         return config;
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public NodeContext<?> perform() {
         NavigationContext navigationCtx = navigationService.loadNavigation(navigationKey);
 
@@ -168,29 +169,25 @@ public class NavigationFragmentImporter {
         }
     }
 
-    private void perform(PageNodeContainer src, final NodeContext<?> dst,
-            final Map<NodeContext<?>, Map<Locale, org.exoplatform.portal.mop.State>> labelMap) {
+    private void perform(PageNodeContainer src,
+                         NodeContext<?> dst,
+                         Map<NodeContext<?>,
+                         Map<Locale, org.exoplatform.portal.mop.State>> labelMap) {
         navigationService.rebaseNode(dst, Scope.CHILDREN, null);
 
         //
-        ListDiff<PageNodeContainer, NodeContext<?>, String> diff = new ListDiff<PageNodeContainer, NodeContext<?>, String>(
-                PAGE_NODE_CONTAINER_ADAPTER, NODE_ADAPTER);
+        ListDiff<PageNodeContainer, NodeContext<?>, String> diff = new ListDiff<>(PAGE_NODE_CONTAINER_ADAPTER, NODE_ADAPTER);
 
         //
-        List<PageNode> srcChildren = src.getNodes();
         ListChangeIterator<PageNodeContainer, NodeContext<?>, String> it = diff.iterator(src, dst);
 
         class Change {
             final ListChangeType type;
             final String name;
-            final int index1;
-            final int index2;
 
-            Change(ListChangeType type, String name, int index1, int index2) {
+            Change(ListChangeType type, String name) {
                 this.type = type;
                 this.name = name;
-                this.index1 = index1;
-                this.index2 = index2;
             }
         }
 
@@ -198,7 +195,7 @@ public class NavigationFragmentImporter {
         LinkedList<Change> changes = new LinkedList<>();
         while (it.hasNext()) {
             ListChangeType type = it.next();
-            changes.add(new Change(type, it.getElement(), it.getIndex1(), it.getIndex2()));
+            changes.add(new Change(type, it.getElement()));
         }
         changes.sort((change1, change2) -> {
           PageNode srcNode1 = src.getNode(change1.name);
@@ -231,11 +228,8 @@ public class NavigationFragmentImporter {
                     previousChild = dstChild;
                     break;
                 case REMOVE:
-                    if (dst.getNode(change.name) != null) {
-                    } else {
-                        if (config.createMissing) {
-                            previousChild = add(srcChild, previousChild, dst, labelMap);
-                        }
+                    if (dst.getNode(change.name) == null && config.createMissing) {
+                      previousChild = add(srcChild, previousChild, dst, labelMap);
                     }
                     break;
                 case ADD:
@@ -267,7 +261,7 @@ public class NavigationFragmentImporter {
         } else if (labels.isEmpty()) {
             description = null;
         } else {
-            description = new HashMap<Locale, org.exoplatform.portal.mop.State>();
+            description = new HashMap<>();
             for (Map.Entry<Locale, String> entry : labels.getExtended(portalLocale).entrySet()) {
                 description.put(entry.getKey(), new org.exoplatform.portal.mop.State(entry.getValue(), null));
             }
@@ -275,13 +269,20 @@ public class NavigationFragmentImporter {
 
         //
         String name = target.getName();
-        int index;
-        if (previous != null) {
-            index = parent.get((previous).getName()).getIndex() + 1;
+        NodeContext<?> child;
+        if (target.getOrder() >= 0) {
+          int nodesCount = parent.getNodeCount();
+          int index = target.getOrder() >= 0 && target.getOrder() < nodesCount ? target.getOrder() : nodesCount - 1;
+          child = parent.add(Math.max(index, 0), name);
         } else {
-            index = 0;
+          Integer index;
+          if (previous != null) {
+            index = parent.get((previous).getName()).getIndex() + 1;
+          } else {
+            index = null;
+          }
+          child = parent.add(index, name);
         }
-        NodeContext<?> child = parent.add(index, name);
         NodeState state = target.getState();
         child.setState(state);
 
@@ -303,17 +304,28 @@ public class NavigationFragmentImporter {
         return child;
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private void update(PageNodeContainer srcParent, NodeContext dstParent, PageNode src, NodeContext<?> target, Map<NodeContext<?>, Map<Locale, org.exoplatform.portal.mop.State>> labelMap) {
         target.setState(src.getState());
 
         int srcIndex = srcParent.getNodes().indexOf(src);
         if (srcIndex <= 0) {
-          dstParent.add(0, target);
+          if (src.getOrder() >= 0) {
+            int nodesCount = dstParent.getNodeCount();
+            int index = src.getOrder() >= 0 && src.getOrder() < nodesCount ? src.getOrder() : nodesCount - 1;
+            dstParent.add(Math.max(index, 0), target);
+          } else {
+            dstParent.add(0, target);
+          }
         } else {
           PageNode previousSrcNode = srcParent.getNodes().get(srcIndex - 1);
           NodeContext previousTargetNode = dstParent.get(previousSrcNode.getName());
           if (previousTargetNode != null) {
             dstParent.add(previousTargetNode.getIndex() + 1, target);
+          } else if (src.getOrder() >= 0) {
+            int nodesCount = dstParent.getNodeCount();
+            int index = src.getOrder() >= 0 && src.getOrder() < nodesCount ? src.getOrder() : nodesCount - 1;
+            dstParent.add(Math.max(index, 0), target);
           } else {
             dstParent.add(null, target);
           }
@@ -327,7 +339,7 @@ public class NavigationFragmentImporter {
         } else if (labels.isEmpty()) {
             description = null;
         } else {
-            description = new HashMap<Locale, org.exoplatform.portal.mop.State>();
+            description = new HashMap<>();
             for (Map.Entry<Locale, String> entry : labels.getExtended(portalLocale).entrySet()) {
                 description.put(entry.getKey(), new org.exoplatform.portal.mop.State(entry.getValue(), null));
             }

@@ -23,12 +23,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
@@ -41,11 +44,9 @@ import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
-import org.exoplatform.portal.application.PortletPreferences;
 import org.exoplatform.portal.config.Query;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.ModelObject;
 import org.exoplatform.portal.config.model.Page;
@@ -54,6 +55,7 @@ import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteFilter;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.Utils;
 import org.exoplatform.portal.mop.importer.Status;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
@@ -65,9 +67,12 @@ import org.exoplatform.portal.pom.data.ModelData;
 import org.exoplatform.portal.pom.data.PageData;
 import org.exoplatform.portal.pom.data.PortalData;
 import org.exoplatform.portal.pom.data.PortalKey;
+import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+
+import lombok.SneakyThrows;
 
 public class LayoutServiceImpl implements LayoutService {
 
@@ -111,6 +116,63 @@ public class LayoutServiceImpl implements LayoutService {
   public void create(PortalConfig config) {
     siteStorage.create(config);
     broadcastEvent(PORTAL_CONFIG_CREATED, config);
+  }
+
+  @Override
+  public void savePortalFromTemplate(SiteKey sourceSiteTemplate,
+                                     SiteKey targetSiteKey,
+                                     String permission) throws ObjectNotFoundException {
+    PortalConfig templatePortalConfig = getPortalConfig(sourceSiteTemplate);
+    if (templatePortalConfig == null) {
+      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", sourceSiteTemplate));
+    }
+    boolean exists = getPortalConfig(targetSiteKey) != null;
+    PortalConfig portalConfig = templatePortalConfig.clone();
+    portalConfig.resetStorage();
+    portalConfig.setType(targetSiteKey.getTypeName());
+    portalConfig.setName(targetSiteKey.getName());
+    portalConfig.setBannerFileId(0);
+    if (StringUtils.isNotBlank(permission)) {
+      portalConfig.setAccessPermissions(getPermissionsFromTemplate(portalConfig.getAccessPermissions(), permission));
+      portalConfig.setEditPermission(getPermissionFromTemplate(portalConfig.getEditPermission(), permission));
+      applyPermissionTemplate(portalConfig.getPortalLayout(), permission);
+    }
+    if (exists) {
+      siteStorage.save(portalConfig.build());
+    } else {
+      siteStorage.create(portalConfig.build());
+    }
+    broadcastEvent(PORTAL_CONFIG_CREATED, portalConfig);
+  }
+
+  @Override
+  public void savePagesFromTemplate(SiteKey sourceSiteTemplate,
+                                    SiteKey targetSiteKey,
+                                    String permission) throws ObjectNotFoundException {
+    List<PageContext> sourceTemplatePages = findPages(sourceSiteTemplate);
+    if (CollectionUtils.isNotEmpty(sourceTemplatePages)) {
+      sourceTemplatePages.stream().map(PageContext::getKey).forEach(k -> savePageFromTemplate(k, targetSiteKey, permission));
+    }
+  }
+
+  @Override
+  @SneakyThrows
+  public void savePageFromTemplate(PageKey sourcePageTemplateKey,
+                                   SiteKey targetSiteKey,
+                                   String permission) {
+    Page page = getPage(sourcePageTemplateKey);
+    page = new Page(page.build());
+    page.resetStorage();
+    page.setOwnerType(targetSiteKey.getTypeName());
+    page.setOwnerId(targetSiteKey.getName());
+    if (StringUtils.isNotBlank(permission)) {
+      page.setAccessPermissions(getPermissionsFromTemplate(page.getAccessPermissions(), permission));
+      page.setEditPermission(getPermissionFromTemplate(page.getEditPermission(), permission));
+      applyPermissionTemplate(page, permission);
+    }
+    pageStorage.savePage(new PageContext(page.getPageKey(), Utils.toPageState(page)));
+    pageStorage.save(page.build());
+    broadcastEvent(PAGE_CREATED, page);
   }
 
   @Override
@@ -232,22 +294,22 @@ public class LayoutServiceImpl implements LayoutService {
   }
 
   @Override
-  public <S> S load(ApplicationState<S> state, ApplicationType<S> type) {
-    return layoutStorage.load(state, type);
+  public Portlet load(ApplicationState state) {
+    return layoutStorage.load(state);
   }
 
   @Override
-  public <S> ApplicationState<S> save(ApplicationState<S> state, S preferences) {
+  public ApplicationState save(ApplicationState state, Portlet preferences) {
     return layoutStorage.save(state, preferences);
   }
 
   @Override
-  public <S> String getId(ApplicationState<S> state) {
+  public String getId(ApplicationState state) {
     return layoutStorage.getId(state);
   }
 
   @Override
-  public <S> Application<S> getApplicationModel(String applicationStorageId) {
+  public Application getApplicationModel(String applicationStorageId) {
     return layoutStorage.getApplicationModel(applicationStorageId);
   }
 
@@ -320,17 +382,6 @@ public class LayoutServiceImpl implements LayoutService {
     Class<T> type = q.getClassType();
     if (PageData.class.equals(type)) {
       throw new UnsupportedOperationException("Use PageService.findPages to instead of");
-    } else if (PortletPreferences.class.equals(type)) {
-      // this task actually return empty portlet preferences
-      return new LazyPageList<>(new ListAccess<T>() {
-        public T[] load(int index, int length) throws Exception {
-          throw new AssertionError();
-        }
-
-        public int getSize() throws Exception {
-          return 0;
-        }
-      }, 10);
     } else if (PortalData.class.equals(type)) {
       String ownerType = q.getOwnerType();
 
@@ -412,10 +463,10 @@ public class LayoutServiceImpl implements LayoutService {
   public InputStream getSiteBannerStream(String siteName) throws ObjectNotFoundException {
     PortalConfig portalConfig = getPortalConfig(siteName);
     if (portalConfig == null) {
-      throw new ObjectNotFoundException("site with name " + siteName + " doesn't exist");
+      throw new ObjectNotFoundException(String.format("site with name %s doesn't exist", siteName));
     }
     if (portalConfig.getBannerFileId() == 0) {
-      throw new ObjectNotFoundException("site with name " + siteName + " doesn't have a bannerId");
+      throw new ObjectNotFoundException(String.format("site with name %s doesn't have a bannerId", siteName));
     }
     try {
       FileItem fileItem = fileService.getFile(portalConfig.getBannerFileId());
@@ -522,4 +573,29 @@ public class LayoutServiceImpl implements LayoutService {
       LOG.warn("Error when broadcasting notification " + eventName + " for " + data, e);
     }
   }
+
+  private void applyPermissionTemplate(ModelObject model, String permission) {
+    if (model instanceof Container container) {
+      container.setAccessPermissions(getPermissionsFromTemplate(container.getAccessPermissions(), permission));
+      if (CollectionUtils.isNotEmpty(container.getChildren())) {
+        container.getChildren().forEach(c -> applyPermissionTemplate(c, permission));
+      }
+    } else if (model instanceof Application application) {
+      application.setAccessPermissions(getPermissionsFromTemplate(application.getAccessPermissions(), permission));
+    }
+  }
+
+  private String[] getPermissionsFromTemplate(String[] accessPermissions, String permission) {
+    if (ArrayUtils.isEmpty(accessPermissions)) {
+      return accessPermissions;
+    }
+    return Arrays.stream(accessPermissions)
+                 .map(p -> getPermissionFromTemplate(p, permission))
+                 .toArray(String[]::new);
+  }
+
+  private String getPermissionFromTemplate(String selectedPermission, String permission) {
+    return selectedPermission.replace("@owner_id@", permission);
+  }
+
 }

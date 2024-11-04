@@ -1,21 +1,27 @@
 package org.exoplatform.portal.mop.storage;
 
-import static org.exoplatform.portal.mop.storage.utils.MOPUtils.convertSiteType;
 import static org.exoplatform.portal.mop.storage.utils.MOPUtils.parseJsonArray;
 
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.gatein.api.page.PageQuery;
 import org.json.simple.JSONArray;
 
 import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.portal.config.NoSuchDataException;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.jdbc.entity.ComponentEntity;
 import org.exoplatform.portal.jdbc.entity.PageEntity;
 import org.exoplatform.portal.jdbc.entity.PermissionEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
+import org.exoplatform.portal.mop.EventType;
+import org.exoplatform.portal.mop.PageType;
+import org.exoplatform.portal.mop.QueryResult;
+import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.Utils;
 import org.exoplatform.portal.mop.dao.PageDAO;
 import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.page.PageContext;
@@ -23,24 +29,34 @@ import org.exoplatform.portal.mop.page.PageError;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.page.PageServiceException;
 import org.exoplatform.portal.mop.page.PageState;
+import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.PageData;
-import org.exoplatform.portal.mop.EventType;
-import org.exoplatform.portal.mop.QueryResult;
-import org.exoplatform.portal.mop.SiteKey;
-import org.exoplatform.portal.mop.SiteType;
-import org.exoplatform.portal.mop.Utils;
-import org.exoplatform.portal.mop.PageType;
 import org.exoplatform.services.listener.ListenerService;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
-public class PageStorageImpl extends AbstractPageStorage {
+public class PageStorageImpl implements PageStorage {
+
+  private static final Log    LOG                  = ExoLogger.getLogger(PageStorageImpl.class);
 
   private static final String NO_NULL_KEY_ACCEPTED = "No null key accepted";
+
+  protected ListenerService   listenerService;
+
+  protected LayoutStorage     layoutStorage;
+
+  protected SiteDAO           siteDAO;
+
+  protected PageDAO           pageDAO;
 
   public PageStorageImpl(ListenerService listenerService,
                          LayoutStorage layoutStorage,
                          SiteDAO siteDAO,
                          PageDAO pageDAO) {
-    super(listenerService, layoutStorage, siteDAO, pageDAO);
+    this.listenerService = listenerService;
+    this.layoutStorage = layoutStorage;
+    this.siteDAO = siteDAO;
+    this.pageDAO = pageDAO;
   }
 
   @Override
@@ -90,10 +106,10 @@ public class PageStorageImpl extends AbstractPageStorage {
    * this method on the {@link PageStorage} interface.
    * </p>
    *
-   * @param  siteKey              the site key
-   * @return                      the list of pages
+   * @param siteKey the site key
+   * @return the list of pages
    * @throws PageServiceException anything that would prevent the operation to
-   *                                succeed
+   *           succeed
    */
   public List<PageContext> loadPages(SiteKey siteKey) {
     if (siteKey == null) {
@@ -228,6 +244,81 @@ public class PageStorageImpl extends AbstractPageStorage {
     return new QueryResult<>(from, pages.size(), pages);
   }
 
+  @Override
+  public void save(PageData page) {
+    SiteKey siteKey = new SiteKey(page.getKey().getType(), page.getKey().getId());
+    org.exoplatform.portal.mop.page.PageKey mopKey =
+                                                   new org.exoplatform.portal.mop.page.PageKey(siteKey, page.getKey().getName());
+
+    PageEntity dst = pageDAO.findByKey(mopKey);
+    if (dst == null) {
+      throw new NoSuchDataException("The page " + page.getKey() + " not found");
+    }
+    List<ComponentData> children = page.getChildren();
+
+    JSONArray pageBodyJson = parseJsonArray(dst.getPageBody());
+    List<ComponentEntity> newPageBody = layoutStorage.saveChildren(pageBodyJson, children);
+    dst.setChildren(newPageBody);
+    dst.setPageBody(((JSONArray) dst.toJSON().get("children")).toJSONString());
+
+    pageDAO.update(dst);
+    broadcastEvent(EventType.PAGE_UPDATED, mopKey);
+  }
+
+  @Override
+  public PageData getPage(org.exoplatform.portal.pom.data.PageKey key) {
+    SiteKey siteKey = new SiteKey(key.getType(), key.getId());
+    org.exoplatform.portal.mop.page.PageKey pageKey = new org.exoplatform.portal.mop.page.PageKey(siteKey, key.getName());
+    PageEntity entity = pageDAO.findByKey(pageKey);
+    return buildPageData(entity);
+  }
+
+  protected PageData buildPageData(PageEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    List<String> accessPermissions = layoutStorage.getPermissions(PageEntity.class.getName(),
+                                                                  entity.getId(),
+                                                                  PermissionEntity.TYPE.ACCESS);
+    List<String> editPermissions = layoutStorage.getPermissions(PageEntity.class.getName(),
+                                                                entity.getId(),
+                                                                PermissionEntity.TYPE.EDIT);
+    String editPermission = CollectionUtils.isEmpty(editPermissions) ? null : editPermissions.get(0);
+
+    List<ComponentData> children = layoutStorage.buildChildren(parseJsonArray(entity.getPageBody()));
+
+    return new PageData("page_" + entity.getId(), // storageId
+                        null, // id
+                        entity.getName(), // name
+                        null, // icon
+                        null, // template
+                        entity.getFactoryId(), // factoryId
+                        entity.getDisplayName(), // title
+                        entity.getDescription(), // description
+                        null, // width
+                        null, // height
+                        null, // cssClass
+                        entity.getProfiles(), // profiles
+                        accessPermissions, // accessPermissions
+                        children, // children
+                        entity.getOwnerType().getName(), // ownerType
+                        entity.getOwnerId(), // ownerId
+                        editPermission, // editPermission
+                        entity.isShowMaxWindow(), // showMaxWindow
+                        entity.isHideSharedLayout(),
+                        entity.getPageType() != null ? entity.getPageType().name() : null,
+                        entity.getLink());
+  }
+
+  protected void broadcastEvent(String eventName, org.exoplatform.portal.mop.page.PageKey pageKey) {
+    try {
+      listenerService.broadcast(eventName, this, pageKey);
+    } catch (Exception e) {
+      LOG.warn("Error when broadcasting notification " + eventName + " for page " + pageKey, e);
+    }
+  }
+
   protected PageKey getPageKey(long id) {
     PageEntity pageEntity = pageDAO.find(id);
     return pageEntity == null ? null : new PageKey(pageEntity.getOwnerType(), pageEntity.getOwnerId(), pageEntity.getName());
@@ -241,17 +332,12 @@ public class PageStorageImpl extends AbstractPageStorage {
   }
 
   private List<PageKey> findPageKeys(SiteType siteType, String siteName, String pageTitle, int from, int limit) {
-    PageQuery pageQuery = new PageQuery.Builder().withDisplayName(pageTitle)
-                                                 .withSiteType(convertSiteType(siteType))
-                                                 .withSiteName(StringUtils.trim(siteName))
-                                                 .withPagination(from, limit)
-                                                 .build();
     try {
-      ListAccess<PageKey> pagesListAccess = pageDAO.findByQuery(pageQuery);
+      ListAccess<PageKey> pagesListAccess = pageDAO.findByQuery(siteType, siteName, pageTitle, from, limit);
       PageKey[] pageKeys = pagesListAccess.load(0, pagesListAccess.getSize());
       return Arrays.asList(pageKeys);
     } catch (Exception ex) {
-      throw new IllegalStateException("Error retrieving pages using query " + pageQuery);
+      throw new IllegalStateException(String.format("Error retrieving pages using query %s, %s, %s", siteType, siteName, pageTitle));
     }
   }
 

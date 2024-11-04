@@ -83,6 +83,7 @@
             <xs:element name="end-publication-date" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="visibility" type="visibility" default="DISPLAYED" minOccurs="0" maxOccurs="1"/>
             <xs:element name="page-reference" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="insertion-index" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="node" type="nodeType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence>
     </xs:complexType>

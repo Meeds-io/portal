@@ -44,11 +44,12 @@ import org.exoplatform.portal.mop.dao.SiteDAOTest;
 import org.exoplatform.portal.mop.dao.WindowDAOTest;
 import org.exoplatform.portal.mop.rest.NavigationRestTest;
 import org.exoplatform.portal.mop.storage.TestDescriptionService;
-import org.exoplatform.portal.mop.storage.TestJCBCNavigationServiceRebase;
-import org.exoplatform.portal.mop.storage.TestJDBCNavigationService;
-import org.exoplatform.portal.mop.storage.TestJDBCNavigationServiceSave;
-import org.exoplatform.portal.mop.storage.TestJDBCNavigationServiceUpdate;
-import org.exoplatform.portal.mop.storage.TestJDBCNavigationServiceWrapper;
+import org.exoplatform.portal.mop.storage.TestNavigationInsertAtIndex;
+import org.exoplatform.portal.mop.storage.TestNavigationServiceRebase;
+import org.exoplatform.portal.mop.storage.TestNavigationService;
+import org.exoplatform.portal.mop.storage.TestNavigationServiceSave;
+import org.exoplatform.portal.mop.storage.TestNavigationServiceUpdate;
+import org.exoplatform.portal.mop.storage.TestNavigationServiceWrapper;
 import org.exoplatform.portal.mop.storage.TestPageService;
 import org.exoplatform.portal.rest.MembershipTypeRestResourcesTest;
 import org.exoplatform.portal.rest.UserFieldValidatorTest;
@@ -86,11 +87,12 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     SiteDAOTest.class,
     WindowDAOTest.class,
     TestDescriptionService.class,
-    TestJCBCNavigationServiceRebase.class,
-    TestJDBCNavigationService.class,
-    TestJDBCNavigationServiceSave.class,
-    TestJDBCNavigationServiceUpdate.class,
-    TestJDBCNavigationServiceWrapper.class,
+    TestNavigationServiceRebase.class,
+    TestNavigationService.class,
+    TestNavigationInsertAtIndex.class,
+    TestNavigationServiceSave.class,
+    TestNavigationServiceUpdate.class,
+    TestNavigationServiceWrapper.class,
     TestPageService.class,
     BrandingRestResourcesTest.class,
     NavigationRestTest.class,

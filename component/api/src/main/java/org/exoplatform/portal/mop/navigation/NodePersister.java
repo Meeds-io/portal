@@ -19,9 +19,15 @@
 
 package org.exoplatform.portal.mop.navigation;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.utils.Safe;
+import org.exoplatform.portal.mop.storage.NavigationStorage;
 
 /**
 * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
@@ -35,12 +41,12 @@ class NodePersister<N> extends NodeChangeListener.Base<NodeContext<N>> {
     final Set<String> toUpdate;
 
     /** . */
-    private final NodeStore persistence;
+    private final NavigationStorage persistence;
 
-    NodePersister(NodeStore persistence) {
+    NodePersister(NavigationStorage persistence) {
         this.persistence = persistence;
-        this.toPersist = new HashMap<String, String>();
-        this.toUpdate = new HashSet<String>();
+        this.toPersist = new HashMap<>();
+        this.toUpdate = new HashSet<>();
     }
 
     @Override
@@ -48,7 +54,22 @@ class NodePersister<N> extends NodeChangeListener.Base<NodeContext<N>> {
             throws HierarchyException {
 
         //
-        NodeData[] result = persistence.createNode(Safe.parseLong(parent.data.id), previous != null ? Safe.parseLong(previous.data.id) : null, name, target.state);
+        Integer index = null;
+        int size = parent.getSize();
+        if (size > 1) {
+          int i = 0;
+          while (index == null && i < size) {
+            if (StringUtils.equals(parent.get(i).getName(), name)) {
+              index = i;
+            }
+            i++;
+          }
+        }
+        NodeData[] result = persistence.createNode(Safe.parseLong(parent.data.id),
+                                                   previous != null ? Safe.parseLong(previous.data.id) : null,
+                                                   name,
+                                                   target.state,
+                                                   index);
 
         //
         parent.data = result[0];
@@ -116,6 +137,7 @@ class NodePersister<N> extends NodeChangeListener.Base<NodeContext<N>> {
         toUpdate.add(to.handle);
     }
 
+    @Override
     public void onRename(NodeContext<N> target, NodeContext<N> parent, String name) throws HierarchyException {
 
         NodeData[] result = persistence.renameNode(Safe.parseLong(target.data.id), Safe.parseLong(parent.data.id), name);

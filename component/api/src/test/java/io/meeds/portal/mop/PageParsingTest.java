@@ -71,7 +71,7 @@ public class PageParsingTest extends TestCase {
       assertTrue("'grid-cell-rowspan-xl-1' not found", column.getCssClass().contains("grid-cell-rowspan-xl-1"));
       assertTrue("'TEST-column-class' custom class not found", column.getCssClass().contains("TEST-column-class"));
 
-      Application<Portlet> columnApplication = (Application<Portlet>) column.getChildren().get(0);
+      Application columnApplication = (Application) column.getChildren().get(0);
       assertNotNull(columnApplication.getCssClass());
       assertTrue("'mt-0' not found in: " + columnApplication.getCssClass(), columnApplication.getCssClass().contains("mt-0"));
       assertTrue("'mb-n3' not found in: " + columnApplication.getCssClass(), columnApplication.getCssClass().contains("mb-n3"));

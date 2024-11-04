@@ -157,7 +157,7 @@ public class OnboardingHandlerTest {
   private Map<String, Object>     applicationParameters;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     this.applicationParameters = null;
     ExoContainerContext.setCurrentContainer(container);
     lenient().when(container.getComponentInstanceOfType(ResourceBundleService.class)).thenReturn(resourceBundleService);
@@ -204,7 +204,7 @@ public class OnboardingHandlerTest {
   }
 
   @After
-  public void teardown() throws Exception {
+  public void teardown() {
     ExoContainerContext.setCurrentContainer(null);
   }
 

@@ -26,7 +26,6 @@
 
   <page-nodes>
     <node>
-      <uri>home</uri>
       <name>home</name>
       <label>Home</label>
       <page-reference>portal::@owner@::sitemap</page-reference>

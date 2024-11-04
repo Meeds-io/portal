@@ -19,45 +19,35 @@
 
 package org.exoplatform.portal.application;
 
-import org.exoplatform.container.ExoContainer;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.UserProfile;
 import org.exoplatform.web.application.Application;
 import org.exoplatform.web.application.ApplicationLifecycle;
-import org.exoplatform.web.application.RequestFailure;
 import org.exoplatform.webui.application.WebuiRequestContext;
 
 public class UserProfileLifecycle implements ApplicationLifecycle<WebuiRequestContext> {
-    public static final String USER_PROFILE_ATTRIBUTE_NAME = "PortalUserProfile";
 
-    public void onInit(Application app) {
-        // do nothing for now
+  public static final String  USER_PROFILE_ATTRIBUTE_NAME = "PortalUserProfile";
+
+  private OrganizationService organizationService;
+
+  @Override
+  public void onStartRequest(final Application app, final WebuiRequestContext context) throws Exception {
+    String username = context.getRemoteUser();
+    if (username == null) {
+      context.setAttribute(UserProfileLifecycle.USER_PROFILE_ATTRIBUTE_NAME, null);
+    } else {
+      UserProfile userProfile = getOrganizationService().getUserProfileHandler()
+                                                        .findUserProfileByName(username);
+      context.setAttribute(UserProfileLifecycle.USER_PROFILE_ATTRIBUTE_NAME, userProfile);
     }
+  }
 
-    public void onStartRequest(final Application app, final WebuiRequestContext context) throws Exception {
-        String user = context.getRemoteUser();
-        UserProfile userProfile = null;
-        if (user != null) {
-            ExoContainer exoContainer = app.getApplicationServiceContainer();
-            if (exoContainer != null) {
-                OrganizationService organizationService = (OrganizationService) exoContainer
-                        .getComponentInstanceOfType(OrganizationService.class);
-                userProfile = organizationService.getUserProfileHandler().findUserProfileByName(user);
-            }
-        }
-
-        context.setAttribute(UserProfileLifecycle.USER_PROFILE_ATTRIBUTE_NAME, userProfile);
+  public OrganizationService getOrganizationService() {
+    if (organizationService == null) {
+      organizationService = ExoContainerContext.getService(OrganizationService.class);
     }
-
-    public void onFailRequest(Application app, WebuiRequestContext context, RequestFailure failureType) {
-
-    }
-
-    public void onEndRequest(Application app, WebuiRequestContext context) throws Exception {
-    }
-
-    public void onDestroy(Application app) {
-        // do nothing for now
-    }
-
+    return organizationService;
+  }
 }

@@ -28,6 +28,7 @@ import org.exoplatform.commons.utils.Safe;
 import org.exoplatform.portal.Constants;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.config.NoSuchDataException;
+import org.exoplatform.portal.pc.ExoPortletState;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.util.Util;
@@ -90,9 +91,9 @@ public class UIPortletActionListener {
      * an object of type ActionOutput that contains several information such as the next window state and portlet modes (if they
      * have to change) as well as a list of Events to be broadcasted to the other portlets located in the same portal page
      */
-    public static class ProcessActionActionListener<S, C extends Serializable, I> extends EventListener<UIPortlet<S, C>> {
-        public void execute(Event<UIPortlet<S, C>> event) throws Exception {
-            UIPortlet<S, C> uiPortlet = event.getSource();
+    public static class ProcessActionActionListener<S, C extends Serializable, I> extends EventListener<UIPortlet> {
+        public void execute(Event<UIPortlet> event) throws Exception {
+            UIPortlet uiPortlet = event.getSource();
             PortalRequestContext prcontext = (PortalRequestContext) event.getRequestContext();
 
             // set the public render parameters from the request before creating the invocation
@@ -116,14 +117,14 @@ public class UIPortletActionListener {
             // deal with potential portlet context modifications
             ExoPortletInstanceContext instanceCtx = (ExoPortletInstanceContext) actionInvocation.getInstanceContext();
             if (instanceCtx.getModifiedContext() != null) {
-                StatefulPortletContext<C> updatedCtx = (StatefulPortletContext<C>) instanceCtx.getModifiedContext();
-                C portletState = uiPortlet.getModifiedState(updatedCtx);
+                StatefulPortletContext<ExoPortletState> updatedCtx = (StatefulPortletContext<ExoPortletState>) instanceCtx.getModifiedContext();
+                ExoPortletState portletState = uiPortlet.getModifiedState(updatedCtx);
                 uiPortlet.update(portletState);
             } else {
                 // todo: fix me as this shouldn't probably be done only for the WSRP case
                 PortletContext clonedContext = instanceCtx.getClonedContext();
                 if (clonedContext != null) {
-                    C state = uiPortlet.getClonedState(clonedContext);
+                    ExoPortletState state = uiPortlet.getClonedState(clonedContext);
                     uiPortlet.update(state);
                 }
             }
@@ -150,7 +151,7 @@ public class UIPortletActionListener {
         }
 
         private void handleUpdateNavigationalStateResponse(UpdateNavigationalStateResponse navStateResponse,
-                UIPortlet<S, C> uiPortlet, PortalRequestContext prcontext) throws Exception {
+                UIPortlet uiPortlet, PortalRequestContext prcontext) throws Exception {
             /*
              * Update the portlet window state according to the action output information
              *
@@ -239,8 +240,7 @@ public class UIPortletActionListener {
         }
 
         private void handleSecurityResponse(SecurityResponse response) throws Exception {
-            if (response instanceof SecurityErrorResponse) {
-                SecurityErrorResponse securityErrorResponse = (SecurityErrorResponse) response;
+            if (response instanceof SecurityErrorResponse securityErrorResponse) {
                 throw new Exception("SecurityErrorResponse Returned while trying to process portlet action. ",
                         securityErrorResponse.getThrowable());
             } else {
@@ -310,9 +310,9 @@ public class UIPortletActionListener {
      * Finally the content is set in the portal response writer or outputstream depending on the type; the processRender()
      * method of the portal is not called as we set the response as complete
      */
-    public static class ServeResourceActionListener<S, C extends Serializable, I> extends EventListener<UIPortlet<S, C>> {
-        public void execute(Event<UIPortlet<S, C>> event) throws Exception {
-            UIPortlet<S, C> uiPortlet = event.getSource();
+    public static class ServeResourceActionListener<S, C extends Serializable, I> extends EventListener<UIPortlet> {
+        public void execute(Event<UIPortlet> event) throws Exception {
+            UIPortlet uiPortlet = event.getSource();
             log.trace("Serve Resource for portlet: " + uiPortlet.getPortletContext());
             String resourceId = null;
 
@@ -344,8 +344,7 @@ public class UIPortletActionListener {
                 String charset;
                 Object content;
                 if (!(portletResponse instanceof ContentResponse)) {
-                    if (portletResponse instanceof ErrorResponse) {
-                        ErrorResponse errorResponse = (ErrorResponse) portletResponse;
+                    if (portletResponse instanceof ErrorResponse errorResponse) {
                         Throwable cause = errorResponse.getCause();
                         if (cause != null) {
                             log.trace("Got error response from portlet", cause);
@@ -525,7 +524,7 @@ public class UIPortletActionListener {
      * The processEvent() method can also generates IPC events and hence the portal itself will call the
      * ProcessEventsActionListener once again
      */
-    public static <S, C extends Serializable, I> List<javax.portlet.Event> processEvent(UIPortlet<S, C> uiPortlet,
+    public static <S, C extends Serializable, I> List<javax.portlet.Event> processEvent(UIPortlet uiPortlet,
             javax.portlet.Event event) {
         log.trace("Process Event: " + event.getName() + " for portlet: " + uiPortlet.getState());
         try {
@@ -544,8 +543,8 @@ public class UIPortletActionListener {
             //
             ExoPortletInstanceContext instanceCtx = (ExoPortletInstanceContext) eventInvocation.getInstanceContext();
             if (instanceCtx.getModifiedContext() != null) {
-                StatefulPortletContext<C> updatedCtx = (StatefulPortletContext<C>) instanceCtx.getModifiedContext();
-                C portletState = updatedCtx.getState();
+                StatefulPortletContext<ExoPortletState> updatedCtx = (StatefulPortletContext<ExoPortletState>) instanceCtx.getModifiedContext();
+                ExoPortletState portletState = updatedCtx.getState();
                 uiPortlet.update(portletState);
             }
 

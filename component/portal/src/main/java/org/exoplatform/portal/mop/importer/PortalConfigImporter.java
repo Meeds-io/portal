@@ -71,15 +71,20 @@ public class PortalConfigImporter {
         }
 
         if (dst != null) {
-            LOG.info("Importing Portal config of site of type '{}' with name '{}', import mode '{}', already exists = {}",
-                     src.getType(),
-                     src.getName(),
-                     mode,
-                     !portalNotExists);
             if (portalNotExists) {
-                service.create(dst);
+              LOG.info("Creating Portal config of site of type '{}' with name '{}'",
+                       src.getType(),
+                       src.getName(),
+                       mode,
+                       !portalNotExists);
+              service.create(dst);
             } else {
-                service.save(dst);
+              LOG.info("Updating Portal config of site of type '{}' with name '{}'",
+                       src.getType(),
+                       src.getName(),
+                       mode,
+                       !portalNotExists);
+              service.save(dst);
             }
         }
     }

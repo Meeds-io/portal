@@ -19,35 +19,39 @@
 
 package org.exoplatform.portal.config;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
-import org.gatein.common.util.Tools;
-
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.portal.config.model.Application;
-import org.exoplatform.portal.config.model.ApplicationState;
-import org.exoplatform.portal.config.model.ApplicationType;
-import org.exoplatform.portal.config.model.Container;
+import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PageBody;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.EventType;
+import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.Visibility;
+import org.exoplatform.portal.mop.navigation.NavigationContext;
+import org.exoplatform.portal.mop.navigation.NodeContext;
+import org.exoplatform.portal.mop.navigation.NodeData;
+import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.navigation.Scope;
+import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
@@ -58,15 +62,12 @@ import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
-import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.User;
-import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.services.security.Authenticator;
 import org.exoplatform.services.security.ConversationState;
@@ -75,25 +76,27 @@ import org.exoplatform.test.mocks.servlet.MockServletRequest;
 
 import jakarta.servlet.http.HttpServletRequest;
 import junit.framework.AssertionFailedError;
+import lombok.SneakyThrows;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
 @ConfiguredBy({
-  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
-  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.portal-configuration-local.xml"),
-  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/config/conf/configuration.xml")})
+                @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
+                @ConfigurationUnit(scope = ContainerScope.PORTAL,
+                                   path = "conf/exo.portal.component.portal-configuration-local.xml"),
+                @ConfigurationUnit(scope = ContainerScope.PORTAL,
+                                   path = "org/exoplatform/portal/config/conf/configuration.xml") })
 public class TestUserPortalConfigService extends AbstractConfigTest {
 
   /** . */
-  private UserPortalConfigService userPortalConfigSer_;
-
-  /** . */
-  private OrganizationService     orgService_;
+  private UserPortalConfigService userPortalConfigService;
 
   /** . */
   private LayoutService           layoutService;
+
+  private NavigationService       navigationService;
 
   /** . */
   private PageStorage             pageStorage;
@@ -129,12 +132,12 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     };
 
     PortalContainer container = getContainer();
-    userPortalConfigSer_ = (UserPortalConfigService) container.getComponentInstanceOfType(UserPortalConfigService.class);
-    orgService_ = (OrganizationService) container.getComponentInstanceOfType(OrganizationService.class);
-    authenticator = (Authenticator) container.getComponentInstanceOfType(Authenticator.class);
-    listenerService = (ListenerService) container.getComponentInstanceOfType(ListenerService.class);
-    events = new LinkedList<Event>();
+    userPortalConfigService = container.getComponentInstanceOfType(UserPortalConfigService.class);
+    authenticator = container.getComponentInstanceOfType(Authenticator.class);
+    listenerService = container.getComponentInstanceOfType(ListenerService.class);
+    events = new LinkedList<>();
     layoutService = container.getComponentInstanceOfType(LayoutService.class);
+    navigationService = container.getComponentInstanceOfType(NavigationService.class);
     pageStorage = container.getComponentInstanceOfType(PageStorage.class);
     siteStorage = container.getComponentInstanceOfType(SiteStorage.class);
 
@@ -151,16 +154,162 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }
   }
 
-  private static Map<String, UserNavigation> toMap(UserPortal cfg) {
-    return toMap(cfg.getNavigations());
+  @SneakyThrows
+  public void testCreateUserPortalConfigFromTemplate() {
+    OrganizationService organizationService = ExoContainerContext.getService(OrganizationService.class);
+    GroupHandler groupHandler = organizationService.getGroupHandler();
+    Group group = groupHandler.createGroupInstance();
+    group.setGroupName("groupFromTemplate");
+    group.setLabel("Group from template");
+    groupHandler.addChild(null, group, true);
+
+    String permission = "/organization/management/executive-board";
+    String siteTemplate = "classic";
+    String groupId = "/" + group.getGroupName();
+    SiteKey groupSiteKey = SiteKey.group(groupId);
+    SiteKey templateSiteKey = SiteKey.groupTemplate(siteTemplate);
+    assertThrows(ObjectNotFoundException.class,
+                 () -> userPortalConfigService.createSiteFromTemplate(SiteKey.groupTemplate("NotExistingTemplate"),
+                                                                      groupSiteKey,
+                                                                      permission));
+    userPortalConfigService.createSiteFromTemplate(templateSiteKey, groupSiteKey, permission);
+
+    PortalConfig portalConfig = layoutService.getPortalConfig(groupSiteKey);
+    assertNotNull(portalConfig);
+    assertEquals(1, portalConfig.getAccessPermissions().length);
+    String accessPermission = "member:/organization/management/executive-board";
+    assertEquals(accessPermission, portalConfig.getAccessPermissions()[0]);
+    String editPermission = "manager:/organization/management/executive-board";
+    assertEquals(editPermission, portalConfig.getEditPermission());
+    assertEquals(0, portalConfig.getBannerFileId());
+    assertEquals(1, portalConfig.getDisplayOrder());
+    assertFalse(portalConfig.isDefaultLayout());
+    assertFalse(portalConfig.isDisplayed());
+    assertEquals("Classic Label", portalConfig.getLabel());
+    assertEquals("Classic Description", portalConfig.getDescription());
+    assertEquals(groupSiteKey.getName(), portalConfig.getName());
+    assertEquals(groupSiteKey.getTypeName(), portalConfig.getType());
+    assertNotNull(portalConfig.getPortalLayout());
+    assertNotNull(portalConfig.getPortalLayout().getChildren());
+    assertEquals(2, portalConfig.getPortalLayout().getChildren().size());
+    assertEquals(Application.class, portalConfig.getPortalLayout().getChildren().get(0).getClass());
+    assertEquals(PageBody.class, portalConfig.getPortalLayout().getChildren().get(1).getClass());
+    assertEquals(accessPermission,
+                 ((Application) portalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0]);
+
+    List<PageContext> pages = layoutService.findPages(groupSiteKey);
+    assertNotNull(pages);
+    assertEquals(3, pages.size());
+
+    PageContext pageContext = pages.stream().filter(p -> p.getKey().getName().equals("homepage")).findFirst().orElseThrow();
+    assertEquals(accessPermission, pageContext.getState().getAccessPermissions().get(0));
+    assertEquals(editPermission, pageContext.getState().getEditPermission());
+    assertEquals("Home Page", pageContext.getState().getDisplayName());
+
+    Page page = layoutService.getPage(pageContext.getKey());
+    assertNotNull(page);
+    assertEquals(1, page.getChildren().size());
+    assertEquals(accessPermission, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
+
+    NavigationContext navigation = navigationService.loadNavigation(groupSiteKey);
+    assertNotNull(navigation);
+
+    NodeContext<NodeContext<Object>> rootNode = navigationService.loadNode(groupSiteKey);
+    assertNotNull(rootNode);
+    assertEquals(2, rootNode.getNodeCount());
+    NodeData data = rootNode.get(0).getData();
+    NodeState state = rootNode.get(0).getState();
+    assertEquals("home", data.getName());
+    assertEquals("Home", state.getLabel());
+    assertEquals(groupSiteKey.page("homepage"), state.getPageRef());
+    assertEquals(1, rootNode.get(0).getNodeCount());
+
+    data = rootNode.get(0).get(0).getData();
+    state = rootNode.get(0).get(0).getState();
+    assertEquals("testSubNode", data.getName());
+    assertEquals("Sub Node", state.getLabel());
+    assertEquals(groupSiteKey.page("testSubNode"), state.getPageRef());
+
+    data = rootNode.get(1).getData();
+    state = rootNode.get(1).getState();
+    assertEquals("test", data.getName());
+    assertEquals("Test", state.getLabel());
+    assertEquals(groupSiteKey.page("test"), state.getPageRef());
   }
 
-  private static Map<String, UserNavigation> toMap(List<UserNavigation> navigations) {
-    Map<String, UserNavigation> map = new HashMap<String, UserNavigation>();
-    for (UserNavigation nav : navigations) {
-      map.put(nav.getKey().getType().getName() + "::" + nav.getKey().getName(), nav);
-    }
-    return map;
+  @SneakyThrows
+  public void testDuplicateSiteTemplate() {
+    String siteTemplate = "classic";
+    String targetSiteTemplate = "classic2";
+
+    String accessPermission = "member:@owner_id@";
+    String editPermission = "manager:@owner_id@";
+
+    SiteKey sourceTemplateSiteKey = SiteKey.groupTemplate(siteTemplate);
+    SiteKey targetTemplateSiteKey = SiteKey.groupTemplate(targetSiteTemplate);
+    PortalConfig sourcePortalConfig = layoutService.getPortalConfig(sourceTemplateSiteKey);
+    assertNotNull(sourcePortalConfig);
+
+    userPortalConfigService.createSiteFromTemplate(sourceTemplateSiteKey, targetTemplateSiteKey);
+
+    PortalConfig targetPortalConfig = layoutService.getPortalConfig(targetTemplateSiteKey);
+    assertNotNull(targetPortalConfig);
+    assertEquals(1, targetPortalConfig.getAccessPermissions().length);
+    assertEquals(sourcePortalConfig.getAccessPermissions()[0], targetPortalConfig.getAccessPermissions()[0]);
+    assertEquals(sourcePortalConfig.getEditPermission(), targetPortalConfig.getEditPermission());
+    assertEquals(sourcePortalConfig.getDisplayOrder(), targetPortalConfig.getDisplayOrder());
+    assertEquals(sourcePortalConfig.isDefaultLayout(), targetPortalConfig.isDefaultLayout());
+    assertEquals(sourcePortalConfig.isDisplayed(), targetPortalConfig.isDisplayed());
+    assertEquals(sourcePortalConfig.getLabel(), targetPortalConfig.getLabel());
+    assertEquals(sourcePortalConfig.getDescription(), targetPortalConfig.getDescription());
+    assertEquals(targetTemplateSiteKey.getName(), targetPortalConfig.getName());
+    assertEquals(targetTemplateSiteKey.getTypeName(), targetPortalConfig.getType());
+    assertNotNull(targetPortalConfig.getPortalLayout());
+    assertNotNull(targetPortalConfig.getPortalLayout().getChildren());
+    assertEquals(2, targetPortalConfig.getPortalLayout().getChildren().size());
+    assertEquals(Application.class, targetPortalConfig.getPortalLayout().getChildren().get(0).getClass());
+    assertEquals(PageBody.class, targetPortalConfig.getPortalLayout().getChildren().get(1).getClass());
+    assertEquals(((Application) sourcePortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0],
+                 ((Application) targetPortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0]);
+
+    List<PageContext> pages = layoutService.findPages(targetTemplateSiteKey);
+    assertNotNull(pages);
+    assertEquals(3, pages.size());
+
+    PageContext pageContext = pages.stream().filter(p -> p.getKey().getName().equals("homepage")).findFirst().orElseThrow();
+    assertEquals(accessPermission, pageContext.getState().getAccessPermissions().get(0));
+    assertEquals(editPermission, pageContext.getState().getEditPermission());
+    assertEquals("Home Page", pageContext.getState().getDisplayName());
+
+    Page page = layoutService.getPage(pageContext.getKey());
+    assertNotNull(page);
+    assertEquals(1, page.getChildren().size());
+    assertEquals(accessPermission, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
+
+    NavigationContext navigation = navigationService.loadNavigation(targetTemplateSiteKey);
+    assertNotNull(navigation);
+
+    NodeContext<NodeContext<Object>> rootNode = navigationService.loadNode(targetTemplateSiteKey);
+    assertNotNull(rootNode);
+    assertEquals(2, rootNode.getNodeCount());
+    NodeData data = rootNode.get(0).getData();
+    NodeState state = rootNode.get(0).getState();
+    assertEquals("home", data.getName());
+    assertEquals("Home", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("homepage"), state.getPageRef());
+    assertEquals(1, rootNode.get(0).getNodeCount());
+
+    data = rootNode.get(0).get(0).getData();
+    state = rootNode.get(0).get(0).getState();
+    assertEquals("testSubNode", data.getName());
+    assertEquals("Sub Node", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("testSubNode"), state.getPageRef());
+
+    data = rootNode.get(1).getData();
+    state = rootNode.get(1).getState();
+    assertEquals("test", data.getName());
+    assertEquals("Test", state.getLabel());
+    assertEquals(targetTemplateSiteKey.page("test"), state.getPageRef());
   }
 
   public void testComputePortalSitePath() {
@@ -173,7 +322,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         HashSet<String> owners = new HashSet<>();
         owners.add("test2");
         config.setPredefinedOwner(owners);
-        NewPortalConfigListener newPortalConfigListener = new NewPortalConfigListener(userPortalConfigSer_,
+        NewPortalConfigListener newPortalConfigListener = new NewPortalConfigListener(userPortalConfigService,
                                                                                       layoutService,
                                                                                       getContainer().getComponentInstanceOfType(ConfigurationManager.class),
                                                                                       new InitParams(),
@@ -185,14 +334,14 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         newPortalConfigListener.initPageDB(config);
         newPortalConfigListener.initPageNavigationDB(config);
 
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("test2", "root");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("test2", "root");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
         assertEquals(PortalConfig.PORTAL_TYPE, portalCfg.getType());
         assertEquals("test2", portalCfg.getName());
 
-        String path = userPortalConfigSer_.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
+        String path = userPortalConfigService.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
           @Override
           public String getRemoteUser() {
             return "root";
@@ -204,7 +353,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         layoutService.remove(PageKey.parse("portal::test2::test"));
         restartTransaction();
 
-        path = userPortalConfigSer_.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
+        path = userPortalConfigService.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
           @Override
           public String getRemoteUser() {
             return "root";
@@ -218,7 +367,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testUpdatePortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -229,7 +378,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
 
         layoutService.save(portalCfg);
 
-        userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         portalCfg = userPortalCfg.getPortalConfig();
         assertEquals("fr", portalCfg.getLocale());
       }
@@ -239,7 +388,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testEnforcedReimporting() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -250,14 +399,14 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
 
         layoutService.save(portalCfg);
 
-        userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         portalCfg = userPortalCfg.getPortalConfig();
         assertEquals("fr", portalCfg.getLocale());
 
         // Re-import site config from configuration
-        userPortalConfigSer_.start();
+        userPortalConfigService.start();
 
-        userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         portalCfg = userPortalCfg.getPortalConfig();
         assertEquals("en", portalCfg.getLocale());
       }
@@ -267,7 +416,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testRootGetUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -285,36 +434,20 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }.execute("root");
   }
 
-  public void testGetAllPortalNames() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        assertTrue(userPortalConfigSer_.getSiteNames(SiteType.PORTAL, 0, 0).contains("system"));
-
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "system";
-        try {
-          assertFalse(userPortalConfigSer_.getSiteNames(SiteType.PORTAL, 0, 0).contains("system"));
-        } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
-        }
-      }
-    }.execute("root");
-  }
-
   public void testGetSites() {
     new UnitTest() {
       public void execute() throws Exception {
-        userPortalConfigSer_.removeUserPortalConfig("jazz");
-        int size = userPortalConfigSer_.getUserPortalSites().size();
+        userPortalConfigService.removeUserPortalConfig("jazz");
+        int size = userPortalConfigService.getUserPortalSites("root").size();
         assertTrue(size >= 5);
 
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "system";
-        userPortalConfigSer_.siteFilter.setExcludedSiteName(userPortalConfigSer_.getGlobalPortal());
+        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
+        userPortalConfigService.setGlobalPortal("system");
+        userPortalConfigService.siteFilter.setExcludedSiteName(userPortalConfigService.getGlobalPortal());
         try {
-          assertEquals(size - 1, userPortalConfigSer_.getUserPortalSites().size());
+          assertEquals(size - 1, userPortalConfigService.getUserPortalSites("root").size());
         } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
+          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
         }
       }
     }.execute("root");
@@ -323,7 +456,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testGetGlobalUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -333,19 +466,19 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
         assertTrue(navigations.containsKey("portal::classic"));
-        assertFalse(navigations.containsKey("portal::" + userPortalConfigSer_.getGlobalPortal()));
+        assertFalse(navigations.containsKey("portal::" + userPortalConfigService.getGlobalPortal()));
 
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "system";
+        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
+        userPortalConfigService.setGlobalPortal("system");
         try {
-          userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+          userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
           userPortal = userPortalCfg.getUserPortal();
           navigations = toMap(userPortal);
 
           assertTrue(navigations.containsKey("portal::classic"));
           assertTrue(navigations.containsKey("portal::system"));
         } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
+          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
         }
       }
     }.execute("root");
@@ -359,7 +492,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         filterConfigBuilder.withTemporalCheck();
         UserNodeFilterConfig filterConfig = filterConfigBuilder.build();
 
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -372,10 +505,10 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         int initialNodesSize = nodes.size();
         assertTrue(initialNodesSize > 0);
 
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "systemtest";
+        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
+        userPortalConfigService.setGlobalPortal("systemtest");
         try {
-          userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+          userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
           portalCfg = userPortalCfg.getPortalConfig();
           userPortal = userPortalCfg.getUserPortal();
           nodes = userPortal.getNodes(SiteType.PORTAL, Scope.ALL, filterConfig);
@@ -390,12 +523,12 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
           assertEquals("systemhome", lastUserNode.getName());
           assertEquals("systemtest", lastUserNode.getNavigation().getKey().getName());
         } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
+          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
         }
       }
     }.execute("root");
   }
-  
+
   public void testGetUserNodesGlobalNotIncluded() {
     new UnitTest() {
       public void execute() throws Exception {
@@ -404,7 +537,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         filterConfigBuilder.withTemporalCheck();
         UserNodeFilterConfig filterConfig = filterConfigBuilder.build();
 
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -417,10 +550,10 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         int initialNodesSize = nodes.size();
         assertTrue(initialNodesSize > 0);
 
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "systemtest";
+        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
+        userPortalConfigService.setGlobalPortal("systemtest");
         try {
-          userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+          userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
           portalCfg = userPortalCfg.getPortalConfig();
           userPortal = userPortalCfg.getUserPortal();
           nodes = userPortal.getNodes(SiteType.PORTAL, Scope.ALL, filterConfig, false);
@@ -435,7 +568,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
           assertEquals("webexplorer", lastUserNode.getName());
           assertEquals("classic", lastUserNode.getNavigation().getKey().getName());
         } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
+          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
         }
       }
     }.execute("root");
@@ -444,7 +577,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testGetGlobalUserNode() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
         assertNotNull(userPortalCfg);
 
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
@@ -462,10 +595,10 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         assertNotNull(userNode);
         assertEquals("home", userNode.getName());
 
-        String originalGlobalPortal = userPortalConfigSer_.globalPortal_;
-        userPortalConfigSer_.globalPortal_ = "systemtest";
+        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
+        userPortalConfigService.setGlobalPortal("systemtest");
         try {
-          userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+          userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
           portalCfg = userPortalCfg.getPortalConfig();
           userPortal = userPortalCfg.getUserPortal();
           userNode = userPortal.resolvePath(filterConfig, "systemhome");
@@ -473,7 +606,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
           assertNotNull(userNode);
           assertEquals("systemhome", userNode.getName());
         } finally {
-          userPortalConfigSer_.globalPortal_ = originalGlobalPortal;
+          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
         }
       }
     }.execute("root");
@@ -482,7 +615,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testJohnGetUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "john");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -502,7 +635,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testMaryGetUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "mary");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "mary");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -521,7 +654,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testGuestGetUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", null);
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", null);
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -539,7 +672,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testGetMetaPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        PortalConfig portalConfig = userPortalConfigSer_.getMetaPortalConfig();
+        PortalConfig portalConfig = userPortalConfigService.getMetaPortalConfig();
         assertNotNull(portalConfig);
         assertEquals(PortalConfig.PORTAL_TYPE, portalConfig.getType());
         assertEquals("classic", portalConfig.getName());
@@ -550,7 +683,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testNavigationOrder() {
     new UnitTest() {
       public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("classic", "root");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         UserPortal userPortal = userPortalCfg.getUserPortal();
         List<UserNavigation> navigations = userPortal.getNavigations();
         assertEquals("expected to have 4 navigations instead of " + navigations, 4, navigations.size());
@@ -565,8 +698,8 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testCreateUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        userPortalConfigSer_.createUserPortalConfig(PortalConfig.PORTAL_TYPE, "jazz", "test");
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("jazz", "root");
+        userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, "jazz", "test");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("jazz", "root");
         assertNotNull(userPortalCfg);
         PortalConfig portalCfg = userPortalCfg.getPortalConfig();
         assertNotNull(portalCfg);
@@ -595,221 +728,32 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }.execute("root");
   }
 
-  public void testCreateGroupPortalConfigWithDefaultTemplate() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        String originalDefaultGroupSiteTemplate = userPortalConfigSer_.getDefaultGroupSiteTemplate();
-
-        // Test creating group site with default template having a predefined
-        // group.xml
-        userPortalConfigSer_.setDefaultGroupSiteTemplate("group");
-        try {
-          String groupId = "/groupTemplate101";
-          userPortalConfigSer_.createGroupSite(groupId);
-
-          PortalConfig groupPortalConfig = layoutService.getPortalConfig(PortalConfig.GROUP_TYPE, groupId);
-
-          assertNotNull(groupPortalConfig);
-          assertNotNull(groupPortalConfig.getPortalLayout());
-          assertNotNull(groupPortalConfig.getPortalLayout().getChildren());
-          assertEquals(4, groupPortalConfig.getPortalLayout().getChildren().size());
-          assertFalse(groupPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultGroupSiteTemplate(originalDefaultGroupSiteTemplate);
-        }
-
-        // Test creating group site with not existing template
-        userPortalConfigSer_.setDefaultGroupSiteTemplate("fake");
-        try {
-          String groupId = "/groupTemplate102";
-          userPortalConfigSer_.createGroupSite(groupId);
-
-          PortalConfig groupPortalConfig = layoutService.getPortalConfig(PortalConfig.GROUP_TYPE, groupId);
-
-          assertNotNull(groupPortalConfig);
-          assertNotNull(groupPortalConfig.getPortalLayout());
-          assertNotNull(groupPortalConfig.getPortalLayout().getChildren());
-          assertEquals(1, groupPortalConfig.getPortalLayout().getChildren().size());
-          assertEquals(PageBody.class, groupPortalConfig.getPortalLayout().getChildren().get(0).getClass());
-          assertTrue(groupPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultGroupSiteTemplate(originalDefaultGroupSiteTemplate);
-        }
-
-        // Test creating group site with null template
-        userPortalConfigSer_.setDefaultGroupSiteTemplate(null);
-        try {
-          String groupId = "/groupTemplate103";
-          userPortalConfigSer_.createGroupSite(groupId);
-
-          PortalConfig groupPortalConfig = layoutService.getPortalConfig(PortalConfig.GROUP_TYPE, groupId);
-
-          assertNotNull(groupPortalConfig);
-          assertNotNull(groupPortalConfig.getPortalLayout());
-          assertNotNull(groupPortalConfig.getPortalLayout().getChildren());
-          assertEquals(1, groupPortalConfig.getPortalLayout().getChildren().size());
-          assertEquals(PageBody.class, groupPortalConfig.getPortalLayout().getChildren().get(0).getClass());
-          assertTrue(groupPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultGroupSiteTemplate(originalDefaultGroupSiteTemplate);
-        }
-      }
-    }.execute("root");
-  }
-
-  public void testCreateUserPortalConfigWithDefaultTemplate() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        String originalDefaultUserSiteTemplate = userPortalConfigSer_.getDefaultUserSiteTemplate();
-
-        // Test creating user site with default template having a predefined
-        // user.xml
-        userPortalConfigSer_.setDefaultUserSiteTemplate("user");
-        try {
-          String userId = "/userTemplate101";
-          userPortalConfigSer_.createUserSite(userId);
-
-          PortalConfig userPortalConfig = layoutService.getPortalConfig(PortalConfig.USER_TYPE, userId);
-
-          assertNotNull(userPortalConfig);
-          assertNotNull(userPortalConfig.getPortalLayout());
-          assertNotNull(userPortalConfig.getPortalLayout().getChildren());
-          assertEquals(2, userPortalConfig.getPortalLayout().getChildren().size());
-          assertFalse(userPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultUserSiteTemplate(originalDefaultUserSiteTemplate);
-        }
-
-        // Test creating user site with not existing template
-        userPortalConfigSer_.setDefaultUserSiteTemplate("fake");
-        try {
-          String userId = "userTemplate102";
-          userPortalConfigSer_.createUserSite(userId);
-
-          PortalConfig userPortalConfig = layoutService.getPortalConfig(PortalConfig.USER_TYPE, userId);
-
-          assertNotNull(userPortalConfig);
-          assertNotNull(userPortalConfig.getPortalLayout());
-          assertNotNull(userPortalConfig.getPortalLayout().getChildren());
-          assertEquals(1, userPortalConfig.getPortalLayout().getChildren().size());
-          assertEquals(PageBody.class, userPortalConfig.getPortalLayout().getChildren().get(0).getClass());
-          assertTrue(userPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultUserSiteTemplate(originalDefaultUserSiteTemplate);
-        }
-
-        // Test creating user site with null template
-        userPortalConfigSer_.setDefaultUserSiteTemplate(null);
-        try {
-          String userId = "userTemplate103";
-          userPortalConfigSer_.createUserSite(userId);
-
-          PortalConfig userPortalConfig = layoutService.getPortalConfig(PortalConfig.USER_TYPE, userId);
-
-          assertNotNull(userPortalConfig);
-          assertNotNull(userPortalConfig.getPortalLayout());
-          assertNotNull(userPortalConfig.getPortalLayout().getChildren());
-          assertEquals(1, userPortalConfig.getPortalLayout().getChildren().size());
-          assertEquals(PageBody.class, userPortalConfig.getPortalLayout().getChildren().get(0).getClass());
-          assertTrue(userPortalConfig.isDefaultLayout());
-        } finally {
-          userPortalConfigSer_.setDefaultUserSiteTemplate(originalDefaultUserSiteTemplate);
-        }
-      }
-    }.execute("root");
-  }
-
   public void testRemoveUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
-        userPortalConfigSer_.createUserPortalConfig(PortalConfig.PORTAL_TYPE, "jazz", "test");
-        UserPortalConfig userPortalCfg = userPortalConfigSer_.getUserPortalConfig("jazz", "root");
+        userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, "jazz", "test");
+        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("jazz", "root");
         assertNotNull(userPortalCfg);
         restartTransaction();
-        userPortalConfigSer_.removeUserPortalConfig("jazz");
+        userPortalConfigService.removeUserPortalConfig("jazz");
         restartTransaction();
-        assertNull(userPortalConfigSer_.getUserPortalConfig("jazz", "root"));
+        assertNull(userPortalConfigService.getUserPortalConfig("jazz", "root"));
       }
     }.execute("root");
-  }
-
-  public void testRootGetMakableNavigations() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        Set<String> navigations = new HashSet<String>(userPortalConfigSer_.getMakableNavigations("root", false));
-        Set<String> expectedNavigations = Tools.toSet("/platform/users",
-                                                      "/platform",
-                                                      "/platform/guests",
-                                                      "/platform/administrators",
-                                                      "/organization",
-                                                      "/organization/management",
-                                                      "/organization/management/executive-board");
-        for (String expectedNavigation : expectedNavigations) {
-          assertTrue("Navigation not found : " + expectedNavigation, navigations.contains(expectedNavigation));
-        }
-      }
-    }.execute(null);
-  }
-
-  public void testJohnGetMakableNavigations() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        Set<String> navigations = new HashSet<String>(userPortalConfigSer_.getMakableNavigations("john", false));
-        Set<String> expectedNavigations = Tools.toSet("/organization/management/executive-board");
-        assertEquals(expectedNavigations, navigations);
-      }
-    }.execute(null);
-  }
-
-  public void testMaryGetMakableNavigations() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        Set<String> navigations = new HashSet<String>(userPortalConfigSer_.getMakableNavigations("mary", false));
-        Set<String> expectedNavigations = Collections.emptySet();
-        assertEquals(expectedNavigations, navigations);
-      }
-    }.execute(null);
-  }
-
-  public void testHasMakableNavigations() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        assertEquals(true, userPortalConfigSer_.hasMakableNavigations("root", true)); // super
-                                                                                      // user
-        assertEquals(false, userPortalConfigSer_.hasMakableNavigations(null, true)); // remote
-                                                                                     // user
-                                                                                     // is
-                                                                                     // null
-        assertEquals(true, userPortalConfigSer_.hasMakableNavigations("john", true)); // john
-                                                                                      // is
-                                                                                      // an
-                                                                                      // administrator
-                                                                                      // so
-                                                                                      // he
-                                                                                      // has
-                                                                                      // at
-                                                                                      // least
-                                                                                      // a
-                                                                                      // membership
-                                                                                      // in
-                                                                                      // adminstration
-                                                                                      // group
-      }
-    }.execute(null);
   }
 
   public void testRootGetPage() {
     new UnitTest() {
       public void execute() throws Exception {
         assertEquals("group::/platform/administrators::newAccount",
-                     userPortalConfigSer_.getPage(PageKey.parse("group::/platform/administrators::newAccount"))
-                                         .getKey()
-                                         .format());
+                     userPortalConfigService.getPage(PageKey.parse("group::/platform/administrators::newAccount"), "root")
+                                            .getKey()
+                                            .format());
         assertEquals("group::/organization/management/executive-board::newStaff",
-                     userPortalConfigSer_
-                                         .getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"))
-                                         .getKey()
-                                         .format());
+                     userPortalConfigService.getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"),
+                                                     "root")
+                                            .getKey()
+                                            .format());
       }
     }.execute("root");
   }
@@ -817,12 +761,12 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testJohnGetPage() {
     new UnitTest() {
       public void execute() throws Exception {
-        assertEquals(null, userPortalConfigSer_.getPage(PageKey.parse("group::/platform/administrators::newAccount")));
+        assertNull(userPortalConfigService.getPage(PageKey.parse("group::/platform/administrators::newAccount"), "john"));
         assertEquals("group::/organization/management/executive-board::newStaff",
-                     userPortalConfigSer_
-                                         .getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"))
-                                         .getKey()
-                                         .format());
+                     userPortalConfigService.getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"),
+                                                     "john")
+                                            .getKey()
+                                            .format());
       }
     }.execute("john");
   }
@@ -830,10 +774,9 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testMaryGetPage() {
     new UnitTest() {
       public void execute() throws Exception {
-        assertEquals(null, userPortalConfigSer_.getPage(PageKey.parse("group::/platform/administrators::newAccount")));
-        assertEquals(null,
-                     userPortalConfigSer_.getPage(PageKey
-                                                         .parse("group::/organization/management/executive-board::newStaff")));
+        assertNull(userPortalConfigService.getPage(PageKey.parse("group::/platform/administrators::newAccount"), "mary"));
+        assertNull(userPortalConfigService.getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"),
+                                                   "mary"));
       }
     }.execute("mary");
   }
@@ -841,111 +784,49 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   public void testAnonymousGetPage() {
     new UnitTest() {
       public void execute() throws Exception {
-        assertEquals(null, userPortalConfigSer_.getPage(PageKey.parse("group::/platform/administrators::newAccount")));
-        assertEquals(null,
-                     userPortalConfigSer_.getPage(PageKey
-                                                         .parse("group::/organization/management/executive-board::newStaff")));
+        assertNull(userPortalConfigService.getPage(PageKey.parse("group::/platform/administrators::newAccount"), null));
+        assertNull(userPortalConfigService.getPage(PageKey.parse("group::/organization/management/executive-board::newStaff"),
+                                                   null));
       }
     }.execute(null);
   }
 
-  public void testOverwriteUserLayout() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        PortalConfig cfg = layoutService.getPortalConfig(PortalConfig.USER_TYPE, "overwritelayout");
-        assertNotNull(cfg);
-
-        Container container = cfg.getPortalLayout();
-        assertNotNull(container);
-        assertEquals(2, container.getChildren().size());
-        assertTrue(container.getChildren().get(0) instanceof PageBody);
-        assertTrue(((Application) container.getChildren().get(1)).getType() == ApplicationType.PORTLET);
-        Application<Portlet> pa = (Application<Portlet>) container.getChildren().get(1);
-        ApplicationState<Portlet> state = pa.getState();
-        assertEquals("overwrite_application_ref/overwrite_portlet_ref", layoutService.getId(state));
-      }
-    }.execute(null);
-  }
-
-  public void testUserTemplate() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        assertNull(layoutService.getPortalConfig(PortalConfig.USER_TYPE, "user"));
-        assertNull(layoutService.getPortalConfig(PortalConfig.USER_TYPE, "julien"));
-
-        //
-        UserHandler userHandler = orgService_.getUserHandler();
-        User user = userHandler.createUserInstance("julien");
-        user.setPassword("default");
-        user.setFirstName("default");
-        user.setLastName("default");
-        user.setEmail("exo@exoportal.org");
-        userHandler.createUser(user, true);
-
-        //
-        PortalConfig cfg = layoutService.getPortalConfig(PortalConfig.USER_TYPE, "julien");
-        assertNotNull(cfg);
-        Container container = cfg.getPortalLayout();
-        assertNotNull(container);
-        assertEquals(2, container.getChildren().size());
-        assertTrue(container.getChildren().get(0) instanceof PageBody);
-        assertTrue(((Application) container.getChildren().get(1)).getType() == ApplicationType.PORTLET);
-        Application<Portlet> pa = (Application<Portlet>) container.getChildren().get(1);
-        ApplicationState state = pa.getState();
-        assertEquals("foo/bar", layoutService.getId(pa.getState()));
-      }
-    }.execute(null);
-  }
-
-  public void testGroupTemplate() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        String groupName = "groupTest";
-        assertNull(layoutService.getPortalConfig(PortalConfig.GROUP_TYPE, groupName));
-
-        //
-        GroupHandler groupHandler = orgService_.getGroupHandler();
-        Group group = groupHandler.createGroupInstance();
-        group.setGroupName(groupName);
-        group.setDescription("this is a group for test");
-        groupHandler.addChild(null, group, true);
-
-        //
-        PortalConfig cfg = layoutService.getPortalConfig(PortalConfig.GROUP_TYPE, "/" + groupName);
-        assertNotNull(cfg);
-        Container container = cfg.getPortalLayout();
-        assertNotNull(container);
-        assertEquals(4, container.getChildren().size());
-        assertTrue(container.getChildren().get(2) instanceof PageBody);
-        assertTrue(((Application) container.getChildren().get(1)).getType() == ApplicationType.PORTLET);
-
-        groupHandler.removeGroup(group, true);
-      }
-    }.execute(null);
-  }
-
-  public void testGetPortalSiteRootNodeAndFirstAllowedPageNode(){
+  public void testGetPortalSiteRootNodeAndFirstAllowedPageNode() {
     new UnitTest() {
       public void execute() throws Exception {
         String siteName = "classic";
         HttpServletRequest httpRequest = new MockHttpServletRequest("/portal/classic", null, 0, "GET", null);
-        UserNode rootNode = userPortalConfigSer_.getPortalSiteRootNode(siteName, SiteType.PORTAL.getName(), httpRequest);
+        UserNode rootNode = userPortalConfigService.getPortalSiteRootNode(siteName, SiteType.PORTAL.getName(), httpRequest);
         assertNotNull(rootNode);
       }
     }.execute(null);
 
   }
-  public void testGetFirstAllowedPageNode(){
+
+  public void testGetFirstAllowedPageNode() {
     new UnitTest() {
       public void execute() throws Exception {
         String siteName = "classic";
         HttpServletRequest httpRequest = new MockHttpServletRequest("/portal/classic", null, 0, null, null);
-        String path = userPortalConfigSer_.getFirstAllowedPageNode(siteName, SiteType.PORTAL.getName(), "home", httpRequest);
+        String path = userPortalConfigService.getFirstAllowedPageNode(siteName, SiteType.PORTAL.getName(), "home", httpRequest);
         assertNotNull(path);
       }
     }.execute(null);
 
   }
+
+  private static Map<String, UserNavigation> toMap(UserPortal cfg) {
+    return toMap(cfg.getNavigations());
+  }
+
+  private static Map<String, UserNavigation> toMap(List<UserNavigation> navigations) {
+    Map<String, UserNavigation> map = new HashMap<>();
+    for (UserNavigation nav : navigations) {
+      map.put(nav.getKey().getType().getName() + "::" + nav.getKey().getName(), nav);
+    }
+    return map;
+  }
+
   private abstract class UnitTest {
 
     /** . */

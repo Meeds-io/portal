@@ -25,8 +25,11 @@ import java.util.Collections;
 
 import org.apache.commons.lang3.StringUtils;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
+
+import lombok.EqualsAndHashCode;
 
 /**
  * May 13, 2004
@@ -34,6 +37,7 @@ import org.exoplatform.portal.pom.data.PortalData;
  * @author Tuan Nguyen
  * @version $Id: PortalConfig.java,v 1.7 2004/08/06 03:02:29 tuan08 Exp $
  **/
+@EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
   public static final String    USER_TYPE      = SiteType.USER.getName();
@@ -43,6 +47,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
   public static final String    PORTAL_TYPE    = SiteType.PORTAL.getName();
 
   public static final String    SPACE_TYPE     = SiteType.SPACE.getName();
+
+  public static final String    GROUP_TEMPLATE = SiteType.GROUP_TEMPLATE.getName();
 
   public static final Container DEFAULT_LAYOUT = initDefaultLayout();
 
@@ -116,6 +122,14 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.displayed = data.isDisplayed();
     this.displayOrder = data.getDisplayOrder();
     this.bannerFileId = data.getBannerFileId();
+  }
+
+  public long getId() {
+    if (StringUtils.contains(storageId, "_")) {
+      return Long.parseLong(storageId.split("_")[1]);
+    } else {
+      return 0;
+    }
   }
 
   public String getType() {
@@ -305,6 +319,12 @@ public class PortalConfig extends ModelObject implements Cloneable {
                           displayed,
                           displayOrder,
                           bannerFileId);
+  }
+
+  @Override
+  public void resetStorage() throws ObjectNotFoundException {
+    super.resetStorage();
+    getPortalLayout().resetStorage();
   }
 
   public void useMetaPortalLayout() {

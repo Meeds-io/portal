@@ -26,119 +26,106 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.gatein.mop.api.content.ContentType;
-
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
 public class Portlet implements Iterable<Preference>, Serializable {
 
-    private static final long serialVersionUID = -4571832137663336152L;
+  private static final long         serialVersionUID = -4571832137663336152L;
 
-    /** . */
-    public static final ContentType<Portlet> CONTENT_TYPE = new ContentType<Portlet>("application/portlet", Portlet.class);
+  protected Map<String, Preference> state;
 
-    /** . */
-    final Map<String, Preference> state;
+  private Map<String, Preference>   entries;
 
-    /** . */
-    private final Map<String, Preference> entries;
+  public Portlet() {
+    this.state = new HashMap<>();
+    this.entries = Collections.unmodifiableMap(this.state);
+  }
 
-    public Portlet() {
-        this.state = new HashMap<String, Preference>();
-        this.entries = Collections.unmodifiableMap(this.state);
+  public Portlet(Map<String, Preference> preferences) {
+    this.state = new HashMap<>(preferences);
+    this.entries = Collections.unmodifiableMap(this.state);
+  }
+
+  public List<String> getValues(String name) {
+    Preference entry = entries.get(name);
+    return entry != null ? entry.getValues() : null;
+  }
+
+  public Portlet setValues(String name, List<String> values) {
+    Preference entry = entries.get(name);
+    if (entry == null) {
+      entry = new Preference(name, values, false);
+    } else {
+      entry = new Preference(entry.getName(), values, entry.isReadOnly());
     }
+    entries.put(name, entry);
+    return this;
+  }
 
-    public Portlet(Map<String, Preference> state) {
-        if (state == null) {
-            throw new NullPointerException();
-        }
+  public String getValue(String name) {
+    Preference entry = entries.get(name);
+    return entry != null ? entry.getValue() : null;
+  }
 
-        //
-        this.state = new HashMap<String, Preference>(state);
-        this.entries = Collections.unmodifiableMap(this.state);
+  public Portlet setValue(String name, String value) {
+    Preference entry = entries.get(name);
+    if (entry == null) {
+      entry = new Preference(name, value, false);
+    } else {
+      entry = new Preference(entry.getName(), value, entry.isReadOnly());
     }
+    state.put(name, entry);
+    return this;
+  }
 
-    public List<String> getValues(String name) {
-        Preference entry = entries.get(name);
-        return entry != null ? entry.getValues() : null;
-    }
+  public Boolean isReadOnly(String name) {
+    Preference entry = entries.get(name);
+    return entry != null ? entry.isReadOnly() : null;
+  }
 
-    public Portlet setValues(String name, List<String> values) {
-        Preference entry = entries.get(name);
-        if (entry == null) {
-            entry = new Preference(name, values, false);
-        } else {
-            entry = new Preference(entry.getName(), values, entry.isReadOnly());
-        }
-        entries.put(name, entry);
-        return this;
+  public Portlet setReadOnly(String name, boolean readOnly) {
+    Preference entry = entries.get(name);
+    if (entry == null) {
+      throw new IllegalStateException();
     }
+    entry = new Preference(entry.getName(), entry.getValues(), readOnly);
+    state.put(name, entry);
+    return this;
+  }
 
-    public String getValue(String name) {
-        Preference entry = entries.get(name);
-        return entry != null ? entry.getValue() : null;
-    }
+  public Preference getPreference(String name) {
+    return entries.get(name);
+  }
 
-    public Portlet setValue(String name, String value) {
-        Preference entry = entries.get(name);
-        if (entry == null) {
-            entry = new Preference(name, value, false);
-        } else {
-            entry = new Preference(entry.getName(), value, entry.isReadOnly());
-        }
-        state.put(name, entry);
-        return this;
-    }
+  public Portlet putPreference(Preference preference) {
+    state.put(preference.getName(), preference);
+    return this;
+  }
 
-    public Boolean isReadOnly(String name) {
-        Preference entry = entries.get(name);
-        return entry != null ? entry.isReadOnly() : null;
-    }
+  public Iterator<Preference> iterator() {
+    return entries.values().iterator();
+  }
 
-    public Portlet setReadOnly(String name, boolean readOnly) {
-        Preference entry = entries.get(name);
-        if (entry == null) {
-            throw new IllegalStateException();
-        }
-        entry = new Preference(entry.getName(), entry.getValues(), readOnly);
-        state.put(name, entry);
-        return this;
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
     }
+    if (obj instanceof Portlet that) {
+      return state.equals(that.state);
+    }
+    return false;
+  }
 
-    public Preference getPreference(String name) {
-        return entries.get(name);
-    }
+  @Override
+  public int hashCode() {
+    return state.hashCode();
+  }
 
-    public Portlet putPreference(Preference preference) {
-        state.put(preference.getName(), preference);
-        return this;
-    }
-
-    public Iterator<Preference> iterator() {
-        return entries.values().iterator();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-        if (obj instanceof Portlet) {
-            Portlet that = (Portlet) obj;
-            return state.equals(that.state);
-        }
-        return false;
-    }
-
-    @Override
-    public int hashCode() {
-        return state.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return "Preferences[state=" + state.toString() + "]";
-    }
+  @Override
+  public String toString() {
+    return "Preferences[state=" + state.toString() + "]";
+  }
 }
