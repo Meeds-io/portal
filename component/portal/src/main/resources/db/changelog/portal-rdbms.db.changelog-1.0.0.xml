@@ -10,21 +10,23 @@
 
   <!-- Site -->
   <changeSet author="portal" id="1.0.0-6">
+    <validCheckSum>9:0fd6de2c90ea745a8d75f49d98a1ef4d</validCheckSum>
+    <validCheckSum>9:ca5439fc665d690f25b24fa0979a696d</validCheckSum>
     <createTable tableName="PORTAL_SITES">
       <column name="ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_SITE"/>
       </column>
       <column name="TYPE" type="INT"/>
-      <column name="NAME" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
       <column name="LOCALE" type="VARCHAR(20)" />
-      <column name="SKIN" type="NVARCHAR(200)"/>
-      <column name="LABEL" type="NVARCHAR(200)"/>
+      <column name="SKIN" type="VARCHAR(200)"/>
+      <column name="LABEL" type="VARCHAR(200)"/>
       <column name="DESCRIPTION" type="LONGTEXT" />
       <column name="PROPERTIES" type="LONGTEXT"/>
       <column name="SITE_BODY" type="LONGTEXT" />
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-7" dbms="oracle,postgresql">
@@ -46,14 +48,14 @@
         <constraints nullable="false"/>
       </column>
       <column name="SHOW_MAX_WINDOW" type="BOOLEAN" defaultValueBoolean="false" />
-      <column name="DISPLAY_NAME" type="NVARCHAR(200)"/>
-      <column name="NAME" type="NVARCHAR(200)"/>
+      <column name="DISPLAY_NAME" type="VARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
       <column name="DESCRIPTION" type="LONGTEXT" />
-      <column name="FACTORY_ID" type="NVARCHAR(200)"/>
+      <column name="FACTORY_ID" type="VARCHAR(200)"/>
       <column name="PAGE_BODY" type="LONGTEXT" />
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-10" dbms="oracle,postgresql">
@@ -70,13 +72,15 @@
 
   <!-- Navigation -->
   <changeSet author="portal" id="1.0.0-12">
+    <validCheckSum>9:8aeda2e99a606a9a6060ec9de9379008</validCheckSum>
+    <validCheckSum>9:0e6d5d9ed955f12f95a691aca1039022</validCheckSum>
     <createTable tableName="PORTAL_NAVIGATION_NODES">
       <column name="NODE_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_NAVIGATION_NODE"/>
       </column>
-      <column name="NAME" type="NVARCHAR(200)"/>
-      <column name="LABEL" type="NVARCHAR(200)"/>
-      <column name="ICON" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
+      <column name="LABEL" type="VARCHAR(200)"/>
+      <column name="ICON" type="VARCHAR(200)"/>
       <column name="START_TIME" type="BIGINT"/>
       <column name="END_TIME" type="BIGINT"/>
       <column name="VISIBILITY" type="INT"/>
@@ -89,7 +93,7 @@
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-13" dbms="oracle,postgresql">
@@ -106,6 +110,7 @@
                              onDelete="CASCADE" onUpdate="NO ACTION" />
   </changeSet>
   <changeSet author="portal" id="1.0.0-15">
+    <validCheckSum>9:e6f3aabe1e7a0c508b7ebf5d9f164c55</validCheckSum>
     <createTable tableName="PORTAL_NAVIGATIONS">
       <column name="NAVIGATION_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_NAVIGATION"/>
@@ -119,7 +124,7 @@
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-16" dbms="oracle,postgresql">
@@ -139,16 +144,18 @@
 
 
   <changeSet author="portal" id="1.0.0-18">
+    <validCheckSum>9:b16621d25e0354200ab842a7da7c7b99</validCheckSum>
+    <validCheckSum>9:3d1f47a8d10ef6d656ca5d77b4dfdbd2</validCheckSum>
     <createTable tableName="PORTAL_DESCRIPTIONS">
       <column name="DESCRIPTION_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_DESCRIPTIONS"/>
       </column>
       <column name="REF_ID" type="VARCHAR(200)"/>
-      <column name="NAME" type="NVARCHAR(200)"/>
-      <column name="DESCRIPTION" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
+      <column name="DESCRIPTION" type="VARCHAR(200)"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-19" dbms="oracle,postgresql">
@@ -156,14 +163,16 @@
   </changeSet>
 
   <changeSet author="portal" id="1.0.0-20">
+    <validCheckSum>9:13cbfb463ac0a5011b516dcb47d77abf</validCheckSum>
+    <validCheckSum>9:87c54ae055461a765c99abcfb400cd1d</validCheckSum>
     <createTable tableName="PORTAL_DESCRIPTION_LOCALIZED">
       <column name="DESCRIPTION_ID" type="BIGINT"/>
       <column name="LOCALE" type="VARCHAR(20)"/>
-      <column name="NAME" type="NVARCHAR(200)"/>
-      <column name="DESCRIPTION" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
+      <column name="DESCRIPTION" type="VARCHAR(200)"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-21">
@@ -179,16 +188,18 @@
 
   <!-- Portal/Page Layout -->
   <changeSet author="portal" id="1.0.0-22">
+    <validCheckSum>9:87976b2625260b3a49eee9f49751f974</validCheckSum>
+    <validCheckSum>9:498e2093e53a289fa221429bad89fd44</validCheckSum>
     <createTable tableName="PORTAL_CONTAINERS">
       <column name="ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_CONTAINER"/>
       </column>
       <column name="WEBUI_ID" type="VARCHAR(200)"/>
-      <column name="NAME" type="NVARCHAR(200)"/>
-      <column name="ICON" type="NVARCHAR(200)"/>
-      <column name="TEMPLATE" type="NVARCHAR(500)"/>
-      <column name="FACTORY_ID" type="NVARCHAR(200)"/>
-      <column name="TITLE" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
+      <column name="ICON" type="VARCHAR(200)"/>
+      <column name="TEMPLATE" type="VARCHAR(500)"/>
+      <column name="FACTORY_ID" type="VARCHAR(200)"/>
+      <column name="TITLE" type="VARCHAR(200)"/>
       <column name="DESCRIPTION" type="LONGTEXT" />
       <column name="WIDTH" type="VARCHAR(20)"/>
       <column name="HEIGHT" type="VARCHAR(20)"/>
@@ -196,7 +207,7 @@
       <column name="CONTAINER_BODY" type="LONGTEXT" />
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
 
@@ -206,22 +217,22 @@
       <column name="ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_WINDOW"/>
       </column>
-      <column name="TITLE" type="NVARCHAR(200)"/>
-      <column name="ICON" type="NVARCHAR(200)"/>
+      <column name="TITLE" type="VARCHAR(200)"/>
+      <column name="ICON" type="VARCHAR(200)"/>
       <column name="DESCRIPTION" type="LONGTEXT" />
       <column name="SHOW_INFO_BAR" type="BOOLEAN" defaultValueBoolean="false" />
       <column name="SHOW_APP_STATE" type="BOOLEAN" defaultValueBoolean="false" />
       <column name="SHOW_APP_MODE" type="BOOLEAN" defaultValueBoolean="false" />
-      <column name="THEME" type="NVARCHAR(200)"/>
+      <column name="THEME" type="VARCHAR(200)"/>
       <column name="WIDTH" type="VARCHAR(20)"/>
       <column name="HEIGHT" type="VARCHAR(20)"/>
       <column name="PROPERTIES" type="LONGTEXT" />
       <column name="APP_TYPE" type="INT"/>
-      <column name="CONTENT_ID" type="NVARCHAR(200)"/>
+      <column name="CONTENT_ID" type="VARCHAR(200)"/>
       <column name="CUSTOMIZATION" type="BLOB"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-24" dbms="oracle,postgresql">
@@ -231,6 +242,8 @@
 
   <!-- Permission -->
   <changeSet author="portal" id="1.0.0-25">
+    <validCheckSum>9:de8d0b2342bb3677a596c41c009e2dd8</validCheckSum>
+    <validCheckSum>9:59c295f4ff08bdafa6a0b8130c0a2922</validCheckSum>
     <createTable tableName="PORTAL_PERMISSIONS">
       <column name="PERMISSION_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_PERMISSIONS"/>
@@ -241,11 +254,11 @@
       <column name="REF_ID" type="BIGINT">
         <constraints nullable="false"/>
       </column>
-      <column name="PERMISSION" type="NVARCHAR(200)"/>
+      <column name="PERMISSION" type="VARCHAR(200)"/>
       <column name="TYPE" type="INT"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="portal" id="1.0.0-26" dbms="oracle,postgresql">
@@ -344,19 +357,19 @@
     </createIndex>
     <createIndex indexName="IDX_PORTAL_SITES_NAME_01"
                  tableName="PORTAL_SITES">
-      <column name="NAME" type="NVARCHAR(200)"/>
+      <column name="NAME" type="VARCHAR(200)"/>
     </createIndex>
     <createIndex indexName="IDX_PORTAL_LOCALE_01"
                  tableName="PORTAL_SITES">
-      <column name="LOCALE" type="NVARCHAR(200)"/>
+      <column name="LOCALE" type="VARCHAR(200)"/>
     </createIndex>
     <createIndex indexName="IDX_PORTAL_SKIN_01"
                  tableName="PORTAL_SITES">
-      <column name="SKIN" type="NVARCHAR(200)"/>
+      <column name="SKIN" type="VARCHAR(200)"/>
     </createIndex>
     <createIndex indexName="IDX_PORTAL_LABEL_01"
                  tableName="PORTAL_SITES">
-      <column name="LABEL" type="NVARCHAR(200)"/>
+      <column name="LABEL" type="VARCHAR(200)"/>
     </createIndex>
   </changeSet>
 
@@ -392,8 +405,9 @@
   </changeSet>
 
   <changeSet author="portal" id="1.0.0-40">
+    <validCheckSum>9:105d4c3e63f2d4389d80ee60b93250ee</validCheckSum>
     <addColumn tableName="PORTAL_PAGES">
-      <column name="PROFILES" type="NVARCHAR(2000)" />
+      <column name="PROFILES" type="VARCHAR(2000)" />
     </addColumn>
   </changeSet>
 
@@ -408,7 +422,8 @@
   </changeSet>
 
   <changeSet author="portal" id="1.0.0-43">
-    <modifyDataType tableName="PORTAL_CONTAINERS" columnName="WIDTH" newDataType="NVARCHAR(200)" />
+    <validCheckSum>9:065c37bd73ac0a726bdd12c833b4784e</validCheckSum>
+    <modifyDataType tableName="PORTAL_CONTAINERS" columnName="WIDTH" newDataType="VARCHAR(200)" />
   </changeSet>
 
   <changeSet author="portal" id="1.0.0-44" dbms="mysql">
@@ -464,5 +479,17 @@
       ALTER TABLE PORTAL_WINDOWS MODIFY COLUMN PROPERTIES longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     </sql>
   </changeSet>
-
+  <changeSet author="portal" id="1.0.0-53">
+    <sql dbms="mysql">
+      ALTER TABLE PORTAL_SITES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_PAGES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_NAVIGATION_NODES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_NAVIGATIONS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_DESCRIPTIONS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_DESCRIPTION_LOCALIZED CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_CONTAINERS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_WINDOWS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE PORTAL_PERMISSIONS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
+  </changeSet>
 </databaseChangeLog>

@@ -16,21 +16,25 @@
 
 
   <changeSet author="file" id="1.0.0-1">
+    <validCheckSum>9:be5195fa6ce6a38f3b27dcb925f4b0ed</validCheckSum>
+    <validCheckSum>9:74f9248853e225aa44e44f9bb95beb9c</validCheckSum>
     <createTable tableName="FILES_NAMESPACES">
       <column name="NAMESPACE_ID" type="INT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_NAMESPACES_ID"/>
       </column>
-      <column name="NAME" type="NVARCHAR(30)">
+      <column name="NAME" type="VARCHAR(30)">
         <constraints nullable="false"/>
       </column>
-      <column name="DESCRIPTION" type="NVARCHAR(100)"/>
+      <column name="DESCRIPTION" type="VARCHAR(100)"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
   <changeSet author="file" id="1.0.0-2">
+    <validCheckSum>9:a092999e7d167e9b9bb761cb89fcd8ad</validCheckSum>
+    <validCheckSum>9:1166e5b1dd1d0161dc080749b292c003</validCheckSum>
     <createTable tableName="FILES_FILES">
       <column name="FILE_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_FILES_ID"/>
@@ -38,24 +42,26 @@
       <column name="NAMESPACE_ID" type="INT">
         <constraints nullable="false" foreignKeyName="FK_FILES_FILES_NAMESPACE_ID" references="FILES_NAMESPACES(NAMESPACE_ID)"/>
       </column>
-      <column name="NAME" type="NVARCHAR(550)">
+      <column name="NAME" type="VARCHAR(550)">
         <constraints nullable="false"/>
       </column>
-      <column name="MIMETYPE" type="NVARCHAR(100)"/>
+      <column name="MIMETYPE" type="VARCHAR(100)"/>
       <column name="FILE_SIZE" type="BIGINT"/>
       <column name="UPDATED_DATE" type="TIMESTAMP" defaultValueComputed="${now}">
         <constraints nullable="false"/>
       </column>
-      <column name="UPDATER" type="NVARCHAR(100)"/>
-      <column name="CHECKSUM" type="NVARCHAR(100)"/>
+      <column name="UPDATER" type="VARCHAR(100)"/>
+      <column name="CHECKSUM" type="VARCHAR(100)"/>
       <column name="DELETED" type="BOOLEAN" defaultValueBoolean="false"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
   <changeSet author="file" id="1.0.0-3">
+    <validCheckSum>9:f8b2b501b543dd5bfc14f5efabbd4a8d</validCheckSum>
+    <validCheckSum>9:bfadbe7f211d58f5c8b30fa2d226302f</validCheckSum>
     <createTable tableName="FILES_ORPHAN_FILES">
       <column name="ID" type="INT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_ORPHAN_ID"/>
@@ -66,10 +72,10 @@
       <column name="DELETED_DATE" type="TIMESTAMP" defaultValueComputed="${now}">
         <constraints nullable="false"/>
       </column>
-      <column name="CHECKSUM" type="NVARCHAR(100)"/>
+      <column name="CHECKSUM" type="VARCHAR(100)"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -86,18 +92,20 @@
   </changeSet>
 
   <changeSet author="file" id="1.0.0-7">
+    <validCheckSum>9:23baec6f374d5ca8976caec7d755b30e</validCheckSum>
+    <validCheckSum>9:64ead1b3dd8dd0680e38b1b4ccfae087</validCheckSum>
     <createTable tableName="FILES_BINARY">
       <column name="BLOB_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_BLOB_ID"/>
       </column>
-      <column name="NAME" type="NVARCHAR(100)">
+      <column name="NAME" type="VARCHAR(100)">
         <constraints nullable="false"  unique="true"/>
       </column>
       <column name="DATA" type="LONGBLOB"/>
       <column name="UPDATED_DATE" type="TIMESTAMP" defaultValueComputed="${now}"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -133,8 +141,9 @@
   </changeSet>
 
   <changeSet author="file" id="1.0.0-13">
+    <validCheckSum>9:f84b9d63cb36a643ab71f5f0de6c86fc</validCheckSum>
     <modifyDataType columnName="UPDATER"
-                    newDataType="NVARCHAR(200)"
+                    newDataType="VARCHAR(200)"
                     tableName="FILES_FILES"/>
   </changeSet>
 
@@ -144,5 +153,12 @@
     <createSequence sequenceName="SEQ_FILES_ORPHAN_FILES_ID" startValue="1" />
     <createSequence sequenceName="SEQ_FILES_BINARY_BLOB_ID" startValue="1" />
   </changeSet>
-
+  <changeSet author="file" id="1.0.0-15" >
+    <sql dbms="mysql">
+      ALTER TABLE FILES_NAMESPACES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_FILES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_ORPHAN_FILES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_BINARY CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
+  </changeSet>
 </databaseChangeLog>

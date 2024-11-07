@@ -10,11 +10,13 @@
   <property name="autoIncrement" value="false" dbms="oracle,postgresql"/>
 
   <changeSet author="idmQueue" id="1.0.0-1">
+    <validCheckSum>9:c2a458a9756c2e843d0eec147955d740</validCheckSum>
+    <validCheckSum>9:9a368cbaa9d8b54a9ea08d00cfa54fba</validCheckSum>
     <createTable tableName="IDM_QUEUE">
       <column name="IDM_QUEUE_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_IDM_QUEUE_ID"/>
       </column>
-      <column name="ENTITY_ID" type="NVARCHAR(200)">
+      <column name="ENTITY_ID" type="VARCHAR(200)">
         <constraints nullable="false"/>
       </column>
       <column name="ENTITY_TYPE" type="INT">
@@ -34,7 +36,7 @@
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -55,4 +57,9 @@
     <createSequence sequenceName="SEQ_IDM_QUEUE_ID" startValue="1"/>
   </changeSet>
 
+  <changeSet author="idmQueue" id="1.0.0-5" >
+    <sql dbms="mysql">
+      ALTER TABLE IDM_QUEUE CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
+  </changeSet>
 </databaseChangeLog>

@@ -16,45 +16,51 @@
 
 <!-- SETTINGS -->
   <changeSet author="settings" id="1.0.0-1">
+    <validCheckSum>9:48559ec5f2406fe0a334f6345d798dd7</validCheckSum>
+    <validCheckSum>9:4c43b9b2eaf2207606959f7808075244</validCheckSum>
     <createTable tableName="STG_CONTEXTS">
       <column name="CONTEXT_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_STG_CONTEXT_ID"/>
       </column>
-      <column name="TYPE" type="NVARCHAR(200)">
+      <column name="TYPE" type="VARCHAR(200)">
         <constraints nullable="false"/>
       </column>
-      <column name="NAME" type="NVARCHAR(200)">
+      <column name="NAME" type="VARCHAR(200)">
         <constraints nullable="false"/>
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
   <changeSet author="settings" id="1.0.0-2">
+    <validCheckSum>9:bf8625c64e2e100edadbb74dd599d22c</validCheckSum>
+    <validCheckSum>9:a5d4928c532a50653eb9aaa46dea5f9b</validCheckSum>
     <createTable tableName="STG_SCOPES">
       <column name="SCOPE_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_STG_SCOPE_ID"/>
       </column>
-      <column name="TYPE" type="NVARCHAR(200)">
+      <column name="TYPE" type="VARCHAR(200)">
         <constraints nullable="false"/>
       </column>
-      <column name="NAME" type="NVARCHAR(200)">
+      <column name="NAME" type="VARCHAR(200)">
         <constraints />
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
   <changeSet author="settings" id="1.0.0-3">
+    <validCheckSum>9:50f827668e1508ed010da401be9f58e2</validCheckSum>
+    <validCheckSum>9:f6baa28d0ebe0b5d6b9567cf51c2c8b7</validCheckSum>
     <createTable tableName="STG_SETTINGS">
       <column name="SETTING_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_STG_SETTINGS_ID"/>
       </column>
-      <column name="NAME" type="NVARCHAR(200)">
+      <column name="NAME" type="VARCHAR(200)">
         <constraints nullable="false"/>
       </column>
       <column name="VALUE" type="CLOB"/>
@@ -66,7 +72,7 @@
       </column>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -129,5 +135,11 @@
       ALTER TABLE STG_SETTINGS MODIFY COLUMN VALUE longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     </sql>
   </changeSet>
-
+  <changeSet author="settings" id="1.0.0-15" >
+    <sql dbms="mysql">
+      ALTER TABLE STG_CONTEXTS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE STG_SCOPES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE STG_SETTINGS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
+  </changeSet>
 </databaseChangeLog>
