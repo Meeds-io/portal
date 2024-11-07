@@ -16,21 +16,23 @@
 
 
   <changeSet author="file" id="1.0.0-1">
+    <validCheckSum>ANY</validCheckSum>
     <createTable tableName="FILES_NAMESPACES">
       <column name="NAMESPACE_ID" type="INT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_NAMESPACES_ID"/>
       </column>
-      <column name="NAME" type="NVARCHAR(30)">
+      <column name="NAME" type="VARCHAR(30)">
         <constraints nullable="false"/>
       </column>
-      <column name="DESCRIPTION" type="NVARCHAR(100)"/>
+      <column name="DESCRIPTION" type="VARCHAR(100)"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
   <changeSet author="file" id="1.0.0-2">
+    <validCheckSum>ANY</validCheckSum>
     <createTable tableName="FILES_FILES">
       <column name="FILE_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_FILES_ID"/>
@@ -38,20 +40,20 @@
       <column name="NAMESPACE_ID" type="INT">
         <constraints nullable="false" foreignKeyName="FK_FILES_FILES_NAMESPACE_ID" references="FILES_NAMESPACES(NAMESPACE_ID)"/>
       </column>
-      <column name="NAME" type="NVARCHAR(550)">
+      <column name="NAME" type="VARCHAR(550)">
         <constraints nullable="false"/>
       </column>
-      <column name="MIMETYPE" type="NVARCHAR(100)"/>
+      <column name="MIMETYPE" type="VARCHAR(100)"/>
       <column name="FILE_SIZE" type="BIGINT"/>
       <column name="UPDATED_DATE" type="TIMESTAMP" defaultValueComputed="${now}">
         <constraints nullable="false"/>
       </column>
-      <column name="UPDATER" type="NVARCHAR(100)"/>
-      <column name="CHECKSUM" type="NVARCHAR(100)"/>
+      <column name="UPDATER" type="VARCHAR(100)"/>
+      <column name="CHECKSUM" type="VARCHAR(100)"/>
       <column name="DELETED" type="BOOLEAN" defaultValueBoolean="false"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -64,18 +66,19 @@
   </changeSet>
 
   <changeSet author="file" id="1.0.0-7">
+    <validCheckSum>ANY</validCheckSum>
     <createTable tableName="FILES_BINARY">
       <column name="BLOB_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_BLOB_ID"/>
       </column>
-      <column name="NAME" type="NVARCHAR(100)">
+      <column name="NAME" type="VARCHAR(100)">
         <constraints nullable="false"  unique="true"/>
       </column>
       <column name="DATA" type="LONGBLOB"/>
       <column name="UPDATED_DATE" type="TIMESTAMP" defaultValueComputed="${now}"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci"/>
     </modifySql>
   </changeSet>
 
@@ -106,8 +109,9 @@
   </changeSet>
 
   <changeSet author="file" id="1.0.0-13">
+    <validCheckSum>ANY</validCheckSum>
     <modifyDataType columnName="UPDATER"
-                    newDataType="NVARCHAR(200)"
+                    newDataType="VARCHAR(200)"
                     tableName="FILES_FILES"/>
   </changeSet>
 
@@ -124,4 +128,12 @@
     <dropTable tableName="FILES_ORPHAN_FILES" />
   </changeSet>
 
+  <changeSet author="file" id="1.0.0-16" >
+    <sql dbms="mysql">
+      ALTER TABLE FILES_NAMESPACES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_FILES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_ORPHAN_FILES CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      ALTER TABLE FILES_BINARY CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
+  </changeSet>
 </databaseChangeLog>

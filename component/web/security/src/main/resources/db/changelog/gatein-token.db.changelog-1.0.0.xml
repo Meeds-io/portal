@@ -10,20 +10,21 @@
 
   <!-- Application Registry -->
   <changeSet author="gatein-token" id="1.0.0-1">
+    <validCheckSum>ANY</validCheckSum>
     <createTable tableName="PORTAL_TOKENS">
       <column name="ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
         <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_TOKENS"/>
       </column>
-      <column name="TOKEN_ID" type="NVARCHAR(200)">
+      <column name="TOKEN_ID" type="VARCHAR(200)">
         <constraints nullable="false" unique="true" uniqueConstraintName="UK_GATEIN_TOKEN_ID"/>
       </column>
-      <column name="TOKEN_HASH" type="NVARCHAR(200)"/>
-      <column name="USERNAME" type="NVARCHAR(200)" />
-      <column name="PASSWORD" type="NVARCHAR(200)"/>
+      <column name="TOKEN_HASH" type="VARCHAR(200)"/>
+      <column name="USERNAME" type="VARCHAR(200)" />
+      <column name="PASSWORD" type="VARCHAR(200)"/>
       <column name="EXPIRATION_TIME" type="BIGINT"/>
     </createTable>
     <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci" />
+      <append value=" ENGINE=INNODB CHARSET=UTF8MB4 COLLATE utf8mb4_0900_ai_ci" />
     </modifySql>
   </changeSet>
   <changeSet author="gatein-token" id="1.0.0-2" dbms="oracle,postgresql">
@@ -38,8 +39,14 @@
     </addColumn>
   </changeSet>
   <changeSet author="gatein-token" id="1.0.0-5">
+    <validCheckSum>ANY</validCheckSum>
     <modifyDataType tableName="PORTAL_TOKENS"
                     columnName="PASSWORD"
-                    newDataType="NVARCHAR(500)"/>
+                    newDataType="VARCHAR(500)"/>
+  </changeSet>
+  <changeSet author="gatein-token" id="1.0.0-6">
+    <sql dbms="mysql">
+      ALTER TABLE PORTAL_TOKENS CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    </sql>
   </changeSet>
 </databaseChangeLog>
