@@ -108,6 +108,10 @@ public class UploadService {
     createUploadResource(uploadId, request);
   }
 
+  public void createUploadResource(UploadResource uploadResource) {
+    uploadResources.put(uploadResource.getUploadId(), uploadResource);
+  }
+
   public void createUploadResource(String uploadId, HttpServletRequest request) throws FileUploadException {
     if (uploadId == null || !UPLOAD_ID_PATTERN.matcher(uploadId).matches()) {
       throw new FileUploadException("Upload id " + uploadId + " is not valid, it cannot be null or contain '.' , '/' or '\\'");
