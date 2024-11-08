@@ -194,7 +194,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     assertEquals(2, portalConfig.getPortalLayout().getChildren().size());
     assertEquals(Application.class, portalConfig.getPortalLayout().getChildren().get(0).getClass());
     assertEquals(PageBody.class, portalConfig.getPortalLayout().getChildren().get(1).getClass());
-    assertEquals(accessPermission,
+    assertEquals(UserACL.EVERYONE,
                  ((Application) portalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0]);
 
     List<PageContext> pages = layoutService.findPages(groupSiteKey);
@@ -209,7 +209,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     Page page = layoutService.getPage(pageContext.getKey());
     assertNotNull(page);
     assertEquals(1, page.getChildren().size());
-    assertEquals(accessPermission, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
+    assertEquals(UserACL.EVERYONE, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
 
     NavigationContext navigation = navigationService.loadNavigation(groupSiteKey);
     assertNotNull(navigation);
@@ -269,7 +269,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     assertEquals(2, targetPortalConfig.getPortalLayout().getChildren().size());
     assertEquals(Application.class, targetPortalConfig.getPortalLayout().getChildren().get(0).getClass());
     assertEquals(PageBody.class, targetPortalConfig.getPortalLayout().getChildren().get(1).getClass());
-    assertEquals(((Application) sourcePortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0],
+    assertEquals(UserACL.EVERYONE,
                  ((Application) targetPortalConfig.getPortalLayout().getChildren().get(0)).getAccessPermissions()[0]);
 
     List<PageContext> pages = layoutService.findPages(targetTemplateSiteKey);
@@ -284,7 +284,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     Page page = layoutService.getPage(pageContext.getKey());
     assertNotNull(page);
     assertEquals(1, page.getChildren().size());
-    assertEquals(accessPermission, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
+    assertEquals(UserACL.EVERYONE, ((Application) page.getChildren().get(0)).getAccessPermissions()[0]);
 
     NavigationContext navigation = navigationService.loadNavigation(targetTemplateSiteKey);
     assertNotNull(navigation);
