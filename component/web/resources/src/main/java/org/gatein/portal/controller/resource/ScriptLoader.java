@@ -178,8 +178,7 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
     SourceFile[] inputs = new SourceFile[] { SourceFile.fromCode(sourceName, code.toString()) };
 
     com.google.javascript.jscomp.Compiler compiler = new Compiler();
-    compiler.setErrorManager(new LoggerErrorManager(java.util.logging.Logger.getLogger(ResourceRequestHandler.class
-                                                                                                                   .getName())));
+    compiler.setErrorManager(new LoggerErrorManager(java.util.logging.Logger.getLogger(ScriptLoader.class.getName())));
     Result res = compiler.compile(AbstractCommandLineRunner.getBuiltinExterns(CompilerOptions.Environment.BROWSER),
                                   Arrays.asList(inputs),
                                   options);

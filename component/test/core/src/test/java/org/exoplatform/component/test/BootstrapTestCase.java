@@ -26,6 +26,7 @@ import java.sql.DatabaseMetaData;
 import javax.naming.InitialContext;
 import javax.sql.DataSource;
 
+import org.exoplatform.commons.InitialContextInitializer2;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.services.naming.InitialContextInitializer;
@@ -52,8 +53,10 @@ public class BootstrapTestCase extends AbstractKernelTest {
     }
 
     public void testDataSource() throws Exception {
-        PortalContainer container = PortalContainer.getInstance();
-        container.getComponentInstanceOfType(InitialContextInitializer.class);
+        InitialContextInitializer initialContextInitializer = PortalContainer.getInstance().getComponentInstanceOfType(InitialContextInitializer.class);
+        if (initialContextInitializer instanceof InitialContextInitializer2 startable) {
+          startable.start();
+        }
         DataSource ds = (DataSource) new InitialContext().lookup("jdbcexo");
         assertNotNull(ds);
         Connection conn = ds.getConnection();
