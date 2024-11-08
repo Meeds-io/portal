@@ -28,6 +28,7 @@ import org.exoplatform.container.component.ComponentPlugin;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.services.naming.BindReferencePlugin;
 import org.exoplatform.services.naming.InitialContextInitializer;
+import org.exoplatform.services.naming.SimpleContextFactory;
 
 /**
  * This code should be moved in the core, for now it is here as it is needed here. It extends the
@@ -42,6 +43,7 @@ public class InitialContextInitializer2 extends InitialContextInitializer implem
 
     public InitialContextInitializer2(InitParams params) throws Exception { // NOSONAR
         super(params);
+        System.setProperty("java.naming.factory.initial", SimpleContextFactory.class.getName());
     }
 
     @Override
@@ -58,13 +60,4 @@ public class InitialContextInitializer2 extends InitialContextInitializer implem
         }
     }
 
-    @Override
-    public void start() {
-      // Nothing to start
-    }
-
-    @Override
-    public void stop() {
-      // Nothing to stop
-    }
 }

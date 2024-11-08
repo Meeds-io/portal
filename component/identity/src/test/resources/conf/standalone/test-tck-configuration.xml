@@ -29,7 +29,6 @@
   <import>jar:/conf/base-root-configuration.xml</import>
   <import>jar:/conf/base-portal-configuration.xml</import>
   <import>jar:/conf/exo.portal.component.settings-configuration.xml</import>
-  <import>jar:/conf/exo.portal.component.settings-configuration-local-jta.xml</import>
   <import>jar:/conf/exo.portal.component.identity-configuration-local.xml</import>
 
 </configuration>

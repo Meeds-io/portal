@@ -15,13 +15,8 @@
  */
 package org.exoplatform.services.organization.idm;
 
-import javax.transaction.Status;
-import javax.transaction.UserTransaction;
-
-import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.gatein.common.transaction.JTAUserTransactionLifecycleService;
 import org.picketlink.idm.api.IdentitySession;
 
 /**
@@ -43,21 +38,7 @@ public class AbstractDAOImpl {
 
     public void handleException(String messageToLog, Exception e) {
         try {
-          // Mark JTA transaction to rollback-only if JTA setup is enabled
-          if (orgService.getConfiguration().isUseJTA()) {
-              try {
-                  JTAUserTransactionLifecycleService transactionLfService = (JTAUserTransactionLifecycleService) ExoContainerContext
-                          .getCurrentContainer().getComponentInstanceOfType(JTAUserTransactionLifecycleService.class);
-                  UserTransaction tx = transactionLfService.getUserTransaction();
-                  if (tx.getStatus() == Status.STATUS_ACTIVE) {
-                      tx.setRollbackOnly();
-                  }
-              } catch (Exception tre) {
-                  log.warn("Unable to set Transaction status to be rollback only", tre);
-              }
-          } else {
-              orgService.recoverFromIDMError();
-          }
+          orgService.recoverFromIDMError();
           // Always throw the original exception to make sure that top layer services
           // are triggered about the error
           throw new IllegalStateException(messageToLog, e);

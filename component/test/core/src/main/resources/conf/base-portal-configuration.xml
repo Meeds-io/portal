@@ -37,6 +37,4 @@
     </init-params>
   </component>
 
-  <remove-configuration>org.exoplatform.services.cache.ExoCacheFactory</remove-configuration>
-
 </configuration>

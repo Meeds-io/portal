@@ -53,16 +53,6 @@
       <artifactId>picketlink-idm-ldap</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>io.meeds.kernel</groupId>
-      <artifactId>exo.kernel.component.ext.cache.impl.infinispan.v8</artifactId>
-      <!--
-        Make it here provided to avoid transitive dependency for upper layers
-        and is added in portal.web.portal for runtime usage
-       -->
-      <scope>provided</scope>
-    </dependency>
-
     <!-- Test scope -->
     <dependency>
       <groupId>${project.groupId}</groupId>
