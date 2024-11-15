@@ -25,25 +25,9 @@
     xsi:schemaLocation="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd http://www.exoplatform.org/xml/ns/kernel_1_2.xsd"
     xmlns="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd">
 
-   <component>
-      <key>org.exoplatform.services.listener.ListenerService</key>
-      <type>org.exoplatform.services.listener.ListenerService</type>
-   </component>
-
   <component>
-    <key>org.infinispan.transaction.lookup.TransactionManagerLookup</key>
-    <type>org.exoplatform.services.transaction.infinispan.JBossStandaloneJTAManagerLookup</type>
-  </component>
-
-  <component>
-    <key>org.exoplatform.services.transaction.TransactionService</key>
-    <type>org.exoplatform.services.transaction.infinispan.JBossTransactionsService</type>
-    <init-params>
-      <value-param>
-        <name>timeout</name>
-        <value>${gatein.jcr.transaction.timeout:420}</value>
-      </value-param>
-    </init-params>
+    <key>org.exoplatform.services.listener.ListenerService</key>
+    <type>org.exoplatform.services.listener.ListenerService</type>
   </component>
 
   <component>
@@ -249,25 +233,6 @@
   </component>
 
   <component>
-    <key>org.exoplatform.services.cache.ExoCacheFactory</key>
-    <type>org.exoplatform.services.cache.impl.infinispan.ExoCacheFactoryImpl</type>
-    <init-params>
-      <value-param>
-        <name>cache.config.template</name>
-        <value>${exo.cache.config.template:jar:/conf/cache/infinispan/local/cache-config.xml}</value>
-      </value-param>
-      <value-param profiles="cluster">
-        <name>cache.config.template</name>
-        <value>${exo.cache.config.template:jar:/conf/cache/infinispan/cluster/cache-config.xml}</value>
-      </value-param>
-      <value-param profiles="cluster">
-        <name>cache.async.config.template</name>
-        <value>${exo.cache.async.config.template:jar:/conf/cache/infinispan/cluster/cache-async-config.xml}</value>
-      </value-param>
-    </init-params>
-  </component>
-
-  <component>
     <key>org.exoplatform.portal.resource.SkinService</key>
     <type>org.exoplatform.portal.resource.SkinService</type>
     <init-params>
@@ -322,45 +287,5 @@
     <key>org.exoplatform.web.security.AuthenticationRegistry</key>
     <type>org.exoplatform.web.security.AuthenticationRegistryImpl</type>
   </component>
-
-  <external-component-plugins>
-    <target-component>org.exoplatform.services.cache.ExoCacheFactory</target-component>
-    <component-plugin>
-      <name>addCreator</name>
-      <set-method>addCreator</set-method>
-      <type>org.exoplatform.services.cache.impl.infinispan.ExoCacheCreatorPlugin</type>
-      <description>add Exo Cache Creator</description>
-      <init-params>
-        <object-param>
-          <name>Generic-insp-cacheCreator</name>
-          <description>The generic cache creator</description>
-            <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheCreator">
-              <field name="implementations">
-                <collection type="java.util.HashSet">
-                  <value>
-                    <string>NONE</string>
-                  </value>
-                  <value>
-                    <string>LRU</string>
-                  </value>
-                  <value>
-                    <string>UNORDERED</string>
-                  </value>
-                  <value>
-                    <string>MANUAL</string>
-                  </value>
-                  <value>
-                    <string>LIRS</string>
-                  </value>
-                </collection>
-              </field>
-              <field name="defaultStrategy"><string>${exo.cache.eviction.defaultStrategy:LIRS}</string></field>
-              <field name="defaultMaxIdle"><long>${exo.cache.expiration.defaultMaxIdle:-1}</long></field>
-              <field name="defaultWakeUpInterval"><long>${exo.cache.expiration.defaultWakeUpInterval:5000}</long></field>
-            </object>
-          </object-param>
-       </init-params>
-    </component-plugin>
-  </external-component-plugins>
 
 </configuration>
