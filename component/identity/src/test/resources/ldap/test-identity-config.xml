@@ -886,14 +886,6 @@
                   <!--<value>true</value>-->
                <!--</option>-->
               <option>
-                <name>cache.configFile</name>
-                <value>infinispan.xml</value>
-              </option>
-              <option>
-                <name>cache.configName</name>
-                <value>xml-configured-cache</value>
-              </option>
-              <option>
                 <name>pagedResultsExtensionSupported</name>
                 <value>true</value>
               </option>

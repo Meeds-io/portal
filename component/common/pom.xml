@@ -52,16 +52,6 @@
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
-
-    <dependency>
-      <groupId>io.meeds.kernel</groupId>
-      <artifactId>exo.kernel.component.ext.cache.impl.infinispan.v8</artifactId>
-      <!--
-        Make it here for test purpose only to avoid transitive dependency for upper layers
-        and is added in portal.web.portal for runtime usage
-       -->
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <build>

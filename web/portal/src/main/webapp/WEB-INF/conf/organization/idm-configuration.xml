@@ -29,13 +29,7 @@
   </component>
 
   <component>
-    <key>org.gatein.common.transaction.JTAUserTransactionLifecycleService</key>
-    <type>org.gatein.common.transaction.JTAUserTransactionLifecycleServiceImpl</type>
-  </component>
-  <component>
-    <key>org.exoplatform.services.database.HibernateService</key>
-    <jmx-name>database:type=HibernateService</jmx-name>
-    <type>org.exoplatform.services.organization.idm.CustomHibernateServiceImpl</type>
+    <type>org.exoplatform.services.organization.idm.IdmHibernateService</type>
     <init-params>
       <properties-param>
         <name>hibernate.properties</name>
@@ -45,28 +39,9 @@
         <property name="hibernate.connection.datasource" value="${gatein.idm.datasource.name}${container.name.suffix}" />
         <property name="hibernate.connection.autocommit" value="false" />
         <property name="hibernate.id.new_generator_mappings" value="false"/>
-
-        <!-- Non-JTA setup -->
         <property name="hibernate.current_session_context_class" value="thread"/>
-
-        <!-- JTA setup -->
-        <!--<property name="hibernate.current_session_context_class" value="jta"/>
-        <property name="hibernate.transaction.factory_class" value="org.hibernate.transaction.JTATransactionFactory" /> -->
-
         <property name="hibernate.cache.use_second_level_cache" value="false"/>
         <property name="hibernate.cache.use_query_cache" value="false"/>
-        <!-- Uncomment for enable 2nd level cache based on Infinispan -->
-        <!--<property name="hibernate.cache.region.factory_class" value="org.jboss.as.jpa.hibernate4.infinispan.InfinispanRegionFactory" />-->
-        <!-- Uncomment to enable cache statistics for infinispan />-->
-        <!--<property name="hibernate.cache.infinispan.statistics" value="true" />-->
-        <!-- Uncomment to use custom infinispan configuration file instead of the default bundled in hibernate-infinispan jar -->
-        <!--<property name="hibernate.cache.infinispan.cfg" value="/home/infinispan/cacheprovider-configs.xml"/>-->
-
-        <!--
-          Should be automatically detected. Force otherwise
-          <property name="hibernate.dialect" value="org.hibernate.dialect.XXXDialect"/>
-        -->
-
         <property name="hibernate.listeners.envers.autoRegister" value="false"/>
         <property name="hibernate.identifier_generator_strategy_provider" value="io.meeds.common.persistence.HibernateCustomIdentifierGeneratorStrategyProvider" />
       </properties-param>
@@ -196,10 +171,6 @@
               </value>-->
             </collection>
           </field>
-          <!-- If 'true' will use JTA UserTransaction. If 'false' will use IDM transaction API -->
-          <field name="useJTA">
-            <boolean>false</boolean>
-          </field>
 
           <!-- If PLIDM group will have name containing slash "/" char than it will be replace with following string.
                Slashes are used in group paths and if present in names may cause unpredictable behaviour -->
@@ -260,76 +231,5 @@
       <priority>10</priority>
     </component-plugin>
   </external-component-plugins>    
-
-  <external-component-plugins>
-    <target-component>org.exoplatform.services.cache.CacheService</target-component>
-    <component-plugin>
-      <name>addExoCacheConfig</name>
-      <set-method>addExoCacheConfig</set-method>
-      <type>org.exoplatform.services.cache.ExoCacheConfigPlugin</type>
-      <description>add Exo Cache Config</description>
-      <init-params>
-        <object-param>
-          <name>portal.User</name>
-          <description>Exo Cache cluster configuration for IDM User entity</description>
-          <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheConfig">
-            <field name="name"><string>portal.User</string></field>
-            <field name="strategy"  profiles="cluster"><string>${exo.cache.portal.user.strategy:LIRS}</string></field>
-            <field name="maxSize"><int>${exo.cache.portal.user.MaxNodes:5000}</int></field>
-            <field name="liveTime"><long>${exo.cache.portal.user.TimeToLive:3600}</long></field>
-            <field name="cacheMode"  profiles="cluster"><string>${exo.cache.portal.user.cacheMode:replication}</string></field>
-          </object>
-        </object-param>
-        
-        <object-param>
-          <name>portal.Profile</name>
-          <description>Exo Cache cluster configuration for IDM User Profile entity</description>
-          <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheConfig">
-            <field name="name"><string>portal.Profile</string></field>
-            <field name="strategy"  profiles="cluster"><string>${exo.cache.portal.profile.strategy:LIRS}</string></field>
-            <field name="maxSize"><int>${exo.cache.portal.profile.MaxNodes:5000}</int></field>
-            <field name="liveTime"><long>${exo.cache.portal.profile.TimeToLive:3600}</long></field>
-            <field name="cacheMode"  profiles="cluster"><string>${exo.cache.portal.profile.cacheMode:replication}</string></field>
-          </object>
-        </object-param>
-        
-        <object-param>
-          <name>portal.Membership</name>
-          <description>Exo Cache cluster configuration for IDM Membership entity</description>
-          <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheConfig">
-            <field name="name"><string>portal.Membership</string></field>
-            <field name="strategy"  profiles="cluster"><string>${exo.cache.portal.membership:LIRS}</string></field>
-            <field name="maxSize"><int>${exo.cache.portal.membership.MaxNodes:5000}</int></field>
-            <field name="liveTime"><long>${exo.cache.portal.membership.TimeToLive:86400}</long></field>
-            <field name="cacheMode"  profiles="cluster"><string>${exo.cache.portal.membership.cacheMode:replication}</string></field>
-          </object>
-        </object-param>
-        
-        <object-param>
-          <name>portal.Role</name>
-          <description>Exo Cache cluster configuration for IDM Membership Type entity</description>
-          <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheConfig">
-            <field name="name"><string>portal.Role</string></field>
-            <field name="strategy"  profiles="cluster"><string>${exo.cache.portal.role.strategy:LIRS}</string></field>
-            <field name="maxSize"><int>${exo.cache.portal.role.MaxNodes:5000}</int></field>
-            <field name="liveTime"><long>${exo.cache.portal.role.TimeToLive:-1}</long></field>
-            <field name="cacheMode"  profiles="cluster"><string>${exo.cache.portal.role.cacheMode:replication}</string></field>
-          </object>
-        </object-param>
-        
-        <object-param>
-          <name>portal.Group</name>
-          <description>Exo Cache cluster configuration for IDM Group entity</description>
-          <object type="org.exoplatform.services.cache.impl.infinispan.generic.GenericExoCacheConfig">
-            <field name="name"><string>portal.Group</string></field>
-            <field name="strategy"  profiles="cluster"><string>${exo.cache.portal.group.strategy:LIRS}</string></field>
-            <field name="maxSize"><int>${exo.cache.portal.group.MaxNodes:5000}</int></field>
-            <field name="liveTime"><long>${exo.cache.portal.group.TimeToLive:-1}</long></field>
-            <field name="cacheMode"  profiles="cluster"><string>${exo.cache.portal.group.cacheMode:replication}</string></field>
-          </object>
-        </object-param>
-      </init-params>
-    </component-plugin>
-  </external-component-plugins>
 
 </configuration>

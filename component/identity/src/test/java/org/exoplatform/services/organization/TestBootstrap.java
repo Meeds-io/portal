@@ -24,15 +24,15 @@ import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.container.PortalContainer;
-import org.exoplatform.services.database.HibernateService;
+import org.exoplatform.services.organization.idm.IdmHibernateService;
 
 @ConfiguredBy({ @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.identity-configuration-local.xml") })
 public class TestBootstrap extends AbstractKernelTest {
 
     public void testWorkspace() throws Exception {
         PortalContainer container = PortalContainer.getInstance();
-        HibernateService hibernate = (HibernateService) container.getComponentInstanceOfType(HibernateService.class);
-        assertNotNull(hibernate);
+        IdmHibernateService idmHibernateService = container.getComponentInstanceOfType(IdmHibernateService.class);
+        assertNotNull(idmHibernateService);
         OrganizationService organization = (OrganizationService) container
                 .getComponentInstanceOfType(OrganizationService.class);
         assertNotNull(organization);
