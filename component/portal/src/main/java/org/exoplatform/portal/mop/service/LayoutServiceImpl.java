@@ -45,6 +45,7 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.portal.config.Query;
+import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationState;
 import org.exoplatform.portal.config.model.Container;
@@ -75,6 +76,8 @@ import org.exoplatform.services.log.Log;
 import lombok.SneakyThrows;
 
 public class LayoutServiceImpl implements LayoutService {
+
+  private static final String OWNER_ID_TEMPLATE = "@owner_id@";
 
   private static final Log       LOG                     = ExoLogger.getLogger(LayoutServiceImpl.class);
 
@@ -119,12 +122,12 @@ public class LayoutServiceImpl implements LayoutService {
   }
 
   @Override
-  public void savePortalFromTemplate(SiteKey sourceSiteTemplate,
+  public void savePortalFromTemplate(SiteKey sourceSiteKey,
                                      SiteKey targetSiteKey,
                                      String permission) throws ObjectNotFoundException {
-    PortalConfig templatePortalConfig = getPortalConfig(sourceSiteTemplate);
+    PortalConfig templatePortalConfig = getPortalConfig(sourceSiteKey);
     if (templatePortalConfig == null) {
-      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", sourceSiteTemplate));
+      throw new ObjectNotFoundException(String.format("Site template %s wasn't found", sourceSiteKey));
     }
     boolean exists = getPortalConfig(targetSiteKey) != null;
     PortalConfig portalConfig = templatePortalConfig.clone();
@@ -132,10 +135,14 @@ public class LayoutServiceImpl implements LayoutService {
     portalConfig.setType(targetSiteKey.getTypeName());
     portalConfig.setName(targetSiteKey.getName());
     portalConfig.setBannerFileId(0);
+    applyPermissionTemplate(portalConfig.getPortalLayout());
     if (StringUtils.isNotBlank(permission)) {
       portalConfig.setAccessPermissions(getPermissionsFromTemplate(portalConfig.getAccessPermissions(), permission));
       portalConfig.setEditPermission(getPermissionFromTemplate(portalConfig.getEditPermission(), permission));
-      applyPermissionTemplate(portalConfig.getPortalLayout(), permission);
+    } else if (StringUtils.equalsIgnoreCase(sourceSiteKey.getTypeName(), PortalConfig.GROUP_TYPE)) {
+      String groupId = sourceSiteKey.getName();
+      portalConfig.setAccessPermissions(getPermissionsToTemplate(portalConfig.getAccessPermissions(), groupId));
+      portalConfig.setEditPermission(getPermissionToTemplate(portalConfig.getEditPermission(), groupId));
     }
     if (exists) {
       siteStorage.save(portalConfig.build());
@@ -157,18 +164,22 @@ public class LayoutServiceImpl implements LayoutService {
 
   @Override
   @SneakyThrows
-  public void savePageFromTemplate(PageKey sourcePageTemplateKey,
+  public void savePageFromTemplate(PageKey sourcePageKey,
                                    SiteKey targetSiteKey,
                                    String permission) {
-    Page page = getPage(sourcePageTemplateKey);
+    Page page = getPage(sourcePageKey);
     page = new Page(page.build());
     page.resetStorage();
     page.setOwnerType(targetSiteKey.getTypeName());
     page.setOwnerId(targetSiteKey.getName());
+    applyPermissionTemplate(page.getChildren());
     if (StringUtils.isNotBlank(permission)) {
       page.setAccessPermissions(getPermissionsFromTemplate(page.getAccessPermissions(), permission));
       page.setEditPermission(getPermissionFromTemplate(page.getEditPermission(), permission));
-      applyPermissionTemplate(page, permission);
+    } else if (StringUtils.equalsIgnoreCase(sourcePageKey.getSite().getTypeName(), PortalConfig.GROUP_TYPE)) {
+      String groupId = sourcePageKey.getSite().getName();
+      page.setAccessPermissions(getPermissionsToTemplate(page.getAccessPermissions(), groupId));
+      page.setEditPermission(getPermissionToTemplate(page.getEditPermission(), groupId));
     }
     pageStorage.savePage(new PageContext(page.getPageKey(), Utils.toPageState(page)));
     pageStorage.save(page.build());
@@ -574,17 +585,6 @@ public class LayoutServiceImpl implements LayoutService {
     }
   }
 
-  private void applyPermissionTemplate(ModelObject model, String permission) {
-    if (model instanceof Container container) {
-      container.setAccessPermissions(getPermissionsFromTemplate(container.getAccessPermissions(), permission));
-      if (CollectionUtils.isNotEmpty(container.getChildren())) {
-        container.getChildren().forEach(c -> applyPermissionTemplate(c, permission));
-      }
-    } else if (model instanceof Application application) {
-      application.setAccessPermissions(getPermissionsFromTemplate(application.getAccessPermissions(), permission));
-    }
-  }
-
   private String[] getPermissionsFromTemplate(String[] accessPermissions, String permission) {
     if (ArrayUtils.isEmpty(accessPermissions)) {
       return accessPermissions;
@@ -594,8 +594,37 @@ public class LayoutServiceImpl implements LayoutService {
                  .toArray(String[]::new);
   }
 
+  private String[] getPermissionsToTemplate(String[] accessPermissions, String permission) {
+    if (ArrayUtils.isEmpty(accessPermissions)) {
+      return accessPermissions;
+    }
+    return Arrays.stream(accessPermissions)
+                 .map(p -> getPermissionToTemplate(p, permission))
+                 .toArray(String[]::new);
+  }
+
+  private String getPermissionToTemplate(String selectedPermission, String permission) {
+    return selectedPermission.replace(permission, OWNER_ID_TEMPLATE);
+  }
+
   private String getPermissionFromTemplate(String selectedPermission, String permission) {
-    return selectedPermission.replace("@owner_id@", permission);
+    return selectedPermission.replace(OWNER_ID_TEMPLATE, permission);
+  }
+
+  private void applyPermissionTemplate(ModelObject model) {
+    if (model instanceof Container container) {
+      container.setAccessPermissions(new String[] {UserACL.EVERYONE});
+      ArrayList<ModelObject> children = container.getChildren();
+      applyPermissionTemplate(children);
+    } else if (model instanceof Application application) {
+      application.setAccessPermissions(new String[] {UserACL.EVERYONE});
+    }
+  }
+
+  private void applyPermissionTemplate(ArrayList<ModelObject> children) {
+    if (CollectionUtils.isNotEmpty(children)) {
+      children.forEach(this::applyPermissionTemplate);
+    }
   }
 
 }
