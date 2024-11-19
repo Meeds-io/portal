@@ -1,17 +1,16 @@
 package org.exoplatform.commons.file.resource;
 
-import org.exoplatform.commons.file.model.FileInfo;
-import org.exoplatform.commons.file.model.FileItem;
-import org.exoplatform.commons.file.storage.dao.FileBinaryDAO;
-import org.exoplatform.commons.file.storage.entity.FileBinaryEntity;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Objects;
+
+import org.exoplatform.commons.file.model.FileInfo;
+import org.exoplatform.commons.file.model.FileItem;
+import org.exoplatform.commons.file.storage.dao.FileBinaryDAO;
+import org.exoplatform.commons.file.storage.entity.FileBinaryEntity;
 
 /**
  * This class provide database implementation of the File RDBMS API.
@@ -100,7 +99,7 @@ public class RdbmsResourceProvider implements BinaryProvider {
   @Override
   public boolean exists(String name) throws IOException {
     FileBinaryEntity fileBinaryEntity = fileBinaryDAO.findFileBinaryByName(name);
-    return (fileBinaryEntity != null) ? true : false;
+    return fileBinaryEntity != null;
   }
 
   @Override

@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -12,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.IOUtils;
 
-import org.exoplatform.commons.file.model.FileInfo;
 import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.resource.BinaryProvider;
 import org.exoplatform.component.test.AbstractKernelTest;
@@ -34,10 +34,12 @@ public class FileServiceImplIntegrationTest extends AbstractKernelTest {
 
   private AtomicInteger   counter         = new AtomicInteger(0);
 
+  @Override
   protected void setUp() throws IOException {
     begin();
   }
 
+  @Override
   protected void tearDown() {
     end();
   }
@@ -63,20 +65,22 @@ public class FileServiceImplIntegrationTest extends AbstractKernelTest {
     assertEquals("file", fetchedFile.getFileInfo().getNameSpace());
     InputStream fileStream = fetchedFile.getAsStream();
     assertNotNull(fileStream);
-    assertEquals("test", IOUtils.toString(fileStream));
+    assertEquals("test", IOUtils.toString(fileStream, StandardCharsets.UTF_8));
   }
-  
+
   public void testShouldReturnFilesByChecksum() throws Exception {
     FileService fileService = getContainer().getComponentInstanceOfType(FileService.class);
     FileItem createdFile1 = fileService.writeFile(new FileItem(null,
-                                                              "file1",
-                                                              "plain/text",
-                                                              null,
-                                                              1,
-                                                              new Date(),
-                                                              "john",
-                                                              false,
-                                                              new ByteArrayInputStream("test1".getBytes())));
+                                                               "file1",
+                                                               "plain/text",
+                                                               null,
+                                                               1,
+                                                               new Date(),
+                                                               "john",
+                                                               false,
+                                                               new ByteArrayInputStream("test1".getBytes())));
+    String file1Checksum = createdFile1.getFileInfo().getChecksum();
+
     FileItem createdFile2 = fileService.writeFile(new FileItem(null,
                                                                "file2",
                                                                "plain/text",
@@ -86,8 +90,9 @@ public class FileServiceImplIntegrationTest extends AbstractKernelTest {
                                                                "root",
                                                                false,
                                                                new ByteArrayInputStream("test2".getBytes())));
-    List<FileItem> fetchedFiles = fileService.getFilesByChecksum(createdFile1.getFileInfo().getChecksum());
-    assertNotNull(fetchedFiles);
+    restartTransaction();
+
+    List<FileItem> fetchedFiles = fileService.getFilesByChecksum(file1Checksum);
     assertEquals(1, fetchedFiles.size());
     assertEquals("file1", fetchedFiles.get(0).getFileInfo().getName());
     assertEquals("plain/text", fetchedFiles.get(0).getFileInfo().getMimetype());
@@ -96,10 +101,10 @@ public class FileServiceImplIntegrationTest extends AbstractKernelTest {
     assertEquals(1, fetchedFiles.get(0).getFileInfo().getSize());
     assertEquals("file", fetchedFiles.get(0).getFileInfo().getNameSpace());
     InputStream fileStream = fetchedFiles.get(0).getAsStream();
-    assertNotNull(fileStream);
-    assertEquals("test1", IOUtils.toString(fileStream));
-    
-    
+    assertEquals("test1", IOUtils.toString(fileStream, StandardCharsets.UTF_8));
+
+    fetchedFiles = fileService.getFilesByChecksum(createdFile2.getFileInfo().getChecksum());
+    assertEquals(1, fetchedFiles.size());
   }
 
   public void testUpdateFile() throws Exception {
@@ -126,7 +131,7 @@ public class FileServiceImplIntegrationTest extends AbstractKernelTest {
                                                                    false,
                                                                    new ByteArrayInputStream("test".getBytes())));
     assertNotNull(updatedSameFile);
-    assertEquals(fetchedFile.getFileInfo().getChecksum(), updatedSameFile.getFileInfo().getChecksum());
+    assertNotSame(fetchedFile.getFileInfo().getChecksum(), updatedSameFile.getFileInfo().getChecksum());
 
     FileItem updatedNewFile =
                             fileService.updateFile(new FileItem(fetchedFile.getFileInfo().getId(),

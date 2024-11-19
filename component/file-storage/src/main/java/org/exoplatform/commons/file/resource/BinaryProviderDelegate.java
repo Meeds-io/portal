@@ -37,7 +37,7 @@ public class BinaryProviderDelegate implements BinaryProvider, Startable {
 
   private InitParams                      initParams;
 
-  private List<ResourceProviderPlugin>    plugins              = new ArrayList<ResourceProviderPlugin>();
+  private List<ResourceProviderPlugin>    plugins              = new ArrayList<>();
 
   public BinaryProviderDelegate(InitParams initParams) {
     this.initParams = initParams;

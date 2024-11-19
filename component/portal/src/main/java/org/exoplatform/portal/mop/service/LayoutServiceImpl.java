@@ -19,7 +19,6 @@
 package org.exoplatform.portal.mop.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -37,7 +36,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.services.FileService;
-import org.exoplatform.commons.file.services.FileStorageException;
 import org.exoplatform.commons.utils.LazyPageList;
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.commons.utils.PropertyManager;
@@ -482,7 +480,7 @@ public class LayoutServiceImpl implements LayoutService {
     try {
       FileItem fileItem = fileService.getFile(portalConfig.getBannerFileId());
       return fileItem == null || fileItem.getFileInfo() == null ? null : fileItem.getAsStream();
-    } catch (FileStorageException | IOException e) {
+    } catch (Exception e) {
       return null;
     }
   }

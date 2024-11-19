@@ -20,7 +20,6 @@ package org.exoplatform.commons.file;
 
 import org.exoplatform.commons.api.persistence.DataInitializer;
 import org.exoplatform.commons.file.storage.dao.FileBinaryDAO;
-import org.exoplatform.commons.file.storage.dao.OrphanFileDAO;
 import org.exoplatform.commons.file.storage.dao.FileInfoDAO;
 import org.exoplatform.commons.file.storage.dao.NameSpaceDAO;
 import org.exoplatform.component.test.ConfigurationUnit;
@@ -41,8 +40,6 @@ public class CommonsJPAIntegrationTest extends BaseTest {
 
   protected NameSpaceDAO  nameSpaceDAO;
 
-  protected OrphanFileDAO orphanFileDAO;
-
   protected FileBinaryDAO fileBinaryDAO;
 
   public void setUp() {
@@ -56,7 +53,6 @@ public class CommonsJPAIntegrationTest extends BaseTest {
     // Init DAO
     fileInfoDAO = getService(FileInfoDAO.class);
     nameSpaceDAO = getService(NameSpaceDAO.class);
-    orphanFileDAO = getService(OrphanFileDAO.class);
     fileBinaryDAO = getService(FileBinaryDAO.class);
 
     // Clean Data
@@ -66,7 +62,6 @@ public class CommonsJPAIntegrationTest extends BaseTest {
   public void testInit() {
     assertNotNull(fileInfoDAO);
     assertNotNull(nameSpaceDAO);
-    assertNotNull(orphanFileDAO);
     assertNotNull(fileBinaryDAO);
   }
 
@@ -77,7 +72,6 @@ public class CommonsJPAIntegrationTest extends BaseTest {
   }
 
   private void cleanDB() {
-    orphanFileDAO.deleteAll();
     fileInfoDAO.deleteAll();
     nameSpaceDAO.deleteAll();
     fileBinaryDAO.deleteAll();

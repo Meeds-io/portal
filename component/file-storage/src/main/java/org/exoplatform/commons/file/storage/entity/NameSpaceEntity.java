@@ -18,23 +18,24 @@
  */
 package org.exoplatform.commons.file.storage.entity;
 
-import org.exoplatform.commons.api.persistence.ExoEntity;
-
-import jakarta.persistence.*;
 import java.util.List;
 
-/**
- * Entity for NameSpace. Created by The eXo Platform SAS Author : eXoPlatform
- * exo@exoplatform.com
- */
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+
 @Entity(name = "NameSpaceEntity")
-@ExoEntity
 @Table(name = "FILES_NAMESPACES")
-@NamedQueries(
-  @NamedQuery(
-      name = "nameSpace.getNameSpaceByName",
-      query = "SELECT t FROM NameSpaceEntity t WHERE t.name = :name"
-  )
+@NamedQuery(
+    name = "nameSpace.getNameSpaceByName",
+    query = "SELECT t FROM NameSpaceEntity t WHERE t.name = :name"
 )
 public class NameSpaceEntity {
   @Id

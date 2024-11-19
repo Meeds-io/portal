@@ -15,7 +15,6 @@
  */
 package org.exoplatform.commons.file.dao.mock;
 
-import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
@@ -27,28 +26,18 @@ import org.exoplatform.jpa.mock.AbstractInMemoryDAO;
 public class InMemoryFileInfoDAO extends AbstractInMemoryDAO<FileInfoEntity> implements FileInfoDAO {
 
   @Override
-  public List<FileInfoEntity> findDeletedFiles(Date date) {
-    return entities.values()
-                   .stream()
-                   .filter(entity -> entity.isDeleted() && (entity.getUpdatedDate() != null && entity.getUpdatedDate().before(date)))
-                   .toList();
-  }
-
-  @Override
   public List<FileInfoEntity> findFilesByChecksum(String checksum) {
     return entities.values()
                    .stream()
-                   .filter(entity -> StringUtils.equals(checksum, entity.getChecksum()))
+                   .filter(entity -> StringUtils.equals(checksum, entity.getChecksum()) && !entity.isDeleted())
                    .toList();
   }
 
   @Override
-  public List<FileInfoEntity> findAllByPage(int offset, int limit) {
-    return entities.values()
-                   .stream()
-                   .skip(offset)
-                   .limit(limit)
-                   .toList();
+  public int countFilesByChecksum(String checksum) {
+    return (int) entities.values()
+                         .stream()
+                         .filter(entity -> StringUtils.equals(checksum, entity.getChecksum()) && !entity.isDeleted())
+                         .count();
   }
-
 }

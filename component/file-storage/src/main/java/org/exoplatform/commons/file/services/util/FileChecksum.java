@@ -18,11 +18,10 @@
  */
 package org.exoplatform.commons.file.services.util;
 
-import org.exoplatform.commons.utils.PropertyManager;
+import lombok.SneakyThrows;
 
 import java.io.InputStream;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /**
  * Offers to calculate Checksum
@@ -39,13 +38,13 @@ public final class FileChecksum {
    *
    * @param string chain  to calculate Checksum
    * @return Checksum
-   * @throws Exception exception
    */
-  public static String getChecksum(String string) throws Exception {
-    MessageDigest digest = java.security.MessageDigest.getInstance(digestAlgorithm);
+  @SneakyThrows
+  public static String getChecksum(String string) {
+    MessageDigest digest = MessageDigest.getInstance(digestAlgorithm);
     digest.update(string.getBytes());
-    byte messageDigest[] = digest.digest();
-    //This bytes[] has bytes in decimal format;
+    byte[] messageDigest = digest.digest();
+    //This bytes[] has bytes in decimal format
     //Convert it to hexadecimal format
     StringBuilder sb = new StringBuilder();
     for(int i=0; i< messageDigest.length ;i++)
@@ -61,9 +60,9 @@ public final class FileChecksum {
    *
    * @param fis InputStream
    * @return Checksum
-   * @throws Exception exception
    */
-  public static String getChecksum(InputStream fis) throws Exception {
+  @SneakyThrows
+  public static String getChecksum(InputStream fis) {
     MessageDigest digest = java.security.MessageDigest.getInstance(digestAlgorithm);
     //Create byte array to read data in chunks
     byte[] byteArray = new byte[1024];
@@ -72,7 +71,7 @@ public final class FileChecksum {
     //Read file data and update in message digest
     while ((bytesCount = fis.read(byteArray)) != -1) {
       digest.update(byteArray, 0, bytesCount);
-    };
+    }
 
     //close the stream; We don't need it now.
     fis.close();
@@ -80,7 +79,7 @@ public final class FileChecksum {
     //Get the hash's bytes
     byte[] bytes = digest.digest();
 
-    //This bytes[] has bytes in decimal format;
+    //This bytes[] has bytes in decimal format
     //Convert it to hexadecimal format
     StringBuilder sb = new StringBuilder();
     for(int i=0; i< bytes.length ;i++)

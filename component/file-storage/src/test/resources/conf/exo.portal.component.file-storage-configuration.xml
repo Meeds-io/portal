@@ -30,11 +30,6 @@
     <type>org.exoplatform.commons.file.dao.mock.InMemoryNameSpaceDAO</type>
   </component>
   <component>
-    <key>org.exoplatform.commons.file.storage.dao.OrphanFileDAO</key>
-    <type>org.exoplatform.commons.file.dao.mock.InMemoryOrphanFileDAO</type>
-  </component>
-
-  <component>
     <key>org.exoplatform.commons.file.storage.dao.FileBinaryDAO</key>
     <type>org.exoplatform.commons.file.dao.mock.InMemoryFileBinaryDAO</type>
   </component>
@@ -83,11 +78,6 @@
         <value>file</value>
       </value-param>
     </init-params>
-  </component>
-
-  <component>
-    <key>org.exoplatform.commons.file.services.checker.FileStorageCheckController</key>
-    <type>org.exoplatform.commons.file.services.checker.FileStorageCheckController</type>
   </component>
 
   <external-component-plugins>
