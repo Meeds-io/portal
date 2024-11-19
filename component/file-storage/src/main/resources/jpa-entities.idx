@@ -1,0 +1,3 @@
+org.exoplatform.commons.file.storage.entity.FileBinaryEntity
+org.exoplatform.commons.file.storage.entity.FileInfoEntity
+org.exoplatform.commons.file.storage.entity.NameSpaceEntity

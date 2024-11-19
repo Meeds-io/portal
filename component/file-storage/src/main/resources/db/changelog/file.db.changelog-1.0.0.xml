@@ -55,34 +55,12 @@
     </modifySql>
   </changeSet>
 
-  <changeSet author="file" id="1.0.0-3">
-    <createTable tableName="FILES_ORPHAN_FILES">
-      <column name="ID" type="INT" autoIncrement="${autoIncrement}" startWith="1">
-        <constraints nullable="false" primaryKey="true" primaryKeyName="PK_FILES_ORPHAN_ID"/>
-      </column>
-      <column name="FILE_ID" type="BIGINT">
-        <constraints nullable="false" foreignKeyName="FK_FILES_ORPHAN_FILE_ID" references="FILES_FILES(FILE_ID)"/>
-      </column>
-      <column name="DELETED_DATE" type="TIMESTAMP" defaultValueComputed="${now}">
-        <constraints nullable="false"/>
-      </column>
-      <column name="CHECKSUM" type="NVARCHAR(100)"/>
-    </createTable>
-    <modifySql dbms="mysql">
-      <append value=" ENGINE=INNODB CHARSET=UTF8 COLLATE utf8_general_ci"/>
-    </modifySql>
-  </changeSet>
-
   <changeSet author="file" id="1.0.0-4" dbms="oracle,postgresql">
     <createSequence sequenceName="SEQ_FILES_FILES_FILE_ID" startValue="1"/>
   </changeSet>
 
   <changeSet author="file" id="1.0.0-5" dbms="oracle,postgresql">
     <createSequence sequenceName="SEQ_FILES_NS_NAMESPACE_ID" startValue="1"/>
-  </changeSet>
-
-  <changeSet author="file" id="1.0.0-6" dbms="oracle,postgresql">
-    <createSequence sequenceName="SEQ_FILES_ORPHAN_FILES_ID" startValue="1"/>
   </changeSet>
 
   <changeSet author="file" id="1.0.0-7">
@@ -120,11 +98,6 @@
       <column name="NAME"/>
     </createIndex>
   </changeSet>
-  <changeSet author="file" id="1.0.0-11">
-    <createIndex tableName="FILES_ORPHAN_FILES" indexName="IDX_FILES_ORPHAN_FILES_01">
-      <column name="DELETED_DATE"/>
-    </createIndex>
-  </changeSet>
 
   <changeSet author="file" id="1.0.0-12" dbms="mysql,mssql,h2,sybase,db2,hsqldb,postgresql">
     <createIndex tableName="FILES_BINARY" indexName="IDX_FILES_BINARY_01">
@@ -141,8 +114,14 @@
   <changeSet author="file" id="1.0.0-14" dbms="hsqldb">
     <createSequence sequenceName="SEQ_FILES_FILES_FILE_ID" startValue="1" />
     <createSequence sequenceName="SEQ_FILES_NS_NAMESPACE_ID" startValue="1" />
-    <createSequence sequenceName="SEQ_FILES_ORPHAN_FILES_ID" startValue="1" />
     <createSequence sequenceName="SEQ_FILES_BINARY_BLOB_ID" startValue="1" />
+  </changeSet>
+
+  <changeSet author="file" id="1.0.0-15" onValidationFail="MARK_RAN">
+    <preConditions onFail="MARK_RAN">
+      <tableExists tableName="FILES_ORPHAN_FILES" />
+    </preConditions>
+    <dropTable tableName="FILES_ORPHAN_FILES" />
   </changeSet>
 
 </databaseChangeLog>

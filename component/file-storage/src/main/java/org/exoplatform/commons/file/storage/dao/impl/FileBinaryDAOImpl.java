@@ -8,19 +8,21 @@ import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
 /**
- * Data Access Object layer for binary data files.
- * Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
+ * Data Access Object layer for binary data files. Created by The eXo Platform
+ * SAS Author : eXoPlatform exo@exoplatform.com
  */
 public class FileBinaryDAOImpl extends GenericDAOJPAImpl<FileBinaryEntity, Long> implements FileBinaryDAO {
-    @Override
-    public FileBinaryEntity findFileBinaryByName(String name) {
-        TypedQuery<FileBinaryEntity> query = getEntityManager().createNamedQuery("FileBinaryEntity.findByName", FileBinaryEntity.class)
-                .setParameter("name", name);
-        try{
-            return query.getSingleResult();
-        }catch(NoResultException ex){
-            return null;
-        }
+
+  @Override
+  public FileBinaryEntity findFileBinaryByName(String name) {
+    TypedQuery<FileBinaryEntity> query =
+                                       getEntityManager().createNamedQuery("FileBinaryEntity.findByName", FileBinaryEntity.class)
+                                                         .setParameter("name", name);
+    try {
+      return query.getSingleResult();
+    } catch (NoResultException ex) {
+      return null;
     }
+  }
+
 }

@@ -775,7 +775,9 @@ public class PortalRequestContext extends WebuiRequestContext {
         log.warn("An URI was sent with global site name, it will be replaced by default site to avoid returning HTTP 404");
       }
     }
-    response_.sendRedirect(url);
+    if (!response_.isCommitted()) {
+      response_.sendRedirect(url);
+    }
   }
 
   public void setHeaders(Map<String, String> headers) {

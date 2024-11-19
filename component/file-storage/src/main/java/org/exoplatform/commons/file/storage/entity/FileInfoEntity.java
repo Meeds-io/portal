@@ -1,21 +1,24 @@
 package org.exoplatform.commons.file.storage.entity;
 
-import org.exoplatform.commons.api.persistence.ExoEntity;
-
-import jakarta.persistence.*;
 import java.util.Date;
 
-/**
- * Entity for File Information. Created by The eXo Platform SAS Author :
- * eXoPlatform exo@exoplatform.com
- */
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
+
 @Entity(name = "FileInfoEntity")
-@ExoEntity
 @Table(name = "FILES_FILES")
-@NamedQueries({
-    @NamedQuery(name = "fileEntity.findByChecksum", query = "SELECT t FROM FileInfoEntity t WHERE t.checksum = :checksum"),
-    @NamedQuery(name = "fileEntity.findDeletedFiles", query = "SELECT t FROM FileInfoEntity t WHERE t.deleted = true and t.updatedDate < :updatedDate"),
-    @NamedQuery(name = "fileEntity.getAllByLimitOffset", query = "SELECT t FROM FileInfoEntity t") })
+@NamedQuery(name = "fileEntity.findByChecksum", query = "SELECT t FROM FileInfoEntity t WHERE t.checksum = :checksum AND t.deleted = FALSE")
+@NamedQuery(name = "fileEntity.countByChecksum", query = "SELECT COUNT(t) FROM FileInfoEntity t WHERE t.checksum = :checksum AND t.deleted = FALSE")
 public class FileInfoEntity {
 
   @Id
