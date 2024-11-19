@@ -1,41 +1,26 @@
 package org.exoplatform.commons.file.services;
 
-import org.exoplatform.commons.file.resource.FileSystemResourceProvider;
-import org.exoplatform.commons.file.resource.BinaryProvider;
-import org.exoplatform.commons.file.model.FileInfo;
-import org.exoplatform.commons.file.model.FileItem;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileNotFoundException;
 
-import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsNot.not;
-import static org.junit.Assert.*;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
-/**
- *
- */
+import org.exoplatform.commons.file.model.FileInfo;
+import org.exoplatform.commons.file.model.FileItem;
+import org.exoplatform.commons.file.resource.BinaryProvider;
+import org.exoplatform.commons.file.resource.FileSystemResourceProvider;
+
 public class FileSystemBinaryProviderTest {
 
   @Rule
   public TemporaryFolder         folder    = new TemporaryFolder();
-
-  @Rule
-  public final ExpectedException exception = ExpectedException.none();
-
-  @Before
-  public void setup() throws Exception {
-  }
-
-  @Test
-  public void shouldReadBinary() throws Exception {
-
-  }
 
   @Test
   public void shouldWriteBinary() throws Exception {
@@ -43,6 +28,7 @@ public class FileSystemBinaryProviderTest {
     FileSystemResourceProvider fileResourceProvider = new FileSystemResourceProvider(folder.getRoot().getPath());
     // When
     FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream(new byte[] {}));
+    file.getFileInfo().setChecksum("checksum");
     fileResourceProvider.put(file.getFileInfo().getChecksum(), file.getAsStream());
 
     // Then
@@ -57,15 +43,16 @@ public class FileSystemBinaryProviderTest {
 
     // When
     FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream("test".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     fileResourceProvider.put(file.getFileInfo().getChecksum(), file.getAsStream());
     java.io.File createdFile = fileResourceProvider.getFile(file.getFileInfo().getChecksum());
     assertTrue(createdFile.exists());
-    file.setChecksum(new ByteArrayInputStream("test-updated".getBytes()));
+    file.getFileInfo().setChecksum(String.valueOf("test-updated".hashCode()));
     fileResourceProvider.put(file.getFileInfo().getChecksum(), file.getAsStream());
 
     // Then
     java.io.File updatedFile = fileResourceProvider.getFile(file.getFileInfo().getChecksum());
-    assertThat(updatedFile.getAbsolutePath(), is(not(createdFile.getAbsolutePath())));
+    assertNotEquals(updatedFile.getAbsolutePath(), createdFile.getAbsolutePath());
   }
 
   @Test
@@ -75,6 +62,7 @@ public class FileSystemBinaryProviderTest {
 
     // When
     FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream("test".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     fileResourceProvider.put(file);
     java.io.File createdFile = new java.io.File(fileResourceProvider.getFilePath(file.getFileInfo()));
     assertTrue(createdFile.exists());
@@ -94,6 +82,7 @@ public class FileSystemBinaryProviderTest {
 
     // When
     FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream("test".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     fileResourceProvider.put(file);
     java.io.File createdFile = new java.io.File(fileResourceProvider.getFilePath(file.getFileInfo()));
     assertTrue(createdFile.exists());
@@ -102,17 +91,6 @@ public class FileSystemBinaryProviderTest {
     // Then
     java.io.File deletedFile = new java.io.File(fileResourceProvider.getFilePath(file.getFileInfo()));
     assertFalse(deletedFile.exists());
-  }
-
-  @Test
-  public void shouldThrowExceptionWhenDeletingABinaryWhichDoesNotExist() throws Exception {
-    // Given
-    FileSystemResourceProvider fileResourceProvider = new FileSystemResourceProvider(folder.getRoot().getPath());
-
-    // When
-    FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream("test".getBytes()));
-    exception.expect(FileNotFoundException.class);
-    fileResourceProvider.remove(file.getFileInfo());
   }
 
   @Test

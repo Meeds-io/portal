@@ -1,12 +1,10 @@
 package org.exoplatform.commons.file.model;
 
-import org.apache.commons.io.IOUtils;
-import org.exoplatform.commons.file.services.util.FileChecksum;
-
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+
+import org.apache.commons.io.IOUtils;
 
 /**
  * Object representing a file : information + binary
@@ -23,7 +21,6 @@ public class FileItem {
     this.fileInfo = fileInfo;
     if (inputStream != null) {
       this.data = IOUtils.toByteArray(inputStream);
-      setChecksum(new ByteArrayInputStream(data));
     }
   }
 
@@ -40,7 +37,6 @@ public class FileItem {
     this.fileInfo = new FileInfo(id, name, mimetype, nameSpace, size, updatedDate, updater, null, deleted);
     if (inputStream != null) {
       this.data = IOUtils.toByteArray(inputStream);
-      setChecksum(new ByteArrayInputStream(data));
     }
   }
 
@@ -51,11 +47,12 @@ public class FileItem {
   /**
    * {@inheritDoc}
    */
-  public InputStream getAsStream() throws IOException {
-    if (data != null)
+  public InputStream getAsStream() {
+    if (data != null) {
       return new ByteArrayInputStream(data);
-    else
+    } else {
       return null;
+    }
   }
 
   public byte[] getAsByte(){
@@ -72,10 +69,4 @@ public class FileItem {
     this.fileInfo = fileInfo;
   }
 
-  public void setChecksum(InputStream inputStream) throws Exception {
-      if (inputStream != null) {
-        String checksum = FileChecksum.getChecksum(inputStream);
-        fileInfo.setChecksum(checksum);
-      }
-  }
 }
