@@ -30,10 +30,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.picocontainer.Startable;
 
 import org.exoplatform.commons.cache.future.FutureCache;
@@ -166,7 +165,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
       return;
 
     // init resources
-    cl = Thread.currentThread().getContextClassLoader();
+    cl = portalContainer_.getPortalClassLoader();
     final List<String> initResources = initResources_;
     final Collection<LocaleConfig> localeConfigs = localeService_.getLocalConfigs();
     // Load resources for default local
@@ -194,13 +193,11 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
   }
 
   public ResourceBundle getResourceBundle(String[] name, Locale locale) {
-    ClassLoader cl = Thread.currentThread().getContextClassLoader();
-    return getResourceBundle(name, locale, cl);
+    return getResourceBundle(name, locale, getCurrentClassLoader());
   }
 
   public ResourceBundle getResourceBundle(String name, Locale locale) {
-    ClassLoader cl = Thread.currentThread().getContextClassLoader();
-    return getResourceBundle(name, locale, cl);
+    return getResourceBundle(name, locale, getCurrentClassLoader());
   }
 
   public String[] getSharedResourceBundleNames() {
@@ -209,23 +206,17 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
 
   @Override
   public String getSharedString(String key, Locale locale) {
-    ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-    Thread.currentThread().setContextClassLoader(portalContainer_.getPortalClassLoader());
-    try {
-      String[] sharedResourceBundleNames = getSharedResourceBundleNames();
-      ResourceBundle resourceBundle = getResourceBundle(sharedResourceBundleNames, locale);
+    String[] sharedResourceBundleNames = getSharedResourceBundleNames();
+    ResourceBundle resourceBundle = getResourceBundle(sharedResourceBundleNames, locale);
+    if (resourceBundle.containsKey(key)) {
+      return resourceBundle.getString(key);
+    } else if (!DEFAULT_CROWDIN_LOCALE.equals(locale)) {
+      resourceBundle = getResourceBundle(sharedResourceBundleNames, DEFAULT_CROWDIN_LOCALE);
       if (resourceBundle.containsKey(key)) {
         return resourceBundle.getString(key);
-      } else if (!DEFAULT_CROWDIN_LOCALE.equals(locale)) {
-        resourceBundle = getResourceBundle(sharedResourceBundleNames, DEFAULT_CROWDIN_LOCALE);
-        if (resourceBundle.containsKey(key)) {
-          return resourceBundle.getString(key);
-        }
       }
-      return null;
-    } finally {
-      Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
+    return null;
   }
 
   public ResourceBundleData createResourceBundleDataInstance() {
@@ -387,7 +378,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
 
   protected void loadResourcesForLocale(Locale locale) {
     for (String resource : getInitResources_()) {
-      initResources(resource, locale, cl);
+      initResources(resource, locale, getCurrentClassLoader());
     }
     localeList_.add(locale.toLanguageTag());
   }
@@ -531,7 +522,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
     }
 
     private ResourceBundle getContent(String _name, ResourceBundle parent, Locale defaultLocale) throws Exception {
-      String content = getResourceBundleContent(_name.replace('.', '/'), locale, defaultLocale, cl);
+      String content = getResourceBundleContent(_name.replace('.', '/'), locale, defaultLocale, getCurrentClassLoader());
       if (content != null) {
         ResourceBundleData data = new ResourceBundleData();
         data.setName(_name);
@@ -544,6 +535,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
       }
       return null;
     }
+
   }
 
   /**
@@ -631,5 +623,9 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
       }
       return outputBundled;
     }
+  }
+
+  private ClassLoader getCurrentClassLoader() {
+    return ObjectUtils.firstNonNull(cl, Thread.currentThread().getContextClassLoader());
   }
 }
