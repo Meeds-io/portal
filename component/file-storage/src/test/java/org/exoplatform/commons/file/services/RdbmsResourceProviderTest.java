@@ -1,20 +1,18 @@
 package org.exoplatform.commons.file.services;
 
+import static org.junit.Assert.assertNotEquals;
+
+import java.io.ByteArrayInputStream;
+
+import org.junit.After;
+import org.junit.Before;
+
 import org.exoplatform.commons.file.CommonsJPAIntegrationTest;
 import org.exoplatform.commons.file.model.FileInfo;
 import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.resource.BinaryProvider;
 import org.exoplatform.commons.file.resource.FileUtils;
 import org.exoplatform.commons.file.resource.RdbmsResourceProvider;
-import org.junit.After;
-import org.junit.Before;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-
-import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsNot.not;
-import static org.junit.Assert.*;
 
 /**
  * Rdbms Resource Provider test class.
@@ -42,6 +40,7 @@ public class RdbmsResourceProviderTest extends CommonsJPAIntegrationTest {
     RdbmsResourceProvider rdbmsResourceProvider = new RdbmsResourceProvider(fileBinaryDAO);
     // When
     FileItem file = new FileItem(1L, "file1", "", null, 1, null, "", false, new ByteArrayInputStream(new byte[] {}));
+    file.getFileInfo().setChecksum("checksum");
     rdbmsResourceProvider.put(file.getFileInfo().getChecksum(), file.getAsStream());
 
     // Then
@@ -55,18 +54,18 @@ public class RdbmsResourceProviderTest extends CommonsJPAIntegrationTest {
 
     // When
     FileItem file = new FileItem(1L, "file2", "", null, 1, null, "", false, new ByteArrayInputStream("test2".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     rdbmsResourceProvider.put(file);
     ByteArrayInputStream createdData = (ByteArrayInputStream) rdbmsResourceProvider.getStream(file.getFileInfo().getChecksum());
     assertNotNull(createdData);
 
-    InputStream inputStream =new ByteArrayInputStream("test-updated".getBytes());
-    file.setInputStream(inputStream);
-    file.setChecksum(inputStream);
+    file.setInputStream(new ByteArrayInputStream("test-updated".getBytes()));
+    file.getFileInfo().setChecksum(String.valueOf("test-updated".hashCode()));
     rdbmsResourceProvider.put(file);
 
     // Then
     ByteArrayInputStream updateddData = (ByteArrayInputStream) rdbmsResourceProvider.getStream(file.getFileInfo().getChecksum());
-    assertThat(new String(FileUtils.readBytes(updateddData)), is(not(new String(FileUtils.readBytes(createdData)))));
+    assertNotEquals(new String(FileUtils.readBytes(updateddData)), new String(FileUtils.readBytes(createdData)));
   }
 
   public void testFileAlreadyExistsAndBinaryHasNotChanged() throws Exception {
@@ -75,6 +74,7 @@ public class RdbmsResourceProviderTest extends CommonsJPAIntegrationTest {
 
     // When
     FileItem file = new FileItem(1L, "file3", "", null, 1, null, "", false, new ByteArrayInputStream("test3".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     rdbmsResourceProvider.put(file);
     String created = rdbmsResourceProvider.getFilePath(file.getFileInfo());
     try {
@@ -95,6 +95,7 @@ public class RdbmsResourceProviderTest extends CommonsJPAIntegrationTest {
 
     // When
     FileItem file = new FileItem(1L, "file4", "", null, 1, null, "", false, new ByteArrayInputStream("test4".getBytes()));
+    file.getFileInfo().setChecksum("checksum");
     rdbmsResourceProvider.put(file);
     String created = rdbmsResourceProvider.getFilePath(file.getFileInfo());
     assertNotNull(created);

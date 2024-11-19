@@ -43,9 +43,9 @@ public class FileSystemResourceProvider implements BinaryProvider {
 
   private TreeFileUtils       treeFileUtils   = null;
 
-  public FileSystemResourceProvider(String rootPath) throws Exception {
+  public FileSystemResourceProvider(String rootPath) {
     if (StringUtils.isEmpty(rootPath)) {
-      throw new Exception("Init param '" + ROOT_PATH_PARAM + "' not defined for " + getClass().getSimpleName());
+      throw new IllegalStateException("Init param '" + ROOT_PATH_PARAM + "' not defined for " + getClass().getSimpleName());
     }
 
     if ("/".equals(rootPath)) {
@@ -60,18 +60,18 @@ public class FileSystemResourceProvider implements BinaryProvider {
     treeFileUtils = new TreeFileUtils(new File(rootPath));
   }
 
-  public FileSystemResourceProvider(InitParams initParams) throws Exception {
+  public FileSystemResourceProvider(InitParams initParams) {
     if (initParams == null) {
-      throw new IllegalArgumentException("Init params cannot be null, it must define file system root path in '" + ROOT_PATH_PARAM
-          + "' value param");
+      throw new IllegalArgumentException("Init params cannot be null, it must define file system root path in '" +
+          ROOT_PATH_PARAM + "' value param");
     }
     ValueParam rootPathValueParam = initParams.getValueParam(ROOT_PATH_PARAM);
     if (rootPathValueParam == null) {
-      throw new Exception("Missing init param '" + ROOT_PATH_PARAM + "' for " + getClass().getSimpleName());
+      throw new IllegalStateException("Missing init param '" + ROOT_PATH_PARAM + "' for " + getClass().getSimpleName());
     }
     String rootPath = rootPathValueParam.getValue();
     if (StringUtils.isEmpty(rootPath)) {
-      throw new Exception("Init param '" + ROOT_PATH_PARAM + "' not defined for " + getClass().getSimpleName());
+      throw new IllegalStateException("Init param '" + ROOT_PATH_PARAM + "' not defined for " + getClass().getSimpleName());
     }
 
     if ("/".equals(rootPath)) {
@@ -146,7 +146,7 @@ public class FileSystemResourceProvider implements BinaryProvider {
 
   @Override
   public String getFilePath(FileInfo fileInfo) throws IOException {
-    if (fileInfo == null || StringUtils.isEmpty(fileInfo.getChecksum()) || fileInfo.getChecksum().length() < 9) {
+    if (fileInfo == null || StringUtils.isEmpty(fileInfo.getChecksum())) {
       return null;
     }
     return getFile(fileInfo.getChecksum()).getAbsolutePath();
@@ -225,11 +225,11 @@ public class FileSystemResourceProvider implements BinaryProvider {
     if (this == obj) {
       return true;
     }
-    if (obj instanceof FileSystemResourceProvider) {
-      FileSystemResourceProvider store = (FileSystemResourceProvider) obj;
+    if (obj instanceof FileSystemResourceProvider store) {
       return store.root.equals(root);
+    } else {
+      return false;
     }
-    return false;
   }
 
   @Override

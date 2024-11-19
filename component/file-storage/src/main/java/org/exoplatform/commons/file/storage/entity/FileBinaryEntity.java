@@ -1,20 +1,21 @@
 package org.exoplatform.commons.file.storage.entity;
 
-import org.exoplatform.commons.api.persistence.ExoEntity;
-
-import jakarta.persistence.*;
 import java.util.Date;
 
-/**
- * Entity for Binary DATA File.
- * Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
- */
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
+
 @Entity(name = "FileBinaryEntity")
-@ExoEntity
 @Table(name = "FILES_BINARY")
-@NamedQueries({
-        @NamedQuery(name = "FileBinaryEntity.findByName", query = "SELECT t FROM FileBinaryEntity t WHERE t.name = :name")})
+@NamedQuery(name = "FileBinaryEntity.findByName", query = "SELECT t FROM FileBinaryEntity t WHERE t.name = :name")
 public class FileBinaryEntity {
     @Id
     @Column(name = "BLOB_ID")

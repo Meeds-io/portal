@@ -905,6 +905,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                        fileId,
                        settingKey);
     if (fileId != null
+        && StringUtils.isNotBlank(uploadId)
         && !StringUtils.equals(BRANDING_RESET_ATTACHMENT_ID, uploadId)) {
       // Cleanup old fileId
       fileService.deleteFile(fileId);

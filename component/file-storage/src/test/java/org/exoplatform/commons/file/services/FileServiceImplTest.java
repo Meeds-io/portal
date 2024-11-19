@@ -7,7 +7,6 @@ import org.exoplatform.commons.file.resource.BinaryProvider;
 import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.services.impl.FileServiceImpl;
 import org.exoplatform.commons.file.storage.DataStorage;
-import org.exoplatform.commons.file.storage.dao.OrphanFileDAO;
 import org.exoplatform.commons.file.storage.dao.FileInfoDAO;
 import org.exoplatform.commons.file.storage.dao.NameSpaceDAO;
 import org.exoplatform.commons.file.storage.entity.FileInfoEntity;
@@ -28,6 +27,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.Date;
 
 import static org.junit.Assert.*;
@@ -47,9 +47,6 @@ public class FileServiceImplTest {
   private NameSpaceDAO         nameSpaceDAO;
 
   @Mock
-  private OrphanFileDAO        orphanFileDAO;
-
-  @Mock
   private DataStorage          jpaDataStorage;
 
   @Mock
@@ -66,7 +63,7 @@ public class FileServiceImplTest {
 
   @Mock
   private EntityTransaction    transaction;
-  
+
   @Mock
   private ListenerService      listenerService;
 
@@ -90,16 +87,17 @@ public class FileServiceImplTest {
     BinaryProvider binaryProvider = new FileSystemResourceProvider(folder.getRoot().getAbsolutePath());
     // Given
     lenient().when(nameSpaceDAO.find(anyLong())).thenReturn(new NameSpaceEntity(1, "file", "Default NameSpace"));
-    lenient().when(fileInfoDAO.find(anyLong())).thenReturn(new FileInfoEntity(1,
-                                                                    "file1",
-                                                                    null,
-                                                                    1,
-                                                                    null,
-                                                                    "",
-                                                                    "d41d8cd98f00b204e9800998ecf8427e",
-                                                                    false).setNameSpaceEntity(new NameSpaceEntity(1,
-                                                                                                                  "file",
-                                                                                                                  "Default NameSpace")));
+    lenient().when(fileInfoDAO.find(anyLong()))
+             .thenReturn(new FileInfoEntity(1,
+                                            "file1",
+                                            null,
+                                            1,
+                                            null,
+                                            "",
+                                            "d41d8cd98f00b204e9800998ecf8427e",
+                                            false).setNameSpaceEntity(new NameSpaceEntity(1,
+                                                                                          "file",
+                                                                                          "Default NameSpace")));
     when(jpaDataStorage.getFileInfo(anyLong())).thenReturn(new FileInfo(1L,
                                                                         "file1",
                                                                         null,
@@ -124,15 +122,16 @@ public class FileServiceImplTest {
     // Given
     lenient().when(fileInfoDAO.create(any(FileInfoEntity.class))).thenReturn(new FileInfoEntity());
     lenient().when(jpaDataStorage.getNameSpace(any())).thenReturn(new NameSpace(null, null));
-    lenient().when(jpaDataStorage.create(any(FileInfo.class), any(NameSpace.class))).thenReturn(new FileInfo(1L,
-                                                                                                   "file1",
-                                                                                                   null,
-                                                                                                   "file",
-                                                                                                   1,
-                                                                                                   null,
-                                                                                                   "",
-                                                                                                   "d41d8cd98f00b204e9800998ecf8427e",
-                                                                                                   false));
+    lenient().when(jpaDataStorage.create(any(FileInfo.class), any(NameSpace.class)))
+             .thenReturn(new FileInfo(1L,
+                                      "file1",
+                                      null,
+                                      "file",
+                                      1,
+                                      null,
+                                      "",
+                                      "d41d8cd98f00b204e9800998ecf8427e",
+                                      false));
     FileService fileService = new FileServiceImpl(jpaDataStorage, binaryProvider, nameSpaceService, listenerService);
 
     // When
@@ -150,7 +149,9 @@ public class FileServiceImplTest {
     fileInfo.setId(1L);
     // Then
     verify(jpaDataStorage, times(1)).create(any(FileInfo.class), any(NameSpace.class));
-    verify(listenerService, times(1)).broadcast("file.created", fileInfo, null);
+    verify(listenerService, times(1)).broadcast(eq("file.created"),
+                                                argThat((FileInfo f) -> f.getId() != null && f.getId() > 0),
+                                                eq(null));
   }
 
   @Test
@@ -193,7 +194,7 @@ public class FileServiceImplTest {
     lenient().when(jpaDataStorage.updateFileInfo(any(FileInfo.class))).thenReturn(updatedFileInfo);
 
     lenient().when(jpaDataStorage.getFileInfo(1L))
-            .thenReturn(fileInfo);
+             .thenReturn(fileInfo);
     FileService fileService = new FileServiceImpl(jpaDataStorage, binaryProvider, nameSpaceService, listenerService);
 
     // When
@@ -202,7 +203,6 @@ public class FileServiceImplTest {
     verify(jpaDataStorage, times(1)).updateFileInfo(any(FileInfo.class));
     verify(listenerService, times(1)).broadcast("file.deleted", updatedFileInfo, null);
   }
-  
 
   @Test
   public void shouldRollbackFileWriteWhenSomethingGoesWrong() throws Exception {
@@ -220,7 +220,12 @@ public class FileServiceImplTest {
                                  new Date(),
                                  "john",
                                  false,
-                                 new ByteArrayInputStream("test".getBytes()));
+                                 new ByteArrayInputStream("test".getBytes())) {
+      @Override
+      public InputStream getAsStream() {
+        throw new IllegalStateException();
+      }
+    };
     FileItem createdFile = null;
     try {
       createdFile = fileService.writeFile(file);
