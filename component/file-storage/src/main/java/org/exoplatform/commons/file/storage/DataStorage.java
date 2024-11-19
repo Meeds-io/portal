@@ -18,63 +18,48 @@
  */
 package org.exoplatform.commons.file.storage;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.file.model.FileInfo;
 import org.exoplatform.commons.file.model.NameSpace;
-import org.exoplatform.commons.file.model.OrphanFile;
 import org.exoplatform.commons.file.storage.dao.FileInfoDAO;
 import org.exoplatform.commons.file.storage.dao.NameSpaceDAO;
-import org.exoplatform.commons.file.storage.dao.OrphanFileDAO;
 import org.exoplatform.commons.file.storage.entity.FileInfoEntity;
 import org.exoplatform.commons.file.storage.entity.NameSpaceEntity;
-import org.exoplatform.commons.file.storage.entity.OrphanFileEntity;
-
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
 
 /**
  * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
  */
 public class DataStorage {
+
   private FileInfoDAO   fileInfoDAO;
 
   private NameSpaceDAO  nameSpaceDAO;
 
-  private OrphanFileDAO orphanFileDAO;
-
-  public DataStorage(FileInfoDAO fileInfoDAO, NameSpaceDAO nameSpaceDAO, OrphanFileDAO orphanFileDAO) {
+  public DataStorage(FileInfoDAO fileInfoDAO,
+                     NameSpaceDAO nameSpaceDAO) {
     this.fileInfoDAO = fileInfoDAO;
     this.nameSpaceDAO = nameSpaceDAO;
-    this.orphanFileDAO = orphanFileDAO;
   }
 
   public FileInfo getFileInfo(long id) {
     FileInfoEntity fileInfoEntity = fileInfoDAO.find(id);
     return convertFileEntityToFileInfo(fileInfoEntity);
   }
-  
+
   public List<FileInfo> getFileInfoListByChecksum(String checksum) {
     List<FileInfoEntity> result = fileInfoDAO.findFilesByChecksum(checksum);
-    List<FileInfo> fileInfoList = new ArrayList<FileInfo>();
+    List<FileInfo> fileInfoList = new ArrayList<>();
     for (FileInfoEntity fileInfoEntity : result) {
       fileInfoList.add(convertFileEntityToFileInfo(fileInfoEntity));
     }
     return fileInfoList;
   }
-  
-  public List<FileInfo> getAllFilesInfo(int offset, int limit) {
-    List<FileInfoEntity> result = fileInfoDAO.findAllByPage(offset, limit);
-    List<FileInfo> listFilesInfo = new ArrayList<FileInfo>();
-    for (FileInfoEntity f : result) {
-      listFilesInfo.add(convertFileEntityToFileInfo(f));
-    }
-    return listFilesInfo;
-  }
-    
+
   public int sharedChecksum(String checksum) {
-    List<FileInfoEntity> result = fileInfoDAO.findFilesByChecksum(checksum);
-    return result.size();
+    return fileInfoDAO.countFilesByChecksum(checksum);
   }
 
   public NameSpace getNameSpace(long id) {
@@ -144,69 +129,20 @@ public class DataStorage {
     fileInfoDAO.delete(fileInfoEntity);
   }
 
-  public void createOrphanFile(FileInfo fileInfo) {
-    FileInfoEntity fileInfoEntity = new FileInfoEntity(fileInfo.getId(),
-                                                       fileInfo.getName(),
-                                                       fileInfo.getMimetype(),
-                                                       fileInfo.getSize(),
-                                                       fileInfo.getUpdatedDate(),
-                                                       fileInfo.getUpdater(),
-                                                       fileInfo.getChecksum(),
-                                                       fileInfo.isDeleted());
-
-    OrphanFileEntity deletedFileEntity = new OrphanFileEntity();
-    deletedFileEntity.setChecksum(fileInfo.getChecksum());
-    deletedFileEntity.setFileInfoEntity(fileInfoEntity);
-    deletedFileEntity.setDeletedDate(new Date());
-    orphanFileDAO.create(deletedFileEntity);
-  }
-
-  public void deleteOrphanFile(long id) {
-    OrphanFileEntity orphanFileEntity = orphanFileDAO.find(id);
-    if (orphanFileEntity != null) {
-      orphanFileDAO.delete(orphanFileEntity);
-    }
-  }
-
-  public List<FileInfo> getAllDeletedFiles(Date date) {
-    List<FileInfoEntity> result = fileInfoDAO.findDeletedFiles(date);
-    List<FileInfo> fileInfoList = new ArrayList<FileInfo>();
-    for (FileInfoEntity f : result) {
-      FileInfo obj = convertFileEntityToFileInfo(f);
-      if (obj != null) {
-        fileInfoList.add(convertFileEntityToFileInfo(f));
-      }
-    }
-    return fileInfoList;
-  }
-
-  public List<OrphanFile> getAllOrphanFile(Date date) {
-    List<OrphanFileEntity> result = orphanFileDAO.findDeletedFiles(date);
-    List<OrphanFile> orphanFileList = new ArrayList<OrphanFile>();
-    for (OrphanFileEntity o : result) {
-      OrphanFile file = convertOrphanFileEntity(o);
-      if (file != null) {
-        orphanFileList.add(file);
-      }
-    }
-    return orphanFileList;
-  }
-
   private FileInfo convertFileEntityToFileInfo(FileInfoEntity fileInfoEntity) {
-    if (fileInfoEntity == null) {
+    if (fileInfoEntity == null || fileInfoEntity.isDeleted()) {
       return null;
     }
 
-    FileInfo fileInfo = new FileInfo(fileInfoEntity.getId(),
-                                     fileInfoEntity.getName(),
-                                     fileInfoEntity.getMimetype(),
-                                     fileInfoEntity.getNameSpaceEntity().getName(),
-                                     fileInfoEntity.getSize(),
-                                     fileInfoEntity.getUpdatedDate(),
-                                     fileInfoEntity.getUpdater(),
-                                     fileInfoEntity.getChecksum(),
-                                     fileInfoEntity.isDeleted());
-    return fileInfo;
+    return new FileInfo(fileInfoEntity.getId(),
+                        fileInfoEntity.getName(),
+                        fileInfoEntity.getMimetype(),
+                        fileInfoEntity.getNameSpaceEntity().getName(),
+                        fileInfoEntity.getSize(),
+                        fileInfoEntity.getUpdatedDate(),
+                        fileInfoEntity.getUpdater(),
+                        fileInfoEntity.getChecksum(),
+                        fileInfoEntity.isDeleted());
   }
 
   private NameSpace convertNameSpace(NameSpaceEntity nameSpaceEntity) {
@@ -214,22 +150,6 @@ public class DataStorage {
       return null;
     }
     return new NameSpace(nameSpaceEntity.getId(), nameSpaceEntity.getName(), nameSpaceEntity.getDescription());
-  }
-
-  private OrphanFile convertOrphanFileEntity(OrphanFileEntity orphanFileEntity) {
-    if (orphanFileEntity == null)
-      return null;
-    OrphanFile orphanFile;
-    if (orphanFileEntity.getFileInfoEntity() != null) {
-      orphanFile = new OrphanFile(orphanFileEntity.getId(),
-                                  orphanFileEntity.getFileInfoEntity().getId(),
-                                  orphanFileEntity.getChecksum(),
-                                  orphanFileEntity.getDeletedDate());
-    } else {
-      orphanFile =
-                 new OrphanFile(orphanFileEntity.getId(), -1, orphanFileEntity.getChecksum(), orphanFileEntity.getDeletedDate());
-    }
-    return orphanFile;
   }
 
 }

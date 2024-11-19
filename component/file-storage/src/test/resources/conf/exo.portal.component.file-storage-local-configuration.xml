@@ -30,11 +30,6 @@
     <type>org.exoplatform.commons.file.storage.dao.impl.NameSpaceDAOImpl</type>
   </component>
   <component>
-    <key>org.exoplatform.commons.file.storage.dao.OrphanFileDAO</key>
-    <type>org.exoplatform.commons.file.storage.dao.impl.OrphanFileDAOImpl</type>
-  </component>
-
-  <component>
     <key>org.exoplatform.commons.file.storage.dao.FileBinaryDAO</key>
     <type>org.exoplatform.commons.file.storage.dao.impl.FileBinaryDAOImpl</type>
   </component>
@@ -85,11 +80,6 @@
     </init-params>
   </component>
 
-  <component>
-    <key>org.exoplatform.commons.file.services.checker.FileStorageCheckController</key>
-    <type>org.exoplatform.commons.file.services.checker.FileStorageCheckController</type>
-  </component>
-
   <external-component-plugins>
     <target-component>org.exoplatform.commons.file.services.NameSpaceService</target-component>
     <component-plugin>
@@ -104,32 +94,6 @@
         </properties-param>
       </init-params>
     </component-plugin>
-  </external-component-plugins>
-
-  <external-component-plugins>
-        <target-component>org.exoplatform.services.scheduler.JobSchedulerService</target-component>
-        <component-plugin profiles="all">
-            <name>AddCronJob</name>
-            <set-method>addCronJob</set-method>
-            <type>org.exoplatform.commons.file.services.job.FileStorageCronJob</type>
-            <description>add clean unused files job to the JobSchedulerService</description>
-            <init-params>
-                <properties-param>
-                    <name>cronjob.info</name>
-                    <description>Configuration for remove unused files</description>
-                    <property name="jobName" value="FileStorageCleanJob"/>
-                    <property name="groupName" value="FileStorage"/>
-                    <property name="job" value="org.exoplatform.commons.file.services.job.FileStorageCleanJob"/>
-                    <property name="expression" value="${exo.commons.FileStorageCleanJob.expression:0 0 11 ? * SUN}"/>
-                </properties-param>
-                <properties-param>
-                    <name>FileStorageCleanJob.Param</name>
-                    <description>General parameters for job</description>
-                    <property name="retention-time" value="${exo.commons.FileStorageCleanJob.retention-time:30}"/>
-                    <property name="enabled" value="${exo.commons.FileStorageCleanJob.enabled:true}"/>
-                </properties-param>
-            </init-params>
-        </component-plugin>
   </external-component-plugins>
 
     <!-- Data Initialization for ES -->
