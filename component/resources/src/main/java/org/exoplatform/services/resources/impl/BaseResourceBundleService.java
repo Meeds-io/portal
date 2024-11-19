@@ -30,8 +30,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.picocontainer.Startable;
@@ -166,7 +164,7 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
       return;
 
     // init resources
-    cl = Thread.currentThread().getContextClassLoader();
+    cl = portalContainer_.getPortalClassLoader();
     final List<String> initResources = initResources_;
     final Collection<LocaleConfig> localeConfigs = localeService_.getLocalConfigs();
     // Load resources for default local
@@ -194,12 +192,10 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
   }
 
   public ResourceBundle getResourceBundle(String[] name, Locale locale) {
-    ClassLoader cl = Thread.currentThread().getContextClassLoader();
     return getResourceBundle(name, locale, cl);
   }
 
   public ResourceBundle getResourceBundle(String name, Locale locale) {
-    ClassLoader cl = Thread.currentThread().getContextClassLoader();
     return getResourceBundle(name, locale, cl);
   }
 
@@ -209,23 +205,17 @@ public abstract class BaseResourceBundleService implements ResourceBundleService
 
   @Override
   public String getSharedString(String key, Locale locale) {
-    ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-    Thread.currentThread().setContextClassLoader(portalContainer_.getPortalClassLoader());
-    try {
-      String[] sharedResourceBundleNames = getSharedResourceBundleNames();
-      ResourceBundle resourceBundle = getResourceBundle(sharedResourceBundleNames, locale);
+    String[] sharedResourceBundleNames = getSharedResourceBundleNames();
+    ResourceBundle resourceBundle = getResourceBundle(sharedResourceBundleNames, locale);
+    if (resourceBundle.containsKey(key)) {
+      return resourceBundle.getString(key);
+    } else if (!DEFAULT_CROWDIN_LOCALE.equals(locale)) {
+      resourceBundle = getResourceBundle(sharedResourceBundleNames, DEFAULT_CROWDIN_LOCALE);
       if (resourceBundle.containsKey(key)) {
         return resourceBundle.getString(key);
-      } else if (!DEFAULT_CROWDIN_LOCALE.equals(locale)) {
-        resourceBundle = getResourceBundle(sharedResourceBundleNames, DEFAULT_CROWDIN_LOCALE);
-        if (resourceBundle.containsKey(key)) {
-          return resourceBundle.getString(key);
-        }
       }
-      return null;
-    } finally {
-      Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
+    return null;
   }
 
   public ResourceBundleData createResourceBundleDataInstance() {
