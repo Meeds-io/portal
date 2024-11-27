@@ -1055,25 +1055,6 @@ public class UIPortalApplication extends UIApplication {
   }
 
   /**
-   * @return true if user prefers sticky menu, else false
-   */
-  public boolean isMenuSticky() {
-    PortalRequestContext context = Util.getPortalRequestContext();
-    if (StringUtils.isBlank(context.getRemoteUser())) {
-      return false;
-    } else {
-      SettingValue<?> stickySettingValue =
-                                         getApplicationComponent(SettingService.class).get(Context.USER.id(context.getRemoteUser()),
-                                                                                           Scope.APPLICATION.id("HamburgerMenu"),
-                                                                                           "Sticky");
-      return stickySettingValue == null ?
-                                        Boolean.parseBoolean(System.getProperty("io.meeds.userPrefs.HamburgerMenu.sticky",
-                                                                                "false")) :
-                                        Boolean.parseBoolean(stickySettingValue.getValue().toString());
-    }
-  }
-
-  /**
    * Return the portal url template which will be sent to client ( browser ) and
    * used for JS based portal url generation.
    * <p>
@@ -1083,20 +1064,18 @@ public class UIPortalApplication extends UIApplication {
    * ;}
    *
    * @return return portal url template
-   * @throws UnsupportedEncodingException
    */
-  public String getPortalURLTemplate() throws UnsupportedEncodingException {
+  public String getPortalURLTemplate() {
     PortalRequestContext pcontext = Util.getPortalRequestContext();
     ComponentURL urlTemplate = pcontext.createURL(ComponentURL.TYPE);
     urlTemplate.setMimeType(MimeType.PLAIN);
     urlTemplate.setPath(pcontext.getNodePath());
     urlTemplate.setResource(EMPTY_COMPONENT);
     urlTemplate.setAction("_portal:action_");
-
     return urlTemplate.toString();
   }
 
-  public String getBaseURL() throws UnsupportedEncodingException {
+  public String getBaseURL() {
     PortalRequestContext pcontext = Util.getPortalRequestContext();
     NodeURL nodeURL = pcontext.createURL(NodeURL.TYPE,
                                          new NavigationResource(pcontext.getSiteKey(), pcontext.getNodePath()));
