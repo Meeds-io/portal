@@ -115,6 +115,10 @@ public class UserPortalConfigService implements Startable {
 
   private PortalConfig            metaPortalConfig;
 
+  @Getter
+  @Setter
+  private boolean                 allowUserHome                  = true;
+
   protected final SiteFilter      siteFilter                     = new SiteFilter(SiteType.PORTAL,
                                                                                   null,
                                                                                   null,
@@ -484,7 +488,7 @@ public class UserPortalConfigService implements Startable {
    * @return User home page uri preference
    */
   public String getUserHomePage(String username) {
-    if (StringUtils.isBlank(username)) {
+    if (StringUtils.isBlank(username) || !allowUserHome) {
       return null;
     } else {
       SettingValue<?> homePageSettingValue = settingService.get(Context.USER.id(username),
