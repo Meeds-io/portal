@@ -402,7 +402,7 @@ public class UserPortalImpl implements UserPortal {
     if (scope.score > 0) {
       UserNode ret = scope.userNode;
       if (ret != null && !StringUtils.equals(scope.userNode.getURI(), ret.getURI())) {
-        UserNode globalNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
+        UserNode globalNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments, scope.score);
         if (globalNode != null) {
           return globalNode;
         }
@@ -410,15 +410,15 @@ public class UserPortalImpl implements UserPortal {
       if (ret != null) {
         ret.owner.filterConfig.path = null;
         if (!segments[segments.length - 1].equals(ret.getName())) {
-          globalUserNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
-          if (globalUserNode != null && segments[segments.length - 1].equals(globalUserNode.getName())) {
+          globalUserNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments, scope.score);
+          if (globalUserNode != null) {
             ret = globalUserNode;
           }
         }
         return ret;
       }
     }
-    return globalUserNode == null ? getGlobalUserNode(filterConfig, navigation.getKey(), segments) : globalUserNode;
+    return globalUserNode == null ? getGlobalUserNode(filterConfig, navigation.getKey(), segments, scope.score) : globalUserNode;
   }
 
   @Override
@@ -569,12 +569,12 @@ public class UserPortalImpl implements UserPortal {
                  .toList();
   }
 
-  protected UserNode getGlobalUserNode(UserNodeFilterConfig filterConfig, SiteKey siteKey, String[] segments) {
+  protected UserNode getGlobalUserNode(UserNodeFilterConfig filterConfig, SiteKey siteKey, String[] segments, int score) {
     UserNavigation globalNavigation = getNavigation(SiteKey.portal(this.service.getGlobalPortal()));
     if (globalNavigation != null) {
       MatchingScope globalScope = new MatchingScope(globalNavigation, filterConfig, segments);
       globalScope.resolve();
-      if (globalScope.score > 0) {
+      if (globalScope.score > 0 && globalScope.score > score) {
         UserNode globalNode = globalScope.userNode;
         if (globalNode != null) {
           globalNode.owner.filterConfig.path = null;
