@@ -411,7 +411,7 @@ public class UserPortalImpl implements UserPortal {
         ret.owner.filterConfig.path = null;
         if (!segments[segments.length - 1].equals(ret.getName())) {
           globalUserNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
-          if (globalUserNode != null && segments[segments.length - 1].equals(globalUserNode.getName())) {
+          if (globalUserNode != null) {
             ret = globalUserNode;
           }
         }
