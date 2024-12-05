@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
@@ -71,10 +70,7 @@ import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.services.security.Authenticator;
 import org.exoplatform.services.security.ConversationState;
-import org.exoplatform.services.test.mock.MockHttpServletRequest;
-import org.exoplatform.test.mocks.servlet.MockServletRequest;
 
-import jakarta.servlet.http.HttpServletRequest;
 import junit.framework.AssertionFailedError;
 import lombok.SneakyThrows;
 
@@ -83,12 +79,12 @@ import lombok.SneakyThrows;
  * @version $Revision$
  */
 @ConfiguredBy({
-                @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
-                @ConfigurationUnit(scope = ContainerScope.PORTAL,
-                                   path = "conf/exo.portal.component.portal-configuration-local.xml"),
-                @ConfigurationUnit(scope = ContainerScope.PORTAL,
-                                   path = "org/exoplatform/portal/config/conf/configuration.xml") })
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.portal-configuration-local.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/config/conf/configuration.xml") })
 public class TestUserPortalConfigService extends AbstractConfigTest {
+
+  private static final String     DEFAULT_CLASSIC_HOME = "/portal/classic/home";
 
   /** . */
   private UserPortalConfigService userPortalConfigService;
@@ -341,24 +337,14 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         assertEquals(PortalConfig.PORTAL_TYPE, portalCfg.getType());
         assertEquals("test2", portalCfg.getName());
 
-        String path = userPortalConfigService.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
-          @Override
-          public String getRemoteUser() {
-            return "root";
-          }
-        });
+        String path = userPortalConfigService.getDefaultSitePath("test2", "mary");
         assertEquals("/portal/test2/test", path);
 
         restartTransaction();
         layoutService.remove(PageKey.parse("portal::test2::test"));
         restartTransaction();
 
-        path = userPortalConfigService.computePortalSitePath("test2", new MockServletRequest(null, Locale.ENGLISH) {
-          @Override
-          public String getRemoteUser() {
-            return "root";
-          }
-        });
+        path = userPortalConfigService.getDefaultSitePath("test2", "mary");
         assertEquals("/portal/test2/home/page", path);
       }
     }.execute("root");
@@ -425,30 +411,12 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortal userPortal = userPortalCfg.getUserPortal();
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
-        assertEquals("expected to have 4 navigations instead of " + navigations, 4, navigations.size());
+        assertEquals("expected to have 5 navigations instead of " + navigations, 5, navigations.size());
         assertTrue(navigations.containsKey("portal::classic"));
+        assertTrue(navigations.containsKey("portal::systemportal"));
         assertTrue(navigations.containsKey("group::/platform/administrators"));
         assertTrue(navigations.containsKey("group::/platform/users"));
         assertTrue(navigations.containsKey("group::/organization/management/executive-board"));
-      }
-    }.execute("root");
-  }
-
-  public void testGetSites() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        userPortalConfigService.removeUserPortalConfig("jazz");
-        int size = userPortalConfigService.getUserPortalSites("root").size();
-        assertTrue(size >= 5);
-
-        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
-        userPortalConfigService.setGlobalPortal("system");
-        userPortalConfigService.siteFilter.setExcludedSiteName(userPortalConfigService.getGlobalPortal());
-        try {
-          assertEquals(size - 1, userPortalConfigService.getUserPortalSites("root").size());
-        } finally {
-          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
-        }
       }
     }.execute("root");
   }
@@ -466,7 +434,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
         assertTrue(navigations.containsKey("portal::classic"));
-        assertFalse(navigations.containsKey("portal::" + userPortalConfigService.getGlobalPortal()));
+        assertTrue(navigations.containsKey("portal::" + userPortalConfigService.getGlobalPortal()));
 
         String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
         userPortalConfigService.setGlobalPortal("system");
@@ -514,12 +482,12 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
           nodes = userPortal.getNodes(SiteType.PORTAL, Scope.ALL, filterConfig);
           assertNotNull(nodes);
 
-          assertEquals(initialNodesSize + 1, nodes.size());
+          assertEquals(initialNodesSize, nodes.size());
           UserNode homeNode = nodes.iterator().next();
           assertEquals("home", homeNode.getName());
           assertEquals("classic", homeNode.getNavigation().getKey().getName());
 
-          UserNode lastUserNode = new ArrayList<>(nodes).get(initialNodesSize);
+          UserNode lastUserNode = new ArrayList<>(nodes).get(initialNodesSize - 1);
           assertEquals("systemhome", lastUserNode.getName());
           assertEquals("systemtest", lastUserNode.getNavigation().getKey().getName());
         } finally {
@@ -574,44 +542,6 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }.execute("root");
   }
 
-  public void testGetGlobalUserNode() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
-        assertNotNull(userPortalCfg);
-
-        PortalConfig portalCfg = userPortalCfg.getPortalConfig();
-        assertNotNull(portalCfg);
-
-        UserPortal userPortal = userPortalCfg.getUserPortal();
-        assertNotNull(userPortal);
-
-        UserNodeFilterConfig.Builder filterConfigBuilder = UserNodeFilterConfig.builder();
-        filterConfigBuilder.withReadWriteCheck().withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL);
-        filterConfigBuilder.withTemporalCheck();
-        UserNodeFilterConfig filterConfig = filterConfigBuilder.build();
-
-        UserNode userNode = userPortal.resolvePath(filterConfig, "systemhome");
-        assertNotNull(userNode);
-        assertEquals("home", userNode.getName());
-
-        String originalGlobalPortal = userPortalConfigService.getGlobalPortal();
-        userPortalConfigService.setGlobalPortal("systemtest");
-        try {
-          userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "john");
-          portalCfg = userPortalCfg.getPortalConfig();
-          userPortal = userPortalCfg.getUserPortal();
-          userNode = userPortal.resolvePath(filterConfig, "systemhome");
-
-          assertNotNull(userNode);
-          assertEquals("systemhome", userNode.getName());
-        } finally {
-          userPortalConfigService.setGlobalPortal(originalGlobalPortal);
-        }
-      }
-    }.execute("root");
-  }
-
   public void testJohnGetUserPortalConfig() {
     new UnitTest() {
       public void execute() throws Exception {
@@ -624,7 +554,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortal userPortal = userPortalCfg.getUserPortal();
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
-        assertEquals("expected to have 4 navigations instead of " + navigations, 4, navigations.size());
+        assertEquals("expected to have 5 navigations instead of " + navigations, 5, navigations.size());
         assertTrue(navigations.containsKey("portal::classic"));
         assertTrue(navigations.containsKey("group::/platform/administrators"));
         assertTrue(navigations.containsKey("group::/platform/users"));
@@ -644,7 +574,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortal userPortal = userPortalCfg.getUserPortal();
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
-        assertEquals(2, navigations.size());
+        assertEquals(3, navigations.size());
         assertTrue(navigations.containsKey("portal::classic"));
         assertTrue(navigations.containsKey("group::/platform/users"));
       }
@@ -663,7 +593,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortal userPortal = userPortalCfg.getUserPortal();
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
-        assertEquals("" + navigations, 1, navigations.size());
+        assertEquals("" + navigations, 2, navigations.size());
         assertTrue(navigations.containsKey("portal::classic"));
       }
     }.execute(null);
@@ -686,7 +616,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("classic", "root");
         UserPortal userPortal = userPortalCfg.getUserPortal();
         List<UserNavigation> navigations = userPortal.getNavigations();
-        assertEquals("expected to have 4 navigations instead of " + navigations, 4, navigations.size());
+        assertEquals("expected to have 5 navigations instead of " + navigations, 5, navigations.size());
         assertEquals("classic", navigations.get(0).getKey().getName());
         assertEquals("/platform/administrators", navigations.get(1).getKey().getName());
         assertEquals("/organization/management/executive-board", navigations.get(2).getKey().getName());
@@ -708,7 +638,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         UserPortal userPortal = userPortalCfg.getUserPortal();
         assertNotNull(userPortal.getNavigations());
         Map<String, UserNavigation> navigations = toMap(userPortal);
-        assertEquals("expected to have 4 navigations instead of " + navigations, 4, navigations.size());
+        assertEquals("expected to have 5 navigations instead of " + navigations, 5, navigations.size());
         assertTrue(navigations.containsKey("portal::jazz"));
         assertTrue(navigations.containsKey("group::/platform/administrators"));
         assertTrue(navigations.containsKey("group::/organization/management/executive-board"));
@@ -725,20 +655,6 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
         }
       }
 
-    }.execute("root");
-  }
-
-  public void testRemoveUserPortalConfig() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, "jazz", "test");
-        UserPortalConfig userPortalCfg = userPortalConfigService.getUserPortalConfig("jazz", "root");
-        assertNotNull(userPortalCfg);
-        restartTransaction();
-        userPortalConfigService.removeUserPortalConfig("jazz");
-        restartTransaction();
-        assertNull(userPortalConfigService.getUserPortalConfig("jazz", "root"));
-      }
     }.execute("root");
   }
 
@@ -791,28 +707,67 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }.execute(null);
   }
 
-  public void testGetPortalSiteRootNodeAndFirstAllowedPageNode() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        String siteName = "classic";
-        HttpServletRequest httpRequest = new MockHttpServletRequest("/portal/classic", null, 0, "GET", null);
-        UserNode rootNode = userPortalConfigService.getPortalSiteRootNode(siteName, SiteType.PORTAL.getName(), httpRequest);
-        assertNotNull(rootNode);
-      }
-    }.execute(null);
+  public void testGetUserHomePage() {
+    assertNull(userPortalConfigService.getUserHomePage(null));
+    assertNull(userPortalConfigService.getUserHomePage("john"));
+    assertNull(userPortalConfigService.getUserHomePage("NotExisting"));
+    assertEquals("/portal/test2/home/page", userPortalConfigService.getDefaultPath("john"));
 
+    userPortalConfigService.setUserHomePage("john", "/portal");
+    assertEquals("/portal", userPortalConfigService.getUserHomePage("john"));
+    assertEquals("/portal", userPortalConfigService.getDefaultPath("john"));
   }
 
-  public void testGetFirstAllowedPageNode() {
-    new UnitTest() {
-      public void execute() throws Exception {
-        String siteName = "classic";
-        HttpServletRequest httpRequest = new MockHttpServletRequest("/portal/classic", null, 0, null, null);
-        String path = userPortalConfigService.getFirstAllowedPageNode(siteName, SiteType.PORTAL.getName(), "home", httpRequest);
-        assertNotNull(path);
-      }
-    }.execute(null);
+  public void testGetDefaultSitePath() {
+    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", null));
+    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "NotExisting"));
+    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "john"));
+    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "james"));
+  }
 
+  public void testGetSiteNodeOrGlobalNode() {
+    UserNode userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", null);
+    assertEquals("home", userNode.getURI());
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "Notfound", null);
+    assertEquals("home", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", null);
+    assertEquals("home", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", "NotExisting");
+    assertEquals("home", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", "NotExisting");
+    assertEquals("home", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", "john");
+    assertEquals("home", userNode.getURI());
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode", "john");
+    assertEquals("home/subnode", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode2", "john");
+    assertEquals("home/subnode2", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", "john");
+    assertEquals("webexplorer", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode233", "john");
+    assertEquals("home", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", "mary");
+    assertEquals("home", userNode.getURI());
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode", "mary");
+    assertEquals("home/subnode", userNode.getURI());
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode2", "mary");
+    assertEquals("home/subnode2", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", "john");
+    assertEquals("webexplorer", userNode.getURI());
+
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", null);
+    assertEquals("home", userNode.getURI());
+
+    assertNull(userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "NotFound", "home/subnode233", "mary"));
   }
 
   private static Map<String, UserNavigation> toMap(UserPortal cfg) {

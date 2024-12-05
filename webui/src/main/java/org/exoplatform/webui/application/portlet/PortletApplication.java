@@ -262,7 +262,6 @@ public class PortletApplication extends WebuiApplication {
                 UIPortletApplication uiPortletApp = (UIPortletApplication) uiApp;
                 uiPortletApp.processRender(this, context);
             }
-            uiApp.setLastAccessApplication(System.currentTimeMillis());
 
             // Store ui root
             sm.storeUIRootComponent(context);

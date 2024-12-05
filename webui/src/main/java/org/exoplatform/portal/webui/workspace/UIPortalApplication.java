@@ -19,59 +19,24 @@
 
 package org.exoplatform.portal.webui.workspace;
 
+import java.io.IOException;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-
-import org.exoplatform.commons.api.settings.SettingService;
-import org.exoplatform.commons.api.settings.SettingValue;
-import org.exoplatform.commons.api.settings.data.Context;
-import org.exoplatform.commons.api.settings.data.Scope;
-import org.exoplatform.commons.utils.PropertyManager;
-import org.exoplatform.commons.utils.Safe;
-import org.exoplatform.container.PortalContainer;
-import org.exoplatform.portal.application.PortalRequestContext;
-import org.exoplatform.portal.application.RequestNavigationData;
-import org.exoplatform.portal.branding.BrandingService;
-import org.exoplatform.portal.config.UserPortalConfig;
-import org.exoplatform.portal.config.UserPortalConfigService;
-import org.exoplatform.portal.config.model.Container;
-import org.exoplatform.portal.config.model.PortalConfig;
-import org.exoplatform.portal.mop.SiteKey;
-import org.exoplatform.portal.mop.SiteType;
-import org.exoplatform.portal.mop.service.LayoutService;
-import org.exoplatform.portal.resource.*;
-import org.exoplatform.portal.webui.application.UIPortlet;
-import org.exoplatform.portal.webui.page.UIPage;
-import org.exoplatform.portal.webui.page.UIPageActionListener.ChangeNodeActionListener;
-import org.exoplatform.portal.webui.page.UISiteBody;
-import org.exoplatform.portal.webui.portal.PageNodeEvent;
-import org.exoplatform.portal.webui.portal.UIPortal;
-import org.exoplatform.portal.webui.portal.UISharedLayout;
-import org.exoplatform.portal.webui.util.PortalDataMapper;
-import org.exoplatform.portal.webui.util.Util;
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.resources.LocaleConfig;
-import org.exoplatform.services.resources.LocaleConfigService;
-import org.exoplatform.services.resources.LocaleContextInfo;
-import org.exoplatform.services.resources.Orientation;
-import org.exoplatform.web.ControllerContext;
-import org.exoplatform.web.application.JavascriptManager;
-import org.exoplatform.web.application.RequestContext;
-import org.exoplatform.web.application.javascript.JavascriptConfigParser;
-import org.exoplatform.web.application.javascript.JavascriptConfigService;
-import org.exoplatform.web.url.MimeType;
-import org.exoplatform.web.url.navigation.NavigationResource;
-import org.exoplatform.web.url.navigation.NodeURL;
-import org.exoplatform.webui.application.WebuiRequestContext;
-import org.exoplatform.webui.config.annotation.ComponentConfig;
-import org.exoplatform.webui.config.annotation.EventConfig;
-import org.exoplatform.webui.core.UIApplication;
-import org.exoplatform.webui.core.UIComponent;
-import org.exoplatform.webui.core.UIComponentDecorator;
-import org.exoplatform.webui.core.UIContainer;
-import org.exoplatform.webui.event.Event;
-import org.exoplatform.webui.url.ComponentURL;
-
 import org.gatein.pc.portlet.impl.info.ContainerPortletInfo;
 import org.gatein.portal.controller.resource.ResourceId;
 import org.gatein.portal.controller.resource.ResourceScope;
@@ -81,12 +46,44 @@ import org.gatein.portal.controller.resource.script.Module;
 import org.gatein.portal.controller.resource.script.ScriptResource;
 import org.json.JSONObject;
 
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import org.exoplatform.container.PortalContainer;
+import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.branding.BrandingService;
+import org.exoplatform.portal.config.UserPortalConfigService;
+import org.exoplatform.portal.config.model.Container;
+import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.service.LayoutService;
+import org.exoplatform.portal.mop.user.UserNode;
+import org.exoplatform.portal.resource.Skin;
+import org.exoplatform.portal.resource.SkinConfig;
+import org.exoplatform.portal.resource.SkinService;
+import org.exoplatform.portal.resource.SkinURL;
+import org.exoplatform.portal.resource.SkinVisitor;
+import org.exoplatform.portal.webui.application.UIPortlet;
+import org.exoplatform.portal.webui.page.UIPage;
+import org.exoplatform.portal.webui.portal.UIPortal;
+import org.exoplatform.portal.webui.portal.UISharedLayout;
+import org.exoplatform.portal.webui.util.PortalDataMapper;
+import org.exoplatform.portal.webui.util.Util;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
+import org.exoplatform.services.resources.Orientation;
+import org.exoplatform.web.application.JavascriptManager;
+import org.exoplatform.web.application.javascript.JavascriptConfigParser;
+import org.exoplatform.web.application.javascript.JavascriptConfigService;
+import org.exoplatform.web.url.MimeType;
+import org.exoplatform.web.url.navigation.NavigationResource;
+import org.exoplatform.web.url.navigation.NodeURL;
+import org.exoplatform.webui.application.WebuiRequestContext;
+import org.exoplatform.webui.config.annotation.ComponentConfig;
+import org.exoplatform.webui.core.UIApplication;
+import org.exoplatform.webui.core.UIComponent;
+import org.exoplatform.webui.core.UIComponentDecorator;
+import org.exoplatform.webui.core.UIContainer;
+import org.exoplatform.webui.url.ComponentURL;
+
+import lombok.SneakyThrows;
 
 /**
  * This extends the UIApplication and hence is a sibling of UIPortletApplication
@@ -97,18 +94,10 @@ import java.util.stream.Stream;
  * display the normal or webos portal layouts - UIPopupWindow: a popup window
  * that display or not
  */
-@ComponentConfig(lifecycle = UIPortalApplicationLifecycle.class,
-                 template = "system:/groovy/portal/webui/workspace/UIPortalApplication.gtmpl",
-                 events = { @EventConfig(listeners = ChangeNodeActionListener.class, csrfCheck = false) })
-@SuppressWarnings("rawtypes")
+@ComponentConfig(lifecycle = UIPortalApplicationLifecycle.class, template = "system:/groovy/portal/webui/workspace/UIPortalApplication.gtmpl")
 public class UIPortalApplication extends UIApplication {
 
-  /**
-   * Property settable in the portal'S configuration.properties file. See
-   * {@link EditMode} for possible values. See also
-   * {@link #getDefaultEditMode()}.
-   */
-  public static final String      DEFAULT_MODE_PROPERTY     = "gatein.portal.pageEditor.defaultEditMode";
+  private static final long       serialVersionUID          = 4289299002617728318L;
 
   public static final String      PORTAL_PORTLETS_SKIN_ID   = "portalPortletSkins";
 
@@ -142,18 +131,19 @@ public class UIPortalApplication extends UIApplication {
   public static final int         CONTAINER_VIEW_EDIT_MODE  = 4;
 
   public static final UIComponent EMPTY_COMPONENT           = new UIComponent() {
+                                                              @Override
                                                               public String getId() {
                                                                 return "_portal:componentId_";
-                                                              };
+                                                              }
                                                             };
 
   public static final String      UI_WORKING_WS_ID          = "UIWorkingWorkspace";
 
   public static final String      UI_VIEWING_WS_ID          = "UIViewWS";
 
-  public static final String      UI_EDITTING_WS_ID         = "UIEditInlineWS";
-
   public static final String      UI_MASK_WS_ID             = "UIMaskWorkspace";
+
+  private static final Log        LOG                       = ExoLogger.getLogger("portal:UIPortalApplication");
 
   public enum EditMode {
     /**
@@ -185,78 +175,23 @@ public class UIPortalApplication extends UIApplication {
     NO_EDIT, EDIT_SITE, EDIT_PAGE
   }
 
-  protected UIWorkingWorkspace   uiWorkingWorkspace;
+  private static SkinService             skinService;            // NOSONAR
 
-  private static EditMode        defaultEditMode = null;
+  private static UserPortalConfigService portalConfigService;    // NOSONAR
 
-  private int                    modeState       = NORMAL_MODE;
+  private static LayoutService           layoutService;          // NOSONAR
 
-  private EditLevel              editLevel       = EditLevel.NO_EDIT;
+  private static SkinVisitor             skinVisitor;            // NOSONAR
 
-  private Orientation            orientation_    = Orientation.LT;
+  protected UIWorkingWorkspace           uiWorkingWorkspace;     // NOSONAR
 
-  private SkinService            skinService;
+  private Map<SiteKey, UIPortal>         all_UIPortals;          // NOSONAR
 
-  private SkinVisitor            skinVisitor;
+  private UIComponentDecorator           uiViewWorkingWorkspace; // NOSONAR
 
-  private LayoutService          layoutService;
-
-  private boolean                isSessionOpen   = false;
-
-  private Map<SiteKey, UIPortal> all_UIPortals;
-
-  private boolean                isAjaxInLastRequest;
-
-  private RequestNavigationData  lastNonAjaxRequestNavData;
-
-  private RequestNavigationData  lastRequestNavData;
-
-  private UIComponentDecorator   uiViewWorkingWorkspace;
-
-  private String                 lastPortal;
-
-  private String                 lastPortalOwner;
-
-  /**
-   * Returns a locally cached value of {@value #DEFAULT_MODE_PROPERTY} property
-   * from configuration.properties.
-   *
-   * @return
-   */
+  @Deprecated(forRemoval = true, since = "7.0")
   public static EditMode getDefaultEditMode() {
-    if (defaultEditMode == null) {
-      /*
-       * Initialization: For performance reasons, we have chosen to prefer to
-       * ignore the potential concurrent updates on app startup to some kind of
-       * locking. The concurrent updates should be harmless as they all produce
-       * the same result.
-       */
-      String val = PropertyManager.getProperty(DEFAULT_MODE_PROPERTY);
-      if (val == null || val.length() == 0) {
-        /* hard coded default */
-        defaultEditMode = EditMode.BLOCK;
-      } else {
-        try {
-          defaultEditMode = EditMode.valueOf(val.toUpperCase());
-        } catch (IllegalArgumentException e) {
-          StringBuilder msg = new StringBuilder().append("Ignoring illegal value '")
-                                                 .append(val)
-                                                 .append("' of ")
-                                                 .append(DEFAULT_MODE_PROPERTY)
-                                                 .append(" property in configuration.properties. One of [");
-          for (EditMode mode : EditMode.values()) {
-            if (msg.charAt(msg.length() - 1) != '[') {
-              msg.append(", ");
-            }
-            msg.append(mode.name());
-          }
-          msg.append("] is expected. Using default value '").append(EditMode.BLOCK.name()).append("'.");
-          log.warn(msg.toString());
-          defaultEditMode = EditMode.BLOCK;
-        }
-      }
-    }
-    return defaultEditMode;
+    return EditMode.NO_EDIT;
   }
 
   /**
@@ -276,48 +211,17 @@ public class UIPortalApplication extends UIApplication {
    * @throws Exception
    */
   public UIPortalApplication() throws Exception {
-    log = ExoLogger.getLogger("portal:UIPortalApplication");
-    PortalRequestContext context = PortalRequestContext.getCurrentInstance();
-    skinService = getApplicationComponent(SkinService.class);
-    skinVisitor = getApplicationComponent(SkinVisitor.class);
-    layoutService = getApplicationComponent(LayoutService.class);
-
-    LocaleConfigService localeConfigService = getApplicationComponent(LocaleConfigService.class);
-
-    Locale locale = context.getLocale();
-    if (locale == null) {
-      if (log.isWarnEnabled())
-        log.warn("No locale set on PortalRequestContext! Falling back to 'en'.");
-      locale = Locale.ENGLISH;
+    PortalRequestContext context = getPortalRequestContext();
+    if (skinService == null) {
+      skinService = getApplicationComponent(SkinService.class); // NOSONAR
+      skinVisitor = getApplicationComponent(SkinVisitor.class); // NOSONAR
+      layoutService = getApplicationComponent(LayoutService.class); // NOSONAR
+      portalConfigService = getApplicationComponent(UserPortalConfigService.class); // NOSONAR
     }
-
-    String localeName = LocaleContextInfo.getLocaleAsString(locale);
-    LocaleConfig localeConfig = localeConfigService.getLocaleConfig(localeName);
-    if (localeConfig == null) {
-      if (log.isWarnEnabled())
-        log.warn("Unsupported locale set on PortalRequestContext: " + localeName + "! Falling back to 'en'.");
-      localeConfig = localeConfigService.getLocaleConfig(Locale.ENGLISH.getLanguage());
-    }
-    setOrientation(localeConfig.getOrientation());
     context.setUIApplication(this);
 
     this.all_UIPortals = new HashMap<>();
-    this.lastPortalOwner = context.getPortalOwner();
-    initWorkspaces();
-  }
-
-  /**
-   * Sets the specified portal to be showed in the normal mode currently
-   *
-   * @param uiPortal
-   */
-  public void setCurrentSite(UIPortal uiPortal) {
-    PortalRequestContext.getCurrentInstance().setUiPortal(uiPortal);
-    UISiteBody siteBody = this.findFirstComponentOfType(UISiteBody.class);
-    if (siteBody != null) {
-      // TODO: Check this part carefully
-      siteBody.setUIComponent(uiPortal);
-    }
+    initWorkspaces(context.getPortalOwner());
   }
 
   /**
@@ -326,7 +230,25 @@ public class UIPortalApplication extends UIApplication {
    * @return
    */
   public UIPortal getCurrentSite() {
-    return PortalRequestContext.getCurrentInstance().getUiPortal();
+    return getPortalRequestContext().getUiPortal();
+  }
+
+  @SneakyThrows
+  public UIPortal getUiPortal(SiteKey siteKey) {
+    UIPortal cachedUIPortal = getCachedUIPortal(siteKey);
+    if (cachedUIPortal == null) {
+      PortalRequestContext portalRequestContext = getPortalRequestContext();
+      PortalConfig portalConfig = portalRequestContext.getDynamicPortalConfig();
+      Container layout = portalConfig.getPortalLayout();
+      if (layout != null) {
+        portalRequestContext.getUserPortalConfig().setPortalConfig(portalConfig);
+      }
+      cachedUIPortal = createUIComponent(UIPortal.class, null, null);
+      // Reset selected navigation on userPortalConfig
+      PortalDataMapper.toUIPortalWithMetaLayout(cachedUIPortal, portalRequestContext.getDynamicPortalConfig());
+      putCachedUIPortal(cachedUIPortal);
+    }
+    return cachedUIPortal;
   }
 
   /**
@@ -388,114 +310,20 @@ public class UIPortalApplication extends UIApplication {
     }
   }
 
-  public void refreshCachedUI() throws Exception {
+  public void refreshCachedUI() {
     all_UIPortals.clear();
-
-    UIPortal uiPortal = getCurrentSite();
-    if (uiPortal != null) {
-      SiteKey siteKey = uiPortal.getSiteKey();
-
-      UIPortal tmp = null;
-      PortalConfig portalConfig = Util.getPortalRequestContext().getDynamicPortalConfig();
-      if (portalConfig != null) {
-        tmp = this.createUIComponent(UIPortal.class, null, null);
-        PortalDataMapper.toUIPortalWithMetaLayout(tmp, portalConfig);
-        this.putCachedUIPortal(tmp);
-        tmp.setNavPath(uiPortal.getNavPath());
-        tmp.refreshUIPage();
-
-        setCurrentSite(tmp);
-        if (SiteType.PORTAL.equals(siteKey.getType())) {
-          PortalRequestContext pcontext = Util.getPortalRequestContext();
-          if (pcontext != null) {
-            UserPortalConfig userPortalConfig = pcontext.getUserPortalConfig();
-            userPortalConfig.setPortalConfig(portalConfig);
-          }
-        }
-      }
-    }
-  }
-
-  public boolean isSessionOpen() {
-    return isSessionOpen;
-  }
-
-  public void setSessionOpen(boolean isSessionOpen) {
-    this.isSessionOpen = isSessionOpen;
   }
 
   public Orientation getOrientation() {
-    return orientation_;
-  }
-
-  public void setOrientation(Orientation orientation) {
-    this.orientation_ = orientation;
+    return getPortalRequestContext().getOrientation();
   }
 
   public Locale getLocale() {
     return Util.getPortalRequestContext().getLocale();
   }
 
-  public void setModeState(int mode) {
-    this.modeState = mode;
-    if (modeState == NORMAL_MODE) {
-      editLevel = EditLevel.NO_EDIT;
-    }
-  }
-
-  public void setDefaultEditMode(ComponentTab componentTab, EditLevel editLevel) {
-    this.editLevel = editLevel;
-    EditMode editMode = getDefaultEditMode();
-    switch (componentTab) {
-    case APPLICATIONS:
-      switch (editMode) {
-      case BLOCK:
-        this.modeState = APP_BLOCK_EDIT_MODE;
-        break;
-      case PREVIEW:
-        this.modeState = APP_VIEW_EDIT_MODE;
-        break;
-      default:
-        log.warn("Ignoring unexpected " + EditMode.class.getName() + " value '" + editMode.name() + "' and using '" +
-            EditMode.BLOCK.name() + "'.");
-      }
-      break;
-    case CONTAINERS:
-      switch (editMode) {
-      case BLOCK:
-        this.modeState = CONTAINER_BLOCK_EDIT_MODE;
-        break;
-      case PREVIEW:
-        this.modeState = CONTAINER_VIEW_EDIT_MODE;
-        break;
-      default:
-        log.warn("Ignoring unexpected " + EditMode.class.getName() + " value '" + editMode.name() + "' and using '" +
-            EditMode.BLOCK.name() + "'.");
-      }
-      break;
-    default:
-      log.warn("Ignoring unexpected " + ComponentTab.class.getName() + " value '" + componentTab.name() + "' and using '" +
-          ComponentTab.APPLICATIONS.name() + "'.");
-      switch (editMode) {
-      case BLOCK:
-        this.modeState = APP_BLOCK_EDIT_MODE;
-        break;
-      case PREVIEW:
-        this.modeState = APP_VIEW_EDIT_MODE;
-        break;
-      default:
-        log.warn("Ignoring unexpected " + EditMode.class.getName() + " value '" + editMode.name() + "' and using '" +
-            EditMode.BLOCK.name() + "'.");
-      }
-    }
-  }
-
   public int getModeState() {
-    return modeState;
-  }
-
-  public void setLastRequestNavData(RequestNavigationData navData) {
-    this.lastRequestNavData = navData;
+    return NORMAL_MODE;
   }
 
   /**
@@ -503,7 +331,7 @@ public class UIPortalApplication extends UIApplication {
    * @return True if the Portal is not in the normal mode
    */
   public boolean isEditing() {
-    return (modeState != NORMAL_MODE);
+    return false;
   }
 
   /**
@@ -517,12 +345,11 @@ public class UIPortalApplication extends UIApplication {
    * @return
    */
   public Map<String, Boolean> getScripts() {
-    PortalRequestContext prc = PortalRequestContext.getCurrentInstance();
+    PortalRequestContext prc = getPortalRequestContext();
     JavascriptManager jsMan = prc.getJavascriptManager();
 
     //
     FetchMap<ResourceId> requiredResources = jsMan.getScriptResources();
-    log.debug("Resource ids to resolve: {}", requiredResources);
 
     //
     JavascriptConfigService service = getApplicationComponent(JavascriptConfigService.class);
@@ -543,10 +370,6 @@ public class UIPortalApplication extends UIApplication {
     for (String url : jsMan.getExtendedScriptURLs()) {
       ret.put(url, true);
     }
-
-    //
-    log.debug("Resolved resources for page: " + ret);
-
     return ret;
   }
 
@@ -605,7 +428,7 @@ public class UIPortalApplication extends UIApplication {
   }
 
   public String getSkin() {
-    return PortalRequestContext.getCurrentInstance().getSkin();
+    return getPortalRequestContext().getSkin();
   }
 
   /**
@@ -616,7 +439,8 @@ public class UIPortalApplication extends UIApplication {
    */
   public Set<Skin> getPortletSkins() {
     String skin = getSkin();
-    List<SkinConfig> portletSkins = getCurrentPortlets().stream().map(this::getPortletSkinConfig).filter(Objects::nonNull).toList();
+    List<SkinConfig> portletSkins =
+                                  getCurrentPortlets().stream().map(this::getPortletSkinConfig).filter(Objects::nonNull).toList();
     List<SkinConfig> additionalSkins = portletSkins.stream()
                                                    .filter(portletSkin -> portletSkin instanceof SkinConfig skinConfig
                                                                           && CollectionUtils.isNotEmpty(skinConfig.getAdditionalModules()))
@@ -689,7 +513,7 @@ public class UIPortalApplication extends UIApplication {
     return getCurrentPortlets().stream()
                                .filter(p -> p.getProducedOfferedPortlet() != null)
                                .map(pinfo -> pinfo.getProducedOfferedPortlet().getInfo())
-                               .filter(pinfo -> pinfo instanceof ContainerPortletInfo)
+                               .filter(ContainerPortletInfo.class::isInstance)
                                .map(p -> (ContainerPortletInfo) p)
                                .toList();
   }
@@ -711,7 +535,7 @@ public class UIPortalApplication extends UIApplication {
    *
    * @throws Exception
    */
-  private void initWorkspaces() throws Exception {
+  private void initWorkspaces(String portalName) throws Exception {
     if (this.getChildById(UIPortalApplication.UI_WORKING_WS_ID) != null) {
       this.removeChildById(UIPortalApplication.UI_WORKING_WS_ID);
     }
@@ -721,11 +545,11 @@ public class UIPortalApplication extends UIApplication {
     if (this.getChildById(UIPortalApplication.UI_MASK_WS_ID) == null) {
       this.addChild(UIMaskWorkspace.class, UIPortalApplication.UI_MASK_WS_ID, null);
     }
-    initSharedLayout();
+    initSharedLayout(portalName);
   }
 
-  private void initSharedLayout() throws Exception {
-    Container container = layoutService.getSharedLayout(this.lastPortalOwner);
+  private void initSharedLayout(String portalName) throws Exception {
+    Container container = layoutService.getSharedLayout(portalName);
     if (container != null) {
       UISharedLayout uiContainer = createUIComponent(UISharedLayout.class, null, null);
       uiContainer.setStorageId(container.getStorageId());
@@ -733,28 +557,6 @@ public class UIPortalApplication extends UIApplication {
       uiContainer.setRendered(true);
       this.uiViewWorkingWorkspace.setUIComponent(uiContainer);
     }
-    refreshCachedUI();
-  }
-
-  /**
-   * Check current portal name, if it's changing, reload portal properties (for
-   * now, skin setting)
-   */
-  @Override
-  public void processDecode(WebuiRequestContext context) throws Exception {
-    PortalRequestContext prc = (PortalRequestContext) context;
-    String portalName = prc.getUserPortalConfig().getPortalName();
-    if (!Safe.equals(portalName, lastPortal)) {
-      reloadPortalProperties();
-      lastPortal = portalName;
-    }
-
-    UIPortal uiPortal = getCachedUIPortal(prc.getSiteKey());
-    if (uiPortal != null) {
-      setCurrentSite(uiPortal);
-      uiPortal.refreshUIPage();
-    }
-    super.processDecode(context);
   }
 
   /**
@@ -772,30 +574,21 @@ public class UIPortalApplication extends UIApplication {
   @Override
   public void processAction(WebuiRequestContext context) throws Exception {
     PortalRequestContext pcontext = (PortalRequestContext) context;
-    RequestNavigationData requestNavData = pcontext.getNavigationData();
-
-    boolean isAjax = pcontext.useAjax();
-
-    if (!isAjax) {
-      if (isAjaxInLastRequest) {
-        isAjaxInLastRequest = false;
-        if (requestNavData.equals(lastNonAjaxRequestNavData) && isRefreshPage(requestNavData)
-            && pcontext.getPortletParameters().isEmpty()) {
-          NodeURL nodeURL = pcontext.createURL(NodeURL.TYPE).setNode(getCurrentSite().getSelectedUserNode());
-          pcontext.sendRedirect(nodeURL.toString());
-          return;
-        }
+    UserNode targetNode = pcontext.getNavigationNode();
+    if (targetNode == null) {
+      // If unauthenticated users have no permission on PORTAL node and
+      // URL is valid, they will be required to login
+      if (pcontext.getRemoteUser() == null) {
+        pcontext.requestAuthenticationLogin();
+        return;
+      } else {
+        // If path to node is invalid, get the default node instead of.
+        pcontext.sendRedirect("/portal/" + portalConfigService.getMetaPortal() + "/page-not-found");
+        return;
       }
-      lastNonAjaxRequestNavData = requestNavData;
     }
 
-    isAjaxInLastRequest = isAjax;
-
-    if (isRefreshPage(requestNavData)) {
-      if (!isDraftPage() && !isMaximizePortlet()) {
-        lastRequestNavData = requestNavData;
-      }
-
+    if (isRefreshPage()) {
       StringBuilder js = new StringBuilder("eXo.env.server.portalBaseURL=\"");
       js.append(getBaseURL()).append("\";\n");
 
@@ -810,26 +603,16 @@ public class UIPortalApplication extends UIApplication {
         javascriptManager.addJavascript(js.toString());
       }
 
-      SiteKey siteKey = pcontext.getSiteKey();
-      PageNodeEvent<UIPortalApplication> pnevent = new PageNodeEvent<UIPortalApplication>(this,
-                                                                                          PageNodeEvent.CHANGE_NODE,
-                                                                                          siteKey,
-                                                                                          pcontext.getNodePath());
-      broadcast(pnevent, Event.Phase.PROCESS);
-    }
-
-    if (!isAjax) {
-      lastNonAjaxRequestNavData = requestNavData;
+      uiWorkingWorkspace.setRenderedChild(UIPortalApplication.UI_VIEWING_WS_ID);
+      pcontext.ignoreAJAXUpdateOnPortlets(!pcontext.useAjax());
     }
 
     if (pcontext.isResponseComplete()) {
       return;
+    } else if (getCurrentSite() == null || getCurrentSite().getSelectedUserNode() == null) {
+      // If path to node is invalid, get the default node instead of.
+      pcontext.sendRedirect("/portal/" + portalConfigService.getMetaPortal() + "/page-not-found");
     }
-
-    if (getCurrentSite() == null || getCurrentSite().getSelectedUserNode() == null) {
-      pcontext.sendError(HttpServletResponse.SC_NOT_FOUND);
-    }
-
     super.processAction(pcontext);
   }
 
@@ -857,6 +640,7 @@ public class UIPortalApplication extends UIApplication {
    * block g) Then the scripts and the skins to reload are set in the
    * {@code <div class="PortalResponseScript">}
    */
+  @Override
   public void processRender(WebuiRequestContext context) throws Exception {
     String maximizedPortletId = getMaximizedPortletId();
     if (StringUtils.isNotBlank(maximizedPortletId)) {
@@ -869,17 +653,11 @@ public class UIPortalApplication extends UIApplication {
                                                                                                                     getCurrentPage().getTitle())));
       UIPage uiPage = findFirstComponentOfType(UIPage.class);
       uiPage.normalizePortletWindowStates();
-      uiPage.setMaximizedUIPortlet(maximizedUiPortlet);
+      PortalRequestContext.getCurrentInstance().setMaximizedUIPortlet(maximizedUiPortlet);
     }
     try {
       PortalRequestContext pcontext = (PortalRequestContext) context;
       pcontext.setAttribute("requestStartTime", System.currentTimeMillis());
-
-      // Reload shared layout if site has changed
-      if (!StringUtils.equals(this.lastPortalOwner, pcontext.getPortalOwner())) {
-        this.lastPortalOwner = pcontext.getPortalOwner();
-        initWorkspaces();
-      }
 
       JavascriptManager jsMan = context.getJavascriptManager();
       // Add JS resource of current portal
@@ -897,38 +675,34 @@ public class UIPortalApplication extends UIApplication {
         super.processRender(context);
       } else {
         UIMaskWorkspace uiMaskWS = getChildById(UIPortalApplication.UI_MASK_WS_ID);
-        if (uiMaskWS.isUpdated())
+        if (uiMaskWS.isUpdated()) {
           pcontext.addUIComponentToUpdateByAjax(uiMaskWS);
+        }
         if (USE_WEBUI_RESOURCES && getUIPopupMessages().hasMessage()) {
           pcontext.addUIComponentToUpdateByAjax(getUIPopupMessages());
         }
 
         Set<UIComponent> list = context.getUIComponentToUpdateByAjax();
-        List<UIPortlet> uiPortlets = new ArrayList<UIPortlet>(3);
-        List<UIComponent> uiDataComponents = new ArrayList<UIComponent>(5);
-
+        List<UIPortlet> uiPortlets = new ArrayList<>(3);
+        List<UIComponent> uiDataComponents = new ArrayList<>(5);
         if (list != null) {
           for (UIComponent uicomponent : list) {
-            if (uicomponent instanceof UIPortlet)
-              uiPortlets.add((UIPortlet) uicomponent);
-            else
+            if (uicomponent instanceof UIPortlet uiPortlet) {
+              uiPortlets.add(uiPortlet);
+            } else {
               uiDataComponents.add(uicomponent);
+            }
           }
         }
         w.write("<div class=\"PortalResponse\">");
         w.write("<div class=\"PortalResponseData\">");
         for (UIComponent uicomponent : uiDataComponents) {
-          if (log.isDebugEnabled())
-            log.debug("AJAX call: Need to refresh the UI component " + uicomponent.getName());
           renderBlockToUpdate(uicomponent, context, w);
         }
         w.write("</div>");
 
         if (!context.getFullRender()) {
           for (UIPortlet uiPortlet : uiPortlets) {
-            if (log.isDebugEnabled())
-              log.debug("AJAX call: Need to refresh the Portlet " + uiPortlet.getId());
-
             w.write("<div class=\"PortletResponse\" style=\"display: none\">");
             w.append("<div class=\"PortletResponsePortletId\">" + uiPortlet.getId() + "</div>");
             w.append("<div class=\"PortletResponseData\">");
@@ -957,7 +731,7 @@ public class UIPortalApplication extends UIApplication {
         w.write("</div>");
         w.write("<div class=\"PortalResponseScript\">");
         JavascriptManager jsManager = pcontext.getJavascriptManager();
-        String skin = getAddSkinScript(pcontext.getControllerContext(), list);
+        String skin = getAddSkinScript(list);
         if (skin != null) {
           jsManager.require("SHARED/skin", "skin").addScripts(skin);
         }
@@ -968,13 +742,13 @@ public class UIPortalApplication extends UIApplication {
     } finally {
       if (StringUtils.isNotBlank(maximizedPortletId)) {
         UIPage uiPage = findFirstComponentOfType(UIPage.class);
-        uiPage.setMaximizedUIPortlet(null);
         uiPage.normalizePortletWindowStates();
+        PortalRequestContext.getCurrentInstance().setMaximizedUIPortlet(null);
       }
     }
   }
 
-  private void writeLoadingScripts(PortalRequestContext context) throws Exception {
+  private void writeLoadingScripts(PortalRequestContext context) throws IOException {
     Writer w = context.getWriter();
     Map<String, Boolean> scriptURLs = getScripts();
     w.write("<div class=\"ImmediateScripts\">");
@@ -982,22 +756,14 @@ public class UIPortalApplication extends UIApplication {
     w.write("</div>");
   }
 
-  private String getAddSkinScript(ControllerContext context, Set<UIComponent> updateComponents) {
+  private String getAddSkinScript(Set<UIComponent> updateComponents) {
     if (updateComponents == null) {
       return null;
     }
     List<UIPortlet> uiportlets = new ArrayList<>();
     for (UIComponent uicomponent : updateComponents) {
-      if (uicomponent instanceof UIContainer) {
-        UIContainer uiContainer = (UIContainer) uicomponent;
+      if (uicomponent instanceof UIContainer uiContainer) {
         uiContainer.findComponentOfType(uiportlets, UIPortlet.class);
-      }
-      if (uicomponent instanceof UIComponentDecorator) {
-        UIComponentDecorator uiDecorator = (UIComponentDecorator) uicomponent;
-        if (uiDecorator.getUIComponent() instanceof UIContainer) {
-          UIContainer uiContainer = (UIContainer) uiDecorator.getUIComponent();
-          uiContainer.findComponentOfType(uiportlets, UIPortlet.class);
-        }
       }
     }
 
@@ -1013,8 +779,8 @@ public class UIPortalApplication extends UIApplication {
     }
     StringBuilder b = new StringBuilder(1000);
     for (SkinConfig ele : skins) {
-      SkinURL url = ele.createURL(context);
-      url.setOrientation(orientation_);
+      SkinURL url = ele.createURL();
+      url.setOrientation(getOrientation());
       b.append("skin.addSkin('").append(ele.getId()).append("','").append(url).append("');\n");
     }
 
@@ -1022,36 +788,10 @@ public class UIPortalApplication extends UIApplication {
   }
 
   /**
-   * Use {@link PortalRequestContext#getUserPortalConfig()} instead
-   *
-   * @return
-   */
-  @Deprecated
-  public UserPortalConfig getUserPortalConfig() {
-    return Util.getPortalRequestContext().getUserPortalConfig();
-  }
-
-  /**
-   * Reload portal properties. This is needed to be called when it is changing
-   * Portal site<br>
-   * If user has been authenticated, get the skin name setting from user
-   * profile.<br>
-   * anonymous user or no skin setting in user profile, use the skin setting in
-   * portal config
-   *
-   * @throws Exception
-   */
-  public void reloadPortalProperties() throws Exception {
-    PortalRequestContext context = Util.getPortalRequestContext();
-    context.refreshPortalConfig();
-  }
-
-  /**
    * @return User Home page preference
    */
   public String getUserHomePage() {
-    PortalRequestContext context = Util.getPortalRequestContext();
-    return getApplicationComponent(UserPortalConfigService.class).getUserHomePage(context.getRemoteUser());
+    return portalConfigService.getUserHomePage(getPortalRequestContext().getRemoteUser());
   }
 
   /**
@@ -1082,55 +822,8 @@ public class UIPortalApplication extends UIApplication {
     return nodeURL.toString();
   }
 
-  /**
-   * @return the editLevel
-   */
-  public EditLevel getEditLevel() {
-    return editLevel;
-  }
-
-  /**
-   * @param editLevel the editLevel to set
-   */
-  public void setEditLevel(EditLevel editLevel) {
-    this.editLevel = editLevel;
-  }
-
-  public EditMode getEditMode() {
-    switch (modeState) {
-    case NORMAL_MODE:
-      return EditMode.NO_EDIT;
-    case APP_BLOCK_EDIT_MODE:
-    case CONTAINER_BLOCK_EDIT_MODE:
-      return EditMode.BLOCK;
-    case APP_VIEW_EDIT_MODE:
-    case CONTAINER_VIEW_EDIT_MODE:
-      return EditMode.PREVIEW;
-    default:
-      throw new IllegalStateException("Unexpected " + UIPortalApplication.class.getName() + ".modeState value " + modeState +
-          ".");
-    }
-  }
-
-  public ComponentTab getComponentTab() {
-    switch (modeState) {
-    case NORMAL_MODE:
-      return ComponentTab.NO_EDIT;
-    case APP_VIEW_EDIT_MODE:
-    case APP_BLOCK_EDIT_MODE:
-      return ComponentTab.APPLICATIONS;
-    case CONTAINER_BLOCK_EDIT_MODE:
-    case CONTAINER_VIEW_EDIT_MODE:
-      return ComponentTab.CONTAINERS;
-    default:
-      throw new IllegalStateException("Unexpected " + UIPortalApplication.class.getName() + ".modeState value " + modeState +
-          ".");
-    }
-  }
-
-  @SuppressWarnings("rawtypes")
   public void includePortletScripts() {
-    PortalRequestContext pcontext = PortalRequestContext.getCurrentInstance();
+    PortalRequestContext pcontext = getPortalRequestContext();
     JavascriptManager jsMan = pcontext.getJavascriptManager();
     List<UIPortlet> portlets = new ArrayList<>();
     uiViewWorkingWorkspace.findComponentOfType(portlets, UIPortlet.class);
@@ -1139,45 +832,40 @@ public class UIPortalApplication extends UIApplication {
         try {
           jsMan.loadScriptResource(ResourceScope.PORTLET, uiPortlet.getApplicationId());
         } catch (Exception e) {
-          log.warn("Can't load JS resource for portlet {}", uiPortlet.getName(), e);
+          LOG.warn("Can't load JS resource for portlet {}", uiPortlet.getName(), e);
         }
       }
     }
   }
 
-  public String getLastPortal() {
-    return lastPortal;
-  }
-
   public UIPage getCurrentPage() {
-    return PortalRequestContext.getCurrentInstance().getUiPage();
+    return getPortalRequestContext().getUiPage();
   }
 
-  public void setCurrentPage(UIPage currentPage) {
-    PortalRequestContext.getCurrentInstance().setUiPage(currentPage);
-  }
-
-  private boolean isRefreshPage(RequestNavigationData requestNavData) {
-    return !requestNavData.equals(lastRequestNavData)
-           || getCurrentSite() == null
+  private boolean isRefreshPage() {
+    return getCurrentSite() == null
            || isDraftPage()
            || isMaximizePortlet();
   }
 
   private boolean isDraftPage() {
-    return PortalRequestContext.getCurrentInstance().isDraftPage();
+    return getPortalRequestContext().isDraftPage();
   }
 
   public boolean isMaximizePortlet() {
-    return PortalRequestContext.getCurrentInstance().isMaximizePortlet();
+    return getPortalRequestContext().isMaximizePortlet();
   }
 
   public String getMaximizedPortletId() {
-    return PortalRequestContext.getCurrentInstance().getMaximizedPortletId();
+    return getPortalRequestContext().getMaximizedPortletId();
+  }
+
+  private PortalRequestContext getPortalRequestContext() {
+    return PortalRequestContext.getCurrentInstance();
   }
 
   private List<UIPortlet> getCurrentPortlets() {
-    PortalRequestContext requestContext = PortalRequestContext.getCurrentInstance();
+    PortalRequestContext requestContext = getPortalRequestContext();
     List<UIPortlet> uiPortlets = requestContext.getUiPortlets();
     if (uiPortlets == null) {
       // Determine portlets visible on the page

@@ -19,20 +19,7 @@
 
 package org.exoplatform.portal.webui.page;
 
-import org.exoplatform.container.ExoContainer;
-import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.application.PortalRequestContext;
-import org.exoplatform.portal.config.model.Page;
-import org.exoplatform.portal.mop.Visibility;
-import org.exoplatform.portal.mop.page.PageContext;
-import org.exoplatform.portal.mop.service.LayoutService;
-import org.exoplatform.portal.mop.user.UserNode;
-import org.exoplatform.portal.webui.portal.UIPortal;
-import org.exoplatform.portal.webui.util.PortalDataMapper;
-import org.exoplatform.portal.webui.util.Util;
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
-import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.UIComponentDecorator;
@@ -43,73 +30,37 @@ import org.exoplatform.webui.core.UIComponentDecorator;
 @ComponentConfig(template = "system:/groovy/portal/webui/page/UIPageBody.gtmpl")
 public class UIPageBody extends UIComponentDecorator {
 
-    private String storageId;
+  private String storageId;
 
-    /** . */
-    private final Log log = ExoLogger.getLogger(UIPageBody.class);
+  public UIPageBody() {
+    setId("UIPageBody");
+  }
 
-    public UIPageBody() {
-        setId("UIPageBody");
-    }
+  public String getStorageId() {
+    return storageId;
+  }
 
-    public String getStorageId() {
-        return storageId;
-    }
+  public void setStorageId(String storageId) {
+    this.storageId = storageId;
+  }
 
-    public void setStorageId(String storageId) {
-        this.storageId = storageId;
-    }
+  public String getPageName() {
+    UIPage uiPage = getUiPage();
+    return uiPage == null ? null : uiPage.getName();
+  }
 
-    public String getPageName() {
-      UIPage uiPage = getUIPage();
-      return uiPage == null ? null : uiPage.getName();
-    }
+  @Override
+  public UIComponent getUIComponent() {
+    return getUiPage();
+  }
 
-    public void setPageBody(UserNode pageNode, UIPortal uiPortal) throws Exception {
-      PortalRequestContext context = Util.getPortalRequestContext();
-      uiPortal.setMaximizedUIComponent(null);
+  @Override
+  protected void setChildComponent(UIComponent uicomponent) {
+    PortalRequestContext.getCurrentInstance().setUiPage((UIPage) uicomponent);
+  }
 
-      UIPage uiPage = getUIPage();
-      if (uiPage == null) {
-        uiPage = context.getUIPage(pageNode, uiPortal);
-        if (uiPage == null) {
-          setUIComponent(null);
-          return;
-        }
-        setUIComponent(uiPage);
-      }
+  private UIPage getUiPage() {
+    return PortalRequestContext.getCurrentInstance().getUiPage();
+  }
 
-      if (uiPage.isShowMaxWindow()) {
-        context.setShowMaxWindow(true);
-      }
-      if (uiPage.isHideSharedLayout()) {
-        context.setHideSharedLayout(true);
-      }
-      if (context.isShowMaxWindow()) {
-        uiPortal.setMaximizedUIComponent(uiPage);
-      } else {
-        UIComponent maximizedComponent = uiPortal.getMaximizedUIComponent();
-        if (maximizedComponent instanceof UIPage) {
-          uiPortal.setMaximizedUIComponent(null);
-        }
-      }
-    }
-
-    @Override
-    public UIComponent getUIComponent() {
-      return PortalRequestContext.getCurrentInstance().getUiPage();
-    }
-
-    @Override
-    protected void setChildComponent(UIComponent uicomponent) {
-      PortalRequestContext.getCurrentInstance().setUiPage((UIPage) uicomponent);
-    }
-
-    public UIPage getUIPage() {
-      return (UIPage) getUIComponent();
-    }
-
-    private PortalRequestContext getRequestContext() {
-      return PortalRequestContext.getCurrentInstance();
-    }
 }

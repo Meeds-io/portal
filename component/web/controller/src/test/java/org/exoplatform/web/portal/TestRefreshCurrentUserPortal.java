@@ -35,12 +35,15 @@ import org.exoplatform.portal.mop.navigation.NavigationState;
 import org.exoplatform.portal.mop.navigation.NodeContext;
 import org.exoplatform.portal.mop.navigation.NodeModel;
 import org.exoplatform.portal.mop.navigation.Scope;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserPortal;
+import org.exoplatform.portal.mop.user.UserPortalImpl;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
+import org.exoplatform.services.security.IdentityRegistry;
 import org.exoplatform.services.security.MembershipEntry;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.application.URLBuilder;
@@ -52,10 +55,10 @@ import org.exoplatform.web.url.URLFactory;
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  */
 @ConfiguredBy({
-    @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),
-    @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
-    @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/test.mop.portal.configuration.xml"),
-    @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/web/portal/configuration.xml")
+  @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/test.mop.portal.configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/web/portal/configuration.xml")
 })
 public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONAR
 
@@ -69,21 +72,23 @@ public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONA
 
   private UserPortalConfigService portalConfigService;
 
+  private LayoutService           layoutService;
+
   @Override
   protected void setUp() throws Exception {
     super.setUp();
     begin();
-    Identity identity = new Identity("root",
-                                     Arrays.asList(
-                                                   new MembershipEntry(TEST_USER_PORTAL_GROUP),
-                                                   new MembershipEntry("/platform/users"),
-                                                   new MembershipEntry("/platform/administrators")));
-    ConversationState conversationState = new ConversationState(identity);
-    ConversationState.setCurrent(conversationState);
 
     this.navigationService = getContainer().getComponentInstanceOfType(NavigationService.class);
     this.portalConfigService = getContainer().getComponentInstanceOfType(UserPortalConfigService.class);
-    @SuppressWarnings("deprecation")
+    this.layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    getContainer().getComponentInstanceOfType(IdentityRegistry.class)
+                  .register(new Identity("root",
+                                         Arrays.asList(
+                                                       new MembershipEntry(TEST_USER_PORTAL_GROUP),
+                                                       new MembershipEntry("/platform/users"),
+                                                       new MembershipEntry("/platform/administrators"))));
+
     UserPortalConfig userPortalConfig = portalConfigService.getUserPortalConfig("classic", "root"); // NOSONAR
     this.userPortal = userPortalConfig.getUserPortal();
     RequestContext.setCurrentInstance(new RequestContext(null) {
@@ -133,6 +138,7 @@ public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONA
 
   @Override
   protected void tearDown() throws Exception {
+    getContainer().getComponentInstanceOfType(IdentityRegistry.class).unregister("root");
     removeTestedNavigation();
     RequestContext.setCurrentInstance(null);
     end();
@@ -152,7 +158,7 @@ public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONA
   }
 
   @SuppressWarnings({
-      "rawtypes", "unchecked"
+    "rawtypes", "unchecked"
   })
   public void testUpdate() throws Exception {
     List<UserNavigation> navs = userPortal.getNavigations();
@@ -202,15 +208,18 @@ public class TestRefreshCurrentUserPortal extends AbstractKernelTest { // NOSONA
     assertEquals(initialSize, navs.size());
   }
 
-  private void createTestedNavigation() throws Exception {
-    portalConfigService.createUserPortalConfig(PortalConfig.GROUP_TYPE, TEST_USER_PORTAL_GROUP, "group", "jar:/org/exoplatform/portal/config/conf");
+  private void createTestedNavigation() {
+    portalConfigService.createUserPortalConfig(PortalConfig.GROUP_TYPE,
+                                               TEST_USER_PORTAL_GROUP,
+                                               "group",
+                                               "jar:/org/exoplatform/portal/config/conf");
     navigationService.saveNavigation(new NavigationContext(TEST_USER_PORTAL_SITE_KEY, new NavigationState(1)));
   }
 
-  private void removeTestedNavigation() throws Exception {
+  private void removeTestedNavigation() {
     NavigationContext navigationContext = navigationService.loadNavigation(TEST_USER_PORTAL_SITE_KEY);
     if (navigationContext != null) {
-      portalConfigService.removeUserPortalConfig(TEST_USER_PORTAL_SITE_KEY.getTypeName(), TEST_USER_PORTAL_SITE_KEY.getName());
+      layoutService.remove(layoutService.getPortalConfig(TEST_USER_PORTAL_SITE_KEY));
       restartTransaction();
     }
   }

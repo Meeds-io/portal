@@ -26,12 +26,14 @@ import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.groovyscript.text.BindingContext;
 import org.exoplatform.groovyscript.text.TemplateService;
+import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.resolver.ResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.web.url.navigation.NodeURL;
 import org.exoplatform.webui.application.WebuiRequestContext;
+import org.exoplatform.webui.core.UIApplication;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.UIComponentDecorator;
 import org.exoplatform.webui.core.UIContainer;
@@ -42,6 +44,8 @@ import groovy.lang.Closure;
 public class WebuiBindingContext extends BindingContext {
 
     protected static Log log = ExoLogger.getLogger("portal:WebuiBindingContext");
+
+    private static final boolean DEVELOPPING = PropertyManager.isDevelopping();
 
     private UIComponent uicomponent_;
 
@@ -97,7 +101,7 @@ public class WebuiBindingContext extends BindingContext {
             ResourceBundle res = rcontext_.getApplicationResourceBundle();
             value = res.getString(mesgKey);
         } catch (MissingResourceException ex) {
-            if (PropertyManager.isDevelopping())
+            if (DEVELOPPING)
                 log.warn("Can not find resource bundle for key : " + mesgKey);
             if (mesgKey != null)
                 value = mesgKey.substring(mesgKey.lastIndexOf('.') + 1);
@@ -148,15 +152,13 @@ public class WebuiBindingContext extends BindingContext {
     }
 
     public void include(String name, ResourceResolver resourceResolver) throws Exception {
-        if (PropertyManager.isDevelopping()) {
-          WebuiRequestContext context = getRequestContext();
-          WebuiRequestContext rootContext = (WebuiRequestContext) context.getParentAppRequestContext();
-          if (rootContext == null)
-            rootContext = context;
-          long lastAccess = rootContext.getUIApplication().getLastAccessApplication();
-          if (lastAccess > 0 && resourceResolver.isModified(name, lastAccess)) {
-            log.debug("Invalidate the template: {}", name);
-            service_.invalidateTemplate(name, resourceResolver);
+        if (DEVELOPPING) {
+          PortalRequestContext rootContext = PortalRequestContext.getCurrentInstance();
+          UIApplication uiApplication = rootContext.getUIApplication();
+          long lastAccess = uiApplication.getLastAccessApplication();
+          if (lastAccess == 0 || resourceResolver.isModified(name, lastAccess)) {
+            service_.getTemplatesCache().clearCache();
+            uiApplication.setLastAccessApplication(System.currentTimeMillis());
           }
         }
         service_.include(name, clone(), resourceResolver);

@@ -51,6 +51,8 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 
+import lombok.SneakyThrows;
+
 public class PortalDataMapper {
 
   protected static final Log log = ExoLogger.getLogger("portal:PortalDataMapper");
@@ -93,7 +95,7 @@ public class PortalDataMapper {
     }
   }
 
-  public static void toUIContainer(UIContainer uiContainer, Container model) throws Exception {
+  public static void toUIContainer(UIContainer uiContainer, Container model) {
     uiContainer.setStorageId(model.getStorageId());
     uiContainer.setId(model.getId());
     uiContainer.setWidth(model.getWidth());
@@ -117,7 +119,7 @@ public class PortalDataMapper {
     }
   }
 
-  public static void toUIPage(UIPage uiPage, Page model) throws Exception {
+  public static void toUIPage(UIPage uiPage, Page model) {
     toUIContainer(uiPage, model);
     uiPage.setSiteKey(new SiteKey(model.getOwnerType(), model.getOwnerId()));
     uiPage.setIcon(model.getIcon());
@@ -168,7 +170,8 @@ public class PortalDataMapper {
     }
   }
 
-  private static void buildUIContainer(UIContainer uiContainer, Object model) throws Exception {
+  @SneakyThrows
+  private static void buildUIContainer(UIContainer uiContainer, Object model) {
     UIComponent uiComponent = null;
     WebuiRequestContext context = Util.getPortalRequestContext();
 

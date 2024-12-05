@@ -22,6 +22,22 @@
                xsi:schemaLocation="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd http://www.exoplatform.org/xml/ns/kernel_1_2.xsd"
                xmlns="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd">
 
+  <component>
+    <key>org.exoplatform.portal.config.UserPortalConfigService</key>
+    <type>org.exoplatform.portal.config.UserPortalConfigService</type>
+    <init-params>
+      <value-param>
+        <name>default.import.mode</name>
+        <value>merge</value>
+      </value-param>
+      <value-param>
+        <name>global.portal</name>
+        <description>System site name that defines generic pages</description>
+        <value>systemportal</value>
+      </value-param>
+    </init-params>
+  </component>
+
   <external-component-plugins>
     <target-component>org.exoplatform.portal.config.UserPortalConfigService</target-component>
     <component-plugin>
@@ -84,6 +100,9 @@
                 </value>
                 <value>
                   <string>profiles</string>
+                </value>
+                <value>
+                  <string>systemportal</string>
                 </value>
               </collection>
             </field>
