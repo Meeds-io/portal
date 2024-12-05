@@ -1,8 +1,4 @@
 <%
-  if(!uicomponent.hasPermission()) {
-    return;
-  }
-
   String cssStyle = "";
   String uiComponentWidth = uicomponent.getWidth();
   String uiComponentHeight = uicomponent.getHeight();

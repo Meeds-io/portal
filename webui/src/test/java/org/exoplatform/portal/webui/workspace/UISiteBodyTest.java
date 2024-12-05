@@ -51,7 +51,7 @@ public class UISiteBodyTest {
 
   @Before
   public void setUp() {
-    PORTAL_REQUEST_CONTEXT.when(() -> RequestContext.getCurrentInstance()).thenReturn(pcontext);
+    PORTAL_REQUEST_CONTEXT.when(RequestContext::getCurrentInstance).thenReturn(pcontext);
   }
 
   @Test
@@ -68,11 +68,6 @@ public class UISiteBodyTest {
       @Override
       protected void processContainerRender(WebuiRequestContext context) throws Exception {
         overallRenderCount.incrementAndGet();
-      }
-
-      @Override
-      protected boolean isShowSiteBody(PortalRequestContext requestContext) {
-        return !pcontext.isShowMaxWindow();
       }
     };
     uiSiteBody.processRender(pcontext);

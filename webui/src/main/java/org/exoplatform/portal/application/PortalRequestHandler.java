@@ -19,7 +19,6 @@
 
 package org.exoplatform.portal.application;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.ServiceLoader;
@@ -31,7 +30,6 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.StaleModelException;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
-import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
@@ -83,6 +81,12 @@ public class PortalRequestHandler extends WebRequestHandler {
 
   protected static final String                   PORTAL_PUBLIC_PAGE_NOT_FOUND = "/portal/public/page-not-found";
 
+  protected UserPortalConfigService               portalConfigService;
+
+  protected String                                globalPortal;
+
+  protected String                                metaPortal;
+
   public String getHandlerName() {
     return HANDLER_NAME;
   }
@@ -105,6 +109,9 @@ public class PortalRequestHandler extends WebRequestHandler {
     }
     application.onInit();
     controller.addApplication(application);
+    portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class);
+    metaPortal = portalConfigService.getMetaPortal();
+    globalPortal = portalConfigService.getGlobalPortal();
   }
 
   /**
@@ -142,17 +149,18 @@ public class PortalRequestHandler extends WebRequestHandler {
       return true;
     }
 
-    return processRequest(controllerContext, req, requestLocale, requestSiteName, requestSiteType, requestPath);
+    return processRequest(controllerContext,
+                          requestSiteType,
+                          requestSiteName,
+                          requestPath,
+                          requestLocale);
   }
 
   protected boolean processRequest(ControllerContext controllerContext, // NOSONAR
-                                   HttpServletRequest request,
-                                   Locale requestLocale,
-                                   String requestSiteName,
                                    String requestSiteType,
-                                   String requestPath) throws Exception {
-    UserPortalConfigService portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class);
-    requestPath = computeRequestPath(requestPath, requestSiteName, requestSiteType, portalConfigService, request);
+                                   String requestSiteName,
+                                   String requestPath,
+                                   Locale requestLocale) throws Exception {
     PortalApplication app = controllerContext.getController().getApplication(PortalApplication.PORTAL_APPLICATION_ID);
     PortalRequestContext context = new PortalRequestContext(app,
                                                             controllerContext,
@@ -160,12 +168,11 @@ public class PortalRequestHandler extends WebRequestHandler {
                                                             requestSiteName,
                                                             requestPath,
                                                             requestLocale);
-    String metaPortal = portalConfigService.getMetaPortal();
     try {
       PortalConfig persistentPortalConfig = context.getDynamicPortalConfig();
       if (context.getUserPortalConfig() == null) {
         if (persistentPortalConfig == null
-            || StringUtils.equals(persistentPortalConfig.getName(), portalConfigService.getGlobalPortal())) {
+            || StringUtils.equals(persistentPortalConfig.getName(), globalPortal)) {
           return false;
         } else if (context.getRemoteUser() == null) {
           context.requestAuthenticationLogin();
@@ -175,7 +182,7 @@ public class PortalRequestHandler extends WebRequestHandler {
           return true;
         }
       } else if (persistentPortalConfig != null
-                 && StringUtils.equals(persistentPortalConfig.getName(), portalConfigService.getGlobalPortal())) {
+                 && StringUtils.equals(persistentPortalConfig.getName(), globalPortal)) {
         return false;
       } else {
         processRequest(context, app);
@@ -248,9 +255,6 @@ public class PortalRequestHandler extends WebRequestHandler {
         endRequestPhaseLifecycle(app, context, lifecycles, Phase.RENDER);
       }
 
-      if (uiApp != null)
-        uiApp.setLastAccessApplication(System.currentTimeMillis());
-
       // Store ui root
       app.getStateManager().storeUIRootComponent(context);
     } catch (StaleModelException e) {
@@ -296,9 +300,9 @@ public class PortalRequestHandler extends WebRequestHandler {
 
   @SuppressWarnings("unchecked")
   protected void startRequestPhaseLifecycle(PortalApplication app,
-                                          PortalRequestContext context,
-                                          List<ApplicationLifecycle> lifecycles,
-                                          Phase phase) {
+                                            PortalRequestContext context,
+                                            List<ApplicationLifecycle> lifecycles,
+                                            Phase phase) {
     for (ApplicationLifecycle lifecycle : lifecycles) {
       if (lifecycle instanceof ApplicationRequestPhaseLifecycle requestLifecycle)
         requestLifecycle.onStartRequestPhase(app, context, phase);
@@ -316,21 +320,6 @@ public class PortalRequestHandler extends WebRequestHandler {
     }
   }
 
-  protected String computeRequestPath(String path,
-                                    String portalName,
-                                    String requestSiteType,
-                                    UserPortalConfigService portalConfigService,
-                                    HttpServletRequest context) throws Exception {
-    if (path.isBlank()) {
-      if (SiteType.GROUP.getName().equals(requestSiteType)) {
-        return path;
-      }
-      String newPath = portalConfigService.computePortalSitePath(portalName, context);
-      return newPath == null ? path : newPath.substring(("/" + requestSiteType + "/" + portalName + "/").length());
-    }
-    return portalConfigService.getFirstAllowedPageNode(portalName, requestSiteType, path, context);
-  }
-
   protected Locale getRequestLocale(ControllerContext controllerContext) {
     String lang = controllerContext.getParameter(LANG);
     if (StringUtils.isBlank(lang)) {
@@ -340,7 +329,7 @@ public class PortalRequestHandler extends WebRequestHandler {
     }
   }
 
-  private void sendToNotFoundPage(PortalRequestContext context, String metaPortal) throws IOException, Exception {
+  private void sendToNotFoundPage(PortalRequestContext context, String metaPortal) throws Exception {
     String metaPageNotFound = "/portal/" + metaPortal + "/page-not-found";
     if (!StringUtils.equals(context.getRequest().getRequestURI(), metaPageNotFound)) {
       if (StringUtils.equals(context.getRequest().getRequestURI(), PORTAL_PUBLIC_PAGE_NOT_FOUND)) {

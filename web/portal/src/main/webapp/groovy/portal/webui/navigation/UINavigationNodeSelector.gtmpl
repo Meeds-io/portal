@@ -20,7 +20,6 @@
   	JavascriptManager jsmanager = _ctx.getRequestContext().getJavascriptManager();
   	jsmanager.require("SHARED/uiRightClickPopupMenu", "uiRightClickPopupMenu").addScripts("uiRightClickPopupMenu.disableContextMenu('"+id+"') ;");
     uicomponent.renderUIComponent(uiPopupMenu) ;
-   
   }
 %>
 	<div class="TopLeftContainerOptions">

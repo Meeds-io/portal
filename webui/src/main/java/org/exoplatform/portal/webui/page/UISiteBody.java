@@ -22,8 +22,6 @@ package org.exoplatform.portal.webui.page;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.application.PortalRequestContext;
-import org.exoplatform.portal.webui.portal.UIPortal;
-import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
@@ -49,8 +47,7 @@ public class UISiteBody extends UIComponentDecorator {
 
     @Override
     public void processRender(WebuiRequestContext context) throws Exception {
-      PortalRequestContext requestContext = RequestContext.getCurrentInstance();
-      if (isShowSiteBody(requestContext)) {
+      if (isShowSiteBody()) {
         processContainerRender(context);
       } else {
         processPageBodyRender(context);
@@ -71,17 +68,9 @@ public class UISiteBody extends UIComponentDecorator {
       return PortalRequestContext.getCurrentInstance().getUiPortal();
     }
 
-    public UIPortal getUIPortal() {
-      return (UIPortal) getUIComponent();
-    }
-
-    @Override
-    protected void setChildComponent(UIComponent uicomponent) {
-      PortalRequestContext.getCurrentInstance().setUiPortal((UIPortal) uicomponent);
-    }
-
-    protected boolean isShowSiteBody(PortalRequestContext requestContext) {
-      return !requestContext.isShowMaxWindow() && (Util.getUIPage() == null || !Util.getUIPage().isShowMaxWindow());
+    protected boolean isShowSiteBody() {
+      PortalRequestContext requestContext = RequestContext.getCurrentInstance();
+      return !requestContext.isShowMaxWindow() && (requestContext.getUiPage() == null || !requestContext.getUiPage().isShowMaxWindow());
     }
 
     protected void processPageBodyRender(WebuiRequestContext context) throws Exception {

@@ -1,25 +1,11 @@
 <%	
-	import org.exoplatform.portal.webui.workspace.UIPortalApplication;
-	import org.exoplatform.web.application.JavascriptManager;
-  import org.gatein.common.text.EntityEncoder;
-	import org.exoplatform.commons.utils.HTMLEntityEncoder;
-
 	import javax.portlet.WindowState;
-	
-	def rcontext = _ctx.getRequestContext();
-	
-	UIPortalApplication uiPortalApp = rcontext.getUIApplication();
-	if(!uicomponent.hasAccessPermission()) {
-	  return;
-	}
 
-	JavascriptManager jsmanager = rcontext.getJavascriptManager();
+	def rcontext = _ctx.getRequestContext();
 
 	WindowState windowState = uicomponent.getCurrentWindowState();
 	String portletId = uicomponent.getId();
-	EntityEncoder encoder = HTMLEntityEncoder.getInstance();
-	
-	String title = encoder.encode(uicomponent.getDisplayTitle());
+
   String hiddenClass = "";
   if(portletContent == null || org.apache.commons.lang3.StringUtils.isBlank(portletContent.toString())) {
     hiddenClass = "class=\"hidden\"";
