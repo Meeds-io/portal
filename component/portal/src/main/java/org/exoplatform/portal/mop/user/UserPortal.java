@@ -225,8 +225,12 @@ public interface UserPortal {
      * @throws UserPortalException any user portal exception
      * @throws NavigationServiceException any navigation service exception
      */
-    UserNode resolvePath(UserNodeFilterConfig filterConfig, String path) throws NullPointerException, UserPortalException,
-            NavigationServiceException;
+    @Deprecated(forRemoval = true, since = "7.0")
+    default UserNode resolvePath(UserNodeFilterConfig filterConfig, String path) throws NullPointerException,
+                                                                                 UserPortalException,
+                                                                                 NavigationServiceException {
+      throw new UnsupportedOperationException();
+    }
 
     /**
      * Resolves and returns a node for the specified navigation and for a specified path.
@@ -239,8 +243,11 @@ public interface UserPortal {
      * @throws UserPortalException any user portal exception
      * @throws NavigationServiceException any navigation service exception
      */
-    UserNode resolvePath(UserNavigation navigation, UserNodeFilterConfig filterConfig, String path)
-            throws NullPointerException, UserPortalException, NavigationServiceException;
+    @Deprecated(forRemoval = true, since = "7.0")
+    default UserNode resolvePath(UserNavigation navigation, UserNodeFilterConfig filterConfig, String path)
+            throws NullPointerException, UserPortalException, NavigationServiceException {
+      throw new UnsupportedOperationException();
+    }
 
     /**
      * @param siteKey Site Key

@@ -1,34 +1,31 @@
 <%
-	if (!uicomponent.hasPermission()) {
-	  return;
-	}
   String uiComponentClass = uicomponent.getCssClass() == null ? "" : uicomponent.getCssClass();
+  String style = "";
+  String width  = uicomponent.getWidth();
+  String height = uicomponent.getHeight();
+  if (width != null) style += "width:"+width+";";
+  if (height != null) style += "height:"+height+";";
 %>
-<div id="UITopBarContainerParent" class="<%=uiComponentClass%>" role="banner">
+<div id="UITopBarContainerParent" class="<%=uiComponentClass%>"
+  role="banner">
   <div class="UIContainer UITopBarContainer" id="UITopBarContainer">
-  	<div class="NormalContainerBlock">
-  	<%
-  		String style = "";
-  		String width	= uicomponent.getWidth();
-  		String height	= uicomponent.getHeight();
-  		if(width != null) style += "width:"+width+";";
-  		if(height != null) style += "height:"+height+";";
-		%>
-  		<div class="VIEW-CONTAINER VIEW-BLOCK">
-  			<div>
-  				<div class="UITableColumnContainer" style="margin: 0px auto; $style">
-  					<div id="${uicomponent.id}Children" class="TRContainer clearfix UITopBarContainerItemsParent">
-  						<% 
-  					    for(uiChild in uicomponent.getChildren()) {
-              %>
-  							<div class="UITopBarContainerItem ${uiChild.id}TDContainer">
-                  <% uicomponent.renderUIComponent(uiChild) %>
-                </div>
-    					<% } %>
-  				 </div>
-  				</div>
-  			</div>
-  		</div>
-  	</div>
+    <div class="NormalContainerBlock">
+      <div class="VIEW-CONTAINER VIEW-BLOCK">
+        <div>
+          <div class="UITableColumnContainer"
+            style="margin: 0px auto; $style">
+            <div id="${uicomponent.id}Children"
+              class="TRContainer clearfix UITopBarContainerItemsParent">
+              <%for(uiChild in uicomponent.getChildren()) {%>
+              <div
+                class="UITopBarContainerItem ${uiChild.id}TDContainer">
+                <% uicomponent.renderUIComponent(uiChild) %>
+              </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.security.ConversationState;
+import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIContainer;
 
 import lombok.Getter;
@@ -80,4 +81,24 @@ public class UIPortalComponent extends UIContainer {
                               .hasPermission(ConversationState.getCurrent().getIdentity(), accessPermissions);
   }
 
+  @Override
+  public void processRender(WebuiRequestContext context) throws Exception {
+    if (hasAccessPermission()) {
+      super.processRender(context);
+    }
+  }
+
+  @Override
+  public void processDecode(WebuiRequestContext context) throws Exception {
+    if (hasAccessPermission()) {
+      super.processDecode(context);
+    }
+  }
+
+  @Override
+  public void processAction(WebuiRequestContext context) throws Exception {
+    if (hasAccessPermission()) {
+      super.processAction(context);
+    }
+  }
 }

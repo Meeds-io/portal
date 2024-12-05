@@ -30,7 +30,7 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.utils.ExpressionUtil;
@@ -40,20 +40,17 @@ import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
-import org.exoplatform.portal.mop.navigation.GenericScope;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationServiceException;
 import org.exoplatform.portal.mop.navigation.NodeChangeListener;
 import org.exoplatform.portal.mop.navigation.NodeContext;
-import org.exoplatform.portal.mop.navigation.NodeState;
 import org.exoplatform.portal.mop.navigation.Scope;
-import org.exoplatform.portal.mop.navigation.VisitMode;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.resources.LocaleContextInfo;
 import org.exoplatform.services.resources.ResourceBundleManager;
 import org.exoplatform.services.resources.ResourceBundleService;
-import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
 
@@ -66,14 +63,17 @@ import lombok.SneakyThrows;
  */
 public class UserPortalImpl implements UserPortal {
 
-  private static final String            SPACES_SITE_TYPE_PREFIX  = "/spaces/";
+  public static final String               SPACES_SITE_TYPE_PREFIX  = "/spaces/";
+
+  protected static UserPortalConfigService portalConfigService;
+
+  protected static LayoutService           layoutService;
+
+  protected static ResourceBundleManager   resourceBundleManager;
+
+  protected static OrganizationService     organizationService;
 
   private final UserNavigationComparator userNavigationComparator = new UserNavigationComparator();
-
-  /** . */
-  final UserPortalConfigService          service;
-
-  private ResourceBundleManager          resourceBundleManager;
 
   /** . */
   private final PortalConfig             portalConfig;
@@ -94,18 +94,22 @@ public class UserPortalImpl implements UserPortal {
   @Getter
   private final Locale                   userLocale;
 
-  public UserPortalImpl(UserPortalConfigService service,
-                        String portalName,
+  public UserPortalImpl(String portalName,
                         PortalConfig portal,
                         String userName,
                         Locale locale) {
-    this.service = service;
     this.portalName = portalName;
     this.portalConfig = portal;
     this.userName = userName;
     this.navigations = null;
-    this.userNavigationComparator.setGlobalPortal(service.getGlobalPortal());
     this.userLocale = locale;
+    if (portalConfigService == null) {
+      portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class); // NOSONAR
+      layoutService = ExoContainerContext.getService(LayoutService.class); // NOSONAR
+      resourceBundleManager = ExoContainerContext.getService(ResourceBundleManager.class); // NOSONAR
+      organizationService = ExoContainerContext.getService(OrganizationService.class); // NOSONAR
+    }
+    this.userNavigationComparator.setGlobalPortal(portalConfigService.getGlobalPortal());
   }
 
   @Override
@@ -127,20 +131,20 @@ public class UserPortalImpl implements UserPortal {
 
       // Add group navigations
       if (StringUtils.isNotBlank(userName)) {
-        List<String> userGroupIds = getUserGroupIds(ConversationState.getCurrent());
+        Identity userIdentity = portalConfigService.getUserACL().getUserIdentity(userName);
+        List<String> userGroupIds = getUserGroupIds(userIdentity);
         if (CollectionUtils.isNotEmpty(userGroupIds)) {
           userGroupIds.forEach(groupId -> loadUserNavigation(SiteKey.group(groupId)));
         }
         if (this.refreshList) {
+          this.refreshList = false;
           // Delete navigations where user doesn't belong anymore
           this.navigations.removeIf(nav -> {
-            SiteKey navSiteKey = nav.getKey();
-            return navSiteKey.getType() == SiteType.GROUP && !userGroupIds.contains(navSiteKey.getName());
+            PortalConfig site = layoutService.getPortalConfig(nav.getKey());
+            return site == null || !portalConfigService.getUserACL().hasAccessPermission(site, userIdentity);
           });
         }
       }
-
-      this.refreshList = false;
     }
     return Collections.unmodifiableList(this.navigations);
   }
@@ -160,7 +164,7 @@ public class UserPortalImpl implements UserPortal {
       if (siteKey.getType() != siteType
           || (siteType == SiteType.GROUP && siteKey.getName().startsWith(SPACES_SITE_TYPE_PREFIX))
           || (siteType == SiteType.SPACE && !siteKey.getName().startsWith(SPACES_SITE_TYPE_PREFIX))
-          || (!includeGlobal && siteKey.getName().equalsIgnoreCase(service.getGlobalPortal()))) {
+          || (!includeGlobal && siteKey.getName().equalsIgnoreCase(portalConfigService.getGlobalPortal()))) {
         continue;
       }
 
@@ -201,11 +205,11 @@ public class UserPortalImpl implements UserPortal {
       return null;
     }
     UserNodeContext userNodeContext = new UserNodeContext(userNavigation, filterConfig);
-    NodeContext<UserNode> nodeContext = service.getNavigationService()
-                                               .loadNode(userNodeContext,
-                                                         userNavigation.navigation,
-                                                         scope,
-                                                         new UserNodeListener(listener));
+    NodeContext<UserNode> nodeContext = portalConfigService.getNavigationService()
+                                                           .loadNode(userNodeContext,
+                                                                     userNavigation.navigation,
+                                                                     scope,
+                                                                     new UserNodeListener(listener));
     if (nodeContext != null) {
       return nodeContext.getNode().filter();
     } else {
@@ -221,11 +225,11 @@ public class UserPortalImpl implements UserPortal {
                               NodeChangeListener<UserNode> listener) {
     UserNavigation userNavigation = getNavigation(siteKey);
     UserNodeContext userNodeContext = new UserNodeContext(userNavigation, filterConfig);
-    NodeContext<UserNode> nodeContext = service.getNavigationService()
-                                               .loadNodeById(userNodeContext,
-                                                             userNodeId,
-                                                             scope,
-                                                             new UserNodeListener(listener));
+    NodeContext<UserNode> nodeContext = portalConfigService.getNavigationService()
+                                                           .loadNodeById(userNodeContext,
+                                                                         userNodeId,
+                                                                         scope,
+                                                                         new UserNodeListener(listener));
     if (nodeContext != null) {
       return nodeContext.getNode().filter();
     } else {
@@ -238,7 +242,7 @@ public class UserPortalImpl implements UserPortal {
     if (node == null) {
       throw new IllegalArgumentException("UserNode is mandatory");
     }
-    service.getNavigationService().updateNode(node.context, scope, new UserNodeListener(listener));
+    portalConfigService.getNavigationService().updateNode(node.context, scope, new UserNodeListener(listener));
     node.filter();
   }
 
@@ -247,7 +251,7 @@ public class UserPortalImpl implements UserPortal {
     if (node == null) {
       throw new IllegalArgumentException("No null node accepted");
     }
-    service.getNavigationService().rebaseNode(node.context, scope, new UserNodeListener(listener));
+    portalConfigService.getNavigationService().rebaseNode(node.context, scope, new UserNodeListener(listener));
     node.filter();
   }
 
@@ -258,7 +262,7 @@ public class UserPortalImpl implements UserPortal {
     if (node == null) {
       throw new IllegalArgumentException("No null node accepted");
     }
-    service.getNavigationService().saveNode(node.context, new UserNodeListener(listener));
+    portalConfigService.getNavigationService().saveNode(node.context, new UserNodeListener(listener));
     navigations = null;
     node.filter();
   }
@@ -283,11 +287,11 @@ public class UserPortalImpl implements UserPortal {
     NavigationContext navigation = userNavigation.navigation;
     if (navigation.getState() != null) {
       UserNodeContext userNodeContext = new UserNodeContext(userNavigation, null);
-      NodeContext<UserNode> nodeContext = service.getNavigationService()
-                                                 .loadNode(userNodeContext,
-                                                           navigation,
-                                                           Scope.CHILDREN,
-                                                           null);
+      NodeContext<UserNode> nodeContext = portalConfigService.getNavigationService()
+                                                             .loadNode(userNodeContext,
+                                                                       navigation,
+                                                                       Scope.CHILDREN,
+                                                                       null);
       if (nodeContext != null) {
         UserNode root = nodeContext.getNode();
 
@@ -309,119 +313,6 @@ public class UserPortalImpl implements UserPortal {
   }
 
   @Override
-  public UserNode resolvePath(UserNodeFilterConfig filterConfig, String path) { // NOSONAR
-    if (path == null) {
-      throw new IllegalArgumentException("No null path accepted");
-    }
-
-    // Parse path
-    String[] segments = Utils.parsePath(path);
-
-    // Find the first navigation available or return null
-    if (segments == null) {
-      return getDefaultPath(filterConfig);
-    }
-
-    // Create a filter as we need one for the path
-    if (filterConfig == null) {
-      filterConfig = UserNodeFilterConfig.builder().build();
-    } else {
-      filterConfig = UserNodeFilterConfig.builder(filterConfig).build();
-    }
-
-    // Restrict the filter with path
-    filterConfig.path = segments;
-
-    //
-    MatchingScope best = null;
-    for (UserNavigation navigation : getNavigations()) {
-      MatchingScope scope = new MatchingScope(navigation, filterConfig, segments);
-      scope.resolve();
-      if (scope.score == segments.length) {
-        best = scope;
-        break;
-      } else {
-        if (best == null) {
-          best = scope;
-        } else {
-          if (scope.score > best.score) {
-            best = scope;
-          }
-        }
-      }
-    }
-
-    //
-    if (best != null && best.score > 0) {
-      UserNode ret = best.userNode;
-      if (ret != null) {
-        ret.owner.filterConfig.path = null;
-      }
-      return ret;
-    } else {
-      return getDefaultPath(null);
-    }
-  }
-
-  @Override
-  public UserNode resolvePath(UserNavigation navigation, UserNodeFilterConfig filterConfig, String path)
-                                                                                                         throws NullPointerException,
-                                                                                                         UserPortalException,
-                                                                                                         NavigationServiceException {
-    if (navigation == null) {
-      throw new IllegalArgumentException("No null navigation accepted");
-    }
-    if (path == null) {
-      throw new IllegalArgumentException("No null path accepted");
-    }
-
-    //
-    String[] segments = Utils.parsePath(path);
-
-    //
-    if (segments == null) {
-      return null;
-    }
-
-    // Create a filter as we need one for the path
-    if (filterConfig == null) {
-      filterConfig = UserNodeFilterConfig.builder().build();
-    } else {
-      filterConfig = UserNodeFilterConfig.builder(filterConfig).build();
-    }
-
-    // Restrict the filter with the path
-    filterConfig.path = segments;
-
-    //
-    MatchingScope scope = new MatchingScope(navigation, filterConfig, segments);
-    scope.resolve();
-
-    //
-    UserNode globalUserNode = null;
-    if (scope.score > 0) {
-      UserNode ret = scope.userNode;
-      if (ret != null && !StringUtils.equals(scope.userNode.getURI(), ret.getURI())) {
-        UserNode globalNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
-        if (globalNode != null) {
-          return globalNode;
-        }
-      }
-      if (ret != null) {
-        ret.owner.filterConfig.path = null;
-        if (!segments[segments.length - 1].equals(ret.getName())) {
-          globalUserNode = getGlobalUserNode(filterConfig, navigation.getKey(), segments);
-          if (globalUserNode != null && segments[segments.length - 1].equals(globalUserNode.getName())) {
-            ret = globalUserNode;
-          }
-        }
-        return ret;
-      }
-    }
-    return globalUserNode == null ? getGlobalUserNode(filterConfig, navigation.getKey(), segments) : globalUserNode;
-  }
-
-  @Override
   @SneakyThrows
   public String getPortalLabel(SiteKey siteKey) {
     return getPortalLabel(siteKey, userLocale);
@@ -430,7 +321,7 @@ public class UserPortalImpl implements UserPortal {
   @Override
   @SneakyThrows
   public String getPortalLabel(SiteKey siteKey, Locale locale) {
-    PortalConfig site = service.getDataStorage().getPortalConfig(siteKey);
+    PortalConfig site = portalConfigService.getDataStorage().getPortalConfig(siteKey);
     String label = site == null ?
                                 siteKey.getName() :
                                 StringUtils.firstNonBlank(site.getLabel(),
@@ -440,8 +331,7 @@ public class UserPortalImpl implements UserPortal {
       return StringUtils.firstNonBlank(getLabel(siteKey, label, locale),
                                        siteKey.getName());
     } else if (siteKey.getType() == SiteType.GROUP) {
-      Group siteGroup = ExoContainerContext.getService(OrganizationService.class)
-                                           .getGroupHandler()
+      Group siteGroup = organizationService.getGroupHandler()
                                            .findGroupById(siteKey.getName());
       if (siteGroup != null) {
         return siteGroup.getLabel();
@@ -459,13 +349,12 @@ public class UserPortalImpl implements UserPortal {
   @Override
   @SneakyThrows
   public String getPortalDescription(SiteKey siteKey, Locale locale) {
-    PortalConfig site = service.getDataStorage().getPortalConfig(siteKey);
+    PortalConfig site = portalConfigService.getDataStorage().getPortalConfig(siteKey);
     String description = site == null ? null : site.getDescription();
     if (siteKey.getType() == SiteType.PORTAL && description != null) {
       return getLabel(siteKey, description, locale);
     } else if (siteKey.getType() == SiteType.GROUP) {
-      Group siteGroup = ExoContainerContext.getService(OrganizationService.class)
-                                           .getGroupHandler()
+      Group siteGroup = organizationService.getGroupHandler()
                                            .findGroupById(siteKey.getName());
       if (siteGroup != null) {
         return siteGroup.getLabel();
@@ -510,25 +399,25 @@ public class UserPortalImpl implements UserPortal {
     if (this.navigations == null) {
       this.navigations = new ArrayList<>();
       if (siteKey.getType() == SiteType.PORTAL
-          && StringUtils.isNotBlank(service.getGlobalPortal())
-          && !StringUtils.equals(service.getGlobalPortal(), siteKey.getName())) {
+          && StringUtils.isNotBlank(portalConfigService.getGlobalPortal())
+          && !StringUtils.equals(portalConfigService.getGlobalPortal(), siteKey.getName())) {
         // Add global navigation at the end
-        loadUserNavigation(new SiteKey(SiteType.PORTAL, service.getGlobalPortal()));
+        loadUserNavigation(new SiteKey(SiteType.PORTAL, portalConfigService.getGlobalPortal()));
       }
     } else {
       this.navigations.removeIf(nav -> nav.getKey().equals(siteKey));
     }
-    NavigationContext navigationContext = service.getNavigationService()
-                                                 .loadNavigation(siteKey);
-    PortalConfig sitePortalConfig = service.getDataStorage().getPortalConfig(siteKey);
+    NavigationContext navigationContext = portalConfigService.getNavigationService()
+                                                             .loadNavigation(siteKey);
+    PortalConfig sitePortalConfig = portalConfigService.getDataStorage().getPortalConfig(siteKey);
+    UserACL userAcl = portalConfigService.getUserACL();
     if (navigationContext != null
         && navigationContext.getState() != null
-        && service.getUserACL().hasAccessPermission(sitePortalConfig, getCurrentIdentity())) {
-      UserACL userACL = service.getUserACL();
+        && userAcl.hasAccessPermission(sitePortalConfig, userAcl.getUserIdentity(userName))) {
       UserNavigation userNavigation = new UserNavigation(this,
                                                          navigationContext,
-                                                         userACL.hasEditPermission(sitePortalConfig,
-                                                                                   userACL.getUserIdentity(userName)));
+                                                         userAcl.hasEditPermission(sitePortalConfig,
+                                                                                   userAcl.getUserIdentity(userName)));
       this.navigations.add(userNavigation);
       Collections.sort(this.navigations, userNavigationComparator);
       return userNavigation;
@@ -537,26 +426,22 @@ public class UserPortalImpl implements UserPortal {
     }
   }
 
-  protected List<String> getUserGroupIds(ConversationState conversationState) {
+  @SneakyThrows
+  protected List<String> getUserGroupIds(Identity identity) {
     Collection<?> groups = null;
-    if (conversationState != null && conversationState.getIdentity() != null
-        && !IdentityConstants.ANONIM.equals(conversationState.getIdentity().getUserId())
-        && !IdentityConstants.SYSTEM.equals(conversationState.getIdentity().getUserId())) {
-      groups = conversationState.getIdentity().getGroups();
+    if (StringUtils.isBlank(userName)
+        || IdentityConstants.ANONIM.equals(userName)
+        || IdentityConstants.SYSTEM.equals(userName)
+        || identity == null) {
+      return Collections.emptyList();
     } else {
-      try {
-        groups = ExoContainerContext.getService(OrganizationService.class)
-                                    .getGroupHandler()
-                                    .findGroupsOfUser(userName);
-      } catch (Exception e) {
-        throw new IllegalStateException("Could not retrieve groups", e);
-      }
+      groups = identity.getGroups();
     }
     return getUserGroupIds(groups);
   }
 
-  protected List<String> getUserGroupIds(Collection<?> groups) {
-    String guestsGroupId = service.getUserACL().getGuestsGroup();
+  private List<String> getUserGroupIds(Collection<?> groups) {
+    String guestsGroupId = portalConfigService.getUserACL().getGuestsGroup();
     return groups.stream()
                  .map(groupObj -> {
                    if (groupObj instanceof Group group) {
@@ -569,108 +454,14 @@ public class UserPortalImpl implements UserPortal {
                  .toList();
   }
 
-  protected UserNode getGlobalUserNode(UserNodeFilterConfig filterConfig, SiteKey siteKey, String[] segments) {
-    UserNavigation globalNavigation = getNavigation(SiteKey.portal(this.service.getGlobalPortal()));
-    if (globalNavigation != null) {
-      MatchingScope globalScope = new MatchingScope(globalNavigation, filterConfig, segments);
-      globalScope.resolve();
-      if (globalScope.score > 0) {
-        UserNode globalNode = globalScope.userNode;
-        if (globalNode != null) {
-          globalNode.owner.filterConfig.path = null;
-        }
-        if (globalNode != null && StringUtils.equals(globalScope.userNode.getURI(), globalNode.getURI())) {
-          return globalNode;
-        }
-      }
-    }
-    return null;
-  }
-
-  protected ResourceBundle getNavigationBundle(SiteKey siteKey) {
-    UserNavigation navigation = getNavigation(siteKey);
-    return navigation == null ? null : navigation.getBundle();
-  }
-
-  /**
-   * Note : the scope implementation is not stateless but we don't care in this
-   * case.
-   */
-  protected class MatchingScope extends GenericScope.Branch.Visitor implements Scope {
-    final UserNavigation       userNavigation;
-
-    final UserNodeFilterConfig filterConfig;
-
-    final String[]             match;
-
-    int                        score;
-
-    String                     id;
-
-    UserNode                   userNode;
-
-    MatchingScope(UserNavigation userNavigation, UserNodeFilterConfig filterConfig, String[] match) {
-      this.userNavigation = userNavigation;
-      this.filterConfig = filterConfig;
-      this.match = match;
-    }
-
-    @Override
-    public Visitor get() {
-      return this;
-    }
-
-    @Override
-    protected int getSize() {
-      return match.length;
-    }
-
-    @Override
-    protected String getName(int index) {
-      return match[index];
-    }
-
-    @Override
-    protected Visitor getFederated() {
-      return Scope.CHILDREN.get();
-    }
-
-    @Override
-    public VisitMode enter(int depth, String id, String name, NodeState state) {
-      VisitMode vm = super.enter(depth, id, name, state);
-      if (depth == 0) {
-        score = 0;
-        MatchingScope.this.id = null;
-      } else {
-        if (vm == VisitMode.ALL_CHILDREN) {
-          MatchingScope.this.id = id;
-          score++;
-        }
-      }
-      return vm;
-    }
-
-    void resolve() {
-      UserNodeContext userNodeContext = new UserNodeContext(userNavigation, filterConfig);
-      NodeContext<UserNode> nodeContext = service.getNavigationService()
-                                                 .loadNode(userNodeContext,
-                                                           userNavigation.navigation,
-                                                           this,
-                                                           null);
-      if (score > 0) {
-        userNode = nodeContext.getNode().filter().find(id);
-      }
-    }
-  }
-
   public ResourceBundle getBundle(UserNavigation navigation) {
     return getBundle(getSiteType(navigation), getSiteName(navigation), userLocale);
   }
 
   private ResourceBundle getBundle(String siteType, String siteName, Locale locale) {
-    return getResourceBundleManager().getNavigationResourceBundle(LocaleContextInfo.getLocaleAsString(locale),
-                                                                  siteType,
-                                                                  siteName);
+    return resourceBundleManager.getNavigationResourceBundle(LocaleContextInfo.getLocaleAsString(locale),
+                                                             siteType,
+                                                             siteName);
   }
 
   private String getSiteName(UserNavigation navigation) {
@@ -681,18 +472,6 @@ public class UserPortalImpl implements UserPortal {
   private String getSiteType(UserNavigation navigation) {
     return navigation.getKey()
                      .getTypeName();
-  }
-
-  private ResourceBundleManager getResourceBundleManager() {
-    if (resourceBundleManager == null) {
-      resourceBundleManager = ExoContainerContext.getService(ResourceBundleManager.class);
-    }
-    return resourceBundleManager;
-  }
-
-  private Identity getCurrentIdentity() {
-    ConversationState conversationState = ConversationState.getCurrent();
-    return conversationState == null ? null : conversationState.getIdentity();
   }
 
 }

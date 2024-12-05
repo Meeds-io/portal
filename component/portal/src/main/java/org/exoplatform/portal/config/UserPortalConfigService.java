@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.picocontainer.Startable;
 
@@ -60,6 +60,7 @@ import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
+import org.exoplatform.portal.mop.user.Utils;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
@@ -68,7 +69,6 @@ import org.exoplatform.services.security.Identity;
 
 import io.meeds.common.ContainerTransactional;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.Synchronized;
@@ -81,19 +81,19 @@ public class UserPortalConfigService implements Startable {
 
   public static final String      SITE_TEMPLATE_INSTANTIATED     = "site.template.instantiated";
 
-  private static final Log        LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
+  public static final String      PUBLIC_SITE_NAME               = "public";
 
-  private static final String     PUBLIC_SITE_NAME               = "public";
+  public static final Scope       HOME_PAGE_URI_PREFERENCE_SCOPE = Scope.PORTAL.id("HOME");
 
-  private static final Scope      HOME_PAGE_URI_PREFERENCE_SCOPE = Scope.PORTAL.id("HOME");
-
-  private static final String     HOME_PAGE_URI_PREFERENCE_KEY   = "HOME_PAGE_URI";
+  public static final String      HOME_PAGE_URI_PREFERENCE_KEY   = "HOME_PAGE_URI";
 
   public static final String      DEFAULT_GLOBAL_PORTAL          = "global";
 
   public static final String      DEFAULT_GROUP_SITE_TEMPLATE    = "group";
 
   public static final String      DEFAULT_USER_SITE_TEMPLATE     = "user";
+
+  private static final Log        LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
 
   private LayoutService           layoutService;
 
@@ -119,7 +119,7 @@ public class UserPortalConfigService implements Startable {
   @Setter
   private boolean                 allowUserHome                  = true;
 
-  protected final SiteFilter      siteFilter                     = new SiteFilter(SiteType.PORTAL,
+  protected final SiteFilter      portalSiteFilter               = new SiteFilter(SiteType.PORTAL,
                                                                                   null,
                                                                                   null,
                                                                                   true,
@@ -143,7 +143,7 @@ public class UserPortalConfigService implements Startable {
     this.defaultImportMode =
                            ImportMode.valueOf(getParam(params, "default.import.mode", ImportMode.CONSERVE.name()).toUpperCase());
     this.globalPortal = getParam(params, "global.portal", DEFAULT_GLOBAL_PORTAL);
-    this.siteFilter.setExcludedSiteName(globalPortal);
+    this.portalSiteFilter.setExcludedSiteName(globalPortal);
   }
 
   public LayoutService getDataStorage() {
@@ -204,11 +204,12 @@ public class UserPortalConfigService implements Startable {
   }
 
   public UserPortalConfig getUserPortalConfig(String portalName, String accessUser, Locale locale) {
-    PortalConfig portal = layoutService.getPortalConfig(portalName);
-    if (portal == null || !userAcl.hasAccessPermission(portal, userAcl.getUserIdentity(accessUser))) {
+    PortalConfig site = layoutService.getPortalConfig(portalName);
+    if (site == null
+        || !userAcl.hasAccessPermission(site, userAcl.getUserIdentity(accessUser))) {
       return null;
     }
-    return new UserPortalConfig(portal, this, portalName, accessUser, locale);
+    return new UserPortalConfig(site, portalName, accessUser, locale);
   }
 
   public void createSiteFromTemplate(SiteKey sourceSiteKey,
@@ -270,30 +271,6 @@ public class UserPortalConfigService implements Startable {
   }
 
   /**
-   * This method removes the PortalConfig, Page and PageNavigation that belong
-   * to the portal in the database.
-   *
-   * @param portalName the portal name
-   */
-  public void removeUserPortalConfig(String portalName) {
-    removeUserPortalConfig(PortalConfig.PORTAL_TYPE, portalName);
-  }
-
-  /**
-   * This method removes the PortalConfig, Page and PageNavigation that belong
-   * to the portal in the database.
-   *
-   * @param ownerType the owner type
-   * @param ownerId the portal name
-   */
-  public void removeUserPortalConfig(String ownerType, String ownerId) {
-    PortalConfig config = layoutService.getPortalConfig(ownerType, ownerId);
-    if (config != null) {
-      layoutService.remove(config);
-    }
-  }
-
-  /**
    * Load metadata of specify page
    *
    * @param pageRef the PageKey
@@ -313,142 +290,95 @@ public class UserPortalConfigService implements Startable {
     return getPage(pageRef, userAclIdentity);
   }
 
-  public List<PortalConfig> getUserPortalSites(String username) {
-    Identity userAclIdentity = userAcl.getUserIdentity(username);
-    List<PortalConfig> list = layoutService.getSites(siteFilter);
-    return list.stream()
-               .filter(Objects::nonNull)
-               .filter(portalConfig -> userAcl.hasAccessPermission(portalConfig, userAclIdentity))
-               .sorted((s1, s2) -> {
-                 if (!s2.isDisplayed() && !s1.isDisplayed()) {
-                   if (StringUtils.equals(s1.getName(), PUBLIC_SITE_NAME)) {
-                     return -1;
-                   } else if (StringUtils.equals(s2.getName(), PUBLIC_SITE_NAME)) {
-                     return 1;
-                   } else {
-                     return s2.getName().compareTo(s1.getName());
-                   }
-                 } else if (!s2.isDisplayed()) {
-                   return -Integer.MAX_VALUE;
-                 } else if (!s1.isDisplayed()) {
-                   return Integer.MAX_VALUE;
-                 } else {
-                   int order = s1.getDisplayOrder() - s2.getDisplayOrder();
-                   return order == 0 ? s2.getName().compareTo(s1.getName()) : order;
-                 }
-               })
-               .toList();
+  public String getDefaultPath(String username) {
+    String userHomePage = allowUserHome && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
+    if (StringUtils.isNotBlank(userHomePage)) {
+      return userHomePage;
+    } else {
+      List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
+      if (CollectionUtils.isEmpty(portalConfigList)) {
+        return null;
+      }
+      return portalConfigList.stream()
+                             .filter(PortalConfig::isDefaultSite)
+                             .filter(site -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(site.getType()))
+                             .map(portalConfig -> getDefaultSitePath(portalConfig.getName(), username))
+                             .filter(Objects::nonNull)
+                             .findFirst()
+                             .orElse(null);
+    }
   }
 
-  public String computePortalSitePath(String portalName, HttpServletRequest context) {
+  public String getDefaultSitePath(String portalName, String username) {
     PortalConfig portalConfig = layoutService.getPortalConfig(portalName);
     if (portalConfig == null) {
       return null;
     }
-    Collection<UserNode> userNodes = getPortalSiteNavigations(portalName, SiteType.PORTAL.getName(), context);
-    UserNode userNode = getFirstAllowedPageNode(userNodes);
+    UserNode userNode = getSiteNode(SiteType.PORTAL.getName(), portalName, username);
     if (userNode == null) {
       return null;
     }
     return getDefaultUri(userNode, portalName);
   }
 
-  public String computePortalPath(HttpServletRequest request) {
-    List<PortalConfig> portalConfigList = getUserPortalSites(request.getRemoteUser());
-    if (CollectionUtils.isEmpty(portalConfigList)) {
+  public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
+                                          String portalName,
+                                          String nodePath,
+                                          String username) {
+    UserNode rootUserNode = getSiteRootNode(portalType,
+                                            portalName,
+                                            username);
+    if (rootUserNode == null) {
       return null;
-    }
-    return portalConfigList.stream()
-                           .filter(PortalConfig::isDefaultSite)
-                           .map(portalConfig -> computePortalSitePath(portalConfig.getName(), request))
-                           .filter(Objects::nonNull)
-                           .findFirst()
-                           .orElse(null);
-  }
-
-  public Collection<UserNode> getPortalSiteNavigations(String siteName, String portalType, HttpServletRequest context) {
-    UserPortalConfig userPortalConfig = getUserPortalConfig(siteName, context.getRemoteUser());
-    if (userPortalConfig == null) {
-      return Collections.emptyList();
-    }
-    UserPortal userPortal = userPortalConfig.getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(portalType.toUpperCase()), siteName));
-    if (navigation == null) {
-      return Collections.emptyList();
-    }
-    UserNodeFilterConfig builder = UserNodeFilterConfig.builder()
-                                                       .withReadCheck()
-                                                       .withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL)
-                                                       .withTemporalCheck()
-                                                       .build();
-    UserNode rootNode = userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder, null);
-    return rootNode != null ? rootNode.getChildren() : Collections.emptyList();
-  }
-
-  public UserNode getPortalSiteRootNode(String siteName, String siteType, HttpServletRequest request) {
-    UserPortalConfig userPortalConfig = null;
-    if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
-      userPortalConfig = getUserPortalConfig(siteName, request.getRemoteUser());
+    } else if (StringUtils.isBlank(nodePath)) {
+      return getNodeOrFirstChildWithPage(rootUserNode, username);
     } else {
-      PortalConfig defaultPortalConfig = getUserPortalSites(request.getRemoteUser()).stream().findFirst().orElse(null);
-      if (defaultPortalConfig != null) {
-        userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), request.getRemoteUser());
+      UserNode globalRootUserNode = getSiteRootNode(PortalConfig.PORTAL_TYPE,
+                                                    globalPortal,
+                                                    username);
+      UserNode siteUserNode = rootUserNode;
+      UserNode globalUserNode = globalRootUserNode;
+      int validGlobalDepth = 0;
+      int validSiteDepth = 0;
+      int currentDepth = 0;
+
+      String[] nodeNames = Utils.parsePath(nodePath);
+      Iterator<String> iterator = Arrays.stream(nodeNames).iterator();
+      while (iterator.hasNext()
+             && (validSiteDepth == currentDepth
+                 || validGlobalDepth == currentDepth)) {
+        String path = iterator.next();
+        if (validSiteDepth == currentDepth) {
+          UserNode childUserNode = siteUserNode.getChild(path);
+          if (childUserNode != null) {
+            siteUserNode = childUserNode;
+            validSiteDepth++;
+          }
+        }
+        if (globalUserNode != null && validGlobalDepth == currentDepth) {
+          UserNode childGlobalUserNode = globalUserNode.getChild(path);
+          if (childGlobalUserNode != null) {
+            globalUserNode = childGlobalUserNode;
+            validGlobalDepth++;
+          }
+        }
+        currentDepth++;
       }
-    }
-    if (userPortalConfig == null) {
-      return null;
-    }
-    UserPortal userPortal = userPortalConfig.getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName));
-    if (navigation == null) {
-      return null;
-    }
-    UserNodeFilterConfig builder = UserNodeFilterConfig.builder()
-                                                       .withReadWriteCheck()
-                                                       .withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL)
-                                                       .withTemporalCheck()
-                                                       .build();
-    return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder, null);
-  }
-
-  public UserNode getFirstAllowedPageNode(Collection<UserNode> userNodes) {
-    return userNodes.stream()
-                    .map(node -> {
-                      if (node.getPageRef() != null && layoutService.getPage(node.getPageRef()) != null) {
-                        return node;
-                      } else if (node.getChildren() != null && !node.getChildren().isEmpty()) {
-                        return getFirstAllowedPageNode(node.getChildren());
-                      }
-                      return null;
-                    })
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(null);
-  }
-
-  public String getFirstAllowedPageNode(String portalName, String portalType, String nodePath, HttpServletRequest request) {
-    UserNode targetUserNode = getPortalSiteRootNode(portalName, portalType, request);
-    if (targetUserNode == null) {
-      return nodePath;
-    }
-    String[] pathNodesNames = nodePath.split("/");
-    Iterator<String> iterator = Arrays.stream(pathNodesNames).iterator();
-    while (iterator.hasNext() && targetUserNode != null) {
-      targetUserNode = targetUserNode.getChild(iterator.next());
-    }
-    String newPath = null;
-    while (newPath == null) {
-      if (targetUserNode == null) {
-        return nodePath;
-      } else if (targetUserNode.getPageRef() != null) {
-        newPath = targetUserNode.getURI();
-      } else if (!targetUserNode.getChildren().isEmpty()) {
-        targetUserNode = getFirstAllowedPageNode(targetUserNode.getChildren());
+      if (globalUserNode != null) {
+        if (validSiteDepth >= validGlobalDepth) {
+          return getNodeOrFirstChildWithPage(siteUserNode, username);
+        } else {
+          if (globalUserNode.getPageRef() == null
+              || getPage(globalUserNode.getPageRef(), username) == null) {
+            return null;
+          } else {
+            return globalUserNode;
+          }
+        }
       } else {
-        targetUserNode = targetUserNode.getParent();
+        return getNodeOrFirstChildWithPage(siteUserNode, username);
       }
     }
-    return newPath;
   }
 
   @Synchronized
@@ -498,6 +428,25 @@ public class UserPortalConfigService implements Startable {
         return homePageSettingValue.getValue().toString();
       }
       return PropertyManager.getProperty("exo.portal.user.defaultHome");
+    }
+  }
+
+  /**
+   * Sets the user default Path
+   * 
+   * @param username user name
+   * @param path Page path
+   */
+  public void setUserHomePage(String username, String path) {
+    if (StringUtils.isBlank(path)) {
+      settingService.remove(Context.USER.id(username),
+                            HOME_PAGE_URI_PREFERENCE_SCOPE,
+                            HOME_PAGE_URI_PREFERENCE_KEY);
+    } else {
+      settingService.set(Context.USER.id(username),
+                         HOME_PAGE_URI_PREFERENCE_SCOPE,
+                         HOME_PAGE_URI_PREFERENCE_KEY,
+                         SettingValue.create(path));
     }
   }
 
@@ -558,8 +507,9 @@ public class UserPortalConfigService implements Startable {
     PageContext page = layoutService.getPageContext(pageRef);
     if (page == null || !userAcl.hasAccessPermission(page, userAclIdentity)) {
       return null;
+    } else {
+      return page;
     }
-    return page;
   }
 
   /**
@@ -579,8 +529,102 @@ public class UserPortalConfigService implements Startable {
     }
   }
 
-  public void reloadConfig(String ownerType, String predefinedOwner, String location, String importMode, boolean overrideMode) {
-    newPortalConfigListener.reloadConfig(ownerType, predefinedOwner, location, importMode, overrideMode);
+  private UserNode getSiteNode(String portalType, String portalName, String username) {
+    UserNode targetUserNode = getSiteRootNode(portalType, portalName, username);
+    if (targetUserNode == null) {
+      return null;
+    } else {
+      do {
+        if (isAccessiblePage(targetUserNode, username)) {
+          return targetUserNode;
+        } else if (CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
+          UserNode childUserNode = getNodeOrFirstChildWithPage(targetUserNode.getChildren(), username);
+          if (isAccessiblePage(childUserNode, username)) {
+            return childUserNode;
+          }
+        }
+        targetUserNode = targetUserNode.getParent();
+      } while (targetUserNode != null && targetUserNode != targetUserNode.getParent());
+      return null;
+    }
+  }
+
+  private UserNode getSiteRootNode(String siteType, String siteName, String username) {
+    UserPortalConfig userPortalConfig = null;
+    if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
+      userPortalConfig = getUserPortalConfig(siteName, username);
+    } else {
+      PortalConfig defaultPortalConfig = getAccessiblePortalSites(username).stream().findFirst().orElse(null);
+      if (defaultPortalConfig != null) {
+        userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), username);
+      }
+    }
+    if (userPortalConfig == null) {
+      return null;
+    }
+    UserPortal userPortal = userPortalConfig.getUserPortal();
+    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName));
+    if (navigation == null) {
+      return null;
+    }
+    UserNodeFilterConfig builder = UserNodeFilterConfig.builder()
+                                                       .withReadWriteCheck()
+                                                       .withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL)
+                                                       .withTemporalCheck()
+                                                       .build();
+    return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder, null);
+  }
+
+  private UserNode getNodeOrFirstChildWithPage(UserNode userNode, String username) {
+    return getNodeOrFirstChildWithPage(Collections.singleton(userNode), username);
+  }
+
+  private UserNode getNodeOrFirstChildWithPage(Collection<UserNode> userNodes, String username) {
+    return userNodes.stream()
+                    .map(node -> {
+                      if (isAccessiblePage(node, username)) {
+                        return node;
+                      } else if (CollectionUtils.isNotEmpty(node.getChildren())) {
+                        return getNodeOrFirstChildWithPage(node.getChildren(), username);
+                      }
+                      return null;
+                    })
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+  }
+
+  private List<PortalConfig> getAccessiblePortalSites(String username) {
+    Identity userAclIdentity = userAcl.getUserIdentity(username);
+    List<PortalConfig> list = layoutService.getSites(portalSiteFilter);
+    return list.stream()
+               .filter(Objects::nonNull)
+               .filter(portalConfig -> userAcl.hasAccessPermission(portalConfig, userAclIdentity))
+               .sorted((s1, s2) -> {
+                 if (!s2.isDisplayed() && !s1.isDisplayed()) {
+                   if (StringUtils.equals(s1.getName(), PUBLIC_SITE_NAME)) {
+                     return -1;
+                   } else if (StringUtils.equals(s2.getName(), PUBLIC_SITE_NAME)) {
+                     return 1;
+                   } else {
+                     return s2.getName().compareTo(s1.getName());
+                   }
+                 } else if (!s2.isDisplayed()) {
+                   return -Integer.MAX_VALUE;
+                 } else if (!s1.isDisplayed()) {
+                   return Integer.MAX_VALUE;
+                 } else {
+                   int order = s1.getDisplayOrder() - s2.getDisplayOrder();
+                   return order == 0 ? s2.getName().compareTo(s1.getName()) : order;
+                 }
+               })
+               .toList();
+  }
+
+  private boolean isAccessiblePage(UserNode userNode, String username) {
+    return userNode != null
+           && userNode.getPageRef() != null
+           && getPage(userNode.getPageRef(), username) != null;
   }
 
   private String getDefaultUri(UserNode node, String site) {

@@ -62,7 +62,6 @@ public class UIPage extends UIContainer {
 
   @Getter
   @Setter
-  @SuppressWarnings("rawtypes")
   private UIPortlet maximizedUIPortlet;
 
   public void normalizePortletWindowStates() {
@@ -92,8 +91,7 @@ public class UIPage extends UIContainer {
   }
 
   private List<UIPortlet> recursivelyFindUIPortlets(org.exoplatform.webui.core.UIContainer uiContainer) {
-    List<UIPortlet> uiPortletList = new ArrayList<UIPortlet>();
-
+    List<UIPortlet> uiPortletList = new ArrayList<>();
     for (UIComponent uiComponent : uiContainer.getChildren()) {
       if (org.exoplatform.webui.core.UIContainer.class.isAssignableFrom(uiComponent.getClass())) {
         org.exoplatform.webui.core.UIContainer childUIContainer = (org.exoplatform.webui.core.UIContainer) uiComponent;
@@ -104,7 +102,6 @@ public class UIPage extends UIContainer {
         }
       }
     }
-
     return uiPortletList;
   }
 }

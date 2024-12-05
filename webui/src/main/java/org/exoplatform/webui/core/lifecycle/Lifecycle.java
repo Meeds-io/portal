@@ -22,10 +22,12 @@ package org.exoplatform.webui.core.lifecycle;
 import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.groovyscript.text.TemplateService;
+import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.resolver.ResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.webui.application.WebuiRequestContext;
+import org.exoplatform.webui.core.UIApplication;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.event.Event;
 
@@ -36,8 +38,7 @@ public class Lifecycle<E extends UIComponent> {
 
     protected static Log log = ExoLogger.getLogger("portal:Lifecycle");
 
-    // public void init(UIComponent uicomponent, WebuiRequestContext context)
-    // throws Exception {}
+    private static final boolean DEVELOPPING = PropertyManager.isDevelopping();
 
     public void processDecode(E uicomponent, WebuiRequestContext context) throws Exception {
     }
@@ -76,8 +77,6 @@ public class Lifecycle<E extends UIComponent> {
         renderTemplate(template, bcontext);
     }
 
-    // public void destroy(UIComponent uicomponent) throws Exception {}
-
     /**
      * The method allows to use Groovy templates to render the portal components.
      *
@@ -95,19 +94,17 @@ public class Lifecycle<E extends UIComponent> {
         WebuiRequestContext context = bcontext.getRequestContext();
         bcontext.put("locale", context.getLocale());
         ExoContainer pcontainer = context.getApplication().getApplicationServiceContainer();
-        TemplateService service = (TemplateService) pcontainer.getComponentInstanceOfType(TemplateService.class);
+        TemplateService service = pcontainer.getComponentInstanceOfType(TemplateService.class);
         ResourceResolver resolver = bcontext.getResourceResolver();
 
-        if (PropertyManager.isDevelopping()) {
-            WebuiRequestContext rootContext = (WebuiRequestContext) context.getParentAppRequestContext();
-            if (rootContext == null)
-                rootContext = context;
-            long lastAccess = rootContext.getUIApplication().getLastAccessApplication();
-            if (lastAccess > 0 && resolver.isModified(template, lastAccess)) {
-                if (log.isDebugEnabled())
-                    log.debug("Invalidate the template: " + template);
-                service.invalidateTemplate(template, resolver);
-            }
+        if (DEVELOPPING) {
+          PortalRequestContext rootContext = PortalRequestContext.getCurrentInstance();
+          UIApplication uiApplication = rootContext.getUIApplication();
+          long lastAccess = uiApplication.getLastAccessApplication();
+          if (lastAccess == 0 || resolver.isModified(template, lastAccess)) {
+            service.getTemplatesCache().clearCache();
+            uiApplication.setLastAccessApplication(System.currentTimeMillis());
+          }
         }
 
         try {

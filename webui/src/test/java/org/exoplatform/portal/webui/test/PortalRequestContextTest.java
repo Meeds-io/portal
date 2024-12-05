@@ -71,6 +71,7 @@ public class PortalRequestContextTest extends TestCase {
     ExoContainer container = mock(ExoContainer.class);
     UserNode userNode = mock(UserNode.class);
     UserPortalConfigService configService = mock(UserPortalConfigService.class);
+    PortalRequestContext.portalConfigService = configService;
     UIPortal uiPortal = mock(UIPortal.class);
     PageState state = mock(PageState.class);
     PageContext page = mock(PageContext.class);

@@ -29,8 +29,6 @@ public class UserPortalConfig {
 
   private PortalConfig            portal;
 
-  private UserPortalConfigService service;
-
   private String                  portalName;
 
   private String                  accessUser;
@@ -40,12 +38,10 @@ public class UserPortalConfig {
   private Locale                  locale;
 
   public UserPortalConfig(PortalConfig portal,
-                          UserPortalConfigService service,
                           String portalName,
                           String accessUser,
                           Locale locale) {
     this.portal = portal;
-    this.service = service;
     this.portalName = portalName;
     this.accessUser = accessUser;
     this.locale = locale;
@@ -57,7 +53,7 @@ public class UserPortalConfig {
 
   public UserPortal getUserPortal(boolean isNewlyCreated) {
     if (isNewlyCreated || userPortal == null) {
-      userPortal = new UserPortalImpl(service, portalName, portal, accessUser, locale);
+      userPortal = new UserPortalImpl(portalName, portal, accessUser, locale);
     }
     return userPortal;
   }

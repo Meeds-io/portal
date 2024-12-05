@@ -40,7 +40,7 @@ import org.exoplatform.webui.exception.MessageException;
 @Serialized
 public abstract class UIApplication extends UIContainer implements Serializable {
 
-  protected static Log        log            = ExoLogger.getLogger("portal:UIApplication");
+  protected static final Log  LOG            = ExoLogger.getLogger("portal:UIApplication");
 
   private long                lastAccessApplication_;
 
@@ -59,7 +59,7 @@ public abstract class UIApplication extends UIContainer implements Serializable 
         uiPopupMessages_ = createUIComponent(UIPopupMessages.class, null, null);
         uiPopupMessages_.setId("_" + uiPopupMessages_.hashCode());
       } catch (Exception e) {
-        log.error(e.getMessage(), e);
+        LOG.error(e.getMessage(), e);
       }
     }
     return uiPopupMessages_;
@@ -127,7 +127,7 @@ public abstract class UIApplication extends UIContainer implements Serializable 
     } catch (Throwable t) {
       ApplicationMessage msg = new ApplicationMessage("UIApplication.msg.unknown-error", null, ApplicationMessage.ERROR);
       addMessage(msg);
-      log.error("Error during the processAction phase", t);
+      LOG.error("Error during the processAction phase", t);
     }
   }
 

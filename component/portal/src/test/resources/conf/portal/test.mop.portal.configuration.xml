@@ -55,7 +55,7 @@
                         <field name="ownerType">
                             <string>portal</string>
                         </field>
-                        <field name="templateLocation">
+                        <field name="location">
                             <string>classpath:/org/exoplatform/portal/config/conf</string>
                         </field>
                     </object>
