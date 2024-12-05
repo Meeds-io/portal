@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (C) 2011 eXo Platform SAS.
+  ~ Copyright (C) 2009 eXo Platform SAS.
   ~
   ~ This is free software; you can redistribute it and/or modify it
   ~ under the terms of the GNU Lesser General Public License as
@@ -18,27 +18,8 @@
   ~ 02110-1301 USA, or see the FSF site: http://www.fsf.org.
   -->
 
-<node-navigation
+<page-set
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.gatein.org/xml/ns/gatein_objects_1_6 http://www.gatein.org/xml/ns/gatein_objects_1_6"
     xmlns="http://www.gatein.org/xml/ns/gatein_objects_1_6">
-  <priority>1</priority>
-
-  <page-nodes>
-    <node>
-      <name>home</name>
-      <label>#{portal.classic.home}</label>
-      <page-reference>portal::classic::homepage</page-reference>
-      <node>
-        <name>subnode</name>
-        <label>#{portal.classic.home}</label>
-        <page-reference>portal::classic::homepage</page-reference>
-      </node>
-    </node>
-    <node>
-      <name>webexplorer</name>
-      <label>#{portal.classic.webexplorer}</label>
-      <page-reference>portal::classic::webexplorer</page-reference>
-    </node>
-  </page-nodes>
-</node-navigation>
+</page-set>

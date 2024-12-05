@@ -19,8 +19,10 @@
 
 package org.exoplatform.portal.config;
 
-import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.organization.Group;
@@ -34,11 +36,12 @@ public class RemoveGroupPortalConfigListener extends Listener<GroupHandler, Grou
     @Override
     public void onEvent(Event<GroupHandler, Group> event) throws Exception {
         Group group = event.getData();
-        ExoContainer container = ExoContainerContext.getCurrentContainer();
-        UserPortalConfigService portalConfigService = (UserPortalConfigService) container
-                .getComponentInstanceOfType(UserPortalConfigService.class);
+        LayoutService layoutService = ExoContainerContext.getService(LayoutService.class);
         String groupId = group.getId().substring(1);
-        portalConfigService.removeUserPortalConfig("group", groupId);
+        PortalConfig site = layoutService.getPortalConfig(SiteKey.group(groupId));
+        if (site != null) {
+          layoutService.remove(site);
+        }
     }
 
 }

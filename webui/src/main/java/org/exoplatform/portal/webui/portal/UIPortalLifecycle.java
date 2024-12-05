@@ -28,13 +28,14 @@ import org.exoplatform.webui.core.lifecycle.Lifecycle;
  */
 public class UIPortalLifecycle extends Lifecycle<UIPortal> {
 
-    public void processRender(UIPortal uicomponent, WebuiRequestContext context) throws Exception {
-        if (uicomponent.getMaximizedUIComponent() != null) {
-            UIComponent uiComponent = uicomponent.getMaximizedUIComponent();
-            uiComponent.processRender(context);
-            return;
-        }
-        super.processRender(uicomponent, context);
+  @Override
+  public void processRender(UIPortal uiPortal, WebuiRequestContext context) throws Exception {
+    UIComponent maximizedUIComponent = uiPortal.getMaximizedUIComponent();
+    if (maximizedUIComponent == null) {
+      super.processRender(uiPortal, context);
+    } else {
+      maximizedUIComponent.processRender(context);
     }
+  }
 
 }

@@ -23,7 +23,6 @@
     xsi:schemaLocation="http://www.gatein.org/xml/ns/gatein_objects_1_6 http://www.gatein.org/xml/ns/gatein_objects_1_6"
     xmlns="http://www.gatein.org/xml/ns/gatein_objects_1_6">
   <priority>1</priority>
-
   <page-nodes>
     <node>
       <name>home</name>
@@ -31,13 +30,27 @@
       <page-reference>portal::classic::homepage</page-reference>
       <node>
         <name>subnode</name>
-        <label>#{portal.classic.home}</label>
-        <page-reference>portal::classic::homepage</page-reference>
+        <label>#{portal.classic.sitemap}</label>
+        <visibility>DISPLAYED</visibility>
+        <page-reference>portal::classic::sitemap</page-reference>
+      </node>
+      <node>
+        <name>subnode2</name>
+        <label>#{portal.classic.sitemap}</label>
+        <visibility>DISPLAYED</visibility>
+        <page-reference>portal::classic::webexplorer</page-reference>
       </node>
     </node>
     <node>
-      <name>webexplorer</name>
-      <label>#{portal.classic.webexplorer}</label>
+      <name>sitemap</name>
+      <label>#{portal.classic.sitemap}</label>
+      <visibility>DISPLAYED</visibility>
+      <page-reference>portal::classic::webexplorer</page-reference>
+    </node>
+    <node>
+      <name>groupnavigation</name>
+      <label>#{portal.classic.groupnavigation}</label>
+      <visibility>SYSTEM</visibility>
       <page-reference>portal::classic::webexplorer</page-reference>
     </node>
   </page-nodes>

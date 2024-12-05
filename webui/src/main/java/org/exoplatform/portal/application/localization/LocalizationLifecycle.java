@@ -24,11 +24,6 @@ package org.exoplatform.portal.application.localization;
 import java.util.Locale;
 import java.util.Objects;
 
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
-
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.container.ExoContainer;
@@ -37,7 +32,6 @@ import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.portal.Constants;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.localization.LocaleContextInfoUtils;
-import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
@@ -46,8 +40,15 @@ import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.services.resources.LocaleContextInfo;
 import org.exoplatform.services.resources.LocalePolicy;
-import org.exoplatform.web.application.*;
+import org.exoplatform.web.application.Application;
+import org.exoplatform.web.application.ApplicationLifecycle;
+import org.exoplatform.web.application.RequestFailure;
 import org.exoplatform.webui.application.WebuiRequestContext;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 /**
  * This class takes care of loading / initializing / saving the current Locale.
@@ -57,10 +58,8 @@ import org.exoplatform.webui.application.WebuiRequestContext;
  * Locale is then set on current
  * {@link org.exoplatform.portal.application.PortalRequestContext} (it's
  * presumed that current {@link org.exoplatform.web.application.RequestContext}
- * is of type PortalRequestContext) by calling
- * {@link org.exoplatform.portal.application.PortalRequestContext#setLocale}.
- * During request processing
- * {@link org.exoplatform.portal.application.PortalRequestContext#getLocale} is
+ * is of type PortalRequestContext) by calling PortalRequestContext#setLocale.
+ * During request processing PortalRequestContext#getLocale is
  * the ultimate reference consulted by any rendering code that needs to know
  * about current Locale. When this Locale is changed during action processing,
  * the new Locale choice is saved into user's profile or into browser's cookie
@@ -207,7 +206,7 @@ public class LocalizationLifecycle extends BaseComponentPlugin implements Applic
       return;
     }
     // we presume PortalRequestContext, and UIPortalApplication
-    ((UIPortalApplication) context.getUIApplication()).setOrientation(localeConfig.getOrientation());
+    context.setOrientation(localeConfig.getOrientation());
   }
 
   private void saveSessionLocale(PortalRequestContext context, Locale loc) {

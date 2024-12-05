@@ -1,14 +1,4 @@
 <%
-	import org.exoplatform.portal.webui.workspace.UIPortalApplication;
-	import org.exoplatform.commons.utils.HTMLEntityEncoder;
-	
-	def rcontext = _ctx.getRequestContext();
-	UIPortalApplication uiPortalApp = rcontext.getUIApplication();
-
-	if (!uicomponent.hasPermission()) {
-    return;
-  }
-
 	String cssStyle = "";
 	String uiComponentWidth = uicomponent.getWidth();
 	String uiComponentHeight = uicomponent.getHeight();

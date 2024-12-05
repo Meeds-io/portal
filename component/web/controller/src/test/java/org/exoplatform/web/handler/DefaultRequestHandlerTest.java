@@ -36,7 +36,6 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.URIWriter;
-import org.exoplatform.web.handler.DefaultRequestHandler;
 import org.exoplatform.web.url.navigation.NavigationResource;
 import org.exoplatform.web.url.navigation.NodeURL;
 
@@ -58,8 +57,8 @@ public class DefaultRequestHandlerTest {
       when(context.getResponse()).thenReturn(response);
       when(context.getRequest()).thenReturn(request);
       when(request.getRemoteUser()).thenReturn("root");
-      when(portalConfigService.computePortalPath(any(HttpServletRequest.class))).thenReturn("/portal/site2/node");
-      when(response.encodeRedirectURL(anyString())).thenAnswer(new Answer<String>() {
+      when(portalConfigService.getDefaultPath(request.getRemoteUser())).thenReturn("/portal/site2/node");
+      when(response.encodeRedirectURL(anyString())).thenAnswer(new Answer<>() {
         public String answer(InvocationOnMock invocation) {
           return invocation.getArgument(0, String.class);
         }
@@ -84,18 +83,24 @@ public class DefaultRequestHandlerTest {
     try {
       when(context.getResponse()).thenReturn(response);
       when(context.getRequest()).thenReturn(request);
-      when(request.getRemoteUser()).thenReturn("user");
-      when(portalConfigService.getUserHomePage(eq("user"))).thenReturn("/portal/home");
+      DefaultRequestHandler defaultRequestHandler = new DefaultRequestHandler(portalConfigService);
+      defaultRequestHandler.execute(context);
+      verify(response).sendRedirect("/portal/login");
 
-      when(response.encodeRedirectURL(anyString())).thenAnswer(new Answer<String>() {
+      when(request.getRemoteUser()).thenReturn("user");
+      when(portalConfigService.getMetaPortal()).thenReturn("classic");
+
+      when(response.encodeRedirectURL(anyString())).thenAnswer(new Answer<>() {
         public String answer(InvocationOnMock invocation) {
           return invocation.getArgument(0, String.class);
         }
       });
-
-      DefaultRequestHandler defaultRequestHandler = new DefaultRequestHandler(portalConfigService);
       defaultRequestHandler.execute(context);
-      verify(response).sendRedirect(eq("/portal/home"));
+      verify(response).sendRedirect("/portal/classic/page-not-found");
+
+      when(portalConfigService.getDefaultPath(eq("user"))).thenReturn("/portal/home");
+      defaultRequestHandler.execute(context);
+      verify(response).sendRedirect("/portal/home");
     } catch (Exception e) {
       LOG.error("Error while executing method", e);
       fail(e.getMessage());
@@ -116,7 +121,7 @@ public class DefaultRequestHandlerTest {
       when(context.getRequest()).thenReturn(request);
       when(request.getRemoteUser()).thenReturn("root");
       when(request.getRemoteUser()).thenReturn("user");
-      when(portalConfigService.computePortalPath(any(HttpServletRequest.class))).thenReturn("/portal/site1");
+      when(portalConfigService.getDefaultPath(anyString())).thenReturn("/portal/site1");
       doAnswer(invocation -> {
         @SuppressWarnings("unchecked")
         Map<QualifiedName, String> parameters = invocation.getArgument(0, Map.class);
@@ -148,8 +153,6 @@ public class DefaultRequestHandlerTest {
     HttpServletRequest request = mock(HttpServletRequest.class);
 
     try {
-      when(request.getRemoteUser()).thenReturn("user");
-      when(portalConfigService.getUserPortalSites(request.getRemoteUser())).thenReturn(null);
       when(context.getResponse()).thenReturn(response);
       when(context.getRequest()).thenReturn(request);
 
