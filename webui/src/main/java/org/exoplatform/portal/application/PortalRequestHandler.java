@@ -275,13 +275,7 @@ public class PortalRequestHandler extends WebRequestHandler {
       }
     } finally {
       try {
-        if (context.getResponse() instanceof PortalHttpServletResponseWrapper responseWrapper) {
-          responseWrapper.commit();
-          responseWrapper.setWrapMethods(false);
-        }
-
-        // We flush the writer here for all
-        context.getWriter().flush();
+        context.commitResponse();
         //
         try {
           for (ApplicationLifecycle lifecycle : lifecycles)

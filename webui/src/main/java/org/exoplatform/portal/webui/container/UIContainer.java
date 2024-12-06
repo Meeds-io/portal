@@ -19,7 +19,9 @@
 
 package org.exoplatform.portal.webui.container;
 
+import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.webui.portal.UIPortalComponent;
+import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 
 /**
@@ -28,18 +30,18 @@ import org.exoplatform.webui.config.annotation.ComponentConfig;
 @ComponentConfig
 public class UIContainer extends UIPortalComponent {
 
-  public static final String    TABLE_COLUMN_CONTAINER = "TableColumnContainer";
+  public static final String TABLE_COLUMN_CONTAINER = "TableColumnContainer";
 
   /** Storage id. */
-  private String                storageId;
+  private String             storageId;
 
-  protected String              icon;
+  protected String           icon;
 
-  protected String              description;
+  protected String           description;
 
-  protected String              cssClass;
+  protected String           cssClass;
 
-  protected String              profiles;
+  protected String           profiles;
 
   public String getStorageId() {
     return storageId;
@@ -83,6 +85,20 @@ public class UIContainer extends UIPortalComponent {
 
   public String getPermissionClasses() {
     return "";
+  }
+
+  @Override
+  public void processRender(WebuiRequestContext context) throws Exception {
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+    String key = "UIContainer_" + (storageId == null ? getId() : storageId);
+    boolean started = portalRequestContext.startServerTime(key);
+    try {
+      super.processRender(context);
+    } finally {
+      if (started) {
+        portalRequestContext.endServerTime(key);
+      }
+    }
   }
 
 }
