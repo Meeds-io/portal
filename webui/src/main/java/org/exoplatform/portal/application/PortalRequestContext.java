@@ -66,6 +66,7 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.web.ControllerContext;
+import org.exoplatform.web.PortalHttpServletResponseWrapper;
 import org.exoplatform.web.application.JavascriptManager;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.application.URLBuilder;
@@ -81,6 +82,8 @@ import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.url.ComponentURL;
 
+import io.meeds.common.performance.model.ServerResponseTime;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
@@ -95,105 +98,107 @@ import lombok.SneakyThrows;
  */
 public class PortalRequestContext extends WebuiRequestContext {
 
-  public static final int                   PUBLIC_ACCESS       = 0;
+  public static final int                  PUBLIC_ACCESS       = 0;
 
-  public static final int                   PRIVATE_ACCESS      = 1;
+  public static final int                  PRIVATE_ACCESS      = 1;
 
-  public static final String                UI_COMPONENT_ACTION = ComponentURL.PORTAL_COMPONENT_ACTION;
+  public static final String               UI_COMPONENT_ACTION = ComponentURL.PORTAL_COMPONENT_ACTION;
 
-  public static final String                UI_COMPONENT_ID     = ComponentURL.PORTAL_COMPONENT_ID;
+  public static final String               UI_COMPONENT_ID     = ComponentURL.PORTAL_COMPONENT_ID;
 
-  public static final String                TARGET_NODE         = "portal:targetNode";
+  public static final String               TARGET_NODE         = "portal:targetNode";
 
-  public static final String                CACHE_LEVEL         = "portal:cacheLevel";
+  public static final String               CACHE_LEVEL         = "portal:cacheLevel";
 
-  public static final String                REQUEST_TITLE       = "portal:requestTitle".intern();
+  public static final String               REQUEST_TITLE       = "portal:requestTitle".intern();
 
-  public static final String                REQUEST_METADATA    = "portal:requestMetadata".intern();
+  public static final String               REQUEST_METADATA    = "portal:requestMetadata".intern();
 
-  private static final String               DO_LOGIN_PATTERN    = "login";
+  private static final String              DO_LOGIN_PATTERN    = "login";
 
-  private static final Log                  LOG                 = ExoLogger.getLogger("portal:PortalRequestContext");
+  private static final Log                 LOG                 = ExoLogger.getLogger("portal:PortalRequestContext");
 
-  public static DynamicPortalLayoutService portalLayoutService;
+  public static DynamicPortalLayoutService portalLayoutService;                                                     // NOSONAR
 
-  public static UserPortalConfigService    portalConfigService;
+  public static UserPortalConfigService    portalConfigService;                                                     // NOSONAR
 
-  public static LayoutService              layoutService;
+  public static LayoutService              layoutService;                                                           // NOSONAR
 
-  public static SSOHelper                  ssoHelper;
+  public static SSOHelper                  ssoHelper;                                                               // NOSONAR
 
   /** The path decoded from the request. */
-  private final String                      nodePath;
+  private final String                     nodePath;
 
   /** . */
-  private final String                      portalURI;
+  private final String                     portalURI;
 
   /** . */
-  private final String                      contextPath;
+  private final String                     contextPath;
 
   /** . */
-  private final SiteKey                     siteKey;
+  private final SiteKey                    siteKey;
 
   /** The locale from the request. */
   @Getter
-  private final Locale                      requestLocale;
+  private final Locale                     requestLocale;
 
-  /** . */
-  private final HttpServletRequest          request;
+  @Getter
+  private final HttpServletRequest         request;
 
-  /** . */
-  private final HttpServletResponse         response;
+  @Getter
+  private final HttpServletResponse        response;
 
-  private String                            cacheLevel          = "cacheLevelPortlet";
+  private String                           cacheLevel          = "cacheLevelPortlet";
 
-  private boolean                           ajaxRequest         = true;
-
-  @Setter
-  private Boolean                           draftPage;
+  private boolean                          ajaxRequest         = true;
 
   @Setter
-  private Boolean                           noCache;
+  private Boolean                          draftPage;
 
-  private boolean                           forceFullUpdate     = false;
+  @Setter
+  private Boolean                          noCache;
 
-  private Writer                            writer;
+  private boolean                          forceFullUpdate     = false;
 
-  protected JavascriptManager               javascriptManager;
+  private Writer                           writer;
 
-  private List<Element>                     extraMarkupHeaders;
+  protected JavascriptManager              javascriptManager;
 
-  private final PortalURLBuilder            urlBuilder;
+  private List<Element>                    extraMarkupHeaders;
 
-  private Map<String, String[]>             parameterMap;
+  private final PortalURLBuilder           urlBuilder;
+
+  private Map<String, String[]>            parameterMap;
 
   @Getter
   @Setter
-  private Locale                            locale              = Locale.ENGLISH;
+  private Locale                           locale              = Locale.ENGLISH;
 
   @Getter
   @Setter
-  private Orientation                       orientation         = Orientation.LT;
+  private Orientation                      orientation         = Orientation.LT;
 
-  private List<Runnable>                    endRequestRunnables;
-
-  /** . */
-  private final URLFactoryService           urlFactory;
+  private List<Runnable>                   endRequestRunnables;
 
   /** . */
-  private final ControllerContext           controllerContext;
+  private final URLFactoryService          urlFactory;
 
-  private UserPortalConfig                  userPortalConfig;
+  /** . */
+  private final ControllerContext          controllerContext;
 
-  private PortalConfig                      currentPortalConfig;
+  private UserPortalConfig                 userPortalConfig;
 
-  private UIPortal                          uiPortal;
+  private PortalConfig                     currentPortalConfig;
 
-  private UIPage                            uiPage;
+  private UIPortal                         uiPortal;
+
+  private UIPage                           uiPage;
 
   @Getter
   @Setter
   private UIPortlet                        maximizedUIPortlet;
+
+  private ServerResponseTime               serverResponseTime;
 
   public void setUiPage(UIPage uiPage) {
     this.uiPage = uiPage;
@@ -306,6 +311,42 @@ public class PortalRequestContext extends WebuiRequestContext {
     return javascriptManager;
   }
 
+  @Override
+  public final String getRemoteUser() {
+    return request.getRemoteUser();
+  }
+
+  @Override
+  public final boolean isUserInRole(String roleUser) {
+    return request.isUserInRole(roleUser);
+  }
+
+  @Override
+  public final Writer getWriter() throws IOException {
+    if (writer == null) {
+      writer = new PortalPrinter(response.getOutputStream(), false, 30000);
+    }
+    return writer;
+  }
+
+  @Override
+  public final void setWriter(Writer writer) {
+    this.writer = writer;
+  }
+
+  @Override
+  public final boolean useAjax() {
+    return ajaxRequest;
+  }
+
+  /**
+   * @see org.exoplatform.web.application.RequestContext#getFullRender()
+   */
+  @Override
+  public final boolean getFullRender() {
+    return forceFullUpdate;
+  }
+
   public String getSkin() {
     if (skin == null) {
       String siteSkin = getUiPortal().getSkin();
@@ -406,7 +447,7 @@ public class PortalRequestContext extends WebuiRequestContext {
       if (getUiPortal() == null) {
         return null;
       }
-      return getUiPage(navigationNode, uiPortal);
+      return buildUiPage(navigationNode, uiPortal);
     }
   }
 
@@ -610,7 +651,7 @@ public class PortalRequestContext extends WebuiRequestContext {
   }
 
   public String getRequestURI() {
-    return nodePath;
+    return getNodePath();
   }
 
   public String getPortalURI() {
@@ -623,62 +664,6 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public int getAccessPath() {
     return request.getRemoteUser() != null ? PRIVATE_ACCESS : PUBLIC_ACCESS;
-  }
-
-  public final String getRemoteUser() {
-    return request.getRemoteUser();
-  }
-
-  public final boolean isUserInRole(String roleUser) {
-    return request.isUserInRole(roleUser);
-  }
-
-  public final Writer getWriter() throws IOException {
-    if (writer == null) {
-      writer = new PortalPrinter(response.getOutputStream(), false, 30000);
-    }
-    return writer;
-  }
-
-  public final void setWriter(Writer writer) {
-    this.writer = writer;
-  }
-
-  public final boolean useAjax() {
-    return ajaxRequest;
-  }
-
-  @SuppressWarnings("unchecked")
-  public HttpServletRequest getRequest() {
-    return request;
-  }
-
-  @SuppressWarnings("unchecked")
-  public final HttpServletResponse getResponse() {
-    return response;
-  }
-
-  /**
-   * @see org.exoplatform.web.application.RequestContext#getFullRender()
-   */
-  public final boolean getFullRender() {
-    return forceFullUpdate;
-  }
-
-  /**
-   * Sets a boolean value to force whether portal will be fully rendered and it
-   * is only effective to an Ajax request. <br>
-   * if the value is set to <code>true</code>, it means :<br>
-   * 1) Only portal ui components are rendered <br>
-   * 2) Portlets will be fully rendered if are inner of the portal ui components
-   * being updated
-   *
-   * @param forceFullUpdate This method is deprecated,
-   *          ignoreAJAXUpdateOnPortlets should be used instead
-   */
-  @Deprecated()
-  public final void setFullRender(boolean forceFullUpdate) {
-    this.forceFullUpdate = forceFullUpdate;
   }
 
   /**
@@ -722,9 +707,9 @@ public class PortalRequestContext extends WebuiRequestContext {
     }
   }
 
-  public List<String> getExtraMarkupHeadersAsStrings() throws Exception {
-    List<String> markupHeaders = new ArrayList<String>();
-
+  @SneakyThrows
+  public List<String> getExtraMarkupHeadersAsStrings() {
+    List<String> markupHeaders = new ArrayList<>();
     if (extraMarkupHeaders != null && !extraMarkupHeaders.isEmpty()) {
       for (Element element : extraMarkupHeaders) {
         StringWriter sw = new StringWriter();
@@ -732,7 +717,6 @@ public class PortalRequestContext extends WebuiRequestContext {
         markupHeaders.add(sw.toString());
       }
     }
-
     return markupHeaders;
   }
 
@@ -785,6 +769,35 @@ public class PortalRequestContext extends WebuiRequestContext {
     return getRequest().getParameter("maximizedPortletId");
   }
 
+  public boolean startServerTime(String name) {
+    if (ServerResponseTime.SERVER_TIMING_ENABLED) {
+      if (serverResponseTime == null) {
+        serverResponseTime = new ServerResponseTime();
+      }
+      return serverResponseTime.startServerTime(name);
+    }
+    return false;
+  }
+
+  public void endServerTime(String name) {
+    if (serverResponseTime != null) {
+      serverResponseTime.endServerTime(name);
+    }
+  }
+
+  @SneakyThrows
+  public void commitResponse() {
+    if (serverResponseTime != null) {
+      serverResponseTime.addHttpHeader(response);
+      serverResponseTime = null;
+    }
+    if (response instanceof PortalHttpServletResponseWrapper responseWrapper) {
+      responseWrapper.commit();
+      responseWrapper.setWrapMethods(false);
+    }
+    getWriter().flush();
+  }
+
   public static PortalRequestContext getCurrentInstance() {
     RequestContext currentInstance = RequestContext.getCurrentInstance();
     if (currentInstance == null) {
@@ -797,7 +810,7 @@ public class PortalRequestContext extends WebuiRequestContext {
   }
 
   @SneakyThrows
-  private UIPage getUiPage(UserNode pageNode, UIPortal uiPortal) {
+  private UIPage buildUiPage(UserNode pageNode, UIPortal uiPortal) {
     PageContext pageContext = null;
     String pageReference = null;
     if (pageNode != null && pageNode.getPageRef() != null) {
@@ -809,18 +822,22 @@ public class PortalRequestContext extends WebuiRequestContext {
     if (pageContext == null) {
       // Clear the UIPage from cache in UIPortal
       uiPortal.clearUIPage(pageReference);
-      return null;
+      this.uiPage = null;
     } else {
-      setDraftPage(pageNode.getVisibility() == Visibility.DRAFT);
-      this.page = layoutService.getPage(pageReference);
-      if (uiPortal.getUIPage(pageReference) == null) {
+      boolean isDraftPage = pageNode.getVisibility() == Visibility.DRAFT;
+      setDraftPage(isDraftPage);
+      if (this.page == null) {
+        this.page = layoutService.getPage(pageReference);
+      }
+      this.uiPage = uiPortal.getUIPage(pageReference);
+      if (this.uiPage == null) {
         UIPageFactory clazz = UIPageFactory.getInstance(pageContext.getState().getFactoryId());
         this.uiPage = clazz.createUIPage(this);
         pageContext.update(this.page);
         PortalDataMapper.toUIPage(this.uiPage, this.page);
       }
-      return this.uiPage;
     }
+    return this.uiPage;
   }
 
 }

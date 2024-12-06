@@ -47,10 +47,16 @@ public class UISiteBody extends UIComponentDecorator {
 
     @Override
     public void processRender(WebuiRequestContext context) throws Exception {
-      if (isShowSiteBody()) {
-        processContainerRender(context);
-      } else {
-        processPageBodyRender(context);
+      PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+      portalRequestContext.startServerTime("UISiteBody");
+      try {
+        if (isShowSiteBody()) {
+          processContainerRender(context);
+        } else {
+          processPageBodyRender(context);
+        }
+      } finally {
+        portalRequestContext.endServerTime("UISiteBody");
       }
     }
 

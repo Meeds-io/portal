@@ -179,6 +179,9 @@ public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
    * UIPortlet.gtmpl
    */
   public void processRender(UIPortlet uicomponent, WebuiRequestContext context) throws Exception { // NOSONAR
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+    String key = "UIPortlet_" + uicomponent.getApplicationId().split("/")[1] + "_" + uicomponent.getStorageId();
+    boolean started = portalRequestContext.startServerTime(key);
     PortalRequestContext prcontext = (PortalRequestContext) context;
     Text markup = null;
     try {
@@ -243,6 +246,9 @@ public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
       } catch (Throwable e) { // NOSONAR
         LOG.error(e.getMessage(), e);
       }
+    }
+    if (started) {
+      portalRequestContext.endServerTime(key);
     }
   }
 }
