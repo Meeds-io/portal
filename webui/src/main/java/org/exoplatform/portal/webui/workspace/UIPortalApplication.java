@@ -189,11 +189,6 @@ public class UIPortalApplication extends UIApplication {
 
   private UIComponentDecorator           uiViewWorkingWorkspace; // NOSONAR
 
-  @Deprecated(forRemoval = true, since = "7.0")
-  public static EditMode getDefaultEditMode() {
-    return EditMode.NO_EDIT;
-  }
-
   /**
    * The constructor of this class is used to build the tree of UI components
    * that will be aggregated in the portal page.<br>
@@ -327,11 +322,21 @@ public class UIPortalApplication extends UIApplication {
   }
 
   /**
-   * @deprecated use the Mode State instead
-   * @return True if the Portal is not in the normal mode
+   * @return false all time
+   * @deprecated no more WebUI based layout management, thus useless
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public boolean isEditing() {
     return false;
+  }
+
+  /**
+   * @return EditMode.NO_EDIT all time
+   * @deprecated no more WebUI based layout management, thus useless
+   */
+  @Deprecated(forRemoval = true, since = "7.0")
+  public static EditMode getDefaultEditMode() {
+    return EditMode.NO_EDIT;
   }
 
   /**
@@ -641,7 +646,9 @@ public class UIPortalApplication extends UIApplication {
    * {@code <div class="PortalResponseScript">}
    */
   @Override
-  public void processRender(WebuiRequestContext context) throws Exception {
+  public void processRender(WebuiRequestContext context) throws Exception { // NOSONAR
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+    portalRequestContext.startServerTime("UIPortalApplication");
     String maximizedPortletId = getMaximizedPortletId();
     if (StringUtils.isNotBlank(maximizedPortletId)) {
       UIPortlet maximizedUiPortlet = getCurrentPortlets().stream()
@@ -653,36 +660,35 @@ public class UIPortalApplication extends UIApplication {
                                                                                                                     getCurrentPage().getTitle())));
       UIPage uiPage = findFirstComponentOfType(UIPage.class);
       uiPage.normalizePortletWindowStates();
-      PortalRequestContext.getCurrentInstance().setMaximizedUIPortlet(maximizedUiPortlet);
+      portalRequestContext.setMaximizedUIPortlet(maximizedUiPortlet);
     }
     try {
-      PortalRequestContext pcontext = (PortalRequestContext) context;
-      pcontext.setAttribute("requestStartTime", System.currentTimeMillis());
+      portalRequestContext.setAttribute("requestStartTime", System.currentTimeMillis());
 
-      JavascriptManager jsMan = context.getJavascriptManager();
+      JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
       // Add JS resource of current portal
-      String portalOwner = pcontext.getPortalOwner();
-      jsMan.loadScriptResource(ResourceScope.PORTAL, portalOwner);
+      String portalOwner = portalRequestContext.getPortalOwner();
+      jsManager.loadScriptResource(ResourceScope.PORTAL, portalOwner);
 
       //
-      Writer w = context.getWriter();
-      if (!context.useAjax()) {
+      Writer w = portalRequestContext.getWriter();
+      if (!portalRequestContext.useAjax()) {
         // Support for legacy resource declaration
-        jsMan.loadScriptResource(ResourceScope.SHARED, JavascriptConfigParser.LEGACY_JAVA_SCRIPT);
+        jsManager.loadScriptResource(ResourceScope.SHARED, JavascriptConfigParser.LEGACY_JAVA_SCRIPT);
         // Need to add bootstrap as immediate since it contains the loader
-        jsMan.loadScriptResource(ResourceScope.SHARED, "bootstrap");
+        jsManager.loadScriptResource(ResourceScope.SHARED, "bootstrap");
 
-        super.processRender(context);
+        super.processRender(portalRequestContext);
       } else {
         UIMaskWorkspace uiMaskWS = getChildById(UIPortalApplication.UI_MASK_WS_ID);
         if (uiMaskWS.isUpdated()) {
-          pcontext.addUIComponentToUpdateByAjax(uiMaskWS);
+          portalRequestContext.addUIComponentToUpdateByAjax(uiMaskWS);
         }
         if (USE_WEBUI_RESOURCES && getUIPopupMessages().hasMessage()) {
-          pcontext.addUIComponentToUpdateByAjax(getUIPopupMessages());
+          portalRequestContext.addUIComponentToUpdateByAjax(getUIPopupMessages());
         }
 
-        Set<UIComponent> list = context.getUIComponentToUpdateByAjax();
+        Set<UIComponent> list = portalRequestContext.getUIComponentToUpdateByAjax();
         List<UIPortlet> uiPortlets = new ArrayList<>(3);
         List<UIComponent> uiDataComponents = new ArrayList<>(5);
         if (list != null) {
@@ -697,11 +703,11 @@ public class UIPortalApplication extends UIApplication {
         w.write("<div class=\"PortalResponse\">");
         w.write("<div class=\"PortalResponseData\">");
         for (UIComponent uicomponent : uiDataComponents) {
-          renderBlockToUpdate(uicomponent, context, w);
+          renderBlockToUpdate(uicomponent, portalRequestContext, w);
         }
-        w.write("</div>");
+        w.write("</div>"); // NOSONAR
 
-        if (!context.getFullRender()) {
+        if (!portalRequestContext.getFullRender()) {
           for (UIPortlet uiPortlet : uiPortlets) {
             w.write("<div class=\"PortletResponse\" style=\"display: none\">");
             w.append("<div class=\"PortletResponsePortletId\">" + uiPortlet.getId() + "</div>");
@@ -713,7 +719,7 @@ public class UIPortalApplication extends UIApplication {
              * update the javascript client will see that as a full refresh of
              * the content part
              */
-            uiPortlet.processRender(context);
+            uiPortlet.processRender(portalRequestContext);
 
             w.append("</div>");
             w.append("<div class=\"PortletResponseScript\"></div>");
@@ -721,16 +727,15 @@ public class UIPortalApplication extends UIApplication {
           }
         }
         w.write("<div class=\"MarkupHeadElements\">");
-        List<String> headElems = ((PortalRequestContext) context).getExtraMarkupHeadersAsStrings();
+        List<String> headElems = portalRequestContext.getExtraMarkupHeadersAsStrings();
         for (String elem : headElems) {
           w.write(elem);
         }
         w.write("</div>");
         w.write("<div class=\"LoadingScripts\">");
-        writeLoadingScripts(pcontext);
+        writeLoadingScripts(portalRequestContext);
         w.write("</div>");
         w.write("<div class=\"PortalResponseScript\">");
-        JavascriptManager jsManager = pcontext.getJavascriptManager();
         String skin = getAddSkinScript(list);
         if (skin != null) {
           jsManager.require("SHARED/skin", "skin").addScripts(skin);
@@ -743,8 +748,9 @@ public class UIPortalApplication extends UIApplication {
       if (StringUtils.isNotBlank(maximizedPortletId)) {
         UIPage uiPage = findFirstComponentOfType(UIPage.class);
         uiPage.normalizePortletWindowStates();
-        PortalRequestContext.getCurrentInstance().setMaximizedUIPortlet(null);
+        portalRequestContext.setMaximizedUIPortlet(null);
       }
+      portalRequestContext.endServerTime("UIPortalApplication");
     }
   }
 
