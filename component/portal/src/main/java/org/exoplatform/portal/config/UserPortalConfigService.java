@@ -311,6 +311,11 @@ public class UserPortalConfigService implements Startable {
   }
 
   public String getDefaultSitePath(String portalName, String username) {
+    UserNode userNode = getDefaultSiteNode(portalName, username);
+    return userNode == null ? null : getDefaultUri(userNode, portalName);
+  }
+
+  public UserNode getDefaultSiteNode(String portalName, String username) {
     PortalConfig portalConfig = layoutService.getPortalConfig(portalName);
     if (portalConfig == null) {
       return null;
@@ -319,7 +324,7 @@ public class UserPortalConfigService implements Startable {
     if (userNode == null) {
       return null;
     }
-    return getDefaultUri(userNode, portalName);
+    return userNode;
   }
 
   public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
