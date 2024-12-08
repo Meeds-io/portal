@@ -17,7 +17,7 @@
 		uicomponent.setId(componentId.substring("UIContainer-".length()));
 	}
 
-	rcontext.getUIApplication().getJavascriptManager().require("SHARED/mobileSwipeContainer", "mobileSwipe");
+	rcontext.getJavascriptManager().require("SHARED/mobileSwipeContainer", "mobileSwipe");
 %>
 <div class="UIContainer <%=uiComponentClass%> UIMobileSwipeContainer" id="${uicomponent.id}" ${cssStyle}>
 	<div class="NormalContainerBlock UIComponentBlock">
