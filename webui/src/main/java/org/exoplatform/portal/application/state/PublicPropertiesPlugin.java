@@ -23,12 +23,12 @@ import java.util.Map;
 import javax.xml.namespace.QName;
 
 import org.exoplatform.container.xml.InitParams;
+import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.portal.UIPortal;
-import org.exoplatform.portal.webui.util.Util;
 
 /**
  * This plugin setup properties that are publicly supported, hence this is part of a public API and once published its contract
@@ -59,7 +59,7 @@ public class PublicPropertiesPlugin extends AbstractContextualPropertyProviderPl
     /** . */
     private final QName windowWidth;
 
-    public PublicPropertiesPlugin(InitParams params) throws Exception {
+    public PublicPropertiesPlugin(InitParams params) {
         super(params);
 
         //
@@ -75,7 +75,7 @@ public class PublicPropertiesPlugin extends AbstractContextualPropertyProviderPl
     @Override
     public void getProperties(UIPortlet portletWindow, Map<QName, String[]> properties) {
         try {
-            UIPortal currentSite = Util.getUIPortalApplication().getCurrentSite();
+            UIPortal currentSite = PortalRequestContext.getCurrentInstance().getUiPortal();
             UserNode currentNode = currentSite.getSelectedUserNode();
 
             // Navigation related properties

@@ -97,6 +97,7 @@ public class UIPortalApplicationLifecycle extends Lifecycle<UIPortalApplication>
 
         try {
             // flush the parent writer to the output stream so that we are really to accept the child content
+            prc.commitResponse();
             parentWriter.flushOutputStream();
             // now that the parent has been flushed, we can flush the contents of the child to the output
             childWriter.flushOutputStream();

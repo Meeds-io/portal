@@ -28,9 +28,12 @@
     <node>
       <name>home</name>
       <label>#{portal.classic.home}</label>
-      <page-reference>
-        portal::classic::homepage
-      </page-reference>
+      <page-reference>portal::classic::homepage</page-reference>
+      <node>
+        <name>subnode</name>
+        <label>#{portal.classic.home}</label>
+        <page-reference>portal::classic::homepage</page-reference>
+      </node>
     </node>
     <node>
       <name>webexplorer</name>

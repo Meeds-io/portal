@@ -19,7 +19,6 @@
 
 package org.exoplatform.portal.webui.application;
 
-import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;

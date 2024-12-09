@@ -83,11 +83,10 @@ public class PortalTemplateRequestHandler extends PortalRequestHandler {
     }
 
     return processRequest(controllerContext,
-                          request,
-                          requestLocale,
-                          portalConfig.getName(),
                           portalConfig.getType(),
-                          requestPath);
+                          portalConfig.getName(),
+                          requestPath,
+                          requestLocale);
   }
 
   public LayoutService getLayoutService() {

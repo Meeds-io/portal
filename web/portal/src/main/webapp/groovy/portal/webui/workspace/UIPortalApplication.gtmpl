@@ -100,15 +100,6 @@
   }
   def userHomeLink = uicomponent.getUserHomePage();
 
-  def stickyMenu = false;
-  if (rcontext.getRequestParameter("sticky") == null) {
-    stickyMenu = uicomponent.isMenuSticky();
-  } else {
-    stickyMenu = rcontext.getRequestParameter("sticky").equals("true");
-  }
-  if (stickyMenu) {
-    bodyClasses += " HamburgerMenuSticky";
-  }
   PortalConfig sitePortalConfig = rcontext.getDynamicPortalConfig();
   String siteId = sitePortalConfig.getStorageId().split("_")[1];
 
@@ -170,7 +161,6 @@
      eXo.env.portal.context = "<%=docBase%>";
      eXo.env.portal.accessMode = "<%= rcontext.getAccessPath() == 0 ? "public" : "private" %>";
      eXo.env.portal.homeLink = "<%=userHomeLink%>";
-     eXo.env.portal.stickyMenu = <%=stickyMenu%>;
      eXo.env.portal.containerName = "<%=PortalContainer.getInstance().getName()%>";
      eXo.env.portal.userName='<%= userName == null ? "" : userName %>';
      eXo.env.portal.language='<%= language %>';

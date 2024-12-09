@@ -24,7 +24,6 @@ import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.webui.container.UIContainer;
 import org.exoplatform.portal.webui.page.UISiteBody;
 import org.exoplatform.portal.webui.util.Util;
-import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 
@@ -35,11 +34,16 @@ public class UISharedLayout extends UIContainer {
 
   @Override
   public void processRender(WebuiRequestContext context) throws Exception {
-    PortalRequestContext requestContext = RequestContext.getCurrentInstance();
-    if (isShowSharedLayout(requestContext)) {
-      processContainerRender(context);
-    } else {
-      processSiteBodyRender(context);
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+    portalRequestContext.startServerTime("UISharedLayout");
+    try {
+      if (isShowSharedLayout(portalRequestContext)) {
+        processContainerRender(context);
+      } else {
+        processSiteBodyRender(context);
+      }
+    } finally {
+      portalRequestContext.endServerTime("UISharedLayout");
     }
   }
 

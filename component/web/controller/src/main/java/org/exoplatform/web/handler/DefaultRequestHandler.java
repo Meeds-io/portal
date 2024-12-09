@@ -33,41 +33,39 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class DefaultRequestHandler extends WebRequestHandler {
 
-    /** . */
-    private final UserPortalConfigService configService;
+  private final UserPortalConfigService portalConfigService;
 
-    public DefaultRequestHandler(UserPortalConfigService configService) {
-        this.configService = configService;
-    }
+  public DefaultRequestHandler(UserPortalConfigService portalConfigService) {
+    this.portalConfigService = portalConfigService;
+  }
 
-    @Override
-    public String getHandlerName() {
-        return "default";
-    }
+  @Override
+  public String getHandlerName() {
+    return "default";
+  }
 
-    @Override
-    public boolean execute(ControllerContext context) throws Exception {
-      String defaultUri = null;
-      String currentUser = context.getRequest().getRemoteUser();
-      if (StringUtils.isNotBlank(currentUser)) {
-        defaultUri = configService.getUserHomePage(currentUser);
+  @Override
+  public boolean execute(ControllerContext context) throws Exception {
+    String currentUser = context.getRequest().getRemoteUser();
+    String defaultUri = portalConfigService.getDefaultPath(currentUser);
+    HttpServletResponse resp = context.getResponse();
+    if (StringUtils.isBlank(defaultUri)) {
+      if (StringUtils.isBlank(currentUser)) {
+        String currentPortalContainerName = PortalContainer.getCurrentPortalContainerName();
+        resp.sendRedirect("/" + currentPortalContainerName + "/login");
+        return true;
+      } else {
+        resp.sendRedirect("/portal/" + portalConfigService.getMetaPortal() + "/page-not-found");
+        return true;
       }
-      if (StringUtils.isBlank(defaultUri)) {
-        defaultUri = configService.computePortalPath(context.getRequest());
-        if (StringUtils.isBlank(defaultUri)) {
-          HttpServletResponse resp = context.getResponse();
-          String currentPortalContainerName = PortalContainer.getCurrentPortalContainerName();
-          resp.sendRedirect("/" + currentPortalContainerName + "/login");
-          return true;
-        }
-      }
-      HttpServletResponse resp = context.getResponse();
+    } else {
       resp.sendRedirect(resp.encodeRedirectURL(defaultUri));
       return true;
     }
+  }
 
-    @Override
-    protected boolean getRequiresLifeCycle() {
-        return true;
-    }
+  @Override
+  protected boolean getRequiresLifeCycle() {
+    return true;
+  }
 }

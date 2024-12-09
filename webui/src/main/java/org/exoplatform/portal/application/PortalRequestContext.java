@@ -19,16 +19,12 @@
 
 package org.exoplatform.portal.application;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,16 +32,18 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.gatein.common.http.QueryStringParser;
+import org.w3c.dom.Element;
 
 import org.exoplatform.Constants;
 import org.exoplatform.commons.utils.ExpressionUtil;
 import org.exoplatform.commons.utils.PortalPrinter;
 import org.exoplatform.commons.xml.DOMSerializer;
-import org.exoplatform.services.security.ConversationState;
-import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
-import org.exoplatform.portal.config.*;
+import org.exoplatform.portal.config.DynamicPortalLayoutService;
+import org.exoplatform.portal.config.UserPortalConfig;
+import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
@@ -55,10 +53,8 @@ import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
-import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
-import org.exoplatform.portal.mop.user.UserNodeFilterConfig.Builder;
-import org.exoplatform.portal.resource.SkinService;
 import org.exoplatform.portal.mop.user.UserPortal;
+import org.exoplatform.portal.resource.SkinService;
 import org.exoplatform.portal.url.PortalURLContext;
 import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.portal.webui.page.UIPage;
@@ -69,8 +65,8 @@ import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
-import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.web.ControllerContext;
+import org.exoplatform.web.PortalHttpServletResponseWrapper;
 import org.exoplatform.web.application.JavascriptManager;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.application.URLBuilder;
@@ -86,12 +82,13 @@ import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.url.ComponentURL;
 
+import io.meeds.common.performance.model.ServerResponseTime;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
-
-import org.gatein.common.http.QueryStringParser;
-import org.w3c.dom.Element;
 
 /**
  * This class extends the abstract WebuiRequestContext which itself extends the
@@ -100,8 +97,6 @@ import org.w3c.dom.Element;
  * It mainly implements the abstract methods and overide some.
  */
 public class PortalRequestContext extends WebuiRequestContext {
-
-  protected static Log                     log                 = ExoLogger.getLogger("portal:PortalRequestContext");
 
   public static final int                  PUBLIC_ACCESS       = 0;
 
@@ -121,11 +116,18 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   private static final String              DO_LOGIN_PATTERN    = "login";
 
-  /** The path decoded from the request. */
-  private final String                     nodePath_;
+  private static final Log                 LOG                 = ExoLogger.getLogger("portal:PortalRequestContext");
 
-  /** . */
-  private final String                     requestURI_;
+  public static DynamicPortalLayoutService portalLayoutService;                                                     // NOSONAR
+
+  public static UserPortalConfigService    portalConfigService;                                                     // NOSONAR
+
+  public static LayoutService              layoutService;                                                           // NOSONAR
+
+  public static SSOHelper                  ssoHelper;                                                               // NOSONAR
+
+  /** The path decoded from the request. */
+  private final String                     nodePath;
 
   /** . */
   private final String                     portalURI;
@@ -137,25 +139,18 @@ public class PortalRequestContext extends WebuiRequestContext {
   private final SiteKey                    siteKey;
 
   /** The locale from the request. */
+  @Getter
   private final Locale                     requestLocale;
 
-  /** . */
-  private HttpServletRequest               request_;
-
-  /** . */
-  private final HttpServletResponse        response_;
-
-  private String                           cacheLevel_         = "cacheLevelPortlet";
-
-  private boolean                          ajaxRequest_        = true;
+  @Getter
+  private final HttpServletRequest         request;
 
   @Getter
-  @Setter
-  private boolean                          showMaxWindow;
+  private final HttpServletResponse        response;
 
-  @Getter
-  @Setter
-  private boolean                          hideSharedLayout;
+  private String                           cacheLevel          = "cacheLevelPortlet";
+
+  private boolean                          ajaxRequest         = true;
 
   @Setter
   private Boolean                          draftPage;
@@ -165,9 +160,9 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   private boolean                          forceFullUpdate     = false;
 
-  private Writer                           writer_;
+  private Writer                           writer;
 
-  protected JavascriptManager              jsmanager_;
+  protected JavascriptManager              javascriptManager;
 
   private List<Element>                    extraMarkupHeaders;
 
@@ -175,7 +170,13 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   private Map<String, String[]>            parameterMap;
 
+  @Getter
+  @Setter
   private Locale                           locale              = Locale.ENGLISH;
+
+  @Getter
+  @Setter
+  private Orientation                      orientation         = Orientation.LT;
 
   private List<Runnable>                   endRequestRunnables;
 
@@ -185,41 +186,37 @@ public class PortalRequestContext extends WebuiRequestContext {
   /** . */
   private final ControllerContext          controllerContext;
 
-  /** . */
-  private final DynamicPortalLayoutService portalLayoutService;
-
-  private final UserPortalConfigService    portalConfigService;
-
-  private final LayoutService              layoutService;
-
   private UserPortalConfig                 userPortalConfig;
 
   private PortalConfig                     currentPortalConfig;
 
-  @Getter
-  @Setter
   private UIPortal                         uiPortal;
 
-  @Getter
-  @Setter
   private UIPage                           uiPage;
 
   @Getter
   @Setter
-  @SuppressWarnings("rawtypes")
-  private List<UIPortlet>                  uiPortlets;
+  private UIPortlet                        maximizedUIPortlet;
+
+  private ServerResponseTime               serverResponseTime;
+
+  public void setUiPage(UIPage uiPage) {
+    this.uiPage = uiPage;
+  }
 
   @Getter
   @Setter
-  private Page                             page;
+  private List<UIPortlet> uiPortlets;
 
   @Getter
   @Setter
-  private UserNode                         userNode;
+  private Page            page;
 
-  private String                           skin;
+  private UserNode        userNode;
 
-  private String                           pageTitle           = null;
+  private String          skin;
+
+  private String          pageTitle = null;
 
   /**
    * Analyze a request and split this request's URI to get useful information
@@ -232,6 +229,7 @@ public class PortalRequestContext extends WebuiRequestContext {
    * 4. <code>nodePath</code> : The path that is used to reflect to a navigation
    * node
    */
+  @SneakyThrows
   public PortalRequestContext(WebuiApplication app,
                               ControllerContext controllerContext,
                               String requestSiteType,
@@ -243,71 +241,49 @@ public class PortalRequestContext extends WebuiRequestContext {
     //
     this.urlFactory = (URLFactoryService) PortalContainer.getComponent(URLFactoryService.class);
     this.controllerContext = controllerContext;
-    this.jsmanager_ = new JavascriptManager();
-    this.portalLayoutService = ExoContainerContext.getService(DynamicPortalLayoutService.class);
-    this.layoutService = ExoContainerContext.getService(LayoutService.class);
-    this.portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class);
+    this.javascriptManager = new JavascriptManager();
+    if (portalLayoutService == null) {
+      portalLayoutService = ExoContainerContext.getService(DynamicPortalLayoutService.class); // NOSONAR
+      layoutService = ExoContainerContext.getService(LayoutService.class); // NOSONAR
+      portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class); // NOSONAR
+      ssoHelper = ExoContainerContext.getService(SSOHelper.class); // NOSONAR
+    }
 
     //
-    request_ = controllerContext.getRequest();
-    response_ = controllerContext.getResponse();
-    response_.setBufferSize(1024 * 100);
-    contextPath = request_.getContextPath();
-    setSessionId(request_.getSession().getId());
+    request = controllerContext.getRequest();
+    response = controllerContext.getResponse();
+    response.setBufferSize(1024 * 100);
+    contextPath = request.getContextPath();
+    setSessionId(request.getSession().getId());
 
     // The encoding needs to be set before reading any of the parameters since
     // the parameters's encoding
     // is set at the first access.
 
-    // TODO use the encoding from the locale-config.xml file
-    response_.setContentType("text/html");
-    try {
-      request_.setCharacterEncoding("UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      log.error("Encoding not supported", e);
-    }
+    response.setContentType("text/html");
+    request.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
     // Query parameters from the request will be set in the servlet container
     // url encoding and not
     // necessarly in utf-8 format. So we need to directly parse the parameters
     // from the query string.
-    parameterMap = new HashMap<String, String[]>();
-    parameterMap.putAll(request_.getParameterMap());
-    String queryString = request_.getQueryString();
+    parameterMap = new HashMap<>();
+    parameterMap.putAll(request.getParameterMap());
+    String queryString = request.getQueryString();
     if (queryString != null) {
-      // The QueryStringParser currently only likes & and not &amp;
       queryString = queryString.replace("&amp;", "&");
       Map<String, String[]> queryParams = QueryStringParser.getInstance().parseQueryString(queryString);
       parameterMap.putAll(queryParams);
     }
 
-    ajaxRequest_ = "true".equals(request_.getParameter("ajaxRequest"));
-    setShowMaxWindow("true".equals(request_.getParameter("showMaxWindow")));
-    setHideSharedLayout("true".equals(request_.getParameter("hideSharedLayout")));
-    String cache = request_.getParameter(CACHE_LEVEL);
+    ajaxRequest = "true".equals(request.getParameter("ajaxRequest"));
+    String cache = request.getParameter(CACHE_LEVEL);
     if (cache != null) {
-      cacheLevel_ = cache;
+      cacheLevel = cache;
     }
 
-    requestURI_ = requestPath;
-    /*
-     * String decodedURI = URLDecoder.decode(requestURI_, "UTF-8"); //
-     * req.getPathInfo will already have the encoding set from the server. // We
-     * need to use the UTF-8 value since this is how we store the portal name.
-     * // Reconstructing the getPathInfo from the non server decoded values.
-     * String servletPath = URLDecoder.decode(request_.getServletPath(),
-     * "UTF-8"); String contextPath =
-     * URLDecoder.decode(request_.getContextPath(), "UTF-8"); String pathInfo =
-     * "/"; if (requestURI_.length() > servletPath.length() +
-     * contextPath.length()) pathInfo =
-     * decodedURI.substring(servletPath.length() + contextPath.length()); int
-     * colonIndex = pathInfo.indexOf("/", 1); if (colonIndex < 0) { colonIndex =
-     * pathInfo.length(); } portalOwner_ = pathInfo.substring(1, colonIndex);
-     * nodePath_ = pathInfo.substring(colonIndex, pathInfo.length());
-     */
-    //
     this.siteKey = new SiteKey(SiteType.valueOf(requestSiteType.toUpperCase()), requestSiteName);
-    this.nodePath_ = requestPath;
+    this.nodePath = requestPath;
     this.requestLocale = requestLocale;
 
     //
@@ -330,8 +306,45 @@ public class PortalRequestContext extends WebuiRequestContext {
     return url;
   }
 
+  @Override
   public JavascriptManager getJavascriptManager() {
-    return jsmanager_;
+    return javascriptManager;
+  }
+
+  @Override
+  public final String getRemoteUser() {
+    return request.getRemoteUser();
+  }
+
+  @Override
+  public final boolean isUserInRole(String roleUser) {
+    return request.isUserInRole(roleUser);
+  }
+
+  @Override
+  public final Writer getWriter() throws IOException {
+    if (writer == null) {
+      writer = new PortalPrinter(response.getOutputStream(), false, 30000);
+    }
+    return writer;
+  }
+
+  @Override
+  public final void setWriter(Writer writer) {
+    this.writer = writer;
+  }
+
+  @Override
+  public final boolean useAjax() {
+    return ajaxRequest;
+  }
+
+  /**
+   * @see org.exoplatform.web.application.RequestContext#getFullRender()
+   */
+  @Override
+  public final boolean getFullRender() {
+    return forceFullUpdate;
   }
 
   public String getSkin() {
@@ -373,40 +386,31 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   @SneakyThrows
   public UserNode getNavigationNode() {
-    if (userNode != null) {
+    return getNavigationNode(false);
+  }
+
+  private UserNode getNavigationNode(boolean noCache) {
+    if (!noCache && userNode != null) {
       return userNode;
     }
     UserPortal userPortal = getUserPortalConfig().getUserPortal();
     UserNavigation navigation = userPortal.getNavigation(siteKey);
     if (navigation != null) {
-      Builder builder = UserNodeFilterConfig.builder().withReadCheck();
-      if (StringUtils.isBlank(nodePath_)) {
-        userNode = portalConfigService.getPortalSiteRootNode(siteKey.getName(), siteKey.getTypeName(), request_);
-        if (userNode != null) {
-          userNode = portalConfigService.getFirstAllowedPageNode(Collections.singletonList(userNode));
-        }
-      } else {
-        userNode = userPortal.resolvePath(navigation, builder.build(), nodePath_);
-      }
+      userNode = portalConfigService.getSiteNodeOrGlobalNode(siteKey.getTypeName(),
+                                                             siteKey.getName(),
+                                                             nodePath,
+                                                             request.getRemoteUser());
     }
     return userNode;
   }
 
   public UserPortalConfig getUserPortalConfig() {
-    String remoteUser = null;
     if (userPortalConfig == null) {
-      ConversationState conversationState = ConversationState.getCurrent();
-      if (conversationState != null
-          && conversationState.getIdentity() != null
-          && !IdentityConstants.ANONIM.equals(conversationState.getIdentity().getUserId())) {
-        remoteUser = conversationState.getIdentity().getUserId();
-      }
-
       String portalName = getCurrentPortalSite();
       try {
-        userPortalConfig = portalConfigService.getUserPortalConfig(portalName,
-                                                                   remoteUser);
+        userPortalConfig = portalConfigService.getUserPortalConfig(portalName, getRemoteUser());
       } catch (Exception e) {
+        LOG.error("Error retrieving UserPortalConfig with sit {} for user {}", portalName, getRemoteUser(), e);
         return null;
       }
     }
@@ -425,72 +429,62 @@ public class PortalRequestContext extends WebuiRequestContext {
     return portalName;
   }
 
-  public void refreshPortalConfig() {
-    this.userPortalConfig = null;
-    this.currentPortalConfig = null;
+  public UIPortal getUiPortal() {
+    if (uiPortal == null) {
+      uiPortal = ((UIPortalApplication) uiApplication_).getUiPortal(siteKey);
+    }
+    return uiPortal;
   }
 
-  public UIPage getUIPage(UserNode pageNode, UIPortal uiPortal) throws Exception {
-    PageContext pageContext = null;
-    String pageReference = null;
-    if (pageNode != null && pageNode.getPageRef() != null) {
-      pageReference = pageNode.getPageRef().format();
-      pageContext = layoutService.getPageContext(pageNode.getPageRef());
+  public UIPage getUiPage() {
+    if (uiPage != null) {
+      return uiPage;
     }
-
-    // The page has been deleted
-    if (pageContext == null) {
-      // Clear the UIPage from cache in UIPortal
-      uiPortal.clearUIPage(pageReference);
+    UserNode navigationNode = getNavigationNode();
+    if (navigationNode == null) {
       return null;
     } else {
-      setDraftPage(pageNode.getVisibility() == Visibility.DRAFT);
-      this.page = layoutService.getPage(pageReference);
-      if (uiPortal.getUIPage(pageReference) == null) {
-        UIPageFactory clazz = UIPageFactory.getInstance(pageContext.getState().getFactoryId());
-        this.uiPage = clazz.createUIPage(this);
-        pageContext.update(this.page);
-        PortalDataMapper.toUIPage(this.uiPage, this.page);
+      if (getUiPortal() == null) {
+        return null;
       }
-      return this.uiPage;
+      return buildUiPage(navigationNode, uiPortal);
     }
   }
 
   public String getInitialURI() {
-    return request_.getRequestURI();
+    return request.getRequestURI();
   }
 
   public ControllerContext getControllerContext() {
     return controllerContext;
   }
 
-  public void refreshResourceBundle() throws Exception {
+  public void refreshResourceBundle() {
     appRes_ = getApplication().getResourceBundle(getLocale());
   }
 
-  public void requestAuthenticationLogin() throws Exception {
+  public void requestAuthenticationLogin() {
     requestAuthenticationLogin(null);
   }
 
-  public void requestAuthenticationLogin(Map<String, String> params) throws Exception {
+  @SneakyThrows
+  public void requestAuthenticationLogin(Map<String, String> params) {
     StringBuilder initialURI = new StringBuilder();
-    initialURI.append(request_.getRequestURI());
-    if (request_.getQueryString() != null) {
-      initialURI.append("?").append(request_.getQueryString());
+    initialURI.append(request.getRequestURI());
+    if (request.getQueryString() != null) {
+      initialURI.append("?").append(request.getQueryString());
     }
 
     StringBuilder loginPath = new StringBuilder();
 
     // . Check SSO Enable
-    ExoContainer container = getApplication().getApplicationServiceContainer();
-    SSOHelper ssoHelper = container.getComponentInstanceOfType(SSOHelper.class);
     if (ssoHelper != null && ssoHelper.isSSOEnabled() && ssoHelper.skipJSPRedirection()) {
       loginPath.append(getPortalContextPath()).append(ssoHelper.getSSORedirectURLSuffix());
     } else {
       loginPath.append(getPortalContextPath()).append("/").append(DO_LOGIN_PATTERN);
     }
 
-    loginPath.append("?initialURI=").append(URLEncoder.encode(initialURI.toString(), "UTF-8"));
+    loginPath.append("?initialURI=").append(URLEncoder.encode(initialURI.toString(), StandardCharsets.UTF_8));
     if (params != null) {
       for (Map.Entry<String, String> param : params.entrySet()) {
         loginPath.append("&").append(URLEncoder.encode(param.getKey(), "UTF-8"));
@@ -532,7 +526,7 @@ public class PortalRequestContext extends WebuiRequestContext {
     }
   }
 
-  public String getTitle() throws Exception {
+  public String getTitle() {
     if (pageTitle != null) {
       return pageTitle;
     }
@@ -545,9 +539,7 @@ public class PortalRequestContext extends WebuiRequestContext {
       //
       UserNode node = uiportal.getSelectedUserNode();
       if (node != null) {
-        ExoContainer container = getApplication().getApplicationServiceContainer();
-        UserPortalConfigService configService = container.getComponentInstanceOfType(UserPortalConfigService.class);
-        PageContext pageContext = configService.getPage(node.getPageRef(), getRequest().getRemoteUser());
+        PageContext pageContext = portalConfigService.getPage(node.getPageRef(), getRequest().getRemoteUser());
 
         //
         if (pageContext != null) {
@@ -574,29 +566,13 @@ public class PortalRequestContext extends WebuiRequestContext {
     return urlFactory;
   }
 
-  public Orientation getOrientation() {
-    return ((UIPortalApplication) uiApplication_).getOrientation();
-  }
-
-  public Locale getRequestLocale() {
-    return requestLocale;
-  }
-
-  public void setLocale(Locale locale) {
-    this.locale = locale;
-  }
-
-  public Locale getLocale() {
-    return locale;
-  }
-
   @SuppressWarnings("unchecked")
   public Map<String, String> getMetaInformation() {
-    return (Map<String, String>) request_.getAttribute(REQUEST_METADATA);
+    return (Map<String, String>) request.getAttribute(REQUEST_METADATA);
   }
 
   public String getCacheLevel() {
-    return cacheLevel_;
+    return cacheLevel;
   }
 
   public String getRequestParameter(String name) {
@@ -613,7 +589,7 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public Map<String, String[]> getPortletParameters() {
     Map<String, String[]> unsortedParams = parameterMap;
-    Map<String, String[]> sortedParams = new HashMap<String, String[]>();
+    Map<String, String[]> sortedParams = new HashMap<>();
     Set<String> keys = unsortedParams.keySet();
     for (String key : keys) {
       if (!key.startsWith(Constants.PARAMETER_ENCODER)) {
@@ -671,11 +647,11 @@ public class PortalRequestContext extends WebuiRequestContext {
   }
 
   public String getNodePath() {
-    return nodePath_;
+    return nodePath;
   }
 
   public String getRequestURI() {
-    return requestURI_;
+    return getNodePath();
   }
 
   public String getPortalURI() {
@@ -687,63 +663,7 @@ public class PortalRequestContext extends WebuiRequestContext {
   }
 
   public int getAccessPath() {
-    return request_.getRemoteUser() != null ? PRIVATE_ACCESS : PUBLIC_ACCESS;
-  }
-
-  public final String getRemoteUser() {
-    return request_.getRemoteUser();
-  }
-
-  public final boolean isUserInRole(String roleUser) {
-    return request_.isUserInRole(roleUser);
-  }
-
-  public final Writer getWriter() throws IOException {
-    if (writer_ == null) {
-      writer_ = new PortalPrinter(response_.getOutputStream(), false, 30000);
-    }
-    return writer_;
-  }
-
-  public final void setWriter(Writer writer) {
-    this.writer_ = writer;
-  }
-
-  public final boolean useAjax() {
-    return ajaxRequest_;
-  }
-
-  @SuppressWarnings("unchecked")
-  public HttpServletRequest getRequest() {
-    return request_;
-  }
-
-  @SuppressWarnings("unchecked")
-  public final HttpServletResponse getResponse() {
-    return response_;
-  }
-
-  /**
-   * @see org.exoplatform.web.application.RequestContext#getFullRender()
-   */
-  public final boolean getFullRender() {
-    return forceFullUpdate;
-  }
-
-  /**
-   * Sets a boolean value to force whether portal will be fully rendered and it
-   * is only effective to an Ajax request. <br>
-   * if the value is set to <code>true</code>, it means :<br>
-   * 1) Only portal ui components are rendered <br>
-   * 2) Portlets will be fully rendered if are inner of the portal ui components
-   * being updated
-   *
-   * @param forceFullUpdate This method is deprecated,
-   *          ignoreAJAXUpdateOnPortlets should be used instead
-   */
-  @Deprecated()
-  public final void setFullRender(boolean forceFullUpdate) {
-    this.forceFullUpdate = forceFullUpdate;
+    return request.getRemoteUser() != null ? PRIVATE_ACCESS : PUBLIC_ACCESS;
   }
 
   /**
@@ -762,7 +682,7 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public final void sendError(int sc) throws IOException {
     setResponseComplete(true);
-    response_.sendError(sc);
+    response.sendError(sc);
   }
 
   public final void sendRedirect(String url) throws IOException {
@@ -772,24 +692,24 @@ public class PortalRequestContext extends WebuiRequestContext {
       if (url.startsWith(globalSiteURI)) {
         String metaSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + portalConfigService.getMetaPortal();
         url = url.replace(globalSiteURI, metaSiteURI);
-        log.warn("An URI was sent with global site name, it will be replaced by default site to avoid returning HTTP 404");
+        LOG.warn("An URI was sent with global site name, it will be replaced by default site to avoid returning HTTP 404");
       }
     }
-    if (!response_.isCommitted()) {
-      response_.sendRedirect(url);
+    if (!response.isCommitted()) {
+      response.sendRedirect(url);
     }
   }
 
   public void setHeaders(Map<String, String> headers) {
     final Set<String> keys = headers.keySet();
     for (final String key : keys) {
-      response_.setHeader(key, headers.get(key));
+      response.setHeader(key, headers.get(key));
     }
   }
 
-  public List<String> getExtraMarkupHeadersAsStrings() throws Exception {
-    List<String> markupHeaders = new ArrayList<String>();
-
+  @SneakyThrows
+  public List<String> getExtraMarkupHeadersAsStrings() {
+    List<String> markupHeaders = new ArrayList<>();
     if (extraMarkupHeaders != null && !extraMarkupHeaders.isEmpty()) {
       for (Element element : extraMarkupHeaders) {
         StringWriter sw = new StringWriter();
@@ -797,7 +717,6 @@ public class PortalRequestContext extends WebuiRequestContext {
         markupHeaders.add(sw.toString());
       }
     }
-
     return markupHeaders;
   }
 
@@ -834,8 +753,49 @@ public class PortalRequestContext extends WebuiRequestContext {
     return StringUtils.isNotBlank(getMaximizedPortletId());
   }
 
+  public boolean isShowMaxWindow() {
+    return isMaximizePortlet()
+           || "true".equals(request.getParameter("showMaxWindow"))
+           || (uiPage != null && uiPage.isShowMaxWindow());
+  }
+
+  public boolean isHideSharedLayout() {
+    return isMaximizePortlet()
+           || "true".equals(request.getParameter("hideSharedLayout"))
+           || (uiPage != null && uiPage.isHideSharedLayout());
+  }
+
   public String getMaximizedPortletId() {
     return getRequest().getParameter("maximizedPortletId");
+  }
+
+  public boolean startServerTime(String name) {
+    if (ServerResponseTime.SERVER_TIMING_ENABLED) {
+      if (serverResponseTime == null) {
+        serverResponseTime = new ServerResponseTime();
+      }
+      return serverResponseTime.startServerTime(name);
+    }
+    return false;
+  }
+
+  public void endServerTime(String name) {
+    if (serverResponseTime != null) {
+      serverResponseTime.endServerTime(name);
+    }
+  }
+
+  @SneakyThrows
+  public void commitResponse() {
+    if (serverResponseTime != null) {
+      serverResponseTime.addHttpHeader(response);
+      serverResponseTime = null;
+    }
+    if (response instanceof PortalHttpServletResponseWrapper responseWrapper) {
+      responseWrapper.commit();
+      responseWrapper.setWrapMethods(false);
+    }
+    getWriter().flush();
   }
 
   public static PortalRequestContext getCurrentInstance() {
@@ -847,6 +807,37 @@ public class PortalRequestContext extends WebuiRequestContext {
     } else {
       return (PortalRequestContext) currentInstance.getParentAppRequestContext();
     }
+  }
+
+  @SneakyThrows
+  private UIPage buildUiPage(UserNode pageNode, UIPortal uiPortal) {
+    PageContext pageContext = null;
+    String pageReference = null;
+    if (pageNode != null && pageNode.getPageRef() != null) {
+      pageReference = pageNode.getPageRef().format();
+      pageContext = layoutService.getPageContext(pageNode.getPageRef());
+    }
+
+    // The page has been deleted
+    if (pageContext == null) {
+      // Clear the UIPage from cache in UIPortal
+      uiPortal.clearUIPage(pageReference);
+      this.uiPage = null;
+    } else {
+      boolean isDraftPage = pageNode.getVisibility() == Visibility.DRAFT;
+      setDraftPage(isDraftPage);
+      if (this.page == null) {
+        this.page = layoutService.getPage(pageReference);
+      }
+      this.uiPage = uiPortal.getUIPage(pageReference);
+      if (this.uiPage == null) {
+        UIPageFactory clazz = UIPageFactory.getInstance(pageContext.getState().getFactoryId());
+        this.uiPage = clazz.createUIPage(this);
+        pageContext.update(this.page);
+        PortalDataMapper.toUIPage(this.uiPage, this.page);
+      }
+    }
+    return this.uiPage;
   }
 
 }

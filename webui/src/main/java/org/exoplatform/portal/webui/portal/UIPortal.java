@@ -35,7 +35,6 @@ import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
-import org.exoplatform.portal.mop.user.UserPortal;
 import org.exoplatform.portal.webui.container.UIContainer;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.page.UIPageBody;
@@ -98,10 +97,6 @@ public class UIPortal extends UIContainer {
 
   @Getter
   @Setter
-  private UIComponent           maximizedUIComponent;
-
-  @Getter
-  @Setter
   private Map<String, String[]> publicParameters = new HashMap<>();
 
   @Getter
@@ -120,20 +115,7 @@ public class UIPortal extends UIContainer {
 
   public UserNode getNavPath() {
     PortalRequestContext prc = PortalRequestContext.getCurrentInstance();
-    if (prc.getNavigationNode() == null) {
-      UserPortal userPortal = prc.getUserPortalConfig().getUserPortal();
-      UserNavigation navigation = userPortal.getNavigation(prc.getSiteKey());
-      if (navigation == null) {
-        setNavPath(userPortal.getDefaultPath(null));
-      } else {
-        setNavPath(userPortal.getDefaultPath(navigation, null));
-      }
-    }
     return prc.getNavigationNode();
-  }
-
-  public void setNavPath(UserNode nav) {
-    PortalRequestContext.getCurrentInstance().setUserNode(nav);
   }
 
   /**
@@ -149,6 +131,11 @@ public class UIPortal extends UIContainer {
     } else {
       return this.allUiPages.get(pageReference);
     }
+  }
+
+  public UIComponent getMaximizedUIComponent() {
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+    return portalRequestContext.isShowMaxWindow() ? portalRequestContext.getUiPage() : null;
   }
 
   public void setUIPage(String pageReference, UIPage uiPage) {
@@ -175,22 +162,8 @@ public class UIPortal extends UIContainer {
     return prc.getUserPortalConfig().getUserPortal().getNavigation(siteKey);
   }
 
-  /**
-   * Refresh the UIPage under UIPortal
-   *
-   * @throws Exception
-   */
-  public void refreshUIPage() throws Exception {
-    UIPageBody uiPageBody = findFirstComponentOfType(UIPageBody.class);
-    if (uiPageBody == null) {
-      return;
-    }
-
-    uiPageBody.setPageBody(getSelectedUserNode(), this);
-  }
-
   public UserNode getSelectedUserNode() {
-    return getNavPath();
+    return PortalRequestContext.getCurrentInstance().getNavigationNode();
   }
 
   public String getProperty(String name, String defaultValue) {

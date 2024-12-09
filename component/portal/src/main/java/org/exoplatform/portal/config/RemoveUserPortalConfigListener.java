@@ -19,8 +19,10 @@
 
 package org.exoplatform.portal.config;
 
-import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.organization.User;
@@ -34,10 +36,11 @@ public class RemoveUserPortalConfigListener extends Listener<UserHandler, User> 
     @Override
     public void onEvent(Event<UserHandler, User> event) throws Exception {
         User user = event.getData();
-        ExoContainer container = ExoContainerContext.getCurrentContainer();
-        UserPortalConfigService portalConfigService = (UserPortalConfigService) container
-                .getComponentInstanceOfType(UserPortalConfigService.class);
         String userName = user.getUserName();
-        portalConfigService.removeUserPortalConfig("user", userName);
+        LayoutService layoutService = ExoContainerContext.getService(LayoutService.class);
+        PortalConfig site = layoutService.getPortalConfig(SiteKey.user(userName));
+        if (site != null) {
+          layoutService.remove(site);
+        }
     }
 }
