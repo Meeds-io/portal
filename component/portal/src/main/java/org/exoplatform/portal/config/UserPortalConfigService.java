@@ -316,15 +316,54 @@ public class UserPortalConfigService implements Startable {
   }
 
   public UserNode getDefaultSiteNode(String portalName, String username) {
-    PortalConfig portalConfig = layoutService.getPortalConfig(portalName);
-    if (portalConfig == null) {
+    return getDefaultSiteNode(SiteType.PORTAL.getName(), portalName, username);
+  }
+
+  public UserNode getDefaultSiteNode(String portalType, String portalName, String username) {
+    UserNode targetUserNode = getSiteRootNode(portalType, portalName, username, true);
+    if (targetUserNode == null) {
+      return null;
+    } else {
+      do {
+        if (isAccessiblePage(targetUserNode, username)) {
+          return targetUserNode;
+        } else if (CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
+          UserNode childUserNode = getNodeOrFirstChildWithPage(targetUserNode.getChildren(), username);
+          if (isAccessiblePage(childUserNode, username)) {
+            return childUserNode;
+          }
+        }
+        targetUserNode = targetUserNode.getParent();
+      } while (targetUserNode != null && targetUserNode != targetUserNode.getParent());
       return null;
     }
-    UserNode userNode = getSiteNode(SiteType.PORTAL.getName(), portalName, username);
-    if (userNode == null) {
+  }
+
+  public UserNode getSiteRootNode(String siteType, String siteName, String username, boolean withVisibility) {
+    UserPortalConfig userPortalConfig = null;
+    if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
+      userPortalConfig = getUserPortalConfig(siteName, username);
+    } else {
+      PortalConfig defaultPortalConfig = getAccessiblePortalSites(username).stream().findFirst().orElse(null);
+      if (defaultPortalConfig != null) {
+        userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), username);
+      }
+    }
+    if (userPortalConfig == null) {
       return null;
     }
-    return userNode;
+    UserPortal userPortal = userPortalConfig.getUserPortal();
+    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName));
+    if (navigation == null) {
+      return null;
+    }
+    Builder builder = UserNodeFilterConfig.builder().withReadCheck().withTemporalCheck();
+    if (withVisibility) {
+      builder.withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL);
+    } else {
+      builder.withoutVisibility();
+    }
+    return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder.build(), null);
   }
 
   public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
@@ -535,53 +574,6 @@ public class UserPortalConfigService implements Startable {
         RequestLifeCycle.end();
       }
     }
-  }
-
-  private UserNode getSiteNode(String portalType, String portalName, String username) {
-    UserNode targetUserNode = getSiteRootNode(portalType, portalName, username, true);
-    if (targetUserNode == null) {
-      return null;
-    } else {
-      do {
-        if (isAccessiblePage(targetUserNode, username)) {
-          return targetUserNode;
-        } else if (CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
-          UserNode childUserNode = getNodeOrFirstChildWithPage(targetUserNode.getChildren(), username);
-          if (isAccessiblePage(childUserNode, username)) {
-            return childUserNode;
-          }
-        }
-        targetUserNode = targetUserNode.getParent();
-      } while (targetUserNode != null && targetUserNode != targetUserNode.getParent());
-      return null;
-    }
-  }
-
-  private UserNode getSiteRootNode(String siteType, String siteName, String username, boolean withVisibility) {
-    UserPortalConfig userPortalConfig = null;
-    if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
-      userPortalConfig = getUserPortalConfig(siteName, username);
-    } else {
-      PortalConfig defaultPortalConfig = getAccessiblePortalSites(username).stream().findFirst().orElse(null);
-      if (defaultPortalConfig != null) {
-        userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), username);
-      }
-    }
-    if (userPortalConfig == null) {
-      return null;
-    }
-    UserPortal userPortal = userPortalConfig.getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName));
-    if (navigation == null) {
-      return null;
-    }
-    Builder builder = UserNodeFilterConfig.builder().withReadCheck().withTemporalCheck();
-    if (withVisibility) {
-      builder.withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL);
-    } else {
-      builder.withoutVisibility();
-    }
-    return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder.build(), null);
   }
 
   private UserNode getNodeOrFirstChildWithPage(UserNode userNode, String username) {
