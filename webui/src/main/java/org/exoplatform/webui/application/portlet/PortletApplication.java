@@ -38,6 +38,7 @@ import javax.portlet.ResourceResponse;
 
 import org.exoplatform.commons.utils.PortalPrinter;
 import org.exoplatform.commons.utils.Safe;
+import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.resolver.ApplicationResourceResolver;
 import org.exoplatform.resolver.PortletResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
@@ -204,33 +205,33 @@ public class PortletApplication extends WebuiApplication {
      * serveResource of UIPortletApplication is called 7) Finally, the method onEndRequest() is called on every
      * ApplicationLifecycle referenced in the portlet configuration XML file and the parent WebuiRequestContext is restored
      */
+    @SuppressWarnings("unchecked")
     public void serveResource(ResourceRequest req, ResourceResponse res) throws Exception {
-        WebuiRequestContext parentAppRequestContext = WebuiRequestContext.getCurrentInstance();
-        PortletRequestContext context = createRequestContext(req, res, parentAppRequestContext);
-        WebuiRequestContext.setCurrentInstance(context);
-        try {
-            for (ApplicationLifecycle<RequestContext> lifecycle : getApplicationLifecycle()) {
-                lifecycle.onStartRequest(this, context);
-            }
-            StateManager sm = getStateManager();
-            UIApplication uiApp = sm.restoreUIRootComponent(context);
-            context.setUIApplication(uiApp);
-            if (uiApp instanceof UIPortletApplication) {
-                ((UIPortletApplication) uiApp).serveResource(context);
-            }
-
-            // Store ui root
-            sm.storeUIRootComponent(context);
-        } finally {
-            try {
-                for (ApplicationLifecycle<RequestContext> lifecycle : getApplicationLifecycle()) {
-                    lifecycle.onEndRequest(this, context);
-                }
-            } catch (Exception exception) {
-                log.error("Error while trying to call onEndRequest of the portlet ApplicationLifecycle", exception);
-            }
-            WebuiRequestContext.setCurrentInstance(parentAppRequestContext);
+      PortalRequestContext parentAppRequestContext = PortalRequestContext.getCurrentInstance();
+      PortletRequestContext context = createRequestContext(req, res, parentAppRequestContext);
+      RequestContext.setCurrentInstance(context);
+      try {
+        for (ApplicationLifecycle<RequestContext> lifecycle : getApplicationLifecycle()) {
+          lifecycle.onStartRequest(this, context);
         }
+        StateManager sm = getStateManager();
+        UIApplication uiApp = sm.restoreUIRootComponent(context);
+        context.setUIApplication(uiApp);
+        if (uiApp instanceof UIPortletApplication uiPortlet) {
+          uiPortlet.serveResource(context);
+        }
+        // Store ui root
+        sm.storeUIRootComponent(context);
+      } finally {
+        try {
+          for (ApplicationLifecycle<RequestContext> lifecycle : getApplicationLifecycle()) {
+            lifecycle.onEndRequest(this, context);
+          }
+        } catch (Exception exception) {
+          log.error("Error while trying to call onEndRequest of the portlet ApplicationLifecycle", exception);
+        }
+        RequestContext.setCurrentInstance(parentAppRequestContext);
+      }
     }
 
     /**
