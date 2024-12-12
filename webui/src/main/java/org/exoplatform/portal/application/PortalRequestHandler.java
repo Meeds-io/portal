@@ -168,6 +168,7 @@ public class PortalRequestHandler extends WebRequestHandler {
                                                             requestSiteName,
                                                             requestPath,
                                                             requestLocale);
+    RequestContext.setCurrentInstance(context);
     try {
       PortalConfig persistentPortalConfig = context.getDynamicPortalConfig();
       if (context.getUserPortalConfig() == null) {
@@ -196,7 +197,13 @@ public class PortalRequestHandler extends WebRequestHandler {
         return true;
       }
     } finally {
-      context.onRequestEnd();
+      try {
+        context.onRequestEnd();
+      } finally {
+        // To avoid memory leak, the ThreadLocal instances have to be purged all
+        // time, even if an error occurs
+        RequestContext.setCurrentInstance(null);
+      }
     }
   }
 
@@ -226,9 +233,8 @@ public class PortalRequestHandler extends WebRequestHandler {
    */
   @SuppressWarnings("unchecked")
   protected void processRequest(PortalRequestContext context, PortalApplication app) throws Exception {
-    RequestContext.setCurrentInstance(context);
-    createPortalRequestInstance(context);
     List<ApplicationLifecycle> lifecycles = app.getApplicationLifecycle();
+    createPortalRequestInstance(context);
     try {
       if (context.getResponse() instanceof PortalHttpServletResponseWrapper responseWrapper) {
         responseWrapper.setWrapMethods(true);
@@ -286,7 +292,6 @@ public class PortalRequestHandler extends WebRequestHandler {
       } finally {
         // To avoid memory leak, the ThreadLocal instances have to be purged all
         // time, even if an error occurs
-        RequestContext.setCurrentInstance(null);
         PortalRequestImpl.clearInstance();
       }
     }
