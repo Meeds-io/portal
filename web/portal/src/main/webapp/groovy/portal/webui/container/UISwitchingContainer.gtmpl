@@ -15,7 +15,7 @@
   String uiComponentClass = uicomponent.getCssClass() == null ? "" : uicomponent.getCssClass();
 %>
 <div
-  class="UIContainer UITableColumnContainer UISwitchingContainer <%=uiComponentClass%>  id="${uicomponent.id}">
+  class="UIContainer UITableColumnContainer UISwitchingContainer <%=uiComponentClass%>"  id="${uicomponent.id}">
   <div class="NormalContainerBlock UIComponentBlock">
     <div class="VIEW-CONTAINER VIEW-BLOCK">
       <div>
