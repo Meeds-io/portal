@@ -13,7 +13,7 @@
   String uiComponentClass = uicomponent.getCssClass() == null ? "" : uicomponent.getCssClass();
 %>
 <div
-  class="UIContainer UITableColumnContainer UIResponsiveTable33ColumnContainer <%=uiComponentClass%>  id="${uicomponent.id}">
+  class="UIContainer UITableColumnContainer UIResponsiveTable33ColumnContainer <%=uiComponentClass%>"  id="${uicomponent.id}">
   <div class="NormalContainerBlock UIComponentBlock">
     <div class="VIEW-CONTAINER VIEW-BLOCK">
       <div>
