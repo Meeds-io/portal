@@ -27,6 +27,7 @@ import org.apache.commons.lang3.ObjectUtils;
 
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.Properties;
 import org.exoplatform.portal.mop.SiteKey;
@@ -42,6 +43,7 @@ import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.services.listener.Asynchronous;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.login.LoginUtils;
 import org.exoplatform.web.login.LogoutControl;
@@ -59,13 +61,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.Getter;
 import lombok.Setter;
 
-@ComponentConfig(
-                 lifecycle = UIPortalLifecycle.class,
-                 template = "system:/groovy/portal/webui/page/UIPortal.gtmpl",
-                 events = {
-                            @EventConfig(listeners = UIPortal.LogoutActionListener.class,
-                                         csrfCheck = false),
-                 })
+@ComponentConfig(lifecycle = UIPortalLifecycle.class, template = "system:/groovy/portal/webui/page/UIPortal.gtmpl", events = {
+  @EventConfig(listeners = UIPortal.LogoutActionListener.class, csrfCheck = false),
+})
 public class UIPortal extends UIContainer {
 
   @Getter
@@ -107,6 +105,13 @@ public class UIPortal extends UIContainer {
     // Listen to storage to update cached pages when updated
     ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
     listenerService.addListener(LayoutService.PAGE_UPDATED, new RefreshUIPageListener());
+  }
+
+  @Override
+  public boolean hasAccessPermission() {
+    return ExoContainerContext.getService(UserACL.class)
+                              .hasAccessPermission(PortalRequestContext.getCurrentInstance().getPortalConfig(),
+                                                   ConversationState.getCurrent().getIdentity());
   }
 
   public SiteType getSiteType() {
