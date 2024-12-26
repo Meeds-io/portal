@@ -12,6 +12,10 @@
   </component>
 
   <component>
+    <type>io.meeds.common.persistence.HibernateStatisticsService</type>
+  </component>
+
+  <component>
     <type>org.exoplatform.settings.jpa.JPASettingServiceImpl</type>
   </component>
 
