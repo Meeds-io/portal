@@ -133,11 +133,11 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     org.picketlink.idm.api.User plIDMUser = null;
     try {
-      orgService.flush();
-
       plIDMUser = session.getPersistenceManager().createUser(user.getUserName());
     } catch (Exception e) {
       handleException("Identity operation error: ", e);
+    } finally {
+      orgService.flush();
     }
 
     try {
@@ -153,6 +153,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       } catch (Exception e2) {
         handleException("Can't remove user", e);
       }
+    } finally {
+      orgService.flush();
     }
 
     if (broadcast) {
@@ -192,7 +194,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
                         new Object[] { "userName", userName, "enabled", enabled, "broadcast", broadcast });
     }
 
-    orgService.flush();
     IdentitySession session = service_.getIdentitySession();
     User foundUser = getPopulatedUser(userName, session, UserStatus.ANY);
 
@@ -215,6 +216,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
         am.removeAttributes(userName, new String[] { USER_ENABLED });
       } catch (Exception e) {
         handleException("Cannot update enabled status for user: " + userName + "; ", e);
+      } finally {
+        orgService.flush();
       }
     } else {
       Attribute[] attrs = new Attribute[] { new SimpleAttribute(USER_ENABLED, String.valueOf(enabled)) };
@@ -222,6 +225,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
         am.updateAttributes(userName, attrs);
       } catch (Exception e) {
         handleException("Cannot update enabled status for user: " + userName + "; ", e);
+      } finally {
+        orgService.flush();
       }
     }
 
@@ -241,7 +246,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     org.picketlink.idm.api.User foundUser = null;
 
     try {
-      orgService.flush();
       foundUser = session.getPersistenceManager().findUser(userName);
     } catch (IllegalArgumentException e) {
       // Don't rethrow the exception to be compatible with other Org Service
@@ -268,14 +272,14 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       orgService.getUserProfileHandler().removeUserProfile(userName, false);
     } catch (Exception e) {
       handleException("Cannot cleanup user relationships: " + userName + "; ", e);
-
     }
 
     try {
       session.getPersistenceManager().removeUser(foundUser, true);
     } catch (Exception e) {
       handleException("Cannot remove user: " + userName + "; ", e);
-
+    } finally {
+      orgService.flush();
     }
 
     if (broadcast) {
@@ -402,8 +406,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       authenticated = user.getPassword().equals(password);
     } else {
       try {
-        orgService.flush();
-
         IdentitySession session = service_.getIdentitySession();
         org.picketlink.idm.api.User idmUser = session.getPersistenceManager().findUser(user.getUserName());
 
@@ -549,8 +551,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     org.picketlink.idm.api.User plUser = null;
 
     try {
-      orgService.flush();
-
       plUser = session.getAttributesManager().findUserByUniqueAttribute(attributeName, attributeValue);
     } catch (Exception e) {
       handleException("Cannot find user by unique attribute: attrName=" + attributeName + ", attrValue=" + attributeValue + "; ",
@@ -741,8 +741,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
                               org.picketlink.idm.api.User plIDMUser,
                               IdentitySession session,
                               boolean isNew) throws Exception {
-    orgService.flush();
-
     AttributesManager am = session.getAttributesManager();
 
     ArrayList attributes = new ArrayList();
@@ -799,6 +797,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
           am.updatePassword(plIDMUser, user.getPassword());
         } catch (Exception e) {
           handleException("Cannot update password: " + user.getUserName() + "; ", e);
+        } finally {
+          orgService.flush();
         }
       }
     }
@@ -810,14 +810,14 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       am.updateAttributes(user.getUserName(), attrs);
     } catch (Exception e) {
       handleException("Cannot update attributes for user: " + user.getUserName() + "; ", e);
+    } finally {
+      orgService.flush();
     }
 
   }
 
   public User getPopulatedUser(String userName, IdentitySession session, UserStatus userStatus) throws Exception {
     org.picketlink.idm.api.User u = null;
-
-    orgService.flush();
 
     try {
       u = session.getPersistenceManager().findUser(userName);
@@ -895,6 +895,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       }
     } catch (Exception e) {
       handleException("Cannot remove displayName attribute of user: " + user.getUserName() + "; ", e);
+    } finally {
+      orgService.flush();
     }
   }
   private UserQueryBuilder addEnabledUserFilter(UserQueryBuilder qb) throws Exception {
