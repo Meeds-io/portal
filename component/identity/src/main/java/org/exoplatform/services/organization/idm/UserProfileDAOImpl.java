@@ -39,7 +39,6 @@ import org.exoplatform.services.organization.UserProfileHandler;
 import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.impl.UserProfileImpl;
 import org.picketlink.idm.api.Attribute;
-import org.picketlink.idm.api.IdentitySession;
 import org.picketlink.idm.impl.api.SimpleAttribute;
 
 /**
@@ -47,27 +46,27 @@ import org.picketlink.idm.impl.api.SimpleAttribute;
  */
 public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHandler {
 
-    private static UserProfile NOT_FOUND = new UserProfileImpl();
+    private static final UserProfile       NOT_FOUND = new UserProfileImpl();
 
-    private List<UserProfileEventListener> listeners_;
+    private List<UserProfileEventListener> listeners;
 
     public UserProfileDAOImpl(PicketLinkIDMOrganizationServiceImpl orgService, PicketLinkIDMService service) {
         super(orgService, service);
-        listeners_ = new ArrayList<UserProfileEventListener>(3);
+        listeners = new ArrayList<>();
     }
 
     public void addUserProfileEventListener(UserProfileEventListener listener) {
         if (listener == null) {
             throw new IllegalArgumentException("Listener cannot be null");
         }
-        listeners_.add(listener);
+        listeners.add(listener);
     }
 
     public void removeUserProfileEventListener(UserProfileEventListener listener) {
         if (listener == null) {
             throw new IllegalArgumentException("Listener cannot be null");
         }
-        listeners_.remove(listener);
+        listeners.remove(listener);
     }
 
     public final UserProfile createUserProfileInstance() {
@@ -77,15 +76,6 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
     public UserProfile createUserProfileInstance(String userName) {
         return new UserProfileImpl(userName);
     }
-
-    // void createUserProfileEntry(UserProfile up, IdentitySession session) throws Exception
-    // {
-    // UserProfileData upd = new UserProfileData();
-    // upd.setUserProfile(up);
-    // session.save(upd);
-    // session.flush();
-    // cache_.remove(up.getUserName());
-    // }
 
     public void saveUserProfile(UserProfile profile, boolean broadcast) throws Exception {
         // We need to check if userProfile exists, because organization API is limited and it doesn't have separate methods for
@@ -191,25 +181,25 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
     }
 
     private void preSave(UserProfile profile, boolean isNew) throws Exception {
-        for (UserProfileEventListener listener : listeners_) {
+        for (UserProfileEventListener listener : listeners) {
             listener.preSave(profile, isNew);
         }
     }
 
     private void postSave(UserProfile profile, boolean isNew) throws Exception {
-        for (UserProfileEventListener listener : listeners_) {
+        for (UserProfileEventListener listener : listeners) {
             listener.postSave(profile, isNew);
         }
     }
 
     private void preDelete(UserProfile profile) throws Exception {
-        for (UserProfileEventListener listener : listeners_) {
+        for (UserProfileEventListener listener : listeners) {
             listener.preDelete(profile);
         }
     }
 
     private void postDelete(UserProfile profile) throws Exception {
-        for (UserProfileEventListener listener : listeners_) {
+        for (UserProfileEventListener listener : listeners) {
             listener.postDelete(profile);
         }
     }
@@ -294,6 +284,8 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         } catch (Exception e) {
             // TODO:
             handleException("Identity operation error: ", e);
+        } finally {
+          orgService.flush();
         }
 
     }
@@ -310,6 +302,8 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         } catch (Exception e) {
             // TODO:
             handleException("Identity operation error: ", e);
+        } finally {
+          orgService.flush();
         }
     }
 }
