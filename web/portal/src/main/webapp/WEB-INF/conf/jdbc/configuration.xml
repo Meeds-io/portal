@@ -24,7 +24,11 @@
   <component>
     <type>org.exoplatform.commons.persistence.impl.EntityManagerService</type>
   </component>
-  
+
+  <component>
+    <type>io.meeds.common.persistence.HibernateStatisticsService</type>
+  </component>
+
   <component>
     <key>org.exoplatform.portal.mop.dao.PageDAO</key>
     <type>org.exoplatform.portal.mop.dao.PageDAOImpl</type>

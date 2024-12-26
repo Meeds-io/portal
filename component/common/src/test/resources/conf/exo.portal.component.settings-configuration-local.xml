@@ -52,6 +52,10 @@
     <type>org.exoplatform.settings.jpa.JPASettingServiceImpl</type>
   </component>
 
+  <component>
+    <type>io.meeds.common.persistence.HibernateStatisticsService</type>
+  </component>
+
    <external-component-plugins>
     <target-component>org.exoplatform.commons.api.persistence.DataInitializer</target-component>
     <component-plugin>
