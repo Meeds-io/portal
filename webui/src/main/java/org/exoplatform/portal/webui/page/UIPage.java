@@ -24,9 +24,13 @@ import java.util.List;
 
 import javax.portlet.WindowState;
 
+import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.portal.webui.container.UIContainer;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIComponent;
 
@@ -84,6 +88,13 @@ public class UIPage extends UIContainer {
   @Deprecated
   public String getOwnerId() {
     return getSiteKey().getName();
+  }
+
+  @Override
+  public boolean hasAccessPermission() {
+    return ExoContainerContext.getService(UserACL.class)
+                              .hasAccessPermission(PortalRequestContext.getCurrentInstance().getPage(),
+                                                   ConversationState.getCurrent().getIdentity());
   }
 
   private List<UIPortlet> recursivelyFindUIPortlets(org.exoplatform.webui.core.UIContainer uiContainer) {

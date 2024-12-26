@@ -138,6 +138,10 @@ public class PortalRequestContext extends WebuiRequestContext {
   /** . */
   private final SiteKey                    siteKey;
 
+  /** . */
+  @Getter
+  private final PortalConfig               portalConfig;
+
   /** The locale from the request. */
   @Getter
   private final Locale                     requestLocale;
@@ -283,6 +287,7 @@ public class PortalRequestContext extends WebuiRequestContext {
     }
 
     this.siteKey = new SiteKey(SiteType.valueOf(requestSiteType.toUpperCase()), requestSiteName);
+    this.portalConfig = layoutService.getPortalConfig(this.siteKey);
     this.nodePath = requestPath;
     this.requestLocale = requestLocale;
 
