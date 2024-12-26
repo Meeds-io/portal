@@ -27,6 +27,7 @@ import org.exoplatform.services.organization.*;
 import org.exoplatform.services.organization.impl.MembershipTypeImpl;
 import org.picketlink.idm.api.Role;
 import org.picketlink.idm.api.RoleType;
+import org.picketlink.idm.common.exception.FeatureNotSupportedException;
 import org.picketlink.idm.common.exception.IdentityException;
 
 import javax.naming.InvalidNameException;
@@ -87,8 +88,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                     mt, "broadcast", broadcast });
         }
 
-        orgService.flush();
-
         if (user == null) {
             throw new InvalidNameException("Can not create membership record because user is null");
         }
@@ -124,7 +123,11 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
 
         if (isCreateMembership(mt.getName(), g.getId())) {
             if (getIdentitySession().getRoleManager().getRoleType(mt.getName()) == null) {
+              try {
                 getIdentitySession().getRoleManager().createRoleType(mt.getName());
+              } finally {
+                orgService.flush();
+              }
             }
 
             if (getIdentitySession().getRoleManager().hasRole(user.getUserName(), groupId, mt.getName())) {
@@ -137,26 +140,26 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         membership.setUserName(user.getUserName());
         membership.setGroupId(g.getId());
 
+        if (broadcast) {
+          preSave(membership, true);
+        }
+        
         try {
-          if (broadcast) {
-            preSave(membership, true);
-          }
-          
           if (isAssociationMapped() && getAssociationMapping().equals(mt.getName())) {
             if(!getIdentitySession().getRelationshipManager().isAssociatedByKeys(groupId, user.getUserName())) {
               getIdentitySession().getRelationshipManager().associateUserByKeys(groupId, user.getUserName());
             }
           }
-          
+
           if (isCreateMembership(mt.getName(), g.getId())) {
             getIdentitySession().getRoleManager().createRole(mt.getName(), user.getUserName(), groupId);
           }
-          
-          if (broadcast) {
-            postSave(membership, true);
-          }
         } finally {
           orgService.flush();
+        }
+
+        if (broadcast) {
+          postSave(membership, true);
         }
     }
 
@@ -164,8 +167,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         if (log.isTraceEnabled()) {
             Tools.logMethodIn(log, LogLevel.TRACE, "saveMembership", new Object[] { "membership", m, "broadcast", broadcast });
         }
-
-        orgService.flush();
 
         String plGroupName = getPLIDMGroupName(getGroupNameFromId(m.getGroupId()));
 
@@ -189,35 +190,39 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             preSave(m, false);
         }
 
-        if (isCreateMembership(m.getMembershipType(), m.getGroupId())) {
+        try {
+          if (isCreateMembership(m.getMembershipType(), m.getGroupId())) {
 
-            try {
-                getIdentitySession().getRoleManager().createRole(m.getMembershipType(), m.getUserName(), groupId);
-            } catch (Exception e) {
-                try {
-                    if (getIdentitySession().getRoleManager().getRole(m.getMembershipType(), m.getUserName(), groupId) != null) {
-                        getIdentitySession().getRoleManager().removeRole(m.getMembershipType(), m.getUserName(), groupId);
-                    }
-                } catch (IdentityException e1) {
-                    handleException("Cannot remove role: ", e1);
-                }
-                throw e;
+              try {
+                  getIdentitySession().getRoleManager().createRole(m.getMembershipType(), m.getUserName(), groupId);
+              } catch (Exception e) {
+                  try {
+                      if (getIdentitySession().getRoleManager().getRole(m.getMembershipType(), m.getUserName(), groupId) != null) {
+                          getIdentitySession().getRoleManager().removeRole(m.getMembershipType(), m.getUserName(), groupId);
+                      }
+                  } catch (IdentityException e1) {
+                      handleException("Cannot remove role: ", e1);
+                  }
+                  throw e;
 
-            }
-        }
-        if (isAssociationMapped() && getAssociationMapping().equals(m.getMembershipType())) {
-            try {
-                getIdentitySession().getRelationshipManager().associateUserByKeys(groupId, m.getUserName());
-            } catch (Exception e) {
-                try {
-                    if (getIdentitySession().getRelationshipManager().isAssociatedByKeys(groupId, m.getUserName())) {
-                        getIdentitySession().getRelationshipManager().disassociateUsersByKeys(groupId, new ArrayList<String>(Arrays.asList(m.getUserName())));
-                    }
-                } catch (IdentityException e1) {
-                    handleException("Cannot disassociate", e1);
-                }
-                throw e;
-            }
+              }
+          }
+          if (isAssociationMapped() && getAssociationMapping().equals(m.getMembershipType())) {
+              try {
+                  getIdentitySession().getRelationshipManager().associateUserByKeys(groupId, m.getUserName());
+              } catch (Exception e) {
+                  try {
+                      if (getIdentitySession().getRelationshipManager().isAssociatedByKeys(groupId, m.getUserName())) {
+                          getIdentitySession().getRelationshipManager().disassociateUsersByKeys(groupId, new ArrayList<String>(Arrays.asList(m.getUserName())));
+                      }
+                  } catch (IdentityException e1) {
+                      handleException("Cannot disassociate", e1);
+                  }
+                  throw e;
+              }
+          }
+        } finally {
+          orgService.flush();
         }
 
         if (broadcast) {
@@ -229,8 +234,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         if (log.isTraceEnabled()) {
             Tools.logMethodIn(log, LogLevel.TRACE, "removeMembership", new Object[] { "id", id, "broadcast", broadcast });
         }
-
-        orgService.flush();
 
         Membership m = null;
         try {
@@ -275,25 +278,29 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             preDelete(m);
         }
 
-        if (isCreateMembership(m.getMembershipType(), m.getGroupId())) {
+        try {
+          if (isCreateMembership(m.getMembershipType(), m.getGroupId())) {
 
-            try {
-                getIdentitySession().getRoleManager().removeRole(m.getMembershipType(), m.getUserName(), groupId);
-            } catch (Exception e) {
-                // TODO:
-                handleException("Identity operation error: ", e);
-            }
-        }
+              try {
+                  getIdentitySession().getRoleManager().removeRole(m.getMembershipType(), m.getUserName(), groupId);
+              } catch (Exception e) {
+                  // TODO:
+                  handleException("Identity operation error: ", e);
+              }
+          }
 
-        if (isAssociationMapped() && getAssociationMapping().equals(m.getMembershipType()) && associated) {
-            Set<String> keys = new HashSet<String>();
-            keys.add(m.getUserName());
-            try {
-                getIdentitySession().getRelationshipManager().disassociateUsersByKeys(groupId, keys);
-            } catch (Exception e) {
-                // TODO:
-                handleException("Identity operation error: ", e);
-            }
+          if (isAssociationMapped() && getAssociationMapping().equals(m.getMembershipType()) && associated) {
+              Set<String> keys = new HashSet<String>();
+              keys.add(m.getUserName());
+              try {
+                  getIdentitySession().getRelationshipManager().disassociateUsersByKeys(groupId, keys);
+              } catch (Exception e) {
+                  // TODO:
+                  handleException("Identity operation error: ", e);
+              }
+          }
+        } finally {
+          orgService.flush();
         }
 
         if (broadcast) {
@@ -308,8 +315,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             Tools.logMethodIn(log, LogLevel.TRACE, "removeMembershipByUser", new Object[] { "userName", userName, "broadcast",
                     broadcast });
         }
-
-        orgService.flush();
 
         Collection<Role> roles = new HashSet();
 
@@ -334,7 +339,11 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                 preDelete(m);
             }
 
-            getIdentitySession().getRoleManager().removeRole(role);
+            try {
+              getIdentitySession().getRoleManager().removeRole(role);
+            } finally {
+              orgService.flush();
+            }
 
             if (broadcast) {
                 postDelete(m);
@@ -378,8 +387,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembershipByUserAndType", new Object[] { "userName", userName,
                     "groupId", groupId, "type", type, });
         }
-
-        orgService.flush();
 
         String plGroupName = getPLIDMGroupName(getGroupNameFromId(groupId));
 
@@ -438,8 +445,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembershipByUserAndGroup", new Object[] { "userName", userName,
                     "groupId", groupId, });
         }
-
-        orgService.flush();
 
         if (userName == null) {
             // julien fix : if user name is null, need to check if we do need to return a special group
@@ -507,8 +512,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         if (log.isTraceEnabled()) {
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembershipsByUser", new Object[] { "userName", userName });
         }
-
-        orgService.flush();
 
         Collection<Role> roles = new HashSet();
 
@@ -606,8 +609,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembershipsByGroup", new Object[] { "groupId", groupId });
         }
 
-        orgService.flush();
-
         String plGroupName = getPLIDMGroupName(getGroupNameFromId(groupId));
 
         String gid = getIdentitySession().getPersistenceManager().createGroupKey(plGroupName, getGroupTypeFromId(groupId));
@@ -675,8 +676,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembership", new Object[] { "id", id });
         }
 
-        orgService.flush();
-
         Membership m = new MembershipImpl(id);
 
         String plGroupName = getPLIDMGroupName(getGroupNameFromId(m.getGroupId()));
@@ -734,8 +733,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
           log.error("Internal ERROR. Cannot obtain group: " + groupId);
             return new ArrayList<>();
         }
-
-        orgService.flush();
 
         Collection<RoleType> roleTypes = new HashSet();
 

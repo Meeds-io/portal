@@ -125,9 +125,10 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         if(g != null) {
              throw new Exception("Group " + child.getGroupName() + " is already exist");
         }
-        org.picketlink.idm.api.Group childGroup = persistGroup(child);
 
+        org.picketlink.idm.api.Group childGroup = null;
         try {
+            childGroup = persistGroup(child);
             if (parentGroup != null) {
                 getIdentitySession().getRelationshipManager().associateGroups(parentGroup, childGroup);
 
@@ -151,6 +152,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
                 handleException("Cannot deassociate groups: ", e1);
         	}
           throw e;
+        } finally {
+          orgService.flush();
         }
 
         if (broadcast) {
@@ -221,6 +224,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
                                                  .disassociateGroups(jbidParentOriginGroup, List.of(jbidGroupToMove));
         } catch (Exception e) {
             handleException("Cannot dissociate: " + plGroupToMoveName + " to "+plParentOriginGroupName+"; ", e);
+        } finally {
+          orgService.flush();
         }
         //use RelationshiManager.associate
         try {
@@ -228,6 +233,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
                                 .associateGroups(jbidParentTargetGroup,jbidGroupToMove);
         } catch (Exception e) {
             handleException("Cannot associate: " + plGroupToMoveName + " to "+plParentTargetGroupName+"; ", e);
+        } finally {
+          orgService.flush();
         }
 
     }
@@ -256,9 +263,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         String plGroupName = getPLIDMGroupName(group.getGroupName());
 
         try {
-
-            orgService.flush();
-
             jbidGroup = getIdentitySession().getPersistenceManager().findGroup(plGroupName,
                     orgService.getConfiguration().getGroupType(group.getParentId()));
         } catch (Exception e) {
@@ -275,13 +279,13 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
         //Check: Has this group got any child?
         Collection<org.picketlink.idm.api.Group> oneLevelChilds = null;
-        orgService.flush();
         try {
             oneLevelChilds = getIdentitySession().getRelationshipManager()
                     .findAssociatedGroups(jbidGroup, null, true, false);
         } catch (Exception e) {
             handleException("Cannot clear group relationships: " + plGroupName + "; ", e);
         } finally {
+            orgService.flush();
             if(oneLevelChilds != null && oneLevelChilds.size() > 0) {
                 throw new IllegalStateException("Group " + group.getGroupName() + " has at least one child group");
             }
@@ -293,23 +297,7 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         }
 
         try {
-            /*orgService.flush();
-
-            Collection<org.picketlink.idm.api.Group> oneLevelChilds = getIdentitySession().getRelationshipManager()
-                    .findAssociatedGroups(jbidGroup, null, true, false);
-
-            Collection<org.picketlink.idm.api.Group> allChilds = getIdentitySession().getRelationshipManager()
-                    .findAssociatedGroups(jbidGroup, null, true, true);
-
-            getIdentitySession().getRelationshipManager().disassociateGroups(jbidGroup, oneLevelChilds);
-
-            for (org.picketlink.idm.api.Group child : allChilds) {
-                // TODO: impl force in IDM
-                getIdentitySession().getPersistenceManager().removeGroup(child, true);
-            }*/
-
             // Obtain parents
-
             Collection<org.picketlink.idm.api.Group> parents = getIdentitySession().getRelationshipManager()
                     .findAssociatedGroups(jbidGroup, null, false, false);
 
@@ -323,6 +311,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
         } catch (Exception e) {
             handleException("Cannot clear group relationships: " + plGroupName + "; ", e);
+        } finally {
+          orgService.flush();
         }
 
         try {
@@ -330,6 +320,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
         } catch (Exception e) {
             handleException("Cannot remove group: " + plGroupName + "; ", e);
+        } finally {
+          orgService.flush();
         }
 
         if (broadcast) {
@@ -346,8 +338,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         Collection<Role> allRoles = new HashSet<Role>();
 
         try {
-            orgService.flush();
-
             allRoles = getIdentitySession().getRoleManager().findRoles(userName, membershipType);
         } catch (Exception e) {
             handleException("Identity operation error: ", e);
@@ -368,8 +358,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             Collection<org.picketlink.idm.api.Group> groups = new HashSet<org.picketlink.idm.api.Group>();
 
             try {
-                orgService.flush();
-
                 groups = getIdentitySession().getRelationshipManager().findAssociatedGroups(userName, null);
             } catch (Exception e) {
                 handleException("Identity operation error: ", e);
@@ -401,8 +389,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         Collection<Role> roles = new HashSet<Role>();
 
         try {
-            orgService.flush();
-
             roles.addAll(getIdentitySession().getRoleManager().findRoles(userName, membershipType));
 
             roles.addAll(getIdentitySession().getRoleManager().findRoles(userName, MembershipTypeHandler.ANY_MEMBERSHIP_TYPE));
@@ -425,8 +411,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             Collection<org.picketlink.idm.api.Group> groups = new HashSet<org.picketlink.idm.api.Group>();
 
             try {
-                orgService.flush();
-
                 groups = getIdentitySession().getRelationshipManager().findAssociatedGroups(userName, null);
             } catch (Exception e) {
                 handleException("Identity operation error: ", e);
@@ -523,8 +507,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         Collection<org.picketlink.idm.api.Group> allGroups = new HashSet<org.picketlink.idm.api.Group>();
 
         try {
-            orgService.flush();
-
             allGroups = getIdentitySession().getRelationshipManager().findRelatedGroups(user, null, null);
         } catch (Exception e) {
             // TODO:
@@ -567,7 +549,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       }
       Collection<org.picketlink.idm.api.Group> allGroups = new HashSet<>();
       try {
-        orgService.flush();
         allGroups = getIdentitySession().getRelationshipManager().findRelatedGroups(user, groupType, identitySearchCriteria);
       } catch (Exception e) {
         // TODO:
@@ -598,9 +579,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         Set<org.picketlink.idm.api.Group> plGroups = new HashSet<>();
 
         try {
-
-            orgService.flush();
-
             plGroups.addAll(getIdentitySession().getRelationshipManager()
                     .findAssociatedGroups(getRootGroup(), null, true, true));
         } catch (Exception e) {
@@ -690,7 +668,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         return Collections.emptyList();
       }
       Collection<org.picketlink.idm.api.Group> allGroups = new HashSet<>();
-      orgService.flush();
       List<String> excludedGroupsTypes = excludedGroupsParent.stream()
                                                              .map(parent -> orgService.getConfiguration().getGroupType(parent))
                                                              .collect(Collectors.toList());
@@ -739,7 +716,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
       Set<org.picketlink.idm.api.Group> plGroups = new HashSet<org.picketlink.idm.api.Group>();
       try {
-          orgService.flush();
           plGroups.addAll(getIdentitySession().getRelationshipManager().findAssociatedGroups(jbidGroup, null, true, false, identitySearchCriteria));
       } catch (Exception e) {
           handleException("Identity operation error: ", e);
@@ -819,8 +795,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         Map<String, Attribute> attrs = new HashMap<String, Attribute>();
 
         try {
-            orgService.flush();
-
             attrs = getIdentitySession().getAttributesManager().getAttributes(jbidGroup);
         } catch (Exception e) {
             // TODO:
@@ -897,8 +871,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         String gtnGroupName = getGtnGroupName(jbidGroup.getName());
 
         try {
-            orgService.flush();
-
             parents = getIdentitySession().getRelationshipManager().findAssociatedGroups(jbidGroup, null, false, false);
         } catch (Exception e) {
             // TODO:
@@ -1028,6 +1000,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             } catch (Exception e) {
                 // TODO:
                 handleException("Identity operation error: ", e);
+            } finally {
+              orgService.flush();
             }
 
         }
