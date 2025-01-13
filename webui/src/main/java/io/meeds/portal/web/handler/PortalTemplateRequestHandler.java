@@ -76,7 +76,8 @@ public class PortalTemplateRequestHandler extends PortalRequestHandler {
 
     PortalConfig portalConfig = getLayoutService().getPortalConfig(Long.parseLong(requestSiteId));
     if (portalConfig == null
-        || !PortalConfig.GROUP_TEMPLATE.equals(portalConfig.getType())
+        || (!PortalConfig.GROUP_TEMPLATE.equals(portalConfig.getType())
+            && !PortalConfig.PORTAL_TEMPLATE.equals(portalConfig.getType()))
         || !getUserAcl().hasAccessPermission(portalConfig, ConversationState.getCurrent().getIdentity())) {
       response.sendRedirect(request.getContextPath());
       return true;
