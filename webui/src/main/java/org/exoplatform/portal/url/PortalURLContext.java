@@ -145,7 +145,7 @@ public class PortalURLContext implements URLContext {
 
         //
         Map<QualifiedName, String> parameters = new HashMap<>();
-        if (siteKey.getType() == SiteType.GROUP_TEMPLATE) {
+        if (siteKey.getType() == SiteType.GROUP_TEMPLATE || siteKey.getType() == SiteType.PORTAL_TEMPLATE) {
           long siteId = ExoContainerContext.getService(LayoutService.class).getPortalConfig(siteKey).getId();
           parameters.put(WebAppController.HANDLER_PARAM, PortalTemplateRequestHandler.HANDLER_NAME);
           parameters.put(PortalTemplateRequestHandler.REQUEST_SITE_ID, String.valueOf(siteId));

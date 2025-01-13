@@ -234,8 +234,9 @@ public class UserPortalConfigService implements Startable {
    * @param siteType the site type
    * @param siteName the Site name
    * @param template the template to use
+   * @return created {@link PortalConfig}
    */
-  public void createUserPortalConfig(String siteType, String siteName, String template) {
+  public PortalConfig createUserPortalConfig(String siteType, String siteName, String template) {
     NewPortalConfig portalConfig = null;
     if (StringUtils.isBlank(template)) {
       portalConfig = new NewPortalConfig();
@@ -250,6 +251,7 @@ public class UserPortalConfigService implements Startable {
     newPortalConfigListener.createPortalConfig(portalConfig, siteName);
     newPortalConfigListener.createPage(portalConfig, siteName);
     newPortalConfigListener.createPageNavigation(portalConfig, siteName);
+    return layoutService.getPortalConfig(new SiteKey(siteType, siteName));
   }
 
   /**

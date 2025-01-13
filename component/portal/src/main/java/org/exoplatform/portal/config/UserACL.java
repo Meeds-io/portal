@@ -50,39 +50,39 @@ import lombok.SneakyThrows;
 
 public class UserACL {
 
-  public static final String                       EVERYONE               = "Everyone";
+  public static final String                 EVERYONE               = "Everyone";
 
   @Getter
-  private String                                   superUser;
+  private String                             superUser;
 
   @Getter
-  private String                                   guestsGroup;
+  private String                             guestsGroup;
 
   @Getter
-  private List<String>                             portalCreatorGroups;
+  private List<String>                       portalCreatorGroups;
 
   @Getter
-  private String                                   makableMT;
+  private String                             makableMT;
 
   @Getter
-  private List<String>                             mandatoryGroups;
+  private List<String>                       mandatoryGroups;
 
   @Getter
-  private List<String>                             mandatoryMSTypes;
-
-  @Getter
-  @Setter
-  private String                                   adminGroups;
+  private List<String>                       mandatoryMSTypes;
 
   @Getter
   @Setter
-  private String                                   adminMSType;
+  private String                             adminGroups;
 
-  private Map<String, GroupVisibilityPlugin>       groupVisibilityPlugins = new HashMap<>();
+  @Getter
+  @Setter
+  private String                             adminMSType;
 
-  private Authenticator                            authenticator;
+  private Map<String, GroupVisibilityPlugin> groupVisibilityPlugins = new HashMap<>();
 
-  private IdentityRegistry                         identityRegistry;
+  private Authenticator                      authenticator;
+
+  private IdentityRegistry                   identityRegistry;
 
   public UserACL(InitParams params) {
     ValuesParam mandatoryGroupsParam = params.getValuesParam("mandatory.groups");
@@ -356,7 +356,8 @@ public class UserACL {
   public boolean hasEditPermission(Identity identity, String ownerType, String ownerId, String expression) {
     if (isAdministrator(identity)) {
       return true;
-    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)) {
+    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)
+               || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
@@ -387,7 +388,8 @@ public class UserACL {
   public boolean hasAccessPermission(Identity identity, String ownerType, String ownerId, Stream<String> expressionsStream) {
     if (isAdministrator(identity)) {
       return true;
-    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)) {
+    } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)
+               || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
@@ -404,7 +406,8 @@ public class UserACL {
   }
 
   public boolean isAnonymousUser(String username) {
-    return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username) || IdentityConstants.SYSTEM.equals(username);
+    return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username)
+           || IdentityConstants.SYSTEM.equals(username);
   }
 
   public Authenticator getAuthenticator() {
