@@ -1,22 +1,22 @@
-/**
- * Copyright (C) 2009 eXo Platform SAS.
+/*
+ * This file is part of the Meeds project (https://meeds.io/).
  *
- * This is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
  *
- * This software is distributed in the hope that it will be useful,
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this software; if not, write to the Free
- * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
 package org.exoplatform.portal.config.model;
 
 import java.util.ArrayList;
@@ -31,26 +31,22 @@ import org.exoplatform.portal.pom.data.PortalData;
 
 import lombok.EqualsAndHashCode;
 
-/**
- * May 13, 2004
- *
- * @author Tuan Nguyen
- * @version $Id: PortalConfig.java,v 1.7 2004/08/06 03:02:29 tuan08 Exp $
- **/
 @EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
-  public static final String    USER_TYPE      = SiteType.USER.getName();
+  public static final String    USER_TYPE       = SiteType.USER.getName();
 
-  public static final String    GROUP_TYPE     = SiteType.GROUP.getName();
+  public static final String    GROUP_TYPE      = SiteType.GROUP.getName();
 
-  public static final String    PORTAL_TYPE    = SiteType.PORTAL.getName();
+  public static final String    PORTAL_TYPE     = SiteType.PORTAL.getName();
 
-  public static final String    SPACE_TYPE     = SiteType.SPACE.getName();
+  public static final String    SPACE_TYPE      = SiteType.SPACE.getName();
 
-  public static final String    GROUP_TEMPLATE = SiteType.GROUP_TEMPLATE.getName();
+  public static final String    GROUP_TEMPLATE  = SiteType.GROUP_TEMPLATE.getName();
 
-  public static final Container DEFAULT_LAYOUT = initDefaultLayout();
+  public static final String    PORTAL_TEMPLATE = SiteType.PORTAL_TEMPLATE.getName();
+
+  public static final Container DEFAULT_LAYOUT  = initDefaultLayout();
 
   private String                name;
 
@@ -75,7 +71,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   private boolean               defaultLayout;
 
-  private boolean               displayed      = true;
+  private boolean               displayed       = true;
 
   private int                   displayOrder;
 
@@ -205,8 +201,6 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public String getProperty(String name) {
-    if (name == null)
-      throw new NullPointerException();
     if (properties == null || !properties.containsKey(name))
       return null;
     return properties.get(name);
@@ -220,8 +214,9 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public void setProperty(String name, String value) {
-    if (name == null || properties == null)
-      throw new NullPointerException();
+    if (properties == null) {
+      properties = new Properties();
+    }
     properties.setProperty(name, value);
   }
 
