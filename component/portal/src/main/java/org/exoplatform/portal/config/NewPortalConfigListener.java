@@ -74,6 +74,8 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
 
   private static final Pattern           OWNER_PATTERN       = Pattern.compile("@owner@");
 
+  private static final Pattern           OWNER_TYPE_PATTERN  = Pattern.compile("@owner_type@");
+
   /** . */
   private final UserPortalConfigService  owner_;
 
@@ -510,6 +512,7 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
                               .orElse(null);
     if (xml != null) {
       xml = OWNER_PATTERN.matcher(xml).replaceAll(StringEscapeUtils.escapeXml11(portalName));
+      xml = OWNER_TYPE_PATTERN.matcher(xml).replaceAll(StringEscapeUtils.escapeXml11(portalType));
       try {
         return fromXML(portalType, portalName, xml, objectType);
       } catch (Exception e) {
