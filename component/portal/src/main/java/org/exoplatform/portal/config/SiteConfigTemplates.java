@@ -23,43 +23,44 @@ import java.util.Set;
 import org.exoplatform.portal.config.model.PortalConfig;
 
 /**
- * @author <a href="trong.tran@exoplatform.com">Trong Tran</a>
- * @version $Revision$
+ * @deprecated Site Templates has been changed to be stored in database to make
+ *             it dynamically managed by UI rather than statis pages and
+ *             navigation from source files
  */
-
+@Deprecated(forRemoval = true, since = "7.0")
 public class SiteConfigTemplates {
-    private String location;
+  private String      location;
 
-    private Set<String> portalTemplates;
+  private Set<String> portalTemplates;
 
-    private Set<String> groupTemplates;
+  private Set<String> groupTemplates;
 
-    private Set<String> userTemplates;
+  private Set<String> userTemplates;
 
-    /**
-     * @return the location
-     */
-    public String getLocation() {
-        return location;
+  /**
+   * @return the location
+   */
+  public String getLocation() {
+    return location;
+  }
+
+  /**
+   * @param locationPath the locationPath to set
+   */
+  public void setLocation(String locationPath) {
+    this.location = locationPath;
+  }
+
+  /**
+   * @return the type
+   */
+  public Set<String> getTemplates(String type) {
+    if (type.equals(PortalConfig.PORTAL_TYPE)) {
+      return portalTemplates;
+    } else if (type.equals(PortalConfig.GROUP_TYPE)) {
+      return groupTemplates;
+    } else {
+      return userTemplates;
     }
-
-    /**
-     * @param locationPath the locationPath to set
-     */
-    public void setLocation(String locationPath) {
-        this.location = locationPath;
-    }
-
-    /**
-     * @return the type
-     */
-    public Set<String> getTemplates(String type) {
-        if (type.equals(PortalConfig.PORTAL_TYPE)) {
-            return portalTemplates;
-        } else if (type.equals(PortalConfig.GROUP_TYPE)) {
-            return groupTemplates;
-        } else {
-            return userTemplates;
-        }
-    }
+  }
 }

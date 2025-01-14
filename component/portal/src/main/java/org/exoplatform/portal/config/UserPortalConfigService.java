@@ -235,7 +235,13 @@ public class UserPortalConfigService implements Startable {
    * @param siteName the Site name
    * @param template the template to use
    * @return created {@link PortalConfig}
+   * @deprecated the Site creation process has changed to use Site Template
+   *             Definition as deifned in layout addon instead of creating a
+   *             site from a static template from sources. You may replace the
+   *             usage of this method by
+   *             {@link #createSiteFromTemplate(SiteKey, SiteKey)}
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public PortalConfig createUserPortalConfig(String siteType, String siteName, String template) {
     NewPortalConfig portalConfig = null;
     if (StringUtils.isBlank(template)) {
@@ -262,7 +268,13 @@ public class UserPortalConfigService implements Startable {
    * @param siteName the Site name
    * @param template the template to use
    * @param templatePath the template path to use
+   * @deprecated the Site creation process has changed to use Site Template
+   *             Definition as deifned in layout addon instead of creating a
+   *             site from a static template from sources. You may replace the
+   *             usage of this method by
+   *             {@link #createSiteFromTemplate(SiteKey, SiteKey)}
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public void createUserPortalConfig(String siteType, String siteName, String template, String templatePath) {
     NewPortalConfig portalConfigPlugin = new NewPortalConfig(templatePath);
     portalConfigPlugin.setTemplateName(template);
@@ -505,7 +517,11 @@ public class UserPortalConfigService implements Startable {
    * Returns the default portal template to be used when creating a site
    *
    * @return the default portal template name
+   * @deprecated Site Templates has been changed to be stored in database to make
+   *             it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public String getDefaultPortalTemplate() {
     return newPortalConfigListener.getDefaultPortalTemplate();
   }
