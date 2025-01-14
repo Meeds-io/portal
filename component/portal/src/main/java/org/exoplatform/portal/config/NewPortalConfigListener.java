@@ -88,7 +88,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   /** . */
   private volatile List<NewPortalConfig> configs;
 
-  /** . */
+  /**
+   * @deprecated Site Templates has been changed to be stored in database to make
+   *             it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
+   */
+  @Deprecated(forRemoval = true, since = "7.0")
   private List<SiteConfigTemplates>      templateConfigs;
 
   /** . */
@@ -100,7 +105,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    */
   private boolean                        metaPortalSpecified = false;
 
-  /** . */
+  /**
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
+   */
+  @Deprecated(forRemoval = true, since = "7.0")
   private String                         defaultPortalTemplate;
 
   /**
@@ -255,6 +265,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     touchImport();
   }
 
+  /**
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
+   */
+  @Deprecated(forRemoval = true, since = "7.0")
   String getDefaultPortalTemplate() {
     return defaultPortalTemplate;
   }
@@ -541,6 +557,15 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     return content;
   }
 
+  /**
+   * @param type
+   * @param name
+   * @return
+   * @deprecated Site Templates has been changed to be stored in database to make
+   *             it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
+   */
+  @Deprecated(forRemoval = true, since = "7.0")
   public String getTemplateConfig(String type, String name) {
     if (StringUtils.isBlank(name)) {
       return null;
@@ -558,7 +583,11 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    *
    * @param siteType (portal, group, user)
    * @return set of template name
+   * @deprecated Site Templates has been changed to be stored in database to make
+   *             it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public Set<String> getTemplateConfigs(String siteType) {
     Set<String> result = new HashSet<>();
     for (SiteConfigTemplates tempConfig : templateConfigs) {
