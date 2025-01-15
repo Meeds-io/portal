@@ -34,6 +34,8 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
+  public static final String    REMOVABLE_PROP  = "removable";
+
   public static final String    USER_TYPE       = SiteType.USER.getName();
 
   public static final String    GROUP_TYPE      = SiteType.GROUP.getName();
@@ -206,11 +208,21 @@ public class PortalConfig extends ModelObject implements Cloneable {
     return properties.get(name);
   }
 
+  public boolean isRemovable() {
+    return !StringUtils.equals(getProperty(REMOVABLE_PROP), "false");
+  }
+
+  public void setRemovable(boolean removable) {
+    if (removable) {
+      removeProperty(REMOVABLE_PROP);
+    } else {
+      setProperty(REMOVABLE_PROP, "false");
+    }
+  }
+
   public String getProperty(String name, String defaultValue) {
     String value = getProperty(name);
-    if (value != null)
-      return value;
-    return defaultValue;
+    return value == null ? defaultValue : value;
   }
 
   public void setProperty(String name, String value) {
@@ -221,9 +233,9 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public void removeProperty(String name) {
-    if (name == null || properties == null)
-      throw new NullPointerException();
-    properties.remove(name);
+    if (properties != null) {
+      properties.remove(name);
+    }
   }
 
   public void setDescription(String description) {

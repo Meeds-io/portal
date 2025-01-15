@@ -169,7 +169,7 @@ public class SiteStorageImpl implements SiteStorage {
   @ExoTransactional
   public void remove(SiteKey siteKey) {
     PortalData config = getPortalConfig(siteKey);
-    if (config != null) {
+    if (config != null && config.isRemovable()) {
       SiteEntity entity = siteDAO.findByKey(siteKey);
       String siteBody = entity.getSiteBody();
       JSONArray children = parseJsonArray(siteBody);
@@ -178,8 +178,10 @@ public class SiteStorageImpl implements SiteStorage {
       navigationStorage.destroyNavigation(siteKey);
       pageStorage.destroyPages(siteKey);
       siteDAO.delete(entity);
-    } else {
+    } else if (config == null) {
       throw new NoSuchDataException("Could not remove non existing portal " + siteKey);
+    } else {
+      throw new IllegalStateException(String.format("Site %s isn't removable", siteKey));
     }
   }
 
