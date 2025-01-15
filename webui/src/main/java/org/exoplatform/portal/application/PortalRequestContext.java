@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
@@ -65,6 +66,7 @@ import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
+import org.exoplatform.services.resources.ResourceBundleManager;
 import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.PortalHttpServletResponseWrapper;
 import org.exoplatform.web.application.JavascriptManager;
@@ -155,6 +157,8 @@ public class PortalRequestContext extends WebuiRequestContext {
   private String                           cacheLevel          = "cacheLevelPortlet";
 
   private boolean                          ajaxRequest         = true;
+
+  private String                           siteLabel;
 
   @Setter
   private Boolean                          draftPage;
@@ -635,10 +639,33 @@ public class PortalRequestContext extends WebuiRequestContext {
     return siteKey;
   }
 
+  public String getSiteLabel() {
+    if (siteLabel == null) {
+      UIPortal portal = getUiPortal();
+      if (portal == null) {
+        siteLabel = "";
+      } else {
+        siteLabel = portal.getLabel();
+        if (ExpressionUtil.isResourceBindingExpression(siteLabel)) {
+          ResourceBundleManager bundleManager = ExoContainerContext.getService(ResourceBundleManager.class);
+          ResourceBundle navigationResourceBundle = bundleManager.getNavigationResourceBundle(getLocale().toLanguageTag(),
+                                                                                              siteKey.getTypeName(),
+                                                                                              siteKey.getName());
+          String resolvedTitle = ExpressionUtil.getExpressionValue(navigationResourceBundle, siteLabel);
+          // testing to see if the label was translated correctly
+          if (StringUtils.isNotBlank(resolvedTitle) && !resolvedTitle.equals(siteLabel)) {
+            siteLabel = resolvedTitle;
+          }
+        }
+      }
+    }
+    return siteLabel;
+  }
+
   public String getPortalOwner() {
-    UserPortalConfig portalConfig = getUserPortalConfig();
-    if (portalConfig != null && portalConfig.getPortalName() != null) {
-      return portalConfig.getPortalName();
+    UserPortalConfig portal = getUserPortalConfig();
+    if (portal != null && portal.getPortalName() != null) {
+      return portal.getPortalName();
     } else {
       return portalConfigService.getMetaPortal();
     }
