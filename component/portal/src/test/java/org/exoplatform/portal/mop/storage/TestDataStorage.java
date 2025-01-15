@@ -189,6 +189,54 @@ public class TestDataStorage extends AbstractKernelTest {
     assertEquals(label, portal1.getLabel());
     assertEquals(description, portal1.getDescription());
   }
+  
+  public void testRemovePortal() {
+    PortalConfig portal = new PortalConfig();
+    portal.setType("portal");
+    portal.setName("foo85");
+    portal.setLocale("en");
+    portal.setAccessPermissions(new String[] { UserACL.EVERYONE });
+    storage_.create(portal);
+
+    portal = storage_.getPortalConfig(portal.getName());
+    assertNotNull(portal);
+    assertEquals("portal", portal.getType());
+    assertEquals("foo85", portal.getName());
+
+    storage_.remove(portal);
+
+    portal = storage_.getPortalConfig(portal.getName());
+    assertNull(portal);
+  }
+
+  public void testRemovePortalWhenNotRemovable() {
+    String name = "foo89";
+
+    PortalConfig portal = new PortalConfig();
+    portal.setType("portal");
+    portal.setName(name);
+    portal.setLocale("en");
+    portal.setAccessPermissions(new String[] { UserACL.EVERYONE });
+    portal.setRemovable(false);
+    storage_.create(portal);
+
+    portal = storage_.getPortalConfig(portal.getName());
+    assertNotNull(portal);
+    assertEquals("portal", portal.getType());
+    assertEquals(name, portal.getName());
+
+    assertThrows(IllegalStateException.class, () -> storage_.remove(storage_.getPortalConfig(SiteKey.portal(name))));
+
+    portal = storage_.getPortalConfig(portal.getName());
+    assertNotNull(portal);
+
+    portal.setRemovable(true);
+    storage_.save(portal);
+    storage_.remove(portal);
+
+    portal = storage_.getPortalConfig(portal.getName());
+    assertNull(portal);
+  }
 
   public void testPortalConfigSave() throws Exception {
     PortalConfig portal = storage_.getPortalConfig("portal", "test");
