@@ -21,6 +21,10 @@ package org.exoplatform.portal.pom.data;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+
+import org.exoplatform.portal.config.model.PortalConfig;
+
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -160,4 +164,9 @@ public class PortalData extends ModelData {
   public boolean isNull() {
     return key == null;
   }
+
+  public boolean isRemovable() {
+    return properties == null || !StringUtils.equals(properties.get(PortalConfig.REMOVABLE_PROP), "false");
+  }
+
 }
