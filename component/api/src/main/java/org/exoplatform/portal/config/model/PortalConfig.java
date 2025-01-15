@@ -36,6 +36,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   public static final String    REMOVABLE_PROP  = "removable";
 
+  public static final String    ICON_PROP       = "icon";
+
   public static final String    USER_TYPE       = SiteType.USER.getName();
 
   public static final String    GROUP_TYPE      = SiteType.GROUP.getName();
@@ -217,6 +219,18 @@ public class PortalConfig extends ModelObject implements Cloneable {
       removeProperty(REMOVABLE_PROP);
     } else {
       setProperty(REMOVABLE_PROP, "false");
+    }
+  }
+
+  public String getIcon() {
+    return getProperty(ICON_PROP);
+  }
+
+  public void setIcon(String icon) {
+    if (icon == null) {
+      removeProperty(ICON_PROP);
+    } else {
+      setProperty(ICON_PROP, icon);
     }
   }
 
