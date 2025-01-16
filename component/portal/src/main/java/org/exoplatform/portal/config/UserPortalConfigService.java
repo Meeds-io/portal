@@ -310,17 +310,8 @@ public class UserPortalConfigService implements Startable {
     if (StringUtils.isNotBlank(userHomePage)) {
       return userHomePage;
     } else {
-      List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
-      if (CollectionUtils.isEmpty(portalConfigList)) {
-        return null;
-      }
-      return portalConfigList.stream()
-                             .filter(PortalConfig::isDefaultSite)
-                             .filter(site -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(site.getType()))
-                             .map(portalConfig -> getDefaultSitePath(portalConfig.getName(), username))
-                             .filter(Objects::nonNull)
-                             .findFirst()
-                             .orElse(null);
+      PortalConfig portalConfig = getDefaultSite(username);
+      return portalConfig == null ? null : getDefaultSitePath(portalConfig.getName(), username);
     }
   }
 
@@ -358,7 +349,7 @@ public class UserPortalConfigService implements Startable {
     if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
       userPortalConfig = getUserPortalConfig(siteName, username);
     } else {
-      PortalConfig defaultPortalConfig = getAccessiblePortalSites(username).stream().findFirst().orElse(null);
+      PortalConfig defaultPortalConfig = getDefaultSite(username);
       if (defaultPortalConfig != null) {
         userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), username);
       }
@@ -378,6 +369,29 @@ public class UserPortalConfigService implements Startable {
       builder.withoutVisibility();
     }
     return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder.build(), null);
+  }
+
+  public PortalConfig getDefaultSite(String username) {
+    if (StringUtils.isBlank(username)) {
+      PortalConfig publicSitePortalConfig = layoutService.getPortalConfig(SiteKey.portal(PUBLIC_SITE_NAME));
+      if (publicSitePortalConfig == null || !userAcl.hasAccessPermission(publicSitePortalConfig, null)) {
+        return null;
+      } else {
+        return publicSitePortalConfig;
+      }
+    } else {
+      List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
+      if (CollectionUtils.isEmpty(portalConfigList)) {
+        return null;
+      } else {
+        return portalConfigList.stream()
+                               .filter(PortalConfig::isDefaultSite)
+                               .filter(p -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(p.getType()))
+                               .filter(Objects::nonNull)
+                               .findFirst()
+                               .orElse(null);
+      }
+    }
   }
 
   public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
@@ -517,8 +531,8 @@ public class UserPortalConfigService implements Startable {
    * Returns the default portal template to be used when creating a site
    *
    * @return the default portal template name
-   * @deprecated Site Templates has been changed to be stored in database to make
-   *             it dynamically managed by UI rather than statis pages and
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
    *             navigation from source files
    */
   @Deprecated(forRemoval = true, since = "7.0")
