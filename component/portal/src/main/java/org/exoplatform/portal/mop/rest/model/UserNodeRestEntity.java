@@ -17,37 +17,79 @@
 package org.exoplatform.portal.mop.rest.model;
 
 import java.util.List;
-import java.util.Map;
 
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.user.UserNode;
 
-import lombok.EqualsAndHashCode;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Data
 @NoArgsConstructor
-@EqualsAndHashCode
 public class UserNodeRestEntity {
 
-  private UserNode                  userNode;
+  private List<UserNodeRestEntity> subNodes;
 
-  private List<UserNodeRestEntity>  subNodes;
+  private boolean                  canEditPage;
 
-  private boolean                   canEditPage;
+  private String[]                 pageAccessPermissions;
 
-  private Map<String, Object>       pageEditPermission;
+  private String                   pageEditPermission;
 
-  private List<Map<String, Object>> pageAccessPermissions;
+  private String                   pageLink;
 
-  private String                    pageLink;
+  private String                   id;
 
-  private List<UserNodeBreadcrumbItem> userNodeBreadcrumbItemList;
+  private String                   name;
+
+  private Visibility               visibility;
+
+  private String                   label;
+
+  private String                   labelKey;
+
+  private String                   uri;
+
+  private String                   icon;
+
+  private String                   target;
+
+  private SiteKey                  siteKey;
+
+  private PageKey                  pageKey;
+
+  private long                     startPublicationTime;
+
+  private long                     endPublicationTime;
+
+  private long                     updatedDate;
 
   public UserNodeRestEntity(UserNode userNode) {
-    this.userNode = userNode;
+    setUserNode(userNode);
   }
+
+  public void setUserNode(UserNode userNode) {
+    if (userNode == null) {
+      return;
+    }
+    this.label = userNode.getResolvedLabel();
+    this.labelKey = userNode.getLabel();
+    this.id = userNode.getId();
+    this.uri = userNode.getURI();
+    this.icon = userNode.getIcon();
+    this.visibility = userNode.getVisibility();
+    this.name = userNode.getName();
+    this.startPublicationTime = userNode.getStartPublicationTime();
+    this.endPublicationTime = userNode.getEndPublicationTime();
+    this.siteKey = userNode.getNavigation() == null ? null : userNode.getNavigation().getKey();
+    this.pageKey = userNode.getPageRef();
+    this.target = userNode.getTarget();
+    this.updatedDate = userNode.getUpdatedDate();
+  }
+
+  private List<UserNodeBreadcrumbItem> userNodeBreadcrumbItemList;
 
   public void setChildren(List<UserNodeRestEntity> subNodes) {
     this.subNodes = subNodes;
@@ -55,98 +97,6 @@ public class UserNodeRestEntity {
 
   public List<UserNodeRestEntity> getChildren() {
     return subNodes;
-  }
-
-  public String getLabel() {
-    return userNode == null ? null : userNode.getResolvedLabel();
-  }
-
-  public String getLabelKey() {
-    return userNode == null ? null : userNode.getLabel();
-  }
-
-  public String getIcon() {
-    return userNode == null ? null : userNode.getIcon();
-  }
-
-  public String getId() {
-    return userNode == null ? null : userNode.getId();
-  }
-
-  public String getUri() {
-    return userNode == null ? null : userNode.getURI();
-  }
-
-  public Visibility getVisibility() {
-    return userNode == null ? null : userNode.getVisibility();
-  }
-
-  public String getName() {
-    return userNode == null ? null : userNode.getName();
-  }
-
-  public long getStartPublicationTime() {
-    return userNode == null ? 0l : userNode.getStartPublicationTime();
-  }
-
-  public long getEndPublicationTime() {
-    return userNode == null ? 0l : userNode.getEndPublicationTime();
-  }
-
-  public SiteKey getSiteKey() {
-    return userNode == null ? null : userNode.getNavigation().getKey();
-  }
-
-  public PageKey getPageKey() {
-    return userNode == null ? null : userNode.getPageRef();
-  }
-
-  public boolean isCanEditPage() {
-    return canEditPage;
-  }
-
-  public void setCanEditPage(boolean canEditPage) {
-    this.canEditPage = canEditPage;
-  }
-
-  public Map<String, Object> getPageEditPermission() {
-    return pageEditPermission;
-  }
-
-  public void setPageEditPermission(Map<String, Object> pageEditPermission) {
-    this.pageEditPermission = pageEditPermission;
-  }
-
-  public List<Map<String, Object>> getPageAccessPermissions() {
-    return pageAccessPermissions;
-  }
-
-  public void setPageAccessPermissions(List<Map<String, Object>> pageAccessPermissions) {
-    this.pageAccessPermissions = pageAccessPermissions;
-  }
-
-  public String getTarget() {
-    return userNode == null ? null : userNode.getTarget();
-  }
-
-  public String getPageLink() {
-    return pageLink;
-  }
-
-  public void setPageLink(String pageLink) {
-    this.pageLink = pageLink;
-  }
-
-  public long getUpdatedDate() {
-    return userNode == null ? 0l : userNode.getUpdatedDate();
-  }
-
-  public List<UserNodeBreadcrumbItem> getUserNodeBreadcrumbItemList() {
-    return userNodeBreadcrumbItemList;
-  }
-
-  public void setUserNodeBreadcrumbItemList(List<UserNodeBreadcrumbItem> userNodeBreadcrumbItemList) {
-    this.userNodeBreadcrumbItemList = userNodeBreadcrumbItemList;
   }
 
 }
