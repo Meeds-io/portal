@@ -362,6 +362,9 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
       // PortalLayout created by constructor
       if (StringUtils.isNotBlank(config.getTemplateName()) || StringUtils.isNotBlank(config.getTemplateLocation())) {
         UnmarshalledObject<PortalConfig> obj = getConfig(config, owner, type, PortalConfig.class);
+        if (obj == null) {
+          obj = getConfig(config, owner, "portal", PortalConfig.class);
+        }
         if (obj != null) {
           pConfig = obj.getObject();
         }
