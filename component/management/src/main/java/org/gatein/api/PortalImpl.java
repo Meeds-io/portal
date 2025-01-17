@@ -281,10 +281,10 @@ public class PortalImpl implements Portal {
                                         null,
                                         false,
                                         false,
+                                        false,
                                         null,
                                         null,
-                                        Arrays.asList(Util.from(Permission
-                                                                          .everyone())),
+                                        Arrays.asList(Util.from(Permission.everyone())),
                                         Util.from(edit)[0],
                                         PageType.PAGE.name(),
                                         null);

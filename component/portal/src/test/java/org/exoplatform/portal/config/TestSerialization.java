@@ -114,6 +114,7 @@ public class TestSerialization extends AbstractGateInTest {
                                 "foo16",
                                 true,
                                 true,
+                                true,
                                 PageType.LINK.name(),
                                 "wwww.exo.com");
         PageData clone = IOTools.clone(obj);
@@ -138,6 +139,7 @@ public class TestSerialization extends AbstractGateInTest {
         assertEquals(obj.getEditPermission(), clone.getEditPermission());
         assertEquals(obj.isShowMaxWindow(), clone.isShowMaxWindow());
         assertEquals(obj.isHideSharedLayout(), clone.isHideSharedLayout());
+        assertEquals(obj.isShowSharedLayout(), clone.isShowSharedLayout());
         assertEquals(obj.getType(), clone.getType());
         assertEquals(obj.getLink(), clone.getLink());
     }

@@ -298,7 +298,7 @@ public class TestLoadedPOM extends AbstractConfigTest {
     assertEquals("test_factory_id", pageContext.getState().getFactoryId());
     assertEquals(Arrays.<String> asList("test_access_permissions"), pageContext.getState().getAccessPermissions());
     assertEquals("test_edit_permission", pageContext.getState().getEditPermission());
-    assertEquals(true, pageContext.getState().getShowMaxWindow());
+    assertEquals(true, pageContext.getState().isShowMaxWindow());
 
     //
     List<ModelObject> children = page.getChildren();

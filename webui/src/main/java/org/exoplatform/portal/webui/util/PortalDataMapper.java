@@ -131,6 +131,7 @@ public class PortalDataMapper {
     uiPage.setProfiles(model.getProfiles());
     uiPage.setShowMaxWindow(model.isShowMaxWindow());
     uiPage.setHideSharedLayout(model.isHideSharedLayout());
+    uiPage.setShowSharedLayout(model.isShowSharedLayout());
 
     List<UIPortlet> portlets = new ArrayList<>();
     uiPage.findComponentOfType(portlets, UIPortlet.class);

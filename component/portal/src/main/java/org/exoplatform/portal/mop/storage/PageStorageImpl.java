@@ -307,6 +307,7 @@ public class PageStorageImpl implements PageStorage {
                         editPermission, // editPermission
                         entity.isShowMaxWindow(), // showMaxWindow
                         entity.isHideSharedLayout(),
+                        entity.isShowSharedLayout(),
                         entity.getPageType() != null ? entity.getPageType().name() : null,
                         entity.getLink());
   }
@@ -347,8 +348,9 @@ public class PageStorageImpl implements PageStorage {
       entity.setDescription(state.getDescription());
       entity.setDisplayName(state.getDisplayName());
       entity.setFactoryId(state.getFactoryId());
-      entity.setShowMaxWindow(state.getShowMaxWindow());
+      entity.setShowMaxWindow(state.isShowMaxWindow());
       entity.setHideSharedLayout(state.isHideSharedLayout());
+      entity.setShowSharedLayout(state.isShowSharedLayout());
       entity.setPageType(!StringUtils.isBlank(state.getType()) ? PageType.valueOf(state.getType()) : PageType.PAGE);
       entity.setProfiles(state.getProfiles());
       entity.setLink(state.getLink());

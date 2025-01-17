@@ -64,6 +64,10 @@ public class UIPage extends UIContainer {
   @Setter
   private boolean   hideSharedLayout = false;
 
+  @Getter
+  @Setter
+  private boolean showSharedLayout = false;
+
   public void normalizePortletWindowStates() {
     for (UIPortlet childUIPortlet : recursivelyFindUIPortlets(this)) {
       if (!WindowState.MINIMIZED.equals(childUIPortlet.getCurrentWindowState())) {
