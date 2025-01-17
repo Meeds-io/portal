@@ -465,4 +465,10 @@
     </sql>
   </changeSet>
 
+  <changeSet author="portal" id="1.0.0-mip-159-01">
+    <addColumn tableName="PORTAL_PAGES">
+      <column name="SHOW_SHARED_LAYOUT" type="BOOLEAN" defaultValueBoolean="false" />
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>

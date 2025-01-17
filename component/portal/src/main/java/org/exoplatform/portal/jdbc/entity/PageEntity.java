@@ -36,6 +36,8 @@ import jakarta.persistence.NamedQuery;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import lombok.Getter;
+import lombok.Setter;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -64,9 +66,14 @@ public class PageEntity extends ComponentEntity implements Serializable {
 
   @Column(name = "SHOW_MAX_WINDOW")
   private boolean               showMaxWindow;
-
+  
   @Column(name = "HIDE_SHARED_LAYOUT")
   private boolean               hideSharedLayout;
+
+  @Getter
+  @Setter
+  @Column(name = "SHOW_SHARED_LAYOUT")
+  private boolean               showSharedLayout;
 
   @Column(name = "DISPLAY_NAME", length = 200)
   private String                displayName;
