@@ -70,6 +70,7 @@ public class PageDAOTest extends AbstractDAOTest {
     entity.setDescription(description);
     entity.setShowMaxWindow(true);
     entity.setHideSharedLayout(true);
+    entity.setShowSharedLayout(true);
     entity.setFactoryId("testFactoryId");
     entity.setPageBody("testPageBody");
     entity.setPageType(PageType.PAGE);

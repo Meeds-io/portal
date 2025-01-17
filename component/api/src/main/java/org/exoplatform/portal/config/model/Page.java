@@ -49,9 +49,21 @@ public class Page extends Container {
 
   private boolean            showMaxWindow    = false;
 
+  /**
+   * Whether to 'hide' shared layout or not even when the site 'displays' the
+   * shared layout
+   */
   @Getter
   @Setter
   private boolean            hideSharedLayout = false;
+
+  /**
+   * Whether to 'show' shared layout or not even when the site 'hides' the
+   * shared layout layout
+   */
+  @Getter
+  @Setter
+  private boolean            showSharedLayout = false;
 
   private String             type;
 
@@ -74,6 +86,8 @@ public class Page extends Container {
     this.ownerId = data.getOwnerId();
     this.editPermission = data.getEditPermission();
     this.showMaxWindow = data.isShowMaxWindow();
+    this.hideSharedLayout = data.isHideSharedLayout();
+    this.showSharedLayout = data.isShowSharedLayout();
     this.type = data.getType();
     this.link = data.getLink();
   }
@@ -180,6 +194,7 @@ public class Page extends Container {
                         editPermission,
                         showMaxWindow,
                         hideSharedLayout,
+                        showSharedLayout,
                         type,
                         link);
   }

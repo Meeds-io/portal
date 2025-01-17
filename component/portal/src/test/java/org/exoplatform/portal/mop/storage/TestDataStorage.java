@@ -359,7 +359,7 @@ public class TestDataStorage extends AbstractKernelTest {
 
     pageContext = pageService.loadPage(page.getPageKey());
     assertEquals("MyTitle", pageContext.getState().getDisplayName());
-    assertEquals(true, pageContext.getState().getShowMaxWindow());
+    assertEquals(true, pageContext.getState().isShowMaxWindow());
     assertEquals(true, pageContext.getState().isHideSharedLayout());
   }
 
