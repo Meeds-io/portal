@@ -1,78 +1,58 @@
 package org.exoplatform.portal.mop.page;
 
 import java.io.Serializable;
-import java.util.*;
-
-import org.exoplatform.commons.utils.Safe;
-
-import lombok.Getter;
-import lombok.Setter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.exoplatform.portal.mop.PageType;
 
-/**
- * An immutable page state class, modifying an existing state should use the
- * {@link Builder} builder class to rebuild a new immutable state object.
- *
- * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
- */
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
 public class PageState implements Serializable {
 
   private static final long serialVersionUID = 7874166775312871923L;
 
-  /** . */
-  @Getter
-  @Setter
   private String            storageId;
 
-  /** . */
-  final String              editPermission;
+  private boolean           showMaxWindow;
 
-  /** . */
-  final boolean             showMaxWindow;
+  private boolean           hideSharedLayout;
 
-  /** . */
-  @Getter
-  final boolean             hideSharedLayout;
+  private boolean           showSharedLayout;
 
-  final String              profiles;
+  private String            profiles;
 
-  /** . */
-  final String              factoryId;
+  private String            factoryId;
 
-  /** . */
-  final String              displayName;
+  private String            displayName;
 
-  /** . */
-  final String              description;
+  private String            description;
 
-  /** . */
-  final String              type;
+  private String            type;
 
-  /** . */
-  final String              link;
+  private String            link;
 
-  /** . */
-  final List<String>        accessPermissions;
+  private String            editPermission;
 
-  public PageState(String displayName, // NOSONAR
-                   String description,
-                   boolean showMaxWindow,
-                   String factoryId,
-                   List<String> accessPermissions,
-                   String editPermission,
-                   String type,
-                   String link) {
-    this(displayName,
-         description,
-         showMaxWindow,
-         false,
-         factoryId,
-         null,
-         accessPermissions,
-         editPermission,
-         type,
-         link);
+  private List<String>      accessPermissions;
+
+  public PageState(PageState pageState) {
+    this(pageState.storageId,
+         pageState.showMaxWindow,
+         pageState.hideSharedLayout,
+         pageState.showSharedLayout,
+         pageState.profiles,
+         pageState.factoryId,
+         pageState.displayName,
+         pageState.description,
+         pageState.type,
+         pageState.link,
+         pageState.editPermission,
+         pageState.accessPermissions);
   }
 
   public PageState(String displayName, // NOSONAR
@@ -81,13 +61,14 @@ public class PageState implements Serializable {
                    String factoryId,
                    List<String> accessPermissions,
                    String editPermission) {
-    this(displayName, description, showMaxWindow, false, factoryId, accessPermissions, editPermission);
+    this(displayName, description, showMaxWindow, false, false, factoryId, accessPermissions, editPermission);
   }
 
   public PageState(String displayName, // NOSONAR
                    String description,
                    boolean showMaxWindow,
                    boolean hideSharedLayout,
+                   boolean showSharedLayout,
                    String factoryId,
                    String profiles,
                    List<String> accessPermissions,
@@ -97,6 +78,7 @@ public class PageState implements Serializable {
     this.editPermission = editPermission;
     this.showMaxWindow = showMaxWindow;
     this.hideSharedLayout = hideSharedLayout;
+    this.showSharedLayout = showSharedLayout;
     this.factoryId = factoryId;
     this.profiles = profiles;
     this.displayName = displayName;
@@ -110,12 +92,14 @@ public class PageState implements Serializable {
                    String description,
                    boolean showMaxWindow,
                    boolean hideSharedLayout,
+                   boolean showSharedLayout,
                    String factoryId,
                    List<String> accessPermissions,
                    String editPermission) {
     this.editPermission = editPermission;
     this.showMaxWindow = showMaxWindow;
     this.hideSharedLayout = hideSharedLayout;
+    this.showSharedLayout = showSharedLayout;
     this.factoryId = factoryId;
     this.profiles = null;
     this.displayName = displayName;
@@ -125,73 +109,11 @@ public class PageState implements Serializable {
     this.link = null;
   }
 
-  public String getEditPermission() {
-    return editPermission;
-  }
-
-  public boolean getShowMaxWindow() {
-    return showMaxWindow;
-  }
-
-  public String getFactoryId() {
-    return factoryId;
-  }
-
-  public String getDisplayName() {
-    return displayName;
-  }
-
-  public String getDescription() {
-    return description;
-  }
-
-  public String getProfiles() {
-    return profiles;
-  }
-
-  public List<String> getAccessPermissions() {
-    return accessPermissions;
-  }
-
-  public String getType() {
-    return type;
-  }
-
-  public String getLink() {
-    return link;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof PageState)) {
-      return false;
-    }
-    PageState that = (PageState) o;
-    return Safe.equals(editPermission, that.editPermission) && showMaxWindow == that.showMaxWindow
-           && Safe.equals(factoryId, that.factoryId)
-           && Safe.equals(displayName, that.displayName)
-           && Safe.equals(description, that.description)
-           && Safe.equals(accessPermissions, that.accessPermissions);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = editPermission != null ? editPermission.hashCode() : 0;
-    result = 31 * result + (showMaxWindow ? 1 : 0);
-    result = 31 * result + (factoryId != null ? factoryId.hashCode() : 0);
-    result = 31 * result + (displayName != null ? displayName.hashCode() : 0);
-    result = 31 * result + (description != null ? description.hashCode() : 0);
-    result = 31 * result + (accessPermissions != null ? accessPermissions.hashCode() : 0);
-    return result;
-  }
-
   public Builder builder() {
     return new Builder(editPermission,
                        showMaxWindow,
                        hideSharedLayout,
+                       showSharedLayout,
                        factoryId,
                        profiles,
                        displayName,
@@ -211,6 +133,9 @@ public class PageState implements Serializable {
 
     /** . */
     private boolean      hideSharedLayout;
+
+    /** . */
+    private boolean      showSharedLayout;
 
     /** . */
     private String       factoryId;
@@ -235,6 +160,7 @@ public class PageState implements Serializable {
     private Builder(String editPermission, // NOSONAR
                     boolean showMaxWindow,
                     boolean hideSharedLayout,
+                    boolean showSharedLayout,
                     String factoryId,
                     String profiles,
                     String displayName,
@@ -244,7 +170,8 @@ public class PageState implements Serializable {
                     String link) {
       this.editPermission = editPermission;
       this.showMaxWindow = showMaxWindow;
-      this.showMaxWindow = hideSharedLayout;
+      this.hideSharedLayout = hideSharedLayout;
+      this.showSharedLayout = showSharedLayout;
       this.factoryId = factoryId;
       this.profiles = profiles;
       this.displayName = displayName;
@@ -273,9 +200,14 @@ public class PageState implements Serializable {
       this.showMaxWindow = showMaxWindow;
       return this;
     }
-
+    
     public Builder hideSharedLayout(boolean hideSharedLayout) {
       this.hideSharedLayout = hideSharedLayout;
+      return this;
+    }
+
+    public Builder showSharedLayout(boolean showSharedLayout) {
+      this.showSharedLayout = showSharedLayout;
       return this;
     }
 
@@ -314,6 +246,7 @@ public class PageState implements Serializable {
                            description,
                            showMaxWindow,
                            hideSharedLayout,
+                           showSharedLayout,
                            factoryId,
                            profiles,
                            accessPermissions,

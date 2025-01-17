@@ -48,13 +48,14 @@ public class UISharedLayout extends UIContainer {
   }
 
   public boolean isShowSharedLayout(PortalRequestContext requestContext) {
-    boolean showSharedLayout = !requestContext.isHideSharedLayout() && (Util.getUIPage() == null || !Util.getUIPage().isHideSharedLayout());
-    if (requestContext.getUserPortalConfig() != null 
+    boolean showSharedLayout = !hideSiteSharedLayout(requestContext) && !hidePageSharedLayout();
+    if (requestContext.getUserPortalConfig() != null
         && requestContext.getUserPortalConfig().getPortalConfig() != null) {
       showSharedLayout = showSharedLayout
                          && requestContext.getSiteType() != SiteType.GROUP_TEMPLATE
                          && (requestContext.getSiteType() != SiteType.PORTAL
-                             || requestContext.getUserPortalConfig().getPortalConfig().isDisplayed());
+                             || showSiteSharedLayout(requestContext)
+                             || showPageSharedLayout());
     }
     return showSharedLayout;
   }
@@ -66,6 +67,22 @@ public class UISharedLayout extends UIContainer {
 
   protected void processContainerRender(WebuiRequestContext context) throws Exception {
     super.processRender(context);
+  }
+
+  private boolean hideSiteSharedLayout(PortalRequestContext requestContext) {
+    return requestContext.isHideSharedLayout();
+  }
+
+  private boolean showSiteSharedLayout(PortalRequestContext requestContext) {
+    return requestContext.getUserPortalConfig().getPortalConfig().isDisplayed();
+  }
+
+  private boolean hidePageSharedLayout() {
+    return Util.getUIPage() != null && Util.getUIPage().isHideSharedLayout();
+  }
+
+  private boolean showPageSharedLayout() {
+    return !hidePageSharedLayout() && Util.getUIPage() != null && Util.getUIPage().isShowSharedLayout();
   }
 
 }

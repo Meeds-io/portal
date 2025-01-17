@@ -33,92 +33,96 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(force = true)
 public class PageData extends ContainerData {
 
-    public static final PageData NULL_OBJECT = new PageData();
+  public static final PageData NULL_OBJECT      = new PageData();
 
-    private static final long serialVersionUID = 2741613958131096156L;
+  private static final long    serialVersionUID = 2741613958131096156L;
 
-    /** . */
-    private final PageKey key;
+  /** . */
+  private final PageKey        key;
 
-    /** . */
-    private final String editPermission;
+  /** . */
+  private final String         editPermission;
 
-    /** . */
-    private final boolean showMaxWindow;
+  /** . */
+  private final boolean        showMaxWindow;
 
-    /** . */
-    private final boolean hideSharedLayout;
+  /** . */
+  private final boolean        hideSharedLayout;
 
-    /** . */
-    private final String       type;
+  private final boolean        showSharedLayout;
 
-    /** . */
-    private final String       link;
+  /** . */
+  private final String         type;
 
-    public PageData(String storageId, // NOSONAR
-                    String id,
-                    String name,
-                    String icon,
-                    String template,
-                    String factoryId,
-                    String title,
-                    String description,
-                    String width,
-                    String height,
-                    String cssClass,
-                    String profiles,
-                    List<String> accessPermissions,
-                    List<ComponentData> children,
-                    String ownerType,
-                    String ownerId,
-                    String editPermission,
-                    boolean showMaxWindow,
-                    boolean hideSharedLayout,
-                    String type,
-                    String link) {
-      super(storageId,
-            id,
-            name,
-            icon,
-            template,
-            factoryId,
-            title,
-            description,
-            width,
-            height,
-            cssClass,
-            profiles,
-            null,
-            null,
-            accessPermissions,
-            children);
+  /** . */
+  private final String         link;
 
-        //
-        this.key = new PageKey(ownerType, ownerId, name);
-        this.editPermission = editPermission;
-        this.showMaxWindow = showMaxWindow;
-        this.hideSharedLayout = hideSharedLayout;
-        this.type= type;
-        this.link = link;
-    }
+  public PageData(String storageId, // NOSONAR
+                  String id,
+                  String name,
+                  String icon,
+                  String template,
+                  String factoryId,
+                  String title,
+                  String description,
+                  String width,
+                  String height,
+                  String cssClass,
+                  String profiles,
+                  List<String> accessPermissions,
+                  List<ComponentData> children,
+                  String ownerType,
+                  String ownerId,
+                  String editPermission,
+                  boolean showMaxWindow,
+                  boolean hideSharedLayout,
+                  boolean showSharedLayout,
+                  String type,
+                  String link) {
+    super(storageId,
+          id,
+          name,
+          icon,
+          template,
+          factoryId,
+          title,
+          description,
+          width,
+          height,
+          cssClass,
+          profiles,
+          null,
+          null,
+          accessPermissions,
+          children);
 
-    public String getType() {
-        return type;
-    }
+    //
+    this.key = new PageKey(ownerType, ownerId, name);
+    this.editPermission = editPermission;
+    this.showMaxWindow = showMaxWindow;
+    this.hideSharedLayout = hideSharedLayout;
+    this.showSharedLayout = showSharedLayout;
+    this.type = type;
+    this.link = link;
+  }
 
-    public String getLink() {
-        return link;
-    }
+  public String getType() {
+    return type;
+  }
 
-    public String getOwnerType() {
-        return key.getType();
-    }
+  public String getLink() {
+    return link;
+  }
 
-    public String getOwnerId() {
-        return key.getId();
-    }
+  public String getOwnerType() {
+    return key.getType();
+  }
 
-    public boolean isNull() {
-      return key == null;
-    }
+  public String getOwnerId() {
+    return key.getId();
+  }
+
+  public boolean isNull() {
+    return key == null;
+  }
 }
