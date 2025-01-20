@@ -56,8 +56,6 @@ import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
 import org.exoplatform.portal.mop.user.UserPortalImpl;
 import org.exoplatform.portal.rest.services.BaseRestServicesTestCase;
-import org.exoplatform.services.organization.Group;
-import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.rest.impl.ContainerResponse;
 import org.exoplatform.services.rest.impl.EnvironmentContext;
@@ -167,10 +165,6 @@ public class NavigationRestTest extends BaseRestServicesTestCase {
     nodes.add(userNode);
     UserPortalConfig userPortalConfig = mock(UserPortalConfig.class);
     UserPortal userPortal = mock(UserPortal.class);
-    GroupHandler groupHandler = mock(GroupHandler.class);
-    Group group = mock(Group.class);
-    when(organizationService.getGroupHandler()).thenReturn(groupHandler);
-    when(groupHandler.findGroupById("/platform/users")).thenReturn(group);
     PageKey pageKey = PageKey.parse("portal::page::ref");
     when(layoutService.getPage(pageKey)).thenReturn(nodePage);
     when(nodePage.getEditPermission()).thenReturn("*:/platform/users");
@@ -189,11 +183,9 @@ public class NavigationRestTest extends BaseRestServicesTestCase {
     assertNotNull(entity);
     List<UserNodeRestEntity> resultUserNodes = (List<UserNodeRestEntity>) resp.getEntity();
     assertEquals(1, resultUserNodes.size());
-    assertEquals("*", resultUserNodes.get(0).getPageEditPermission().get("membershipType"));
-    assertEquals(group, resultUserNodes.get(0).getPageEditPermission().get("group"));
-    assertEquals(1, resultUserNodes.get(0).getPageAccessPermissions().size());
-    assertEquals("*", resultUserNodes.get(0).getPageAccessPermissions().get(0).get("membershipType"));
-    assertEquals(group, resultUserNodes.get(0).getPageAccessPermissions().get(0).get("group"));
+    assertEquals("*:/platform/users", resultUserNodes.get(0).getPageEditPermission());
+    assertEquals(1, resultUserNodes.get(0).getPageAccessPermissions().length);
+    assertEquals("*:/platform/users", resultUserNodes.get(0).getPageAccessPermissions()[0]);
 
     when(nodePage.getEditPermission()).thenReturn("manager:/platform/users");
     when(nodePage.getAccessPermissions()).thenReturn(new String[] {"Everyone"});
@@ -205,11 +197,10 @@ public class NavigationRestTest extends BaseRestServicesTestCase {
     assertNotNull(entity);
     resultUserNodes = (List<UserNodeRestEntity>) resp.getEntity();
     assertEquals(1, resultUserNodes.size());
-    assertEquals("manager", resultUserNodes.get(0).getPageEditPermission().get("membershipType"));
-    assertEquals(group, resultUserNodes.get(0).getPageEditPermission().get("group"));
-    assertEquals(1, resultUserNodes.get(0).getPageAccessPermissions().size());
-    assertEquals("Everyone", resultUserNodes.get(0).getPageAccessPermissions().get(0).get("membershipType"));
-    assertEquals(null, resultUserNodes.get(0).getPageAccessPermissions().get(0).get("group"));
+    assertEquals(1, resultUserNodes.size());
+    assertEquals("manager:/platform/users", resultUserNodes.get(0).getPageEditPermission());
+    assertEquals(1, resultUserNodes.get(0).getPageAccessPermissions().length);
+    assertEquals("Everyone", resultUserNodes.get(0).getPageAccessPermissions()[0]);
     assertEquals("www.test.com", resultUserNodes.get(0).getPageLink());
   }
 

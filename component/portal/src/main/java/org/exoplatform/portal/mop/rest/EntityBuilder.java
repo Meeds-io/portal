@@ -17,13 +17,9 @@
 package org.exoplatform.portal.mop.rest;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -39,19 +35,13 @@ import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserPortal;
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.ConversationState;
 
 public class EntityBuilder {
-  private static final Log   LOG             = ExoLogger.getLogger(EntityBuilder.class);
 
-  public static final String GROUP           = "group";
-
-  public static final String MEMBERSHIP_TYPE = "membershipType";
-
-  private EntityBuilder() { // NOSONAR
+  private EntityBuilder() {
+    // Utils Class, thus private constructor
   }
 
   public static List<UserNodeRestEntity> toUserNodeRestEntity(Collection<UserNode> nodes,
@@ -72,44 +62,13 @@ public class EntityBuilder {
       UserNodeRestEntity resultNode = new UserNodeRestEntity(userNode);
       if (expand && userNode.getPageRef() != null) {
         Page userNodePage = layoutService.getPage(userNode.getPageRef());
-        if (PageType.LINK.equals(PageType.valueOf(userNodePage.getType()))) {
-          resultNode.setPageLink(userNodePage.getLink());
-        }
+        resultNode.setPageAccessPermissions(userNodePage.getAccessPermissions());
         if (!StringUtils.isBlank(userNodePage.getEditPermission())) {
           resultNode.setCanEditPage(userACL.hasEditPermission(userNodePage, ConversationState.getCurrent().getIdentity()));
-          Map<String, Object> editPermission = new HashMap<>();
-          try {
-            String[] editPermissionExpression = userNodePage.getEditPermission().split(":");
-            if(editPermissionExpression.length == 1) {
-              editPermission.put(MEMBERSHIP_TYPE, userNodePage.getEditPermission());
-            } else {
-              editPermission.put(MEMBERSHIP_TYPE, editPermissionExpression[0]);
-              editPermission.put(GROUP,
-                      organizationService.getGroupHandler()
-                              .findGroupById(editPermissionExpression[1]));
-            }
-          } catch (Exception e) {
-            LOG.warn("Error when getting group with id {}", userNodePage.getEditPermission().split(":")[1], e);
-          }
-          resultNode.setPageEditPermission(editPermission);
+          resultNode.setPageEditPermission(userNodePage.getEditPermission());
         }
-        if (userNodePage.getAccessPermissions() != null) {
-          List<Map<String, Object>> accessPermissions = Arrays.stream(userNodePage.getAccessPermissions()).map(permission -> {
-            String[] permissionArray = permission.split(":");
-            Map<String, Object> accessPermission = new HashMap<>();
-            if(permissionArray.length == 1) {
-              accessPermission.put(MEMBERSHIP_TYPE, userNodePage.getAccessPermissions()[0]);
-            } else {
-              try {
-                accessPermission.put(MEMBERSHIP_TYPE, permission.split(":")[0]);
-                accessPermission.put(GROUP, organizationService.getGroupHandler().findGroupById(permission.split(":")[1]));
-              } catch (Exception e) {
-                LOG.warn("Error when getting group with id {}", permission.split(":")[1], e);
-              }
-            }
-            return accessPermission;
-          }).collect(Collectors.toList());
-          resultNode.setPageAccessPermissions(accessPermissions);
+        if (PageType.LINK.equals(PageType.valueOf(userNodePage.getType()))) {
+          resultNode.setPageLink(userNodePage.getLink());
         }
       }
       if (expandBreadcrumb) {
@@ -158,7 +117,7 @@ public class EntityBuilder {
         nodeUri = userNodePage.getLink();
       } else {
         if (siteName.contains(("/spaces/"))) {
-          siteName = "g/" + siteName.replaceAll("/",":");
+          siteName = "g/" + siteName.replace("/", ":");
         }
         nodeUri = new StringBuilder("/").append(portalName)
                                         .append("/")

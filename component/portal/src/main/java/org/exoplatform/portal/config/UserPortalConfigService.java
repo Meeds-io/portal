@@ -234,8 +234,15 @@ public class UserPortalConfigService implements Startable {
    * @param siteType the site type
    * @param siteName the Site name
    * @param template the template to use
+   * @return created {@link PortalConfig}
+   * @deprecated the Site creation process has changed to use Site Template
+   *             Definition as deifned in layout addon instead of creating a
+   *             site from a static template from sources. You may replace the
+   *             usage of this method by
+   *             {@link #createSiteFromTemplate(SiteKey, SiteKey)}
    */
-  public void createUserPortalConfig(String siteType, String siteName, String template) {
+  @Deprecated(forRemoval = true, since = "7.0")
+  public PortalConfig createUserPortalConfig(String siteType, String siteName, String template) {
     NewPortalConfig portalConfig = null;
     if (StringUtils.isBlank(template)) {
       portalConfig = new NewPortalConfig();
@@ -250,6 +257,7 @@ public class UserPortalConfigService implements Startable {
     newPortalConfigListener.createPortalConfig(portalConfig, siteName);
     newPortalConfigListener.createPage(portalConfig, siteName);
     newPortalConfigListener.createPageNavigation(portalConfig, siteName);
+    return layoutService.getPortalConfig(new SiteKey(siteType, siteName));
   }
 
   /**
@@ -260,7 +268,13 @@ public class UserPortalConfigService implements Startable {
    * @param siteName the Site name
    * @param template the template to use
    * @param templatePath the template path to use
+   * @deprecated the Site creation process has changed to use Site Template
+   *             Definition as deifned in layout addon instead of creating a
+   *             site from a static template from sources. You may replace the
+   *             usage of this method by
+   *             {@link #createSiteFromTemplate(SiteKey, SiteKey)}
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public void createUserPortalConfig(String siteType, String siteName, String template, String templatePath) {
     NewPortalConfig portalConfigPlugin = new NewPortalConfig(templatePath);
     portalConfigPlugin.setTemplateName(template);
@@ -296,17 +310,8 @@ public class UserPortalConfigService implements Startable {
     if (StringUtils.isNotBlank(userHomePage)) {
       return userHomePage;
     } else {
-      List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
-      if (CollectionUtils.isEmpty(portalConfigList)) {
-        return null;
-      }
-      return portalConfigList.stream()
-                             .filter(PortalConfig::isDefaultSite)
-                             .filter(site -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(site.getType()))
-                             .map(portalConfig -> getDefaultSitePath(portalConfig.getName(), username))
-                             .filter(Objects::nonNull)
-                             .findFirst()
-                             .orElse(null);
+      PortalConfig portalConfig = getDefaultSite(username);
+      return portalConfig == null ? null : getDefaultSitePath(portalConfig.getName(), username);
     }
   }
 
@@ -344,7 +349,7 @@ public class UserPortalConfigService implements Startable {
     if (StringUtils.equalsIgnoreCase(siteType, PortalConfig.PORTAL_TYPE)) {
       userPortalConfig = getUserPortalConfig(siteName, username);
     } else {
-      PortalConfig defaultPortalConfig = getAccessiblePortalSites(username).stream().findFirst().orElse(null);
+      PortalConfig defaultPortalConfig = getDefaultSite(username);
       if (defaultPortalConfig != null) {
         userPortalConfig = getUserPortalConfig(defaultPortalConfig.getName(), username);
       }
@@ -364,6 +369,29 @@ public class UserPortalConfigService implements Startable {
       builder.withoutVisibility();
     }
     return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder.build(), null);
+  }
+
+  public PortalConfig getDefaultSite(String username) {
+    if (StringUtils.isBlank(username)) {
+      PortalConfig publicSitePortalConfig = layoutService.getPortalConfig(SiteKey.portal(PUBLIC_SITE_NAME));
+      if (publicSitePortalConfig == null || !userAcl.hasAccessPermission(publicSitePortalConfig, null)) {
+        return null;
+      } else {
+        return publicSitePortalConfig;
+      }
+    } else {
+      List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
+      if (CollectionUtils.isEmpty(portalConfigList)) {
+        return null;
+      } else {
+        return portalConfigList.stream()
+                               .filter(PortalConfig::isDefaultSite)
+                               .filter(p -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(p.getType()))
+                               .filter(Objects::nonNull)
+                               .findFirst()
+                               .orElse(null);
+      }
+    }
   }
 
   public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
@@ -503,7 +531,11 @@ public class UserPortalConfigService implements Startable {
    * Returns the default portal template to be used when creating a site
    *
    * @return the default portal template name
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
+   *             navigation from source files
    */
+  @Deprecated(forRemoval = true, since = "7.0")
   public String getDefaultPortalTemplate() {
     return newPortalConfigListener.getDefaultPortalTemplate();
   }

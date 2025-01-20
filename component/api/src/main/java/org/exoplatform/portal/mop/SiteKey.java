@@ -59,6 +59,8 @@ public final class SiteKey implements Serializable {
       this.type = SiteType.GROUP;
     } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(type)) {
       this.type = SiteType.GROUP_TEMPLATE;
+    } else if (PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(type)) {
+      this.type = SiteType.PORTAL_TEMPLATE;
     } else if (PortalConfig.SPACE_TYPE.equalsIgnoreCase(type)) {
       this.type = SiteType.SPACE;
     } else if (PortalConfig.USER_TYPE.equalsIgnoreCase(type)) {
@@ -87,6 +89,10 @@ public final class SiteKey implements Serializable {
 
   public static SiteKey groupTemplate(String name) {
     return new SiteKey(SiteType.GROUP_TEMPLATE, name);
+  }
+
+  public static SiteKey portalTemplate(String name) {
+    return new SiteKey(SiteType.PORTAL_TEMPLATE, name);
   }
 
   public String getTypeName() {

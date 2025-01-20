@@ -124,14 +124,12 @@ public class Util {
             return null;
 
         switch (siteKey.getType()) {
-            case PORTAL:
+            case PORTAL, GROUP_TEMPLATE, PORTAL_TEMPLATE:
                 return new SiteId(siteKey.getName());
             case GROUP:
                 return new SiteId(new Group(siteKey.getName()));
             case USER:
               return new SiteId(new User(siteKey.getName()));
-            case GROUP_TEMPLATE:
-                return new SiteId(siteKey.getName());
             default:
               throw new IllegalArgumentException("Unexpected value: " + siteKey.getType());
         }
