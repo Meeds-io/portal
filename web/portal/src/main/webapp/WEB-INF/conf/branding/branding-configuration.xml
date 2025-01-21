@@ -50,6 +50,15 @@
         <value>${exo.branding.theme.greyColorLighten1:greyColorLighten1:#707070}</value>
         <value>${exo.branding.theme.textColor:textColor:#20282c}</value>
         <value>${exo.branding.theme.borderRadius:borderRadius:8px}</value>
+        <value>${exo.branding.theme.topBarTextColor:topBarTextColor:#20282c}</value>
+        <value>${exo.branding.theme.topBarTextFontSize:topBarTextFontSize:16px}</value>
+        <value>${exo.branding.theme.topBarTextFontStyle:topBarTextFontStyle:normal}</value>
+        <value>${exo.branding.theme.topBarTextFontWeight:topBarTextFontWeight:bold}</value>
+        <value>${exo.branding.theme.topBarBackgroundColor:topBarBackgroundColor:#FFFFFFFF}</value>
+        <value>${exo.branding.theme.topBarBackgroundPosition:topBarBackgroundPosition:left top}</value>
+        <value>${exo.branding.theme.topBarBackgroundSize:topBarBackgroundSize:cover}</value>
+        <value>${exo.branding.theme.topBarBackgroundImage:topBarBackgroundImage:none}</value>
+        <value>${exo.branding.theme.topBarBackgroundRepeat:topBarBackgroundRepeat:no-repeat}</value>
       </values-param>
     </init-params>
   </component>
