@@ -74,91 +74,103 @@ import lombok.SneakyThrows;
 @SuppressWarnings("unchecked")
 public class BrandingServiceImpl implements BrandingService, Startable {
 
-  private static final Log     LOG                               = ExoLogger.getExoLogger(BrandingServiceImpl.class);
+  private static final Log     LOG                                = ExoLogger.getExoLogger(BrandingServiceImpl.class);
 
-  public static final String   BRANDING_RESET_ATTACHMENT_ID      = "0";
+  public static final String   BRANDING_RESET_ATTACHMENT_ID       = "0";
 
-  public static final String   BRANDING_LOGO_BASE_PATH           = "/portal/rest/v1/platform/branding/logo?v=";            // NOSONAR
+  public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";            // NOSONAR
 
-  public static final String   BRANDING_FAVICON_BASE_PATH        = "/portal/rest/v1/platform/branding/favicon?v=";         // NOSONAR
+  public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";         // NOSONAR
 
-  public static final String   BRANDING_LOGIN_BG_BASE_PATH       = "/portal/rest/v1/platform/branding/loginBackground?v="; // NOSONAR
+  public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v="; // NOSONAR
 
-  public static final String   BRANDING_PAGE_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/pageBackground?v=";  // NOSONAR
+  public static final String   BRANDING_PAGE_BG_BASE_PATH         = "/portal/rest/v1/platform/branding/pageBackground?v=";  // NOSONAR
 
-  public static final String   BRANDING_COMPANY_NAME_INIT_PARAM  = "exo.branding.company.name";
+  public static final String   BRANDING_TOP_BAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/topBarBackground?v=";
+
+  public static final String   BRANDING_COMPANY_NAME_INIT_PARAM   = "exo.branding.company.name";
 
   // Will be used in Mail notification Footer by example
-  public static final String   BRANDING_SITE_NAME_INIT_PARAM     = "exo.branding.company.siteName";
+  public static final String   BRANDING_SITE_NAME_INIT_PARAM      = "exo.branding.company.siteName";
 
   // Will be used in Mail notification Footer by example
-  public static final String   BRANDING_COMPANY_LINK_INIT_PARAM  = "exo.branding.company.link";
+  public static final String   BRANDING_COMPANY_LINK_INIT_PARAM   = "exo.branding.company.link";
 
-  public static final String   BRANDING_LOGIN_TITLE_PARAM        = "authentication.title";
+  public static final String   BRANDING_LOGIN_TITLE_PARAM         = "authentication.title";
 
-  public static final String   BRANDING_LOGIN_SUBTITLE_PARAM     = "authentication.subtitle";
+  public static final String   BRANDING_LOGIN_SUBTITLE_PARAM      = "authentication.subtitle";
 
-  public static final String   BRANDING_LOGIN_BG_INIT_PARAM      = "authentication.background";
+  public static final String   BRANDING_LOGIN_BG_INIT_PARAM       = "authentication.background";
 
-  public static final String   BRANDING_LOGO_INIT_PARAM          = "exo.branding.company.logo";
+  public static final String   BRANDING_LOGO_INIT_PARAM           = "exo.branding.company.logo";
 
-  public static final String   BRANDING_FAVICON_INIT_PARAM       = "exo.branding.company.favicon";
+  public static final String   BRANDING_FAVICON_INIT_PARAM        = "exo.branding.company.favicon";
 
-  public static final String   BRANDING_COMPANY_NAME_SETTING_KEY = "exo.branding.company.name";
+  public static final String   BRANDING_COMPANY_NAME_SETTING_KEY  = "exo.branding.company.name";
 
-  public static final String   BRANDING_SITE_NAME_SETTING_KEY    = "exo.branding.company.siteName";
+  public static final String   BRANDING_SITE_NAME_SETTING_KEY     = "exo.branding.company.siteName";
 
-  public static final String   BRANDING_LOGIN_TEXT_COLOR_KEY     = "authentication.loginBackgroundTextColor";
+  public static final String   BRANDING_LOGIN_TEXT_COLOR_KEY      = "authentication.loginBackgroundTextColor";
 
-  public static final String   BRANDING_TITLE_SETTING_KEY        = "authentication.title.";
+  public static final String   BRANDING_TITLE_SETTING_KEY         = "authentication.title.";
 
-  public static final String   BRANDING_SUBTITLE_SETTING_KEY     = "authentication.subtitle.";
+  public static final String   BRANDING_SUBTITLE_SETTING_KEY      = "authentication.subtitle.";
 
-  public static final String   BRANDING_COMPANY_LINK_SETTING_KEY = "exo.branding.company.link";
+  public static final String   BRANDING_COMPANY_LINK_SETTING_KEY  = "exo.branding.company.link";
 
-  public static final String   BRANDING_THEME_LESS_PATH          = "exo.branding.theme.path";
+  public static final String   BRANDING_THEME_LESS_PATH           = "exo.branding.theme.path";
 
-  public static final String   BRANDING_THEME_VARIABLES          = "exo.branding.theme.variables";
+  public static final String   BRANDING_THEME_VARIABLES           = "exo.branding.theme.variables";
 
-  public static final String   BRANDING_LOGO_ID_SETTING_KEY      = "exo.branding.company.id";
+  public static final String   BRANDING_LOGO_ID_SETTING_KEY       = "exo.branding.company.id";
 
-  public static final String   BRANDING_FAVICON_ID_SETTING_KEY   = "exo.branding.company.favicon.id";
+  public static final String   BRANDING_FAVICON_ID_SETTING_KEY    = "exo.branding.company.favicon.id";
 
-  public static final String   BRANDING_LOGIN_BG_ID_SETTING_KEY  = "authentication.background";
+  public static final String   BRANDING_LOGIN_BG_ID_SETTING_KEY   = "authentication.background";
 
-  public static final String   BRANDING_PAGE_BG_ID_SETTING_KEY   = "page.background";
+  public static final String   BRANDING_PAGE_BG_ID_SETTING_KEY    = "page.background";
 
-  public static final String   BRANDING_PAGE_BG_COLOR_KEY        = "page.backgroundColor";
+  public static final String   BRANDING_TOP_BAR_BG_ID_SETTING_KEY = "topBar.background";
 
-  public static final String   BRANDING_PAGE_BG_REPEAT_KEY       = "page.backgroundRepeat";
+  public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
 
-  public static final String   BRANDING_PAGE_WIDTH_KEY           = "page.width";
+  public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
-  public static final String   BRANDING_PAGE_BG_POSITION_KEY     = "page.backgroundPosition";
+  public static final String   BRANDING_PAGE_BG_REPEAT_KEY        = "page.backgroundRepeat";
 
-  public static final String   BRANDING_PAGE_BG_SIZE_KEY         = "page.backgroundSize";
+  public static final String   BRANDING_PAGE_WIDTH_KEY            = "page.width";
 
-  public static final String   BRANDING_LAST_UPDATED_TIME_KEY    = "branding.lastUpdatedTime";
+  public static final String   BRANDING_CUSTOM_CSS                = "page.customCss";
 
-  public static final String   FILE_API_NAME_SPACE               = "CompanyBranding";
+  public static final String   BRANDING_PAGE_BG_POSITION_KEY      = "page.backgroundPosition";
 
-  public static final String   LOGO_NAME                         = "logo.png";
+  public static final String   BRANDING_PAGE_BG_SIZE_KEY          = "page.backgroundSize";
 
-  public static final String   FAVICON_NAME                      = "favicon.ico";
+  public static final String   BRANDING_LAST_UPDATED_TIME_KEY     = "branding.lastUpdatedTime";
 
-  public static final String   LOGIN_BACKGROUND_NAME             = "loginBackground.png";
+  public static final String   FILE_API_NAME_SPACE                = "CompanyBranding";
 
-  public static final String   PAGE_BACKGROUND_NAME              = "pageBackground.png";
+  public static final String   LOGO_NAME                          = "logo.png";
 
-  public static final String   BRANDING_DEFAULT_LOGO_PATH        = "/skin/images/logo/DefaultLogo.png";                    // NOSONAR
+  public static final String   FAVICON_NAME                       = "favicon.ico";
 
-  public static final String   BRANDING_DEFAULT_FAVICON_PATH     = "/skin/images/favicon.ico";                             // NOSONAR
+  public static final String   LOGIN_BACKGROUND_NAME              = "loginBackground.png";
 
-  public static final Context  BRANDING_CONTEXT                  = Context.GLOBAL.id("BRANDING");
+  public static final String   TOP_BAR_BACKGROUND_NAME            = "topBarBackground.png";
 
-  public static final Scope    BRANDING_SCOPE                    = Scope.APPLICATION.id("BRANDING");
+  public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
-  public static final long     DEFAULT_LAST_MODIFED              = System.currentTimeMillis();
+  public static final String   BRANDING_CUSTOM_STYLE_FEATURE      = "customStylesheet";
+
+  public static final String   BRANDING_DEFAULT_LOGO_PATH         = "/skin/images/logo/DefaultLogo.png";                    // NOSONAR
+
+  public static final String   BRANDING_DEFAULT_FAVICON_PATH      = "/skin/images/favicon.ico";                             // NOSONAR
+
+  public static final Context  BRANDING_CONTEXT                   = Context.GLOBAL.id("BRANDING");
+
+  public static final Scope    BRANDING_SCOPE                     = Scope.APPLICATION.id("BRANDING");
+
+  public static final long     DEFAULT_LAST_MODIFED               = System.currentTimeMillis();
 
   private PortalContainer      container;
 
@@ -213,6 +225,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private Background           loginBackground                   = null;
 
   private Background           pageBackground                    = null;
+
+  private Background           topBarBackground                    = null;
 
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
@@ -276,6 +290,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setLogo(getLogo());
     branding.setFavicon(getFavicon());
     branding.setLoginBackground(getLoginBackground());
+    branding.setTopBarBackground(getTopBarBackground());
     branding.setLoginBackgroundTextColor(getLoginBackgroundTextColor());
     branding.setPageBackground(getPageBackground());
     branding.setPageBackgroundColor(getPageBackgroundColor());
@@ -308,6 +323,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         brandingFile.setData(null);
         branding.setPageBackground(brandingFile);
       }
+      if (branding.getTopBarBackground() != null && branding.getTopBarBackground().getData() != null) {
+        Background brandingFile = branding.getTopBarBackground().clone();
+        brandingFile.setData(null);
+        branding.setTopBarBackground(brandingFile);
+      }
     }
     return branding;
   }
@@ -332,6 +352,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updateLogo(branding.getLogo(), false);
       updateFavicon(branding.getFavicon(), false);
       updateLoginBackground(branding.getLoginBackground(), false);
+      updateTopBarBackground(branding.getTopBarBackground(), false);
       updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
       updatePageBackground(branding.getPageBackground(), false);
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
@@ -339,7 +360,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updatePageBackgroundPosition(branding.getPageBackgroundPosition(), false);
       updatePageBackgroundRepeat(branding.getPageBackgroundRepeat(), false);
       updatePageWidth(branding.getPageWidth(), false);
-      updateThemeStyle(branding.getThemeStyle(), false);
+      Map<String, String> themeStyles = branding.getThemeStyle();
+      processThemeBackgroundImages(themeStyles);
+      updateThemeStyle(themeStyles, false);
       updateLoginTitle(branding.getLoginTitle());
       updateLoginSubtitle(branding.getLoginSubtitle());
     } finally {
@@ -440,6 +463,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Long getTopBarBackgroundId() {
+    return getPropertyValueLong(BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
+  }
+
+  @Override
   public Logo getLogo() {
     if (this.logo == null) {
       try {
@@ -516,6 +544,22 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Background getTopBarBackground() {
+    if (this.topBarBackground == null) {
+      try {
+        Long imageId = getTopBarBackgroundId();
+        if (imageId != null) {
+          this.topBarBackground = retrieveStoredBrandingFile(imageId, new Background());
+        } else {
+          this.topBarBackground = new Background();
+        }
+      } catch (Exception e) {
+        LOG.warn("Error retrieving top bar background", e);
+      }
+    }
+    return this.topBarBackground;
+  }
+  @Override
   public String getLogoPath() {
     Logo brandingLogo = getLogo();
     return brandingLogo == null
@@ -542,6 +586,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     Background background = getPageBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_PAGE_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  @Override
+  public String getTopBarBackgroundPath() {
+    Background background = getTopBarBackground();
+    return background == null
+            || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
@@ -866,6 +917,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
+  private void updateTopBarBackground(Background topBarBackground, boolean updateLastUpdatedTime) {
+    updateBrandingFile(topBarBackground, TOP_BAR_BACKGROUND_NAME, this.getTopBarBackgroundId(), BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
+    this.topBarBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
   private void updatePageBackground(Background background, boolean updateLastUpdatedTime) {
     updateBrandingFile(background, PAGE_BACKGROUND_NAME, this.getPageBackgroundId(), BRANDING_PAGE_BG_ID_SETTING_KEY);
     this.pageBackground = null;
@@ -1091,6 +1148,27 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (triggerEvent) {
       listenerService.broadcast(BRANDING_UPDATED_EVENT, null, getBrandingInformation(false));
     }
+  }
+
+  private void processThemeBackgroundImages(Map<String, String> themeStyles) {
+    String topBarBackgroundImagePath = getTopBarBackgroundPath();
+
+    if (StringUtils.isNotBlank(topBarBackgroundImagePath)) {
+      // Retrieve the existing value (may include background effects)
+      String newValue = themeStyles.get(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
+
+      StringBuilder topBarBackgroundImageUrl = new StringBuilder();
+      topBarBackgroundImageUrl.append("url(");
+      topBarBackgroundImageUrl.append(topBarBackgroundImagePath);
+      topBarBackgroundImageUrl.append(")");
+
+      if (StringUtils.isNotBlank(newValue) && !newValue.equals("none")) {
+        topBarBackgroundImageUrl.append(", ");
+        topBarBackgroundImageUrl.append(newValue);
+      }
+      themeStyles.put(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, topBarBackgroundImageUrl.toString());
+    }
+
   }
 
 }
