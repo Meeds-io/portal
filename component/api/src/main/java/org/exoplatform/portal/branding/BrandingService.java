@@ -238,4 +238,19 @@ public interface BrandingService {
    */
   String getDefaultLanguage();
 
+  /**
+   * @return Login Background File technical identifier
+   */
+  Long getTopBarBackgroundId();
+
+  /**
+   * @return Top bar Background File technical identifier
+   */
+  Background getTopBarBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve top bar background
+   */
+  String getTopBarBackgroundPath();
+
 }
