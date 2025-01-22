@@ -89,6 +89,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_TOP_BAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/topBarBackground?v=";
 
+  public static final String   BRANDING_SIDEBAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/sideBarBackground?v=";
+
   public static final String   BRANDING_COMPANY_NAME_INIT_PARAM   = "exo.branding.company.name";
 
   // Will be used in Mail notification Footer by example
@@ -133,7 +135,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_TOP_BAR_BG_ID_SETTING_KEY = "topBar.background";
 
+  public static final String   BRANDING_SIDEBAR_BG_ID_SETTING_KEY = "sideBar.background";
+
   public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
+
+  public static final String   SIDEBAR_BG_IMAGE_THEME_STYLE_KEY   = "sideBarBackgroundImage";
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -158,6 +164,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   LOGIN_BACKGROUND_NAME              = "loginBackground.png";
 
   public static final String   TOP_BAR_BACKGROUND_NAME            = "topBarBackground.png";
+
+  public static final String   SIDEBAR_BACKGROUND_NAME            = "sideBarBackground.png";
 
   public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
@@ -191,47 +199,49 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private UserACL              userAcl;
 
-  private String               defaultCompanyName                = "";
+  private String               defaultCompanyName                 = "";
 
-  private String               defaultSiteName                   = "";
+  private String               defaultSiteName                    = "";
 
-  private String               defaultCompanyLink                = "";
+  private String               defaultCompanyLink                 = "";
 
-  private String               defaultConfiguredLogoPath         = null;
+  private String               defaultConfiguredLogoPath          = null;
 
-  private String               defaultConfiguredFaviconPath      = null;
+  private String               defaultConfiguredFaviconPath       = null;
 
-  private String               defaultConfiguredLoginBgPath      = null;
+  private String               defaultConfiguredLoginBgPath       = null;
 
-  private String               lessFilePath                      = null;
+  private String               lessFilePath                       = null;
 
-  private Map<String, String>  themeVariables                    = null;
+  private Map<String, String>  themeVariables                     = null;
 
-  private String               defaultLoginTitle                 = null;
+  private String               defaultLoginTitle                  = null;
 
-  private String               defaultLoginSubtitle              = null;
+  private String               defaultLoginSubtitle               = null;
 
-  private Map<String, String>  loginTitle                        = null;
+  private Map<String, String>  loginTitle                         = null;
 
-  private Map<String, String>  loginSubtitle                     = null;
+  private Map<String, String>  loginSubtitle                      = null;
 
-  private Map<String, String>  supportedLanguages                = null;
+  private Map<String, String>  supportedLanguages                 = null;
 
-  private String               lessThemeContent                  = null;
+  private String               lessThemeContent                   = null;
 
-  private String               themeCSSContent                   = null;
+  private String               themeCSSContent                    = null;
 
-  private String               customCss                         = null;
+  private String               customCss                          = null;
 
-  private Logo                 logo                              = null;
+  private Logo                 logo                               = null;
 
-  private Favicon              favicon                           = null;
+  private Favicon              favicon                            = null;
 
-  private Background           loginBackground                   = null;
+  private Background           loginBackground                    = null;
 
-  private Background           pageBackground                    = null;
+  private Background           pageBackground                     = null;
 
-  private Background           topBarBackground                    = null;
+  private Background           topBarBackground                   = null;
+
+  private Background           sideBarBackground                  = null;
 
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
@@ -301,6 +311,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setFavicon(getFavicon());
     branding.setLoginBackground(getLoginBackground());
     branding.setTopBarBackground(getTopBarBackground());
+    branding.setSideBarBackground(getSideBarBackground());
     branding.setLoginBackgroundTextColor(getLoginBackgroundTextColor());
     branding.setPageBackground(getPageBackground());
     branding.setPageBackgroundColor(getPageBackgroundColor());
@@ -339,6 +350,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         brandingFile.setData(null);
         branding.setTopBarBackground(brandingFile);
       }
+      if (branding.getSideBarBackground() != null && branding.getSideBarBackground().getData() != null) {
+        Background brandingFile = branding.getSideBarBackground().clone();
+        brandingFile.setData(null);
+        branding.setSideBarBackground(brandingFile);
+      }
     }
     return branding;
   }
@@ -364,6 +380,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updateFavicon(branding.getFavicon(), false);
       updateLoginBackground(branding.getLoginBackground(), false);
       updateTopBarBackground(branding.getTopBarBackground(), false);
+      updateSideBarBackground(branding.getSideBarBackground(), false);
       updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
       updatePageBackground(branding.getPageBackground(), false);
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
@@ -485,6 +502,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Long getSideBarBackgroundId() {
+    return getPropertyValueLong(BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
+  }
+
+  @Override
   public Logo getLogo() {
     if (this.logo == null) {
       try {
@@ -576,6 +598,24 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
     return this.topBarBackground;
   }
+
+  @Override
+  public Background getSideBarBackground() {
+    if (this.sideBarBackground == null) {
+      try {
+        Long imageId = getSideBarBackgroundId();
+        if (imageId != null) {
+          this.sideBarBackground = retrieveStoredBrandingFile(imageId, new Background());
+        } else {
+          this.sideBarBackground = new Background();
+        }
+      } catch (Exception e) {
+        LOG.warn("Error retrieving sidebar background", e);
+      }
+    }
+    return this.sideBarBackground;
+  }
+
   @Override
   public String getLogoPath() {
     Logo brandingLogo = getLogo();
@@ -610,6 +650,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     Background background = getTopBarBackground();
     return background == null
             || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  @Override
+  public String getSideBarBackgroundPath() {
+    Background background = getSideBarBackground();
+    return background == null
+            || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
@@ -945,6 +992,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
+  private void updateSideBarBackground(Background sideBarBackground, boolean updateLastUpdatedTime) {
+    updateBrandingFile(sideBarBackground, SIDEBAR_BACKGROUND_NAME, this.getSideBarBackgroundId(), BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
+    this.sideBarBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
   private void updatePageBackground(Background background, boolean updateLastUpdatedTime) {
     updateBrandingFile(background, PAGE_BACKGROUND_NAME, this.getPageBackgroundId(), BRANDING_PAGE_BG_ID_SETTING_KEY);
     this.pageBackground = null;
@@ -1196,24 +1249,22 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private void processThemeBackgroundImages(Map<String, String> themeStyles) {
-    String topBarBackgroundImagePath = getTopBarBackgroundPath();
+    processBackgroundImage(themeStyles, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, getTopBarBackgroundPath());
+    processBackgroundImage(themeStyles, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY, getSideBarBackgroundPath());
+  }
 
-    if (StringUtils.isNotBlank(topBarBackgroundImagePath)) {
-      // Retrieve the existing value (may include background effects)
-      String newValue = themeStyles.get(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
+  private void processBackgroundImage(Map<String, String> themeStyles, String styleKey, String imagePath) {
+    if (StringUtils.isNotBlank(imagePath)) {
+      String themeStyleValue = themeStyles.get(styleKey);
 
-      StringBuilder topBarBackgroundImageUrl = new StringBuilder();
-      topBarBackgroundImageUrl.append("url(");
-      topBarBackgroundImageUrl.append(topBarBackgroundImagePath);
-      topBarBackgroundImageUrl.append(")");
+      StringBuilder backgroundImageValue = new StringBuilder("url(").append(imagePath).append(")");
 
-      if (StringUtils.isNotBlank(newValue) && !newValue.equals("none")) {
-        topBarBackgroundImageUrl.append(", ");
-        topBarBackgroundImageUrl.append(newValue);
+      if (StringUtils.isNotBlank(themeStyleValue) && !"none".equals(themeStyleValue)) {
+        backgroundImageValue.append(", ").append(themeStyleValue);
       }
-      themeStyles.put(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, topBarBackgroundImageUrl.toString());
-    }
 
+      themeStyles.put(styleKey, backgroundImageValue.toString());
+    }
   }
 
 }
