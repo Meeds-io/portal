@@ -359,6 +359,8 @@ public class UserACL {
     } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)
                || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
+    } else if (PortalConfig.DRAFT.equals(ownerType)) {
+      return identity != null && ownerId.endsWith("_" + identity.getUserId());
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
@@ -391,6 +393,8 @@ public class UserACL {
     } else if (PortalConfig.GROUP_TEMPLATE.equalsIgnoreCase(ownerType)
                || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
+    } else if (PortalConfig.DRAFT.equals(ownerType)) {
+      return identity != null && ownerId.endsWith("_" + identity.getUserId());
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
