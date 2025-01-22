@@ -21,7 +21,7 @@ package org.exoplatform.portal.mop;
 
 public enum SiteType {
 
-  PORTAL, GROUP, USER, SPACE, GROUP_TEMPLATE, PORTAL_TEMPLATE;
+  PORTAL, GROUP, USER, SPACE, GROUP_TEMPLATE, PORTAL_TEMPLATE, DRAFT;
 
   final String name;
 
