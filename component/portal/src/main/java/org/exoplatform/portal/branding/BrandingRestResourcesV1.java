@@ -142,6 +142,23 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   }
 
   @GET
+  @Path("/sideBarBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default sidebar Background image", description = "Get Default sidebar Background image", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getSideBarBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getSideBarBackground(), request, version);
+  }
+
+  @GET
   @Path("/favicon")
   @Produces(IMAGE_MIME_TYPE)
   @Operation(summary = "Get Branding favicon", description = "Get Branding favicon", method = "GET")
