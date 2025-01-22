@@ -55,6 +55,7 @@ public class UISharedLayout extends UIContainer {
       showSharedLayout = showSharedLayout
                          && requestContext.getSiteType() != SiteType.GROUP_TEMPLATE
                          && requestContext.getSiteType() != SiteType.PORTAL_TEMPLATE
+                         && requestContext.getSiteType() != SiteType.DRAFT
                          && (requestContext.getSiteType() != SiteType.PORTAL
                              || showSiteSharedLayout(requestContext)
                              || showPageSharedLayout());

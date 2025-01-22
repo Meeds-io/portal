@@ -65,6 +65,8 @@ public final class SiteKey implements Serializable {
       this.type = SiteType.SPACE;
     } else if (PortalConfig.USER_TYPE.equalsIgnoreCase(type)) {
       this.type = SiteType.USER;
+    } else if (PortalConfig.DRAFT.equalsIgnoreCase(type)) {
+      this.type = SiteType.DRAFT;
     } else {
       throw new NullPointerException("No null name can be provided");
     }
@@ -93,6 +95,10 @@ public final class SiteKey implements Serializable {
 
   public static SiteKey portalTemplate(String name) {
     return new SiteKey(SiteType.PORTAL_TEMPLATE, name);
+  }
+
+  public static SiteKey draft(String name) {
+    return new SiteKey(SiteType.DRAFT, name);
   }
 
   public String getTypeName() {
