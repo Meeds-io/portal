@@ -124,7 +124,7 @@ public class Util {
             return null;
 
         switch (siteKey.getType()) {
-            case PORTAL, GROUP_TEMPLATE, PORTAL_TEMPLATE:
+            case PORTAL, GROUP_TEMPLATE, PORTAL_TEMPLATE, DRAFT:
                 return new SiteId(siteKey.getName());
             case GROUP:
                 return new SiteId(new Group(siteKey.getName()));
