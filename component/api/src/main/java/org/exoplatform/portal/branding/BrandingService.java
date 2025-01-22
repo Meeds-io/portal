@@ -234,7 +234,7 @@ public interface BrandingService {
   String getDefaultLanguage();
 
   /**
-   * @return Login Background File technical identifier
+   * @return Top bar Background File technical identifier
    */
   Long getTopBarBackgroundId();
 
@@ -247,5 +247,20 @@ public interface BrandingService {
    * @return {@link Background} URL to retrieve top bar background
    */
   String getTopBarBackgroundPath();
+
+  /**
+   * @return Sidebar Background File technical identifier
+   */
+  Long getSideBarBackgroundId();
+
+  /**
+   * @return Sidebar Background File technical identifier
+   */
+  Background getSideBarBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve sideBar background
+   */
+  String getSideBarBackgroundPath();
 
 }
