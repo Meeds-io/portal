@@ -25,6 +25,7 @@
   <portal-name>classic</portal-name>
   <label>#{portal.classic.label}</label>
   <description>#{portal.classic.description}</description>
+  <displayed>true</displayed>
   <display-order>1</display-order>
   <locale>en</locale>
   <access-permissions>Everyone</access-permissions>
