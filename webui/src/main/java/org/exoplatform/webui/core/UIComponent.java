@@ -128,16 +128,6 @@ public abstract class UIComponent {
         return config.getUIComponentLifecycle();
     }
 
-    //
-    // public void processDestroy(WebuiRequestContext context) throws Exception {
-    // MonitorEvent<UIComponent> mevent = createMonitorEvent(Event.Phase.DESTROY, context);
-    // config.getUIComponentLifecycle().init(this, context) ;
-    // if(mevent != null) {
-    // mevent.setEndExecutionTime(System.currentTimeMillis()) ;
-    // mevent.broadcast() ;
-    // }
-    // }
-
     public Component getComponentConfig() {
         return this.config;
     }
