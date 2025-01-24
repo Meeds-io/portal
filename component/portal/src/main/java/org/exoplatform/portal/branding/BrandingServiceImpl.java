@@ -91,6 +91,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_SIDEBAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/sideBarBackground?v=";
 
+  public static final String   BRANDING_DRAWER_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/drawerBackground?v=";
+
   public static final String   BRANDING_COMPANY_NAME_INIT_PARAM   = "exo.branding.company.name";
 
   // Will be used in Mail notification Footer by example
@@ -137,9 +139,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_SIDEBAR_BG_ID_SETTING_KEY = "sideBar.background";
 
+  public static final String   BRANDING_DRAWER_BG_ID_SETTING_KEY = "drawer.background";
+
   public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
 
   public static final String   SIDEBAR_BG_IMAGE_THEME_STYLE_KEY   = "sideBarBackgroundImage";
+
+  public static final String   DRAWER_BG_IMAGE_THEME_STYLE_KEY   = "drawerBackgroundImage";
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -166,6 +172,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   TOP_BAR_BACKGROUND_NAME            = "topBarBackground.png";
 
   public static final String   SIDEBAR_BACKGROUND_NAME            = "sideBarBackground.png";
+
+  public static final String   DRAWER_BACKGROUND_NAME            = "drawerBackground.png";
 
   public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
@@ -243,6 +251,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Background           sideBarBackground                  = null;
 
+  private Background           drawerBackground                  = null;
+
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
                              SettingService settingService,
@@ -312,6 +322,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setLoginBackground(getLoginBackground());
     branding.setTopBarBackground(getTopBarBackground());
     branding.setSideBarBackground(getSideBarBackground());
+    branding.setDrawerBackground(getDrawerBackground());
     branding.setLoginBackgroundTextColor(getLoginBackgroundTextColor());
     branding.setPageBackground(getPageBackground());
     branding.setPageBackgroundColor(getPageBackgroundColor());
@@ -355,6 +366,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         brandingFile.setData(null);
         branding.setSideBarBackground(brandingFile);
       }
+      if (branding.getDrawerBackground() != null && branding.getDrawerBackground().getData() != null) {
+        Background brandingFile = branding.getDrawerBackground().clone();
+        brandingFile.setData(null);
+        branding.setDrawerBackground(brandingFile);
+      }
     }
     return branding;
   }
@@ -381,6 +397,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updateLoginBackground(branding.getLoginBackground(), false);
       updateTopBarBackground(branding.getTopBarBackground(), false);
       updateSideBarBackground(branding.getSideBarBackground(), false);
+      updateDrawerBackground(branding.getDrawerBackground(), false);
       updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
       updatePageBackground(branding.getPageBackground(), false);
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
@@ -507,6 +524,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Long getDrawerBackgroundId() {
+    return getPropertyValueLong(BRANDING_DRAWER_BG_ID_SETTING_KEY);
+  }
+
+  @Override
   public Logo getLogo() {
     if (this.logo == null) {
       try {
@@ -617,6 +639,23 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Background getDrawerBackground() {
+    if (this.drawerBackground == null) {
+      try {
+        Long imageId = getDrawerBackgroundId();
+        if (imageId != null) {
+          this.drawerBackground = retrieveStoredBrandingFile(imageId, new Background());
+        } else {
+          this.drawerBackground = new Background();
+        }
+      } catch (Exception e) {
+        LOG.warn("Error retrieving drawer background", e);
+      }
+    }
+    return this.drawerBackground;
+  }
+
+  @Override
   public String getLogoPath() {
     Logo brandingLogo = getLogo();
     return brandingLogo == null
@@ -657,6 +696,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     Background background = getSideBarBackground();
     return background == null
             || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  @Override
+  public String getDrawerBackgroundPath() {
+    Background background = getDrawerBackground();
+    return background == null
+            || background.getData() == null ? null : BRANDING_DRAWER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
@@ -998,6 +1044,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
+  private void updateDrawerBackground(Background drawerBackground, boolean updateLastUpdatedTime) {
+    updateBrandingFile(drawerBackground, DRAWER_BACKGROUND_NAME, this.getDrawerBackgroundId(), BRANDING_DRAWER_BG_ID_SETTING_KEY);
+    this.drawerBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
   private void updatePageBackground(Background background, boolean updateLastUpdatedTime) {
     updateBrandingFile(background, PAGE_BACKGROUND_NAME, this.getPageBackgroundId(), BRANDING_PAGE_BG_ID_SETTING_KEY);
     this.pageBackground = null;
@@ -1251,6 +1303,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private void processThemeBackgroundImages(Map<String, String> themeStyles) {
     processBackgroundImage(themeStyles, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, getTopBarBackgroundPath());
     processBackgroundImage(themeStyles, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY, getSideBarBackgroundPath());
+    processBackgroundImage(themeStyles, DRAWER_BG_IMAGE_THEME_STYLE_KEY, getDrawerBackgroundPath());
   }
 
   private void processBackgroundImage(Map<String, String> themeStyles, String styleKey, String imagePath) {
