@@ -74,6 +74,28 @@
         <value>${exo.branding.theme.sideBarBackgroundSize:sideBarBackgroundSize:cover}</value>
         <value>${exo.branding.theme.sideBarBackgroundImage:sideBarBackgroundImage:none}</value>
         <value>${exo.branding.theme.sideBarBackgroundRepeat:sideBarBackgroundRepeat:no-repeat}</value>
+
+        <value>${exo.branding.theme.drawerTextTitleColor:drawerTextTitleColor:#20282c}</value>
+        <value>${exo.branding.theme.drawerTextTitleFontSize:drawerTextTitleFontSize:20px}</value>
+        <value>${exo.branding.theme.drawerTextTitleFontStyle:drawerTextTitleFontStyle:normal}</value>
+        <value>${exo.branding.theme.drawerTextTitleFontWeight:drawerTextTitleFontWeight:bold}</value>
+        <value>${exo.branding.theme.drawerTextHeaderColor:drawerTextHeaderColor:#707070}</value>
+        <value>${exo.branding.theme.drawerTextHeaderFontSize:drawerTextHeaderFontSize:18px}</value>
+        <value>${exo.branding.theme.drawerTextHeaderFontStyle:drawerTextHeaderFontStyle:normal}</value>
+        <value>${exo.branding.theme.drawerTextHeaderFontWeight:drawerTextHeaderFontWeight:normal}</value>
+        <value>${exo.branding.theme.drawerTextColor:drawerTextColor:#20282c}</value>
+        <value>${exo.branding.theme.drawerTextFontSize:drawerTextFontSize:16px}</value>
+        <value>${exo.branding.theme.drawerTextFontStyle:drawerTextFontStyle:normal}</value>
+        <value>${exo.branding.theme.drawerTextFontWeight:drawerTextFontWeight:normal}</value>
+        <value>${exo.branding.theme.drawerTextSubtitleColor:drawerTextSubtitleColor:#707070}</value>
+        <value>${exo.branding.theme.drawerTextSubtitleFontSize:drawerTextSubtitleFontSize:12px}</value>
+        <value>${exo.branding.theme.drawerTextSubtitleFontStyle:drawerTextSubtitleFontStyle:normal}</value>
+        <value>${exo.branding.theme.drawerTextSubtitleFontWeight:drawerTextSubtitleFontWeight:normal}</value>
+        <value>${exo.branding.theme.drawerBackgroundColor:drawerBackgroundColor:#FFFFFFFF}</value>
+        <value>${exo.branding.theme.drawerBackgroundPosition:drawerBackgroundPosition:left top}</value>
+        <value>${exo.branding.theme.drawerBackgroundSize:drawerBackgroundSize:cover}</value>
+        <value>${exo.branding.theme.drawerBackgroundImage:drawerBackgroundImage:none}</value>
+        <value>${exo.branding.theme.drawerBackgroundRepeat:drawerBackgroundRepeat:no-repeat}</value>
       </values-param>
     </init-params>
   </component>
