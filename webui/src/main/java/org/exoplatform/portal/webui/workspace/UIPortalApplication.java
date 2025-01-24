@@ -246,25 +246,12 @@ public class UIPortalApplication extends UIApplication {
     return cachedUIPortal;
   }
 
-  /**
-   * Returns a cached UIPortal matching to OwnerType and OwnerId if any
-   *
-   * @param ownerType
-   * @param ownerId
-   * @return
-   */
-  public UIPortal getCachedUIPortal(String ownerType, String ownerId) {
-    if (ownerType == null || ownerId == null) {
-      return null;
-    }
-    return this.all_UIPortals.get(new SiteKey(ownerType, ownerId));
-  }
-
   public UIPortal getCachedUIPortal(SiteKey key) {
-    if (key == null) {
+    if (key == null || isDraftSite() || isNoCache()) {
       return null;
+    } else {
+      return this.all_UIPortals.get(key);
     }
-    return this.all_UIPortals.get(key);
   }
 
   /**
@@ -274,10 +261,11 @@ public class UIPortalApplication extends UIApplication {
    * @param uiPortal
    */
   public void putCachedUIPortal(UIPortal uiPortal) {
-    SiteKey siteKey = uiPortal.getSiteKey();
-
-    if (siteKey != null) {
-      this.all_UIPortals.put(siteKey, uiPortal);
+    if (!isDraftSite()) {
+      SiteKey siteKey = uiPortal.getSiteKey();
+      if (siteKey != null) {
+        this.all_UIPortals.put(siteKey, uiPortal);
+      }
     }
   }
 
@@ -290,8 +278,9 @@ public class UIPortalApplication extends UIApplication {
   public void removeCachedUIPortal(String ownerType, String ownerId) {
     if (ownerType == null || ownerId == null) {
       return;
+    } else {
+      this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
     }
-    this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
   }
 
   /**
@@ -658,7 +647,7 @@ public class UIPortalApplication extends UIApplication {
                                                          .orElseThrow(() -> new IllegalStateException(String.format("Portlet with id %s to maximize wasn't found in page with title '%s'",
                                                                                                                     maximizedPortletId,
                                                                                                                     getCurrentPage().getTitle())));
-      UIPage uiPage = findFirstComponentOfType(UIPage.class);
+      UIPage uiPage = getCurrentPage();
       uiPage.normalizePortletWindowStates();
       portalRequestContext.setMaximizedUIPortlet(maximizedUiPortlet);
     }
@@ -746,7 +735,7 @@ public class UIPortalApplication extends UIApplication {
       }
     } finally {
       if (StringUtils.isNotBlank(maximizedPortletId)) {
-        UIPage uiPage = findFirstComponentOfType(UIPage.class);
+        UIPage uiPage = getCurrentPage();
         uiPage.normalizePortletWindowStates();
         portalRequestContext.setMaximizedUIPortlet(null);
       }
@@ -858,6 +847,14 @@ public class UIPortalApplication extends UIApplication {
     return getPortalRequestContext().isDraftPage();
   }
 
+  private boolean isDraftSite() {
+    return getPortalRequestContext().isDraftSite();
+  }
+
+  public boolean isNoCache() {
+    return getPortalRequestContext().isNoCache();
+  }
+
   public boolean isMaximizePortlet() {
     return getPortalRequestContext().isMaximizePortlet();
   }
@@ -883,7 +880,7 @@ public class UIPortalApplication extends UIApplication {
         UIPage currentPage = getCurrentPage();
         if (currentPage == null) {
           return Collections.emptyList();
-        } else if (!requestContext.isMaximizePortlet() && !currentPage.isShowMaxWindow()) {
+        } else if (!currentPage.isShowMaxWindow()) {
           getCurrentSite().findComponentOfType(uiPortlets, UIPortlet.class);
         } else {
           currentPage.findComponentOfType(uiPortlets, UIPortlet.class);
