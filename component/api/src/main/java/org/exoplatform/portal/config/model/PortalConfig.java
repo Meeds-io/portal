@@ -77,7 +77,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   private boolean               defaultLayout;
 
-  private boolean               displayed       = true;
+  private boolean               displayed;
 
   private int                   displayOrder;
 

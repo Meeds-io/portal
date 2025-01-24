@@ -1,7 +1,7 @@
 /**
  * This file is part of the Meeds project (https://meeds.io/).
  *
- * Copyright (C) 2020 - 2024 Meeds Association contact@meeds.io
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,11 +35,11 @@ import org.exoplatform.web.controller.QualifiedName;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-public class PortalTemplateRequestHandler extends PortalRequestHandler {
+public class PortalDraftRequestHandler extends PortalRequestHandler {
 
-  public static final String        HANDLER_NAME    = "portal-template";
+  public static final String        HANDLER_NAME    = "portal-draft";
 
-  protected static final Log        LOG             = ExoLogger.getLogger(PortalTemplateRequestHandler.class);
+  protected static final Log        LOG             = ExoLogger.getLogger(PortalDraftRequestHandler.class);
 
   public static final QualifiedName REQUEST_PATH    = QualifiedName.create("gtn", "path");
 
@@ -76,9 +76,8 @@ public class PortalTemplateRequestHandler extends PortalRequestHandler {
 
     PortalConfig portalConfig = getLayoutService().getPortalConfig(Long.parseLong(requestSiteId));
     if (portalConfig == null
-        || (!PortalConfig.GROUP_TEMPLATE.equals(portalConfig.getType())
-            && !PortalConfig.PORTAL_TEMPLATE.equals(portalConfig.getType()))
-        || !getUserAcl().hasAccessPermission(portalConfig, ConversationState.getCurrent().getIdentity())) {
+        || (!PortalConfig.DRAFT.equals(portalConfig.getType()))
+        || !getUserAcl().hasEditPermission(portalConfig, ConversationState.getCurrent().getIdentity())) {
       response.sendRedirect(request.getContextPath());
       return true;
     }

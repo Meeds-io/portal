@@ -164,6 +164,9 @@ public class PortalRequestContext extends WebuiRequestContext {
   private Boolean                          draftPage;
 
   @Setter
+  private Boolean                          draftSite;
+
+  @Setter
   private Boolean                          noCache;
 
   private boolean                          forceFullUpdate     = false;
@@ -385,10 +388,21 @@ public class PortalRequestContext extends WebuiRequestContext {
     return noCache.booleanValue();
   }
 
+  public boolean isDraftSite() {
+    if (draftSite == null) {
+      draftSite = portalConfig != null && PortalConfig.DRAFT.equals(portalConfig.getType());
+    }
+    return draftSite.booleanValue();
+  }
+
   public boolean isDraftPage() {
     if (draftPage == null) {
-      UserNode navigationNode = getNavigationNode();
-      draftPage = navigationNode != null && navigationNode.getVisibility() == Visibility.DRAFT;
+      if (portalConfig != null && PortalConfig.DRAFT.equals(portalConfig.getType())) {
+        draftPage = true;
+      } else {
+        UserNode navigationNode = getNavigationNode();
+        draftPage = navigationNode != null && navigationNode.getVisibility() == Visibility.DRAFT;
+      }
     }
     return draftPage.booleanValue();
   }
@@ -402,13 +416,20 @@ public class PortalRequestContext extends WebuiRequestContext {
     if (!noCache && userNode != null) {
       return userNode;
     }
-    UserPortal userPortal = getUserPortalConfig().getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(siteKey);
-    if (navigation != null) {
-      userNode = portalConfigService.getSiteNodeOrGlobalNode(siteKey.getTypeName(),
-                                                             siteKey.getName(),
-                                                             nodePath,
+    if (siteKey.getType() == SiteType.DRAFT) {
+      userNode = portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
+                                                             portalConfigService.getGlobalPortal(),
+                                                             null,
                                                              request.getRemoteUser());
+    } else {
+      UserPortal userPortal = getUserPortalConfig().getUserPortal();
+      UserNavigation navigation = userPortal.getNavigation(siteKey);
+      if (navigation != null) {
+        userNode = portalConfigService.getSiteNodeOrGlobalNode(siteKey.getTypeName(),
+                                                               siteKey.getName(),
+                                                               nodePath,
+                                                               request.getRemoteUser());
+      }
     }
     return userNode;
   }
@@ -856,8 +877,11 @@ public class PortalRequestContext extends WebuiRequestContext {
       uiPortal.clearUIPage(pageReference);
       this.uiPage = null;
     } else {
-      boolean isDraftPage = pageNode.getVisibility() == Visibility.DRAFT;
-      setDraftPage(isDraftPage);
+      if (getPortalConfig() != null && PortalConfig.DRAFT.equals(portalConfig.getType())) {
+        setDraftPage(true);
+      } else {
+        setDraftPage(pageNode.getVisibility() == Visibility.DRAFT);
+      }
       if (this.page == null) {
         this.page = layoutService.getPage(pageReference);
       }
