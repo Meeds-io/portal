@@ -167,6 +167,11 @@
       <type>org.exoplatform.portal.application.PortalRequestHandler</type>
     </component-plugin>
     <component-plugin>
+      <name>PortalDraftRequestHandler</name>
+      <set-method>register</set-method>
+      <type>io.meeds.portal.web.handler.PortalDraftRequestHandler</type>
+    </component-plugin>
+    <component-plugin>
       <name>PortalTemplateRequestHandler</name>
       <set-method>register</set-method>
       <type>io.meeds.portal.web.handler.PortalTemplateRequestHandler</type>

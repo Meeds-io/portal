@@ -19,6 +19,10 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import javax.portlet.WindowState;
+
+import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.lifecycle.Lifecycle;
@@ -32,7 +36,13 @@ public class UIPortalLifecycle extends Lifecycle<UIPortal> {
   public void processRender(UIPortal uiPortal, WebuiRequestContext context) throws Exception {
     UIComponent maximizedUIComponent = uiPortal.getMaximizedUIComponent();
     if (maximizedUIComponent == null) {
-      super.processRender(uiPortal, context);
+      UIPortlet maximizedUIPortlet = PortalRequestContext.getCurrentInstance().getMaximizedUIPortlet();
+      if (maximizedUIPortlet != null) {
+        maximizedUIPortlet.setCurrentWindowState(WindowState.MAXIMIZED);
+        maximizedUIPortlet.processRender(context);
+      } else {
+        super.processRender(uiPortal, context);
+      }
     } else {
       maximizedUIComponent.processRender(context);
     }

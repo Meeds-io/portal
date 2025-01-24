@@ -19,9 +19,12 @@
 
 package org.exoplatform.portal.webui.page;
 
+import javax.portlet.WindowState;
+
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
@@ -80,8 +83,16 @@ public class UISiteBody extends UIComponentDecorator {
     }
 
     protected void processPageBodyRender(WebuiRequestContext context) throws Exception {
-      UIPageBody uiPageBody = findFirstComponentOfType(UIPageBody.class);
-      uiPageBody.processRender(context);
+      UIPortlet maximizedUIPortlet = PortalRequestContext.getCurrentInstance().getMaximizedUIPortlet();
+      if (maximizedUIPortlet != null) {
+        maximizedUIPortlet.setCurrentWindowState(WindowState.MAXIMIZED);
+        maximizedUIPortlet.processRender(context);
+      } else {
+        UIPageBody uiPageBody = findFirstComponentOfType(UIPageBody.class);
+        if (uiPageBody != null) {
+          uiPageBody.processRender(context);
+        }
+      }
     }
 
     protected void processContainerRender(WebuiRequestContext context) throws Exception {
