@@ -263,4 +263,20 @@ public interface BrandingService {
    */
   String getSideBarBackgroundPath();
 
+  /**
+   * @return Drawer Background File technical identifier
+   */
+  Long getDrawerBackgroundId();
+
+  /**
+   * @return Drawer Background File technical identifier
+   */
+  Background getDrawerBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve drawer background
+   */
+  String getDrawerBackgroundPath();
+
+
 }
