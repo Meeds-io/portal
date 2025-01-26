@@ -28,15 +28,30 @@ import org.exoplatform.portal.pom.data.ModelData;
  */
 public class PageBody extends ModelObject {
 
-    public PageBody(String storageId) {
-        super(storageId);
-    }
+  public PageBody(BodyData bodyData) {
+    super(bodyData.getStorageId());
+    this.storageName = bodyData.getStorageName();
+    this.width = bodyData.getWidth();
+    this.height = bodyData.getHeight();
+    this.cssClass = bodyData.getCssClass();
+    this.cssStyle = bodyData.getCssStyle();
+  }
 
-    public PageBody() {
-    }
+  public PageBody(String storageId) {
+    super(storageId);
+  }
 
-    @Override
-    public ModelData build() {
-        return new BodyData(storageId, BodyType.PAGE, cssStyle);
-    }
+  public PageBody() {
+  }
+
+  @Override
+  public ModelData build() {
+    return new BodyData(storageId,
+                        storageName,
+                        cssStyle,
+                        width,
+                        height,
+                        cssClass,
+                        BodyType.PAGE);
+  }
 }
