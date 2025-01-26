@@ -604,7 +604,20 @@ public class LayoutStorage {
             String ctype = (String) attrs.get(MappedAttributes.TYPE.getName());
             if (BodyType.PAGE.name().equals(ctype)) {
               ModelStyle cssStyle = mapPropertiesToStyle(attrs);
-              BodyData body = new BodyData(String.valueOf(id), BodyType.PAGE, cssStyle);
+              String cssClass = null;
+              if (attrs != null) {
+                cssStyle = mapPropertiesToStyle(attrs);
+                if (attrs.containsKey(MappedAttributes.CSS_CLASS.getName())) {
+                  cssClass = (String) attrs.get(MappedAttributes.CSS_CLASS.getName());
+                }
+              }
+              BodyData body = new BodyData(String.valueOf(id),
+                                           null,
+                                           cssStyle,
+                                           containers.get(id).getWidth(),
+                                           containers.get(id).getHeight(),
+                                           cssClass,
+                                           BodyType.PAGE);
               results.add(body);
             } else {
               results.add(buildContainer(containers.get(id),
@@ -706,8 +719,18 @@ public class LayoutStorage {
   @SuppressWarnings("unchecked")
   private ComponentEntity buildContainerEntity(BodyData bodyData) {
     ContainerEntity dst = new ContainerEntity();
+    dst.setHeight(bodyData.getHeight());
+    dst.setWidth(bodyData.getWidth());
+
     JSONObject properties = new JSONObject();
     properties.put(MappedAttributes.TYPE.getName(), bodyData.getType().name());
+    if (StringUtils.isNotBlank(bodyData.getCssClass())) {
+      properties.put(MappedAttributes.CSS_CLASS.getName(), bodyData.getCssClass());
+    }
+    ModelStyle cssStyle = bodyData.getCssStyle();
+    if (cssStyle != null) {
+      mapStyleToProperties(cssStyle, properties);
+    }
     dst.setProperties(properties.toJSONString());
     return dst;
   }
