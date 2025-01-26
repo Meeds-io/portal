@@ -20,25 +20,46 @@ package org.exoplatform.portal.pom.data;
 
 import org.exoplatform.portal.config.model.ModelStyle;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
+@Data
 @EqualsAndHashCode(callSuper = true)
 public class BodyData extends ComponentData {
 
   private static final long serialVersionUID = 4438136697346439120L;
 
+  protected String          width;
+
+  protected String          height;
+
+  protected String          cssClass;
+
   private final BodyType    type;
 
-  public BodyData(String storageId, BodyType type, ModelStyle cssStyle) {
+  public BodyData(String storageId,
+                  BodyType type,
+                  ModelStyle cssStyle) {
     super(storageId, null, cssStyle);
     this.type = type;
   }
 
-  public BodyType getType() {
-    return type;
+  public BodyData(String storageId,
+                  String storageName,
+                  ModelStyle cssStyle,
+                  String width,
+                  String height,
+                  String cssClass,
+                  BodyType type) {
+    super(storageId, storageName, cssStyle);
+    this.type = type;
+    this.width = width;
+    this.height = height;
+    this.cssClass = cssClass;
   }
+
 }
