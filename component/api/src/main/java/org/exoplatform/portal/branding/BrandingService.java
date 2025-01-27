@@ -207,6 +207,12 @@ public interface BrandingService {
   Map<String, String> getThemeStyle();
 
   /**
+   * @return {@link Map} with variable name as key and variable value as map
+   *         value
+   */
+  Map<String, String> getDefaultThemeStyle();
+
+  /**
    * @return {@link Map} of login titles per language
    */
   Map<String, String> getLoginTitle();
