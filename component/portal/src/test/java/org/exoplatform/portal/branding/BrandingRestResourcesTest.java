@@ -79,6 +79,25 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("test1", brandingResp.getCompanyName());
   }
 
+  public void testGetDefaultThemeStyle() throws Exception {
+    // Given
+    String path = "/v1/platform/branding/default";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+
+    Map<String, String> themeStyle = new HashMap<>();
+    when(brandingService.getDefaultThemeStyle()).thenReturn(themeStyle);
+
+    // When
+    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
+
+    // Then
+    assertEquals(200, resp.getStatus());
+    Object entity = resp.getEntity();
+    assertNotNull(entity);
+  }
+
   public void testUpdateBrandingInformation() throws Exception {
     // Given
     String path = "/v1/platform/branding/";

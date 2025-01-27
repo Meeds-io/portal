@@ -757,6 +757,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Map<String, String> getDefaultThemeStyle() {
+    if (themeVariables == null || themeVariables.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    return themeVariables;
+  }
+
+  @Override
   public Map<String, String> getLoginTitle() {
     if (this.loginTitle == null) {
       Map<String, String> valuePerLanguage = new HashMap<>();
