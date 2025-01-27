@@ -19,6 +19,7 @@ package org.exoplatform.portal.branding;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.Map;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.Consumes;
@@ -74,6 +75,19 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   public Response getBrandingInformation() {
     Branding brandingInformation = brandingService.getBrandingInformation(false);
     return Response.ok(brandingInformation).build();
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/default")
+  @RolesAllowed("administrators")
+  @Operation(summary = "Get default theme style", description = "Get default theme style", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+  })
+  public Response getDefaultBrandingThemeStyle() {
+    Map<String, String> defaultThemeStyle = brandingService.getDefaultThemeStyle();
+    return Response.ok(defaultThemeStyle).build();
   }
 
   @PUT
