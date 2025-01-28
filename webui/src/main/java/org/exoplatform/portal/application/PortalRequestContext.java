@@ -670,6 +670,10 @@ public class PortalRequestContext extends WebuiRequestContext {
     return siteKey;
   }
 
+  public long getSiteId() {
+    return portalConfig == null ? 0l : portalConfig.getId();
+  }
+
   public String getSiteLabel() {
     if (siteLabel == null) {
       UIPortal portal = getUiPortal();
