@@ -29,13 +29,12 @@ import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.pom.config.Utils;
 import org.exoplatform.portal.pom.data.*;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * @author Tuan Nguyen
- **/
+@AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class Container extends ModelObject implements Cloneable {
 
