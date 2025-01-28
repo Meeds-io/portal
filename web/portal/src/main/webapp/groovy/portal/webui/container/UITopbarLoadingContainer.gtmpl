@@ -1,8 +1,9 @@
 <%
   _ctx.getRequestContext().getJavascriptManager()
-    .require("SHARED/topbarLoading", "topbarLoading").addScripts("topbarLoading.init()");
+    .require("SHARED/topbarLoading", "topbarLoading")
+    .addScripts("topbarLoading.init()");
 %>
-<div class="VuetifyApp TopbarLoadingContainer" id="$uicomponent.id">
+<div class="VuetifyApp TopbarLoadingContainer" id="TopbarLoadingContainer">
   <div data-app="true"
     class="v-application <%= isRT ? "v-application--is-rtl" : "v-application--is-ltr" %> transparent theme--light">
     <div role="progressbar" aria-valuemin="0" aria-valuemax="100"
