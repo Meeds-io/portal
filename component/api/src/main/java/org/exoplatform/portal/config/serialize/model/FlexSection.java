@@ -20,6 +20,7 @@ package org.exoplatform.portal.config.serialize.model;
 
 import org.exoplatform.portal.config.model.Container;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -28,6 +29,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
+@EqualsAndHashCode(callSuper = true)
 public class FlexSection extends Container {
 
   private boolean mobileColumns;
