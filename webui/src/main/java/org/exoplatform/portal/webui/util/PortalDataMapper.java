@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.gatein.common.net.media.MediaType;
 import org.gatein.pc.api.Portlet;
 import org.gatein.pc.api.info.ModeInfo;
@@ -55,9 +56,10 @@ import lombok.SneakyThrows;
 
 public class PortalDataMapper {
 
+  private static final String SITE_LAYOUT_TEMPLATE = "system:/groovy/portal/webui/container/UISiteLayout.gtmpl";
   protected static final Log log = ExoLogger.getLogger("portal:PortalDataMapper");
 
-  private static void toUIPortlet(UIPortlet uiPortlet, Application model) {
+  public static void toUIPortlet(UIPortlet uiPortlet, Application model) {
     PortletState portletState = new PortletState(model.getState());
     uiPortlet.setWidth(model.getWidth());
     uiPortlet.setHeight(model.getHeight());
@@ -165,8 +167,12 @@ public class PortalDataMapper {
     Container layout = metaLayout && model.isDisplayed() ? metaSite.getPortalLayout() : model.getPortalLayout();
     List<ModelObject> children = layout.getChildren();
     if (children != null) {
-      for (Object child : children) {
-        buildUIContainer(uiPortal, child);
+      if (StringUtils.equals(layout.getTemplate(), SITE_LAYOUT_TEMPLATE)) {
+        buildUIContainer(uiPortal, layout);
+      } else {
+        for (ModelObject child : children) {
+          buildUIContainer(uiPortal, child);
+        }
       }
     }
   }
