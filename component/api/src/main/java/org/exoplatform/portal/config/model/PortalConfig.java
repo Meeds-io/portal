@@ -26,6 +26,7 @@ import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.portal.config.serialize.model.SiteLayout;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
@@ -73,7 +74,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   private String                skin;
 
-  private Container             portalLayout;
+  private SiteLayout            portalLayout;
 
   private boolean               defaultLayout;
 
@@ -103,7 +104,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     //
     this.type = type;
     this.name = ownerId;
-    this.portalLayout = new Container();
+    this.portalLayout = new SiteLayout();
   }
 
   public PortalConfig(PortalData data) {
@@ -119,7 +120,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.editPermission = data.getEditPermission();
     this.properties = data.getProperties() == null ? new Properties() : new Properties(data.getProperties());
     this.skin = data.getSkin();
-    this.portalLayout = new Container(data.getPortalLayout());
+    this.portalLayout = new SiteLayout(data.getPortalLayout());
     this.defaultLayout = data.isDefaultLayout();
     this.displayed = data.isDisplayed();
     this.displayOrder = data.getDisplayOrder();
@@ -187,7 +188,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public void setPortalLayout(Container container) {
-    portalLayout = container;
+    portalLayout = container == null ? new SiteLayout() : new SiteLayout(container);
   }
 
   public boolean isDefaultLayout() {
@@ -213,7 +214,9 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public boolean isRemovable() {
-    return !StringUtils.equals(getProperty(REMOVABLE_PROP), "false");
+    return properties == null
+           || StringUtils.equalsIgnoreCase(getType(), PortalConfig.DRAFT)
+           || !StringUtils.equals(properties.get(PortalConfig.REMOVABLE_PROP), "false");
   }
 
   public void setRemovable(boolean removable) {
