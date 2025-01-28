@@ -30,6 +30,7 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.StaleModelException;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
@@ -187,7 +188,8 @@ public class PortalRequestHandler extends WebRequestHandler {
         return false;
       } else {
         processRequest(context, app);
-        if (context.getUiPage() == null) {
+        if (context.getUiPage() == null
+            && (context.getUiPortal() == null || context.getUiPortal().getSiteType() != SiteType.DRAFT)) {
           if (context.getRemoteUser() == null) {
             context.requestAuthenticationLogin();
           } else {
