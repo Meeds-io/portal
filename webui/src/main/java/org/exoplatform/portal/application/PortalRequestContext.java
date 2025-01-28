@@ -418,9 +418,19 @@ public class PortalRequestContext extends WebuiRequestContext {
     }
     if (siteKey.getType() == SiteType.DRAFT) {
       userNode = portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
-                                                             portalConfigService.getGlobalPortal(),
+                                                             portalConfigService.getMetaPortal(),
                                                              null,
                                                              request.getRemoteUser());
+      if (userNode == null) {
+        List<String> siteNames = layoutService.getSiteNames(SiteType.PORTAL, 0, 10);
+        userNode = siteNames.stream()
+                            .map(siteName -> portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
+                                                                                         siteName,
+                                                                                         null,
+                                                                                         request.getRemoteUser()))
+                            .findFirst()
+                            .orElseThrow();
+      }
     } else {
       UserPortal userPortal = getUserPortalConfig().getUserPortal();
       UserNavigation navigation = userPortal.getNavigation(siteKey);
