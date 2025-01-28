@@ -481,6 +481,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
       case "user": {
         yield "user";
       }
+      case "portal_template": {
+        yield "portal_template";
+      }
+      case "group_template": {
+        yield "group_template";
+      }
       default:
         throw new IllegalArgumentException("Unexpected value: " + portalType);
       };
