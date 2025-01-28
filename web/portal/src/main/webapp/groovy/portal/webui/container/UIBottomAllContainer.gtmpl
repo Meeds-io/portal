@@ -1,0 +1,35 @@
+<%
+  import java.util.ArrayList;
+
+  import org.apache.commons.collections4.CollectionUtils;
+
+  import org.exoplatform.container.ExoContainerContext;
+  import org.exoplatform.commons.addons.AddOnService;
+  import org.exoplatform.portal.config.model.Application;
+  import org.exoplatform.portal.webui.util.PortalDataMapper;
+  import org.exoplatform.portal.webui.application.UIPortlet;
+
+  def rcontext = _ctx.getRequestContext();
+  AddOnService addOnService = ExoContainerContext.getService(AddOnService.class);
+  List<Application> applications = addOnService.getApplications("body-end-container");
+  if (CollectionUtils.isEmpty(applications)) {
+    return;
+  }
+%>
+<div id="body-end-container">
+<%
+  for (application in applications) {
+    def child = rcontext.getUiPortal().getChildById(application.getId());
+    if (child != null) {
+      child.processRender(rcontext);
+    } else {
+      UIPortlet uiPortlet = rcontext.getUiPortal().createUIComponent(rcontext, UIPortlet.class, null, null);
+      uiPortlet.setStorageId(application.getStorageId());
+      uiPortlet.setStorageName(application.getStorageId());
+      PortalDataMapper.toUIPortlet(uiPortlet, application);
+      uiPortlet.setParent(rcontext.getUiPortal());
+      uiPortlet.processRender(rcontext);
+    }
+  }
+%>
+</div>
