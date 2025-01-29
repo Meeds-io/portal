@@ -256,6 +256,8 @@
         <xs:element name="portlet-application" type="portletApplicationType" minOccurs="0" maxOccurs="1" />
       </xs:sequence>
       <xs:attribute name="id" type="xs:string" />
+      <xs:attribute name="h-align" type="xs:string"/>
+      <xs:attribute name="v-align" type="xs:string"/>
       <xs:attribute name="width" type="xs:string"/>
       <xs:attribute name="cssClass" type="xs:string"/>
     </xs:complexType>
@@ -333,6 +335,7 @@
     <xs:complexType name="sectionGridType">
       <xs:sequence>
         <xs:element name="access-permissions" type="xs:string" minOccurs="0" maxOccurs="1" />
+        <xs:element name="css-style" type="styleType" minOccurs="0" maxOccurs="1"/>
         <xs:element name="cell" type="cellType" minOccurs="1" maxOccurs="unbounded" />
       </xs:sequence>
       <xs:attribute name="id" type="xs:string" />
@@ -359,6 +362,7 @@
     <xs:complexType name="sectionFlexType">
       <xs:sequence>
         <xs:element name="access-permissions" type="xs:string" minOccurs="0" maxOccurs="1" />
+        <xs:element name="css-style" type="styleType" minOccurs="0" maxOccurs="1"/>
         <xs:element name="column" type="columnType" minOccurs="1" maxOccurs="unbounded" />
       </xs:sequence>
       <xs:attribute name="id" type="xs:string" />
