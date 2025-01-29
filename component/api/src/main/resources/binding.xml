@@ -210,6 +210,7 @@
     <value name="height" usage="optional" field="height" style="attribute"/>
     <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
     <value name="sticky-beahvior" field="stickyBeahvior" usage="optional" style="attribute"/>
+    <value name="top-bar" field="topBar" usage="optional" style="attribute"/>
     <value name="profiles" field="profiles" usage="optional" style="attribute"/>
     <value
       name="access-permissions"

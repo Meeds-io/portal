@@ -1,11 +1,12 @@
 <%
   _ctx.getRequestContext().getJavascriptManager()
+    .require("SHARED/bodyScrollListener", "bodyScrollListener");
+  _ctx.getRequestContext().getJavascriptManager()
     .require("SHARED/topbarLoading", "topbarLoading")
     .addScripts("topbarLoading.init()");
 %>
-<div class="VuetifyApp TopbarLoadingContainer" id="TopbarLoadingContainer">
-  <div data-app="true"
-    class="v-application <%= isRT ? "v-application--is-rtl" : "v-application--is-ltr" %> transparent theme--light">
+<div class="VuetifyApp TopbarLoading position-sticky t-0 z-index-modal" id="TopbarLoading">
+  <div data-app="true" class="v-application position-absolute full-width <%= isRT ? "v-application--is-rtl" : "v-application--is-ltr" %> transparent theme--light">
     <div role="progressbar" aria-valuemin="0" aria-valuemax="100"
       class="v-progress-linear v-progress-linear--rounded theme--light"
       style="height: 6px; top: 0px;">
