@@ -19,6 +19,8 @@
  */
 package org.exoplatform.portal.config.serialize.model;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.exoplatform.portal.config.model.Container;
 
 import lombok.Data;
@@ -30,6 +32,33 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class BannerCell extends Container {
+
+  private String hAlign;
+
+  private String vAlign;
+
+  @Override
+  public String getCssClass() {
+    StringBuilder cssClasses = new StringBuilder();
+    if (cssStyle != null) {
+      cssClasses.append(cssStyle.getCssClass(cssClass));
+      cssClasses.append(" ");
+    }
+    if (cssClass != null) {
+      cssClasses.append(cssClass);
+    }
+    if (StringUtils.equalsIgnoreCase(vAlign, "right")) {
+      cssClasses.append(" application-align-v-right");
+    } else if (StringUtils.equalsIgnoreCase(vAlign, "center")) {
+      cssClasses.append(" application-align-v-center");
+    }
+    if (StringUtils.equalsIgnoreCase(hAlign, "right")) {
+      cssClasses.append(" application-align-h-right");
+    } else if (StringUtils.equalsIgnoreCase(hAlign, "center")) {
+      cssClasses.append(" application-align-h-center");
+    }
+    return cssClasses.toString();
+  }
 
   @Override
   public String getTemplate() {
