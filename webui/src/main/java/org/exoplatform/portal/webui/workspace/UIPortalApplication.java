@@ -70,7 +70,6 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.web.application.JavascriptManager;
-import org.exoplatform.web.application.javascript.JavascriptConfigParser;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 import org.exoplatform.web.url.MimeType;
 import org.exoplatform.web.url.navigation.NavigationResource;
@@ -276,9 +275,7 @@ public class UIPortalApplication extends UIApplication {
    * @param ownerId
    */
   public void removeCachedUIPortal(String ownerType, String ownerId) {
-    if (ownerType == null || ownerId == null) {
-      return;
-    } else {
+    if (ownerType != null && ownerId != null) {
       this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
     }
   }
@@ -654,21 +651,13 @@ public class UIPortalApplication extends UIApplication {
     try {
       portalRequestContext.setAttribute("requestStartTime", System.currentTimeMillis());
 
-      JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
-      // Add JS resource of current portal
-      String portalOwner = portalRequestContext.getPortalOwner();
-      jsManager.loadScriptResource(ResourceScope.PORTAL, portalOwner);
-
       //
-      Writer w = portalRequestContext.getWriter();
       if (!portalRequestContext.useAjax()) {
-        // Support for legacy resource declaration
-        jsManager.loadScriptResource(ResourceScope.SHARED, JavascriptConfigParser.LEGACY_JAVA_SCRIPT);
-        // Need to add bootstrap as immediate since it contains the loader
-        jsManager.loadScriptResource(ResourceScope.SHARED, "bootstrap");
-
         super.processRender(portalRequestContext);
       } else {
+        Writer w = portalRequestContext.getWriter();
+        JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
+
         UIMaskWorkspace uiMaskWS = getChildById(UIPortalApplication.UI_MASK_WS_ID);
         if (uiMaskWS.isUpdated()) {
           portalRequestContext.addUIComponentToUpdateByAjax(uiMaskWS);
