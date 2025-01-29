@@ -6,8 +6,7 @@
   if (width != null) style += "width:"+width+";";
   if (height != null) style += "height:"+height+";";
 %>
-<div id="UITopBarContainerParent" class="<%=uiComponentClass%>"
-  role="banner">
+<div id="UITopBarContainerParent" class="<%=uiComponentClass%>" role="banner">
   <div class="UIContainer UITopBarContainer" id="UITopBarContainer">
     <div class="NormalContainerBlock">
       <div class="VIEW-CONTAINER VIEW-BLOCK">
@@ -18,7 +17,7 @@
               class="TRContainer clearfix UITopBarContainerItemsParent">
               <%for(uiChild in uicomponent.getChildren()) {%>
               <div
-                class="UITopBarContainerItem ${uiChild.id}TDContainer">
+                class="UITopBarContainerItem ${uiChild.id} ${uiChild.id}TDContainer">
                 <% uicomponent.renderUIComponent(uiChild) %>
               </div>
               <% } %>
