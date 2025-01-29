@@ -820,6 +820,10 @@ public class PortalRequestContext extends WebuiRequestContext {
     return StringUtils.isNotBlank(getMaximizedPortletId());
   }
 
+  public boolean isFullRendering() {
+    return !isMaximizePortlet() || StringUtils.equals(getRequest().getParameter("fullRender"), "true");
+  }
+
   public boolean isShowMaxWindow() {
     return isMaximizePortlet()
            || "true".equals(request.getParameter("showMaxWindow"))
