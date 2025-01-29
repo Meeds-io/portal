@@ -131,6 +131,8 @@
   <mapping name="banner-cell" label="banner-cell" class="org.exoplatform.portal.config.serialize.model.BannerCell">
     <value name="id" usage="optional" field="id" style="attribute"/>
     <value name="width" usage="optional" field="width" style="attribute"/>
+    <value name="h-align" usage="optional" field="hAlign" style="attribute"/>
+    <value name="v-align" usage="optional" field="vAlign" style="attribute"/>
     <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
     <value
       name="access-permissions"
@@ -181,6 +183,10 @@
       default="Everyone"
       serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
       deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
     <collection field="children" ordered="false">
       <structure map-as="org.exoplatform.portal.config.serialize.model.Cell" usage="optional"/>
     </collection>
@@ -200,6 +206,10 @@
       default="Everyone"
       serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
       deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
     <collection field="children" ordered="false">
       <structure map-as="org.exoplatform.portal.config.serialize.model.Column" usage="optional"/>
     </collection>
