@@ -8,7 +8,7 @@
 %>
 <div id="UITopBarContainerParent" class="<%=uiComponentClass%>"
   role="banner">
-  <div class="UIContainer UITopBarContainer" id="UITopBarContainer">
+  <div class="UIContainer UITopBarContainer layout-top-bar" id="UITopBarContainer">
     <div class="NormalContainerBlock">
       <div class="VIEW-CONTAINER VIEW-BLOCK">
         <div>
