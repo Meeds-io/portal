@@ -31,7 +31,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class BannerSection extends Container {
 
-  protected boolean topContainer;
+  protected boolean topBar;
 
   protected boolean stickyBeahvior;
 
@@ -46,7 +46,7 @@ public class BannerSection extends Container {
     }
     if (!cssClasses.toString().contains("layout-banner-top-section")
         && !cssClasses.toString().contains("layout-banner-bottom-section")) {
-      if (topContainer) {
+      if (topBar) {
         cssClasses.append(" layout-banner-top-section");
       } else {
         cssClasses.append(" layout-banner-bottom-section");
