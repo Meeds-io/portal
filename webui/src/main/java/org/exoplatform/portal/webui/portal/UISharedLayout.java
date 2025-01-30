@@ -19,6 +19,8 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.webui.container.UIContainer;
@@ -73,7 +75,9 @@ public class UISharedLayout extends UIContainer {
   }
 
   private boolean showSiteSharedLayout(PortalRequestContext requestContext) {
-    return requestContext.getUserPortalConfig().getPortalConfig().isDisplayed();
+    return requestContext.getUserPortalConfig().getPortalConfig().isDisplayed()
+           || StringUtils.equals(requestContext.getUserPortalConfig().getPortalConfig().getName(),
+                                 requestContext.getMetaPortal());
   }
 
   private boolean hidePageSharedLayout() {
