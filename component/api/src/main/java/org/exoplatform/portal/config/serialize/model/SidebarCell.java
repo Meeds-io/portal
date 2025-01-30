@@ -31,6 +31,24 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class SidebarCell extends Container {
 
+  protected boolean stickyBeahvior;
+
+  @Override
+  public String getCssClass() {
+    StringBuilder cssClasses = new StringBuilder();
+    if (cssStyle != null) {
+      cssClasses.append(cssStyle.getCssClass(cssClass, 0));
+      cssClasses.append(" ");
+    }
+    if (cssClass != null) {
+      cssClasses.append(cssClass);
+    }
+    if (stickyBeahvior) {
+      cssClasses.append(" layout-sticky-section");
+    }
+    return cssClasses.toString();
+  }
+
   @Override
   public String getTemplate() {
     return "SidebarCell";
