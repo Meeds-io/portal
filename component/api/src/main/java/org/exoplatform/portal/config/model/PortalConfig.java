@@ -120,7 +120,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.editPermission = data.getEditPermission();
     this.properties = data.getProperties() == null ? new Properties() : new Properties(data.getProperties());
     this.skin = data.getSkin();
-    this.portalLayout = new SiteLayout(data.getPortalLayout());
+    this.portalLayout = data.getPortalLayout() == null ? new SiteLayout() : new SiteLayout(data.getPortalLayout());
     this.defaultLayout = data.isDefaultLayout();
     this.displayed = data.isDisplayed();
     this.displayOrder = data.getDisplayOrder();
