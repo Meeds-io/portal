@@ -322,8 +322,6 @@ public class SiteStorageImpl implements SiteStorage {
     ContainerData rootContainer = null;
     if (!children.isEmpty()) {
       rootContainer = (ContainerData) children.get(0);
-    } else {
-      throw new IllegalStateException("site doens't has root container layout");
     }
 
     List<String> access = layoutStorage.getPermissions(SiteEntity.class.getName(),

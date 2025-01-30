@@ -249,11 +249,10 @@ public class NavigationRest implements ResourceContainer {
       List<UserNodeRestEntity> resultNodes = EntityBuilder.toUserNodeRestEntity(nodes, expand, organizationService, layoutService, userACL, userPortal, expandBreadcrumb);
       return Response.ok(resultNodes).build();
     } catch (Exception e) {
-      LOG.error("Error retrieving ");
+      LOG.error("Error retrieving Site {}/{} Navigation", siteTypeName, siteName, e);
       return Response.status(500).build();
     }
   }
-
 
   private static UserNodeFilterConfig getUserFilterConfig(Visibility[] visibilities, boolean temporalCheck) {
     UserNodeFilterConfig.Builder builder = UserNodeFilterConfig.builder();
