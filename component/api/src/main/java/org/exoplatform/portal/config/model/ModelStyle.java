@@ -104,34 +104,38 @@ public class ModelStyle implements Serializable {
   }
 
   public String getCssClass(String existingCssClass) { // NOSONAR
+    return getCssClass(existingCssClass, 20);
+  }
+
+  public String getCssClass(String existingCssClass, int diff) { // NOSONAR
     StringBuilder cssClass = new StringBuilder();
     if (marginTop != null && marginTop >= 0 && !StringUtils.contains(existingCssClass, "mt-")) {
       cssClass.append(" mt-");
-      if (marginTop < 20) {
+      if (marginTop < diff) {
         cssClass.append("n");
       }
-      cssClass.append(Math.abs((marginTop - 20) / 4));
+      cssClass.append(Math.abs((marginTop - diff) / 4));
     }
     if (marginBottom != null && marginBottom >= 0 && !StringUtils.contains(existingCssClass, "mb-")) {
       cssClass.append(" mb-");
-      if (marginBottom < 20) {
+      if (marginBottom < diff) {
         cssClass.append("n");
       }
-      cssClass.append(Math.abs((marginBottom - 20) / 4));
+      cssClass.append(Math.abs((marginBottom - diff) / 4));
     }
     if (marginRight != null && marginRight >= 0 && !StringUtils.contains(existingCssClass, "me-")) {
       cssClass.append(" me-");
-      if (marginRight < 20) {
+      if (marginRight < diff) {
         cssClass.append("n");
       }
-      cssClass.append(Math.abs((marginRight - 20) / 4));
+      cssClass.append(Math.abs((marginRight - diff) / 4));
     }
     if (marginLeft != null && marginLeft >= 0 && !StringUtils.contains(existingCssClass, "ms-")) {
       cssClass.append(" ms-");
-      if (marginLeft < 20) {
+      if (marginLeft < diff) {
         cssClass.append("n");
       }
-      cssClass.append(Math.abs((marginLeft - 20) / 4));
+      cssClass.append(Math.abs((marginLeft - diff) / 4));
     }
     if (radiusTopRight != null && !StringUtils.contains(existingCssClass, "brtr-")) {
       cssClass.append(" brtr-");
