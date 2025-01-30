@@ -418,7 +418,7 @@ public class PortalRequestContext extends WebuiRequestContext {
     }
     if (siteKey.getType() == SiteType.DRAFT) {
       userNode = portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
-                                                             portalConfigService.getMetaPortal(),
+                                                             getMetaPortal(),
                                                              null,
                                                              request.getRemoteUser());
       if (userNode == null) {
@@ -464,7 +464,7 @@ public class PortalRequestContext extends WebuiRequestContext {
       portalName = getSiteName();
     }
     if (portalName == null) {
-      portalName = portalConfigService.getMetaPortal();
+      portalName = getMetaPortal();
     }
     return portalName;
   }
@@ -702,7 +702,7 @@ public class PortalRequestContext extends WebuiRequestContext {
     if (portal != null && portal.getPortalName() != null) {
       return portal.getPortalName();
     } else {
-      return portalConfigService.getMetaPortal();
+      return getMetaPortal();
     }
   }
 
@@ -711,6 +711,13 @@ public class PortalRequestContext extends WebuiRequestContext {
    */
   public String getMetaPortal() {
     return portalConfigService.getMetaPortal();
+  }
+
+  /**
+   * @return global portal name
+   */
+  public String getGlobalPortal() {
+    return portalConfigService.getGlobalPortal();
   }
 
   public String getNodePath() {
@@ -754,10 +761,10 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public final void sendRedirect(String url) throws IOException {
     setResponseComplete(true);
-    if (url.contains(portalConfigService.getGlobalPortal())) {
-      String globalSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + portalConfigService.getGlobalPortal();
+    if (url.contains(getGlobalPortal())) {
+      String globalSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + getGlobalPortal();
       if (url.startsWith(globalSiteURI)) {
-        String metaSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + portalConfigService.getMetaPortal();
+        String metaSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + getMetaPortal();
         url = url.replace(globalSiteURI, metaSiteURI);
         LOG.warn("An URI was sent with global site name, it will be replaced by default site to avoid returning HTTP 404");
       }
