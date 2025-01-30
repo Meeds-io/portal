@@ -38,6 +38,10 @@ public class BannerSection extends Container {
   @Override
   public String getCssClass() {
     StringBuilder cssClasses = new StringBuilder();
+    if (cssStyle != null) {
+      cssClasses.append(cssStyle.getCssClass(cssClass, 0));
+      cssClasses.append(" ");
+    }
     if (cssClass != null) {
       cssClasses.append(cssClass);
     }

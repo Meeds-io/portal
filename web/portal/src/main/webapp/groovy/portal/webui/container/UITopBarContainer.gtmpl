@@ -6,7 +6,7 @@
   if (width != null) style += "width:"+width+";";
   if (height != null) style += "height:"+height+";";
 %>
-<div id="UITopBarContainerParent" class="<%=uiComponentClass%>" role="banner">
+<div id="UITopBarContainerParent" class="<%=uiComponentClass%> layout-sticky-top-bar" role="banner">
   <div class="UIContainer UITopBarContainer" id="UITopBarContainer">
     <div class="NormalContainerBlock">
       <div class="VIEW-CONTAINER VIEW-BLOCK">
