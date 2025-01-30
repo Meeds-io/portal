@@ -387,6 +387,8 @@ public class UserPortalConfigService implements Startable {
         return portalConfigList.stream()
                                .filter(PortalConfig::isDefaultSite)
                                .filter(p -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(p.getType()))
+                               .filter(p -> p.isDisplayed() || StringUtils.equals(p.getName(), getMetaPortal()))
+                               .filter(p -> navigationService.loadNode(new SiteKey(p.getType(), p.getName())) != null)
                                .filter(Objects::nonNull)
                                .findFirst()
                                .orElse(null);

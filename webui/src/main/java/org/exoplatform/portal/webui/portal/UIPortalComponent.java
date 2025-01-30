@@ -19,6 +19,7 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.container.ExoContainerContext;
@@ -77,8 +78,10 @@ public class UIPortalComponent extends UIContainer {
   }
 
   public boolean hasAccessPermission() {
-    return ExoContainerContext.getService(UserACL.class)
-                              .hasPermission(ConversationState.getCurrent().getIdentity(), accessPermissions);
+    return ArrayUtils.isEmpty(accessPermissions) || ExoContainerContext.getService(UserACL.class)
+                                                                       .hasPermission(ConversationState.getCurrent()
+                                                                                                       .getIdentity(),
+                                                                                      accessPermissions);
   }
 
   @Override
