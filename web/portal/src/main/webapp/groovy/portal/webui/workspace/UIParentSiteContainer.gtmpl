@@ -1,6 +1,6 @@
 <div id="ParentSiteContainer">
   <div id="ParentSiteLeftContainer">
-    <div class="VuetifyApp">
+    <div class="VuetifyApp layout-side-bar">
       <div class="v-application <%=orientation.isLT() ? "v-application--is-ltr" : "v-application--is-rtl" %> transparent theme--light">
         <div id="ParentSiteStickyMenu"></div>
       </div>
