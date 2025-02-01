@@ -144,10 +144,11 @@ public class LayoutServiceImpl implements LayoutService {
     }
     if (exists) {
       siteStorage.save(portalConfig.build());
+      broadcastEvent(PORTAL_CONFIG_UPDATED, portalConfig);
     } else {
       siteStorage.create(portalConfig.build());
+      broadcastEvent(PORTAL_CONFIG_CREATED, portalConfig);
     }
-    broadcastEvent(PORTAL_CONFIG_CREATED, portalConfig);
   }
 
   @Override
