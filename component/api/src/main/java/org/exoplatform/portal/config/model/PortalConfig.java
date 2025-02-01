@@ -31,8 +31,10 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+@Data
 @EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
@@ -136,76 +138,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
     }
   }
 
-  public String getType() {
-    return type;
-  }
-
-  public void setType(String type) {
-    this.type = type;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String s) {
-    name = s;
-  }
-
-  public String getLocale() {
-    return locale;
-  }
-
-  public void setLocale(String s) {
-    locale = s;
-  }
-
-  public String[] getAccessPermissions() {
-    return accessPermissions;
-  }
-
-  public void setAccessPermissions(String[] s) {
-    accessPermissions = s;
-  }
-
-  public String getEditPermission() {
-    return editPermission;
-  }
-
-  public void setEditPermission(String editPermission) {
-    this.editPermission = editPermission;
-  }
-
-  public String getSkin() {
-    return skin;
-  }
-
-  public void setSkin(String s) {
-    skin = s;
-  }
-
-  public Container getPortalLayout() {
-    return portalLayout;
-  }
-
   public void setPortalLayout(Container container) {
     portalLayout = container == null ? new SiteLayout() : new SiteLayout(container);
-  }
-
-  public boolean isDefaultLayout() {
-    return defaultLayout;
-  }
-
-  public void setDefaultLayout(boolean defaultLayout) {
-    this.defaultLayout = defaultLayout;
-  }
-
-  public Properties getProperties() {
-    return properties;
-  }
-
-  public void setProperties(Properties props) {
-    properties = props;
   }
 
   public String getProperty(String name) {
@@ -256,54 +190,6 @@ public class PortalConfig extends ModelObject implements Cloneable {
     if (properties != null) {
       properties.remove(name);
     }
-  }
-
-  public void setDescription(String description) {
-    this.description = description;
-  }
-
-  public String getDescription() {
-    return description;
-  }
-
-  public void setLabel(String label) {
-    this.label = label;
-  }
-
-  public String getLabel() {
-    return label;
-  }
-
-  public boolean isDisplayed() {
-    return displayed;
-  }
-
-  public void setDisplayed(boolean displayed) {
-    this.displayed = displayed;
-  }
-
-  public int getDisplayOrder() {
-    return displayOrder;
-  }
-
-  public void setDisplayOrder(int displayOrder) {
-    this.displayOrder = displayOrder;
-  }
-
-  public String getBannerUploadId() {
-    return bannerUploadId;
-  }
-
-  public void setBannerUploadId(String bannerUploadId) {
-    this.bannerUploadId = bannerUploadId;
-  }
-
-  public long getBannerFileId() {
-    return bannerFileId;
-  }
-
-  public void setBannerFileId(long bannerFileId) {
-    this.bannerFileId = bannerFileId;
   }
 
   @Override
