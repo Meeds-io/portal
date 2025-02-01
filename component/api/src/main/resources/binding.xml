@@ -154,7 +154,6 @@
     <value name="id" usage="optional" field="id" style="attribute"/>
     <value name="width" usage="optional" field="width" style="attribute"/>
     <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
-    <value name="sticky-beahvior" field="stickyBeahvior" usage="optional" style="attribute"/>
     <value name="profiles" field="profiles" usage="optional" style="attribute"/>
     <value
       name="access-permissions"

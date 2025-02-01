@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.portal.config.serialize.model.SiteLayout;
+import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
@@ -372,6 +373,13 @@ public class PortalConfig extends ModelObject implements Cloneable {
    */
   public void setDefaultSite(boolean defaultSite) {
     setProperty("NO_DEFAULT_PATH", String.valueOf(!defaultSite));
+  }
+
+  /**
+   * @return the associated {@link SiteKey}
+   */
+  public SiteKey getSiteKey() {
+    return new SiteKey(type, name);
   }
 
 }
