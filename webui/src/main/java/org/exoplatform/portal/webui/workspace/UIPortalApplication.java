@@ -46,6 +46,7 @@ import org.gatein.portal.controller.resource.script.Module;
 import org.gatein.portal.controller.resource.script.ScriptResource;
 import org.json.JSONObject;
 
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.branding.BrandingService;
@@ -66,6 +67,9 @@ import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.portal.UISharedLayout;
 import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.portal.webui.util.Util;
+import org.exoplatform.services.listener.Asynchronous;
+import org.exoplatform.services.listener.Listener;
+import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
@@ -216,6 +220,9 @@ public class UIPortalApplication extends UIApplication {
 
     this.all_UIPortals = new HashMap<>();
     initWorkspaces(context.getPortalOwner());
+    // Listen to storage to update cached pages when updated
+    ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, new RefreshUIPortalListener());
   }
 
   /**
@@ -880,4 +887,21 @@ public class UIPortalApplication extends UIApplication {
     return uiPortlets;
   }
 
+  @Asynchronous
+  public class RefreshUIPortalListener extends Listener<LayoutService, PortalConfig> {
+    @Override
+    public void onEvent(org.exoplatform.services.listener.Event<LayoutService, PortalConfig> event) throws Exception {
+      PortalConfig site = event.getData();
+      if (site == null) {
+        return;
+      }
+      SiteKey siteKey = site.getSiteKey();
+      if (siteKey == null) {
+        return;
+      }
+      if (all_UIPortals != null && all_UIPortals.containsKey(siteKey)) {
+        all_UIPortals.remove(siteKey);
+      }
+    }
+  }
 }
