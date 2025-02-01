@@ -45,6 +45,7 @@ import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.Visibility;
+import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NodeContext;
 import org.exoplatform.portal.mop.navigation.NodeData;
@@ -656,6 +657,24 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
       }
 
     }.execute("root");
+  }
+
+  public void testCanRestore() {
+    assertTrue(userPortalConfigService.canRestore("portal", "classic"));
+    String customSiteName = "customSiteName";
+    userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, customSiteName, "test");
+    assertFalse(userPortalConfigService.canRestore("portal", customSiteName));
+  }
+
+  public void testRestore() {
+    assertTrue(userPortalConfigService.restoreSite("portal", "classic", ImportMode.CONSERVE, true, true, true));
+    assertTrue(userPortalConfigService.restoreSite("portal", "classic", ImportMode.INSERT, true, false, true));
+    assertTrue(userPortalConfigService.restoreSite("portal", "classic", ImportMode.MERGE, true, true, false));
+    assertTrue(userPortalConfigService.restoreSite("portal", "classic", ImportMode.OVERWRITE, false, false, true));
+
+    String customSiteName = "customSiteName";
+    userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, customSiteName, "test");
+    assertFalse(userPortalConfigService.restoreSite("portal", customSiteName, ImportMode.OVERWRITE, false, true, false));
   }
 
   public void testRootGetPage() {
