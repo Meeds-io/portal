@@ -88,6 +88,18 @@
     <type>org.exoplatform.portal.mop.rest.NavigationRest</type>
   </component>
 
+  <component>
+    <key>StaticWebUIComponentsFeatureFlag</key>
+    <type>org.exoplatform.container.ExtendedPropertyConfigurator</type>
+    <init-params>
+      <properties-param>
+        <name>EditorAttachImageFeatureProperties</name>
+        <description>Editor attach image plugin Feature enablement flag</description>
+        <property name="exo.feature.portal.staticWebUIComponents.enabled" value="${exo.feature.portal.staticWebUIComponents.enabled:false}" />
+      </properties-param>
+    </init-params>
+  </component>
+
   <external-component-plugins>
     <target-component>org.exoplatform.web.filter.ExtensibleFilter</target-component>
     <component-plugin>

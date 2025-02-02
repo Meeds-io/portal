@@ -159,7 +159,7 @@ public class UserPortalConfigService implements Startable {
   public boolean restoreSite(String type,
                          String name,
                          ImportMode importMode,
-                         boolean restoreSiteConfig,
+                         boolean restoreSiteLayout,
                          boolean restorePages,
                          boolean restoreNavigationTree) {
     if (!canRestore(type, name)) {
@@ -172,8 +172,22 @@ public class UserPortalConfigService implements Startable {
     HashSet<String> ownerName = new HashSet<>();
     ownerName.add(name);
     config.setPredefinedOwner(ownerName);
-    if (restoreSiteConfig) {
+    if (restoreSiteLayout) {
+      PortalConfig previousSite = layoutService.getPortalConfig(type, name);
       newPortalConfigListener.initPortalConfigDB(config, true);
+      PortalConfig site = layoutService.getPortalConfig(type, name);
+      if (previousSite != null) {
+        // Preserve previous version or properties
+        site.setLabel(previousSite.getLabel());
+        site.setDescription(previousSite.getDescription());
+        site.setAccessPermissions(previousSite.getAccessPermissions());
+        site.setEditPermission(previousSite.getEditPermission());
+        site.setDisplayed(previousSite.isDisplayed());
+        site.setDisplayOrder(previousSite.getDisplayOrder());
+        site.setIcon(previousSite.getIcon());
+        site.setProperties(previousSite.getProperties());
+        layoutService.save(site);
+      }
     }
     if (restorePages) {
       newPortalConfigListener.initPageDB(config, true);
