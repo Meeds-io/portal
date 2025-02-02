@@ -46,23 +46,23 @@ public class UIPage extends UIContainer {
   /** . */
   @Getter
   @Setter
-  private String    pageId;
+  private String  pageId;
 
   @Getter
   @Setter
-  private SiteKey   siteKey;
+  private SiteKey siteKey;
 
   @Getter
   @Setter
-  private String    editPermission;
+  private String  editPermission;
 
   @Getter
   @Setter
-  private boolean   showMaxWindow    = false;
+  private boolean showMaxWindow    = false;
 
   @Getter
   @Setter
-  private boolean   hideSharedLayout = false;
+  private boolean hideSharedLayout = false;
 
   @Getter
   @Setter
