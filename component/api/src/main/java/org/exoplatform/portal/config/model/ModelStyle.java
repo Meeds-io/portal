@@ -104,54 +104,56 @@ public class ModelStyle implements Serializable {
   }
 
   public String getCssClass(String existingCssClass) { // NOSONAR
-    return getCssClass(existingCssClass, 20);
+    return getCssClass(existingCssClass, false, 20);
   }
 
-  public String getCssClass(String existingCssClass, int diff) { // NOSONAR
+  public String getCssClass(String existingCssClass, boolean sectionStyle, int diff) { // NOSONAR
     StringBuilder cssClass = new StringBuilder();
-    if (marginTop != null && marginTop >= 0 && !StringUtils.contains(existingCssClass, "mt-")) {
-      cssClass.append(" mt-");
-      if (marginTop < diff) {
-        cssClass.append("n");
+    if (!sectionStyle) {
+      if (marginTop != null && marginTop >= 0 && !StringUtils.contains(existingCssClass, "mt-")) {
+        cssClass.append(" mt-");
+        if (marginTop < diff) {
+          cssClass.append("n");
+        }
+        cssClass.append(Math.abs((marginTop - diff) / 4));
       }
-      cssClass.append(Math.abs((marginTop - diff) / 4));
-    }
-    if (marginBottom != null && marginBottom >= 0 && !StringUtils.contains(existingCssClass, "mb-")) {
-      cssClass.append(" mb-");
-      if (marginBottom < diff) {
-        cssClass.append("n");
+      if (marginBottom != null && marginBottom >= 0 && !StringUtils.contains(existingCssClass, "mb-")) {
+        cssClass.append(" mb-");
+        if (marginBottom < diff) {
+          cssClass.append("n");
+        }
+        cssClass.append(Math.abs((marginBottom - diff) / 4));
       }
-      cssClass.append(Math.abs((marginBottom - diff) / 4));
-    }
-    if (marginRight != null && marginRight >= 0 && !StringUtils.contains(existingCssClass, "me-")) {
-      cssClass.append(" me-");
-      if (marginRight < diff) {
-        cssClass.append("n");
+      if (marginRight != null && marginRight >= 0 && !StringUtils.contains(existingCssClass, "me-")) {
+        cssClass.append(" me-");
+        if (marginRight < diff) {
+          cssClass.append("n");
+        }
+        cssClass.append(Math.abs((marginRight - diff) / 4));
       }
-      cssClass.append(Math.abs((marginRight - diff) / 4));
-    }
-    if (marginLeft != null && marginLeft >= 0 && !StringUtils.contains(existingCssClass, "ms-")) {
-      cssClass.append(" ms-");
-      if (marginLeft < diff) {
-        cssClass.append("n");
+      if (marginLeft != null && marginLeft >= 0 && !StringUtils.contains(existingCssClass, "ms-")) {
+        cssClass.append(" ms-");
+        if (marginLeft < diff) {
+          cssClass.append("n");
+        }
+        cssClass.append(Math.abs((marginLeft - diff) / 4));
       }
-      cssClass.append(Math.abs((marginLeft - diff) / 4));
-    }
-    if (radiusTopRight != null && !StringUtils.contains(existingCssClass, "brtr-")) {
-      cssClass.append(" brtr-");
-      cssClass.append(radiusTopRight / 4);
-    }
-    if (radiusTopLeft != null && !StringUtils.contains(existingCssClass, "brtl-")) {
-      cssClass.append(" brtl-");
-      cssClass.append(radiusTopLeft / 4);
-    }
-    if (radiusBottomRight != null && !StringUtils.contains(existingCssClass, "brbr-")) {
-      cssClass.append(" brbr-");
-      cssClass.append(radiusBottomRight / 4);
-    }
-    if (radiusBottomLeft != null && !StringUtils.contains(existingCssClass, "brbl-")) {
-      cssClass.append(" brbl-");
-      cssClass.append(radiusBottomLeft / 4);
+      if (radiusTopRight != null && !StringUtils.contains(existingCssClass, "brtr-")) {
+        cssClass.append(" brtr-");
+        cssClass.append(radiusTopRight / 4);
+      }
+      if (radiusTopLeft != null && !StringUtils.contains(existingCssClass, "brtl-")) {
+        cssClass.append(" brtl-");
+        cssClass.append(radiusTopLeft / 4);
+      }
+      if (radiusBottomRight != null && !StringUtils.contains(existingCssClass, "brbr-")) {
+        cssClass.append(" brbr-");
+        cssClass.append(radiusBottomRight / 4);
+      }
+      if (radiusBottomLeft != null && !StringUtils.contains(existingCssClass, "brbl-")) {
+        cssClass.append(" brbl-");
+        cssClass.append(radiusBottomLeft / 4);
+      }
     }
     if (mobileHidden != null && mobileHidden.booleanValue() && !StringUtils.contains(existingCssClass, "hidden-sm-and-down")) {
       cssClass.append(" hidden-sm-and-down");
