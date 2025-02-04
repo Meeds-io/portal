@@ -39,7 +39,7 @@ public class BannerSection extends Container {
   public String getCssClass() {
     StringBuilder cssClasses = new StringBuilder();
     if (cssStyle != null) {
-      cssClasses.append(cssStyle.getCssClass(cssClass, 0));
+      cssClasses.append(cssStyle.getCssClass(cssClass, true, 0));
       cssClasses.append(" ");
     }
     if (cssClass != null) {
