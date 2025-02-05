@@ -29,6 +29,8 @@ import org.exoplatform.web.security.hash.NoSaltedHashService;
 import org.exoplatform.web.security.security.CookieTokenService;
 import org.exoplatform.web.security.security.TokenServiceInitializationException;
 
+import io.meeds.web.security.storage.PortalTokenStorage;
+
 /**
  * CookieTokenService with changed mechanism for token generation (testing purposes)
  *
@@ -39,7 +41,7 @@ public class SimpleGeneratorCookieTokenService extends CookieTokenService {
     private int counter = 0;
     private int noRandom = 0;
 
-    public SimpleGeneratorCookieTokenService(InitParams initParams, GateInTokenStore tokenStore)
+    public SimpleGeneratorCookieTokenService(InitParams initParams, PortalTokenStorage tokenStore)
             throws TokenServiceInitializationException {
         super(replaceHashService(initParams), tokenStore);
     }

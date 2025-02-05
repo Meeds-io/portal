@@ -36,12 +36,13 @@
   </component>
 
   <component>
-    <key>org.exoplatform.web.security.jpa.TokenDAO</key>
-    <type>org.exoplatform.web.security.jpa.TokenDAOImpl</type>
+    <key>io.meeds.web.security.dao.TokenDAO</key>
+    <type>io.meeds.web.security.dao.TokenDAOImpl</type>
   </component>
+
   <component>
-    <key>org.exoplatform.web.security.GateInTokenStore</key>
-    <type>org.exoplatform.web.security.jpa.JPAGateInTokenStorage</type>
+    <key>io.meeds.web.security.storage.PortalTokenStorage</key>
+    <type>io.meeds.web.security.storage.cache.CachedPortalTokenStorage</type>
   </component>
 
   <component>

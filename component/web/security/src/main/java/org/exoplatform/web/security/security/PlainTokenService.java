@@ -26,31 +26,31 @@ import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.web.security.Token;
 
 /**
- * An abstraction layer adding {@link #getAllTokens()}. It was necessary to create this because {@link #getAllTokens()} needed
- * to be removed from {@link CookieTokenService} as it has no significance when the tokens are salt-hashed.
- *
- * @author <a href="mailto:ppalaga@redhat.com">Peter Palaga</a>
- *
+ * An abstraction layer adding {@link #getAllTokens()}. It was necessary to
+ * create this because {@link #getAllTokens()} needed to be removed from
+ * {@link CookieTokenService} as it has no significance when the tokens are
+ * salt-hashed.
  */
 public abstract class PlainTokenService<T extends Token, K> extends AbstractTokenService<T, K> {
-    public void cleanExpiredTokens() {
-        K[] ids = getAllTokens();
-        for (K id : ids) {
-            T token = getToken(id);
-            if (token != null && token.isExpired()) {
-                deleteToken(id);
-            }
-        }
-    }
 
-    /**
-     * @param initParams
-     * @throws TokenServiceInitializationException
-     */
-    public PlainTokenService(InitParams initParams) throws TokenServiceInitializationException {
-        super(initParams);
+  public void cleanExpiredTokens() {
+    K[] ids = getAllTokens();
+    for (K id : ids) {
+      T token = getToken(id);
+      if (token != null && token.isExpired()) {
+        deleteToken(id);
+      }
     }
+  }
 
-    public abstract K[] getAllTokens();
+  /**
+   * @param initParams
+   * @throws TokenServiceInitializationException
+   */
+  PlainTokenService(InitParams initParams) {
+    super(initParams);
+  }
+
+  public abstract K[] getAllTokens();
 
 }

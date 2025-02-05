@@ -20,8 +20,9 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.jpa.mock.AbstractInMemoryDAO;
-import org.exoplatform.web.security.jpa.TokenDAO;
-import org.exoplatform.web.security.jpa.TokenEntity;
+
+import io.meeds.web.security.dao.TokenDAO;
+import io.meeds.web.security.entity.TokenEntity;
 
 public class InMemoryTokenDAO extends AbstractInMemoryDAO<TokenEntity> implements TokenDAO {
 

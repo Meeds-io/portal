@@ -22,65 +22,63 @@ package org.exoplatform.web.security.security;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.exoplatform.container.xml.InitParams;
-import org.exoplatform.web.security.GateInToken;
+import org.exoplatform.web.security.PortalToken;
 
-/**
- * Created by The eXo Platform SAS Author : liem.nguyen ncliam@gmail.com Jun 5, 2009
- */
-public class TransientTokenService extends PlainTokenService<GateInToken, String> {
+public class TransientTokenService extends PlainTokenService<PortalToken, String> {
 
-    protected final ConcurrentHashMap<String, GateInToken> tokens = new ConcurrentHashMap<String, GateInToken>();
+  protected final ConcurrentHashMap<String, PortalToken> tokens = new ConcurrentHashMap<>();
 
-    public TransientTokenService(InitParams initParams) throws TokenServiceInitializationException {
-        super(initParams);
-    }
+  public TransientTokenService(InitParams initParams) {
+    super(initParams);
+  }
 
-    public String createToken(String username) {
-        if (validityMillis < 0) {
-            throw new IllegalArgumentException();
-        }
-        if (username == null) {
-            throw new NullPointerException();
-        }
-        String tokenId = nextTokenId();
-        long expirationTimeMillis = System.currentTimeMillis() + validityMillis;
-        tokens.put(tokenId, new GateInToken(expirationTimeMillis, username));
-        return tokenId;
+  public String createToken(String username) {
+    if (validityMillis < 0) {
+      throw new IllegalArgumentException();
     }
+    if (username == null) {
+      throw new NullPointerException();
+    }
+    String tokenId = nextTokenId();
+    long expirationTimeMillis = System.currentTimeMillis() + validityMillis;
+    tokens.put(tokenId, new PortalToken(expirationTimeMillis, username));
+    return tokenId;
+  }
 
-    @Override
-    public GateInToken getToken(String id, String type) {
-        return tokens.get(id);
-    }
-    
-    @Override
-    public GateInToken getToken(String id) {
-        return getToken(id,"");
-    }
+  @Override
+  public PortalToken getToken(String id, String type) {
+    return tokens.get(id);
+  }
 
-    @Override
-    protected String decodeKey(String stringKey) {
-        return stringKey;
-    }
-    
-    @Override
-    public GateInToken deleteToken(String id,String tokenType) {
-        GateInToken token = tokens.get(id);
-        tokens.remove(id);
-        return token;
-    }
-    @Override
-    public GateInToken deleteToken(String id) {
-        return deleteToken(id,"");
-    }
+  @Override
+  public PortalToken getToken(String id) {
+    return getToken(id, "");
+  }
 
-    @Override
-    public String[] getAllTokens() {
-        return tokens.keySet().toArray(new String[] {});
-    }
+  @Override
+  protected String decodeKey(String stringKey) {
+    return stringKey;
+  }
 
-    @Override
-    public long size() {
-        return tokens.size();
-    }
+  @Override
+  public PortalToken deleteToken(String id, String tokenType) {
+    PortalToken token = tokens.get(id);
+    tokens.remove(id);
+    return token;
+  }
+
+  @Override
+  public PortalToken deleteToken(String id) {
+    return deleteToken(id, "");
+  }
+
+  @Override
+  public String[] getAllTokens() {
+    return tokens.keySet().toArray(new String[] {});
+  }
+
+  @Override
+  public long size() {
+    return tokens.size();
+  }
 }

@@ -23,14 +23,15 @@
 package org.exoplatform.web.security.security;
 
 import org.exoplatform.container.xml.InitParams;
-import org.exoplatform.web.security.GateInTokenStore;
+
+import io.meeds.web.security.storage.PortalTokenStorage;
 /**
  * @author <a href="mailto:theute@redhat.com">Thomas Heute</a>
  * @version $Revision$
  */
 public class RemindPasswordTokenService extends CookieTokenService {
 
-    public RemindPasswordTokenService(InitParams initParams, GateInTokenStore tokenStore)
+    public RemindPasswordTokenService(InitParams initParams, PortalTokenStorage tokenStore)
             throws TokenServiceInitializationException {
         super(initParams, tokenStore);
     }
