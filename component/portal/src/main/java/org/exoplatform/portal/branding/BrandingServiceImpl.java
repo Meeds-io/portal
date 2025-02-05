@@ -42,7 +42,6 @@ import com.github.sommeri.less4j.LessCompiler;
 import com.github.sommeri.less4j.LessCompiler.Configuration;
 import com.github.sommeri.less4j.core.ThreadUnsafeLessCompiler;
 
-import org.exoplatform.commons.api.settings.ExoFeatureService;
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
@@ -135,8 +134,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_PAGE_WIDTH_KEY           = "page.width";
 
-  public static final String   BRANDING_CUSTOM_CSS               = "page.customCss";
-
   public static final String   BRANDING_PAGE_BG_POSITION_KEY     = "page.backgroundPosition";
 
   public static final String   BRANDING_PAGE_BG_SIZE_KEY         = "page.backgroundSize";
@@ -152,8 +149,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   LOGIN_BACKGROUND_NAME             = "loginBackground.png";
 
   public static final String   PAGE_BACKGROUND_NAME              = "pageBackground.png";
-
-  public static final String   BRANDING_CUSTOM_STYLE_FEATURE     = "customStylesheet";
 
   public static final String   BRANDING_DEFAULT_LOGO_PATH        = "/skin/images/logo/DefaultLogo.png";                    // NOSONAR
 
@@ -176,8 +171,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private UploadService        uploadService;
 
   private ConfigurationManager configurationManager;
-
-  private ExoFeatureService    featureService;
 
   private ListenerService      listenerService;
 
@@ -213,8 +206,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private String               themeCSSContent                   = null;
 
-  private String               customCss                         = null;
-
   private Logo                 logo                              = null;
 
   private Favicon              favicon                           = null;
@@ -248,11 +239,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public void start() {
     computeThemeCSS();
-    listenerService.addListener(ExoFeatureService.FEATURE_STATUS_CHANGED_EVENT, e -> {
-      if (StringUtils.equals(BRANDING_CUSTOM_STYLE_FEATURE, (String) e.getSource())) {
-        this.triggerBrandingUpdated(true, true);
-      }
-    });
   }
 
   @Override
@@ -297,7 +283,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageBackgroundSize(getPageBackgroundSize());
     branding.setPageBackgroundRepeat(getPageBackgroundRepeat());
     branding.setPageWidth(getPageWidth());
-    branding.setCustomCss(getCustomCss());
     branding.setThemeStyle(getThemeStyle());
     branding.setLoginTitle(getLoginTitle());
     branding.setLoginSubtitle(getLoginSubtitle());
@@ -354,7 +339,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updatePageBackgroundPosition(branding.getPageBackgroundPosition(), false);
       updatePageBackgroundRepeat(branding.getPageBackgroundRepeat(), false);
       updatePageWidth(branding.getPageWidth(), false);
-      updateCustomCss(branding.getCustomCss(), false);
       updateThemeStyle(branding.getThemeStyle(), false);
       updateLoginTitle(branding.getLoginTitle());
       updateLoginSubtitle(branding.getLoginSubtitle());
@@ -398,11 +382,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getPageWidth() {
     return getPropertyValue(BRANDING_PAGE_WIDTH_KEY);
-  }
-
-  @Override
-  public String getCustomCss() {
-    return getPropertyValue(BRANDING_CUSTOM_CSS);
   }
 
   @Override
@@ -573,7 +552,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       settingService.set(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY, SettingValue.create(lastUpdatedTimestamp));
     }
     this.themeCSSContent = null;
-    this.customCss = null;
   }
 
   @Override
@@ -813,10 +791,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     updatePropertyValue(BRANDING_PAGE_WIDTH_KEY, value, updateLastUpdatedTime);
   }
 
-  private void updateCustomCss(String value, boolean updateLastUpdatedTime) {
-    updatePropertyValue(BRANDING_CUSTOM_CSS, value, updateLastUpdatedTime);
-  }
-
   private void updateCompanyName(String companyName, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_COMPANY_NAME_SETTING_KEY, companyName, updateLastUpdatedTime);
   }
@@ -1000,22 +974,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         }
       }
     }
-    if (StringUtils.isNotBlank(getCustomCssContent())
-        && getFeatureService() != null
-        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      this.themeCSSContent += "\n" + this.customCss;
-    }
     return this.themeCSSContent;
-  }
-
-  private String getCustomCssContent() {
-    if (this.customCss == null) {
-      this.customCss = getCustomCss();
-      if (this.customCss == null) {
-        this.customCss = "";
-      }
-    }
-    return this.customCss;
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
@@ -1103,8 +1062,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private void validateCSSInputs(Branding branding) { // NOSONAR
-    Arrays.asList(branding.getCustomCss(),
-                  branding.getPageBackgroundColor(),
+    Arrays.asList(branding.getPageBackgroundColor(),
                   branding.getPageBackgroundPosition(),
                   branding.getPageBackgroundRepeat(),
                   branding.getPageBackgroundSize(),
@@ -1133,13 +1091,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (triggerEvent) {
       listenerService.broadcast(BRANDING_UPDATED_EVENT, null, getBrandingInformation(false));
     }
-  }
-
-  private ExoFeatureService getFeatureService() {
-    if (featureService == null) {
-      featureService = container.getComponentInstanceOfType(ExoFeatureService.class);
-    }
-    return featureService;
   }
 
 }

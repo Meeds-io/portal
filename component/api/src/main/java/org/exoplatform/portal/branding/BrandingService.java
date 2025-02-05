@@ -139,11 +139,6 @@ public interface BrandingService {
   String getPageWidth();
 
   /**
-   * @return Page custom additional css
-   */
-  String getCustomCss();
-
-  /**
    * Update branding logo. If the logo object contains the image data, they are
    * used, otherwise if the uploadId exists it is used to retrieve the uploaded
    * resource. If there is no data, nor uploadId, the logo is deleted.
