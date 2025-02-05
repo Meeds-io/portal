@@ -70,6 +70,9 @@ import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 
 import io.meeds.common.ContainerTransactional;
+import io.meeds.portal.navigation.model.SidebarConfiguration;
+import io.meeds.portal.navigation.model.SidebarItem;
+import io.meeds.portal.navigation.service.NavigationConfigurationService;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -81,55 +84,53 @@ import lombok.Synchronized;
  */
 public class UserPortalConfigService implements Startable {
 
-  public static final String      SITE_TEMPLATE_INSTANTIATED     = "site.template.instantiated";
+  public static final String             SITE_TEMPLATE_INSTANTIATED     = "site.template.instantiated";
 
-  public static final String      PUBLIC_SITE_NAME               = "public";
+  public static final String             PUBLIC_SITE_NAME               = "public";
 
-  public static final Scope       HOME_PAGE_URI_PREFERENCE_SCOPE = Scope.PORTAL.id("HOME");
+  public static final Scope              HOME_PAGE_URI_PREFERENCE_SCOPE = Scope.PORTAL.id("HOME");
 
-  public static final String      HOME_PAGE_URI_PREFERENCE_KEY   = "HOME_PAGE_URI";
+  public static final String             HOME_PAGE_URI_PREFERENCE_KEY   = "HOME_PAGE_URI";
 
-  public static final String      DEFAULT_GLOBAL_PORTAL          = "global";
+  public static final String             DEFAULT_GLOBAL_PORTAL          = "global";
 
-  public static final String      DEFAULT_GROUP_SITE_TEMPLATE    = "group";
+  public static final String             DEFAULT_GROUP_SITE_TEMPLATE    = "group";
 
-  public static final String      DEFAULT_USER_SITE_TEMPLATE     = "user";
+  public static final String             DEFAULT_USER_SITE_TEMPLATE     = "user";
 
-  private static final Log        LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
+  private static final Log               LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
 
-  private LayoutService           layoutService;
+  private LayoutService                  layoutService;
 
-  private UserACL                 userAcl;
+  private UserACL                        userAcl;
 
-  private SettingService          settingService;
+  private SettingService                 settingService;
 
-  private ListenerService         listenerService;
+  private ListenerService                listenerService;
 
-  private NavigationService       navigationService;
+  private NavigationService              navigationService;
 
-  private NewPortalConfigListener newPortalConfigListener;
+  private NavigationConfigurationService navigationConfigurationService;
 
-  @Getter
-  @Setter
-  private String                  globalPortal;
-
-  private final ImportMode        defaultImportMode;
-
-  private PortalConfig            metaPortalConfig;
+  private NewPortalConfigListener        newPortalConfigListener;
 
   @Getter
   @Setter
-  private boolean                 allowUserHome                  = true;
+  private String                         globalPortal;
 
-  protected final SiteFilter      portalSiteFilter               = new SiteFilter(SiteType.PORTAL,
-                                                                                  null,
-                                                                                  null,
-                                                                                  true,
-                                                                                  true,
-                                                                                  false,
-                                                                                  false,
-                                                                                  0,
-                                                                                  0);
+  private final ImportMode               defaultImportMode;
+
+  private PortalConfig                   metaPortalConfig;
+
+  protected final SiteFilter             portalSiteFilter               = new SiteFilter(SiteType.PORTAL,
+                                                                                         null,
+                                                                                         null,
+                                                                                         true,
+                                                                                         true,
+                                                                                         false,
+                                                                                         false,
+                                                                                         0,
+                                                                                         0);
 
   public UserPortalConfigService(LayoutService layoutService,
                                  NavigationService navigationService,
@@ -156,11 +157,11 @@ public class UserPortalConfigService implements Startable {
   }
 
   public boolean restoreSite(String type,
-                         String name,
-                         ImportMode importMode,
-                         boolean restoreSiteLayout,
-                         boolean restorePages,
-                         boolean restoreNavigationTree) {
+                             String name,
+                             ImportMode importMode,
+                             boolean restoreSiteLayout,
+                             boolean restorePages,
+                             boolean restoreNavigationTree) {
     if (!canRestore(type, name)) {
       return false;
     }
@@ -356,10 +357,23 @@ public class UserPortalConfigService implements Startable {
   }
 
   public String getDefaultPath(String username) {
-    String userHomePage = allowUserHome && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
+    String userHomePage = isAllowUserHome() && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
     if (StringUtils.isNotBlank(userHomePage)) {
       return userHomePage;
     } else {
+      if (getNavigationConfigurationService() != null && StringUtils.isNotBlank(username)) {
+        SidebarConfiguration sidebarConfiguration = getNavigationConfigurationService().getSidebarConfiguration(username,
+                                                                                                                Locale.ENGLISH);
+        String userDefaultPath = sidebarConfiguration.getItems()
+                                                     .stream()
+                                                     .filter(SidebarItem::isDefaultPath)
+                                                     .map(SidebarItem::getUrl)
+                                                     .findFirst()
+                                                     .orElse(null);
+        if (StringUtils.isNotBlank(userDefaultPath)) {
+          return userDefaultPath;
+        }
+      }
       PortalConfig portalConfig = getDefaultSite(username);
       return portalConfig == null ? null : getDefaultSitePath(portalConfig.getName(), username);
     }
@@ -547,7 +561,7 @@ public class UserPortalConfigService implements Startable {
    * @return User home page uri preference
    */
   public String getUserHomePage(String username) {
-    if (StringUtils.isBlank(username) || !allowUserHome) {
+    if (StringUtils.isBlank(username) || !isAllowUserHome()) {
       return null;
     } else {
       SettingValue<?> homePageSettingValue = settingService.get(Context.USER.id(username),
@@ -728,6 +742,17 @@ public class UserPortalConfigService implements Startable {
   private String getParam(InitParams params, String name, String defaultValue) {
     ValueParam valueParam = params == null ? null : params.getValueParam(name);
     return valueParam == null ? defaultValue : valueParam.getValue();
+  }
+
+  private boolean isAllowUserHome() {
+    return getNavigationConfigurationService() == null || getNavigationConfigurationService().isAllowUserHome();
+  }
+
+  private NavigationConfigurationService getNavigationConfigurationService() {
+    if (navigationConfigurationService == null) {
+      navigationConfigurationService = ExoContainerContext.getService(NavigationConfigurationService.class);
+    }
+    return navigationConfigurationService;
   }
 
 }
