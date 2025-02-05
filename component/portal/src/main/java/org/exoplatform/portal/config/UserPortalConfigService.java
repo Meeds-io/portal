@@ -157,11 +157,11 @@ public class UserPortalConfigService implements Startable {
   }
 
   public boolean restoreSite(String type,
-                         String name,
-                         ImportMode importMode,
-                         boolean restoreSiteLayout,
-                         boolean restorePages,
-                         boolean restoreNavigationTree) {
+                             String name,
+                             ImportMode importMode,
+                             boolean restoreSiteLayout,
+                             boolean restorePages,
+                             boolean restoreNavigationTree) {
     if (!canRestore(type, name)) {
       return false;
     }

@@ -80,8 +80,9 @@ public class UIPortalApplicationLifecycle extends Lifecycle<UIPortalApplication>
   public void processRender(UIPortalApplication uicomponent, WebuiRequestContext context) throws Exception {
     PortalRequestContext portalRequestContext = (PortalRequestContext) context;
     OutputStream responseOutputStream = portalRequestContext.getResponse().getOutputStream();
-    PortalPrinter parentWriter = new PortalPrinter(responseOutputStream, true, 25000);
-    portalRequestContext.setWriter(parentWriter);
+    PortalPrinter parentWriter = new PortalPrinter(responseOutputStream, true, 5000);
+
+    PortalPrinter childWriter = null;
     if (portalRequestContext.isFullRendering()) {
       JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
       // Add JS resource of current portal
@@ -91,14 +92,31 @@ public class UIPortalApplicationLifecycle extends Lifecycle<UIPortalApplication>
       jsManager.loadScriptResource(ResourceScope.SHARED, JavascriptConfigParser.LEGACY_JAVA_SCRIPT);
       // Need to add bootstrap as immediate since it contains the loader
       jsManager.loadScriptResource(ResourceScope.SHARED, "bootstrap");
-      processRender(uicomponent, portalRequestContext, "system:/groovy/portal/webui/workspace/UIPortalApplication.gtmpl");
+
+      childWriter = new PortalPrinter(responseOutputStream, true, 25000, true);
+
+      context.setWriter(childWriter);
+      processRender(uicomponent, context, "system:/groovy/portal/webui/workspace/UIPortalApplicationChildren.gtmpl");
+
+      context.setWriter(parentWriter);
+      processRender(uicomponent, context, "system:/groovy/portal/webui/workspace/UIPortalApplication.gtmpl");
+      portalRequestContext.setWriter(parentWriter);
     } else {
+      portalRequestContext.setWriter(parentWriter);
       processRender(uicomponent, portalRequestContext, "system:/groovy/portal/webui/workspace/UIApplication.gtmpl");
     }
 
     try {
+      // flush the parent writer to the output stream so that we are really to
+      // accept the child content
       portalRequestContext.commitResponse();
       parentWriter.flushOutputStream();
+      if (childWriter != null) {
+        // now that the parent has been flushed, we can flush the contents of
+        // the
+        // child to the output
+        childWriter.flushOutputStream();
+      }
     } catch (IOException e) {
       // We want to ignore the ClientAbortException since this is caused by the
       // users browser closing the connection and is not something we should be
