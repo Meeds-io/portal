@@ -43,7 +43,7 @@ public class TestTransientTokenService extends AbstractTokenServiceTest<Transien
         String tokenId = service.createToken("root");
         assertEquals(service.getValidityTime(), 2);
 
-        GateInToken token = service.getToken(tokenId);
+        PortalToken token = service.getToken(tokenId);
         assertEquals(token.getUsername(), "root");
         service.deleteToken(tokenId);
     }
@@ -55,10 +55,10 @@ public class TestTransientTokenService extends AbstractTokenServiceTest<Transien
         String[] tokens = service.getAllTokens();
         assertEquals(tokens.length, 2);
 
-        GateInToken token1 = service.getToken(tokenId1);
+        PortalToken token1 = service.getToken(tokenId1);
         assertEquals(token1.getUsername(), "root1");
 
-        GateInToken token2 = service.getToken(tokenId2);
+        PortalToken token2 = service.getToken(tokenId2);
         assertEquals(token2.getUsername(), "root2");
         service.deleteToken(tokenId1);
         service.deleteToken(tokenId2);

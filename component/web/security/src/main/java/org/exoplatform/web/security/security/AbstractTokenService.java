@@ -46,7 +46,8 @@ import org.gatein.common.util.Base64.EncodingOption;
 import org.picocontainer.Startable;
 
 /**
- * Created by The eXo Platform SAS Author : liem.nguyen ncliam@gmail.com Jun 5, 2009
+ * Created by The eXo Platform SAS Author : liem.nguyen ncliam@gmail.com Jun 5,
+ * 2009
  *
  * @param <T> the token type
  * @param <K> the token key type
@@ -58,185 +59,185 @@ public abstract class AbstractTokenService<T extends Token, K> implements Starta
 
   protected final Log              log                       = ExoLogger.getLogger(getClass());
 
-    protected static final String SERVICE_CONFIG = "service.configuration";
+  protected static final String    SERVICE_CONFIG            = "service.configuration";
 
-    protected static final String CLEANUP_PERIOD_TIME = "cleanup.period.time";
+  protected static final String    CLEANUP_PERIOD_TIME       = "cleanup.period.time";
 
-    /**
-     * See {@link #tokenByteLength}. 16 bytes (128 bits) would be enough
-     * (Validator + Selector = 256bits), but we want to get padding-less Byte64
-     * representation, so we take a greater number divisible by 3.<br>
-     * (24 bytes is equal to 192 bits.)
-     */
-    public static final int DEFAULT_TOKEN_BYTE_LENGTH = 24;
+  /**
+   * See {@link #tokenByteLength}. 16 bytes (128 bits) would be enough
+   * (Validator + Selector = 256bits), but we want to get padding-less Byte64
+   * representation, so we take a greater number divisible by 3.<br>
+   * (24 bytes is equal to 192 bits.)
+   */
+  public static final int          DEFAULT_TOKEN_BYTE_LENGTH = 24;
 
-    /**
-     * The number of random bits generared by {@link #nextRandom()}. Use values divisible by 3 to produce random strings
-     * consisting only of {@code 0-9}, {@code a-z}, {@code A-Z}, {@code -} and {@code _}, i.e. URL safe Byte64 without padding.
-     * If a value not divisible by 3 is used the random strings will contain {@code *} in addition to the named characters.
-     */
-    protected final int tokenByteLength;
+  /**
+   * The number of random bits generared by {@link #nextRandom()}. Use values
+   * divisible by 3 to produce random strings consisting only of {@code 0-9},
+   * {@code a-z}, {@code A-Z}, {@code -} and {@code _}, i.e. URL safe Byte64
+   * without padding. If a value not divisible by 3 is used the random strings
+   * will contain {@code *} in addition to the named characters.
+   */
+  protected final int              tokenByteLength;
 
-    protected String name;
+  protected String                 name;
 
-    protected long validityMillis;
+  protected long                   validityMillis;
 
-    protected int delay_time = 600;
+  protected int                    delayTime                 = 600;
 
-    private ScheduledExecutorService executor;
+  private ScheduledExecutorService executor;
 
-    @SuppressWarnings("unchecked")
-    public AbstractTokenService(InitParams initParams) throws TokenServiceInitializationException {
-        List<String> params = initParams.getValuesParam(SERVICE_CONFIG).getValues();
-        this.name = params.get(0);
-        long configValue = Long.parseLong(params.get(1));
-        this.validityMillis = TimeoutEnum.valueOf(params.get(2)).toMilisecond(configValue);
-        this.tokenByteLength = DEFAULT_TOKEN_BYTE_LENGTH;
-        ValueParam delayParam = initParams.getValueParam(CLEANUP_PERIOD_TIME);
-        if(delayParam != null) {
-            delay_time = Integer.parseInt(delayParam.getValue());
-        }
+  AbstractTokenService(InitParams initParams) {
+    List<String> params = initParams.getValuesParam(SERVICE_CONFIG).getValues();
+    this.name = params.get(0);
+    long configValue = Long.parseLong(params.get(1));
+    this.validityMillis = TimeoutEnum.valueOf(params.get(2)).toMilisecond(configValue);
+    this.tokenByteLength = DEFAULT_TOKEN_BYTE_LENGTH;
+    ValueParam delayParam = initParams.getValueParam(CLEANUP_PERIOD_TIME);
+    if (delayParam != null) {
+      delayTime = Integer.parseInt(delayParam.getValue());
     }
+  }
 
-    @Override
-    public void start() {
-        if(delay_time > 0) {
-         // start a thread, garbage expired cookie token every [DELAY_TIME]
-            executor = Executors.newSingleThreadScheduledExecutor();
-            executor.scheduleWithFixedDelay(new Runnable() {
-                public void run() {
-                    try {
-                        PortalContainer container = PortalContainer.getInstance();
-                        ExoContainerContext.setCurrentContainer(container);
-                        RequestLifeCycle.begin(container);
-                        try {
-                            AbstractTokenService.this.cleanExpiredTokens();
-                        } finally {
-                            RequestLifeCycle.end();
-                        }
-                    } catch (Throwable t) {
-                        log.warn("Failed to clean expired tokens", t);
-                    }
-                }
-            }, 0, delay_time, TimeUnit.SECONDS);
-        }
-    }
-
-    @Override
-    public void stop() {
-        if(executor != null) {
-            executor.shutdown();
-        }
-    }
-
-    public static <T extends AbstractTokenService<?, ?>> T getInstance(Class<T> classType) {
-        PortalContainer container = PortalContainer.getInstance();
-        return classType.cast(container.getComponentInstanceOfType(classType));
-    }
-
-    public String validateToken(String stringKey, boolean remove) {
-        if (stringKey == null) {
-            throw new NullPointerException();
-        }
-
-        //
-        K tokenKey = decodeKey(stringKey);
-
-        T token;
+  @Override
+  public void start() {
+    if (delayTime > 0) {
+      // start a thread, garbage expired cookie token every [DELAY_TIME]
+      executor = Executors.newSingleThreadScheduledExecutor();
+      executor.scheduleWithFixedDelay(() -> {
         try {
-            if (remove) {
-                token = this.deleteToken(tokenKey);
-            } else {
-                token = this.getToken(tokenKey);
-            }
-
-            if (token != null) {
-                boolean valid = token.getExpirationTimeMillis() > System.currentTimeMillis();
-                if (valid) {
-                    return token.getUsername();
-                } else if (!remove) {
-                    this.deleteToken(tokenKey);
-                }
-            }
-        } catch (Exception e) {
-          if (log.isDebugEnabled()) {
-            log.warn("Error retrieving token", e);
-          } else {
-            log.warn("Error retrieving token. Cause: " + e.getMessage());
+          PortalContainer container = PortalContainer.getInstance();
+          ExoContainerContext.setCurrentContainer(container);
+          RequestLifeCycle.begin(container);
+          try {
+            AbstractTokenService.this.cleanExpiredTokens();
+          } finally {
+            RequestLifeCycle.end();
           }
+        } catch (Throwable t) { // NOSONAR
+          log.warn("Failed to clean expired tokens", t);
         }
-        return null;
+      }, 0, delayTime, TimeUnit.SECONDS);
+    }
+  }
+
+  @Override
+  public void stop() {
+    if (executor != null) {
+      executor.shutdown();
+    }
+  }
+
+  public static <T extends AbstractTokenService<?, ?>> T getInstance(Class<T> classType) {
+    PortalContainer container = PortalContainer.getInstance();
+    return classType.cast(container.getComponentInstanceOfType(classType));
+  }
+
+  public String validateToken(String stringKey, boolean remove) {
+    if (stringKey == null) {
+      throw new NullPointerException();
     }
 
-    @Managed
-    @ManagedDescription("Clean all tokens are expired")
-    @Impact(ImpactType.IDEMPOTENT_WRITE)
-    public abstract void cleanExpiredTokens();
+    //
+    K tokenKey = decodeKey(stringKey);
 
-    @Managed
-    @ManagedDescription("Get time for token expiration in seconds")
-    public long getValidityTime() {
-        return validityMillis / 1000;
-    }
+    T token;
+    try {
+      if (remove) {
+        token = this.deleteToken(tokenKey);
+      } else {
+        token = this.getToken(tokenKey);
+      }
 
-    @Managed
-    @ManagedDescription("The expiration daemon period time in seconds")
-    public long getPeriodTime() {
-        return delay_time;
-    }
-
-    @Managed
-    @ManagedDescription("The token service name")
-    public String getName() {
-        return name;
-    }
-
-    public abstract T getToken(K id);
-    
-    public abstract T getToken(K id, String tokenType);
-    
-    
-    public abstract T deleteToken(K id);
-    
-    public abstract T deleteToken(K id, String tokenType);
-    /**
-     * Decode a key from its string representation.
-     *
-     * @param stringKey the key a s a string
-     * @return the typed key
-     */
-    protected abstract K decodeKey(String stringKey);
-
-    // We don't make it a property as retrieving the value can be an expensive operation
-    @Managed
-    @ManagedDescription("The number of tokens")
-    @Impact(ImpactType.READ)
-    public abstract long size();
-
-    private enum TimeoutEnum {
-        SECOND(1000), MINUTE(1000l * 60), HOUR(1000l * 60 * 60), DAY(1000l * 60 * 60 * 24);
-
-        private long multiply;
-
-        private TimeoutEnum(long multiply) {
-            this.multiply = multiply;
+      if (token != null) {
+        boolean valid = token.getExpirationTimeMillis() > System.currentTimeMillis();
+        if (valid) {
+          return token.getUsername();
+        } else if (!remove) {
+          this.deleteToken(tokenKey);
         }
+      }
+    } catch (Exception e) {
+      if (log.isDebugEnabled()) {
+        log.warn("Error retrieving token", e);
+      } else {
+        log.warn("Error retrieving token. Cause: " + e.getMessage());
+      }
+    }
+    return null;
+  }
 
-        public long toMilisecond(long configValue) {
-            return configValue * multiply;
-        }
+  @Managed
+  @ManagedDescription("Clean all tokens are expired")
+  @Impact(ImpactType.IDEMPOTENT_WRITE)
+  public abstract void cleanExpiredTokens();
+
+  @Managed
+  @ManagedDescription("Get time for token expiration in seconds")
+  public long getValidityTime() {
+    return validityMillis / 1000;
+  }
+
+  @Managed
+  @ManagedDescription("The expiration daemon period time in seconds")
+  public long getPeriodTime() {
+    return delayTime;
+  }
+
+  @Managed
+  @ManagedDescription("The token service name")
+  public String getName() {
+    return name;
+  }
+
+  public abstract T getToken(K id);
+
+  public abstract T getToken(K id, String tokenType);
+
+  public abstract T deleteToken(K id);
+
+  public abstract T deleteToken(K id, String tokenType);
+
+  /**
+   * Decode a key from its string representation.
+   *
+   * @param stringKey the key a s a string
+   * @return the typed key
+   */
+  protected abstract K decodeKey(String stringKey);
+
+  // We don't make it a property as retrieving the value can be an expensive
+  // operation
+  @Managed
+  @ManagedDescription("The number of tokens")
+  @Impact(ImpactType.READ)
+  public abstract long size();
+
+  private enum TimeoutEnum {
+    SECOND(1000), MINUTE(1000l * 60), HOUR(1000l * 60 * 60), DAY(1000l * 60 * 60 * 24);
+
+    private long multiply;
+
+    private TimeoutEnum(long multiply) {
+      this.multiply = multiply;
     }
 
-    protected String nextTokenId() {
-        return LoginUtils.COOKIE_NAME + nextRandom();
+    public long toMilisecond(long configValue) {
+      return configValue * multiply;
     }
+  }
 
-    protected String nextRandom() {
-        byte[] randomBytes = new byte[tokenByteLength];
-        PortalContainer container = PortalContainer.getInstance();
-        SecureRandom random = container.getComponentInstanceOfType(SecureRandomService.class).getSecureRandom();
-        random.nextBytes(randomBytes);
-        return Base64.encodeBytes(randomBytes, EncodingOption.USEURLSAFEENCODING);
-    }
+  protected String nextTokenId() {
+    return LoginUtils.COOKIE_NAME + nextRandom();
+  }
+
+  protected String nextRandom() {
+    byte[] randomBytes = new byte[tokenByteLength];
+    PortalContainer container = PortalContainer.getInstance();
+    SecureRandom random = container.getComponentInstanceOfType(SecureRandomService.class).getSecureRandom();
+    random.nextBytes(randomBytes);
+    return Base64.encodeBytes(randomBytes, EncodingOption.USEURLSAFEENCODING);
+  }
 
 }

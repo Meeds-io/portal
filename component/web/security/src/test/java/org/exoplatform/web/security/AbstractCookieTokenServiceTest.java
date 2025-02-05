@@ -39,7 +39,7 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         String tokenId = service.createToken("root");
         assertEquals(service.getValidityTime(), 2);
 
-        GateInToken token = service.getToken(tokenId);
+        PortalToken token = service.getToken(tokenId);
         assertEquals(token.getUsername(), "root");
         service.deleteToken(tokenId);
     }
@@ -59,7 +59,7 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
     @Override
     public void testDeleteToken() throws Exception {
         String tokenId = service.createToken("root");
-        GateInToken deletedToken = service.deleteToken(tokenId);
+        PortalToken deletedToken = service.deleteToken(tokenId);
         assertNotNull(deletedToken);
         assertNotSame(service.getToken(tokenId), deletedToken);
         assertNull(service.getToken(tokenId));
@@ -85,7 +85,7 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         String tokenId = service.createToken("root",type);
         assertEquals(service.getValidityTime(), 2);
         
-        GateInToken token = service.getToken(tokenId,type);
+        PortalToken token = service.getToken(tokenId,type);
         assertEquals(token.getUsername(), "root");
         service.deleteToken(tokenId,type);
     }
@@ -95,7 +95,7 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         String tokenId = service.createToken("root",type);
         assertEquals(service.getValidityTime(), 2);
 
-        GateInToken token = service.getToken(tokenId,"otherType");
+        PortalToken token = service.getToken(tokenId,"otherType");
         assertNull(token);
         service.deleteToken(tokenId,type);
     }
@@ -111,11 +111,11 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         assertEquals(service.size(), 1);
         service.deleteToken(token,type);
     }
-    
+
     @Override
     public void testDeleteTokenWithType() throws Exception {
         String tokenId = service.createToken("root",type);
-        GateInToken deletedToken = service.deleteToken(tokenId,type);
+        PortalToken deletedToken = service.deleteToken(tokenId,type);
         assertNotNull(deletedToken);
         assertNotSame(service.getToken(tokenId,type), deletedToken);
         assertNull(service.getToken(tokenId,type));
@@ -134,6 +134,27 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         assertEquals(0, service.size());
         
         service.deleteToken(tokenId1,type);
+    }
+
+    public void testDeleteAll() {
+        service.createToken("root",type);
+        assertEquals(1, service.size());
+        service.deleteAll();
+        assertEquals(0, service.size());
+    }
+
+    public void testDeleteTokensByUsernameAndType() {
+      service.createToken("root", type);
+      assertEquals(1, service.size());
+      service.deleteTokensByUsernameAndType("root", type);
+      assertEquals(0, service.size());
+    }
+    
+    public void testDeleteTokenOfUser() {
+      service.createToken("root", type);
+      assertEquals(1, service.size());
+      service.deleteTokensOfUser("root");
+      assertEquals(0, service.size());
     }
 
 }

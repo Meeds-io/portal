@@ -1,20 +1,42 @@
-package org.exoplatform.web.security.jpa;
+/**
+ * This file is part of the Meeds project (https://meeds.io/).
+ *
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+package io.meeds.web.security.entity;
 
-import org.exoplatform.commons.api.persistence.ExoEntity;
-
-import jakarta.persistence.*;
 import java.io.Serializable;
 import java.util.Date;
 
-@Entity(name = "GateInToken")
-@ExoEntity
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+
+@Entity(name = "PortalToken")
 @Table(name = "PORTAL_TOKENS")
-@NamedQueries({
-        @NamedQuery(name = "GateInToken.findByTokenId", query = "SELECT t FROM GateInToken t WHERE t.tokenId = :tokenId"),
-        @NamedQuery(name = "GateInToken.findByUser", query = "SELECT t FROM GateInToken t WHERE t.username = :username"),
-        @NamedQuery(name = "GateInToken.deleteExpiredTokens", query = "DELETE FROM GateInToken t WHERE t.expirationTime < :expireTime"),
-        @NamedQuery(name = "GateInToken.deleteTokensByUserAndType", query="DELETE FROM GateInToken t WHERE t.username = :username AND t.tokenType = :tokenType")
-})
+@NamedQuery(name = "PortalToken.findByTokenId", query = "SELECT t FROM PortalToken t WHERE t.tokenId = :tokenId")
+@NamedQuery(name = "PortalToken.findByUser", query = "SELECT t FROM PortalToken t WHERE t.username = :username")
+@NamedQuery(name = "PortalToken.deleteExpiredTokens", query = "DELETE FROM PortalToken t WHERE t.expirationTime < :expireTime")
+@NamedQuery(name = "PortalToken.deleteTokensByUserAndType", query="DELETE FROM PortalToken t WHERE t.username = :username AND t.tokenType = :tokenType")
 public class TokenEntity implements Serializable {
     private static final long serialVersionUID = 6633792468705838255L;
 
