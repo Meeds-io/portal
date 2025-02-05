@@ -47,7 +47,7 @@ import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.login.LoginUtils;
 import org.exoplatform.web.login.LogoutControl;
-import org.exoplatform.web.security.GateInToken;
+import org.exoplatform.web.security.PortalToken;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
@@ -190,7 +190,7 @@ public class UIPortal extends UIContainer {
       // Delete the token from store
       String token = getTokenCookie(req);
       if (token != null) {
-        AbstractTokenService<GateInToken, String> tokenService = AbstractTokenService.getInstance(CookieTokenService.class);
+        AbstractTokenService<PortalToken, String> tokenService = AbstractTokenService.getInstance(CookieTokenService.class);
         tokenService.deleteToken(token);
       }
 

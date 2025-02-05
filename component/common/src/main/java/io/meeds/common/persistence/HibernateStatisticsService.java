@@ -21,6 +21,7 @@ package io.meeds.common.persistence;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -173,14 +174,19 @@ public class HibernateStatisticsService implements Startable, ComponentRequestLi
                                       .filter(q -> !StringUtils.containsAny(q, ignoredQueryMatchArray))
                                       .map(q -> {
                                         QueryStatistics stats = statistics.getQueryStatistics(q);
-                                        return String.format("%s;count=%s;dur=%s;max=%s;avg=%s;min=%s",
-                                                             q.replace("\r\n", " ").replace("\n", " ").replace("\r", " "),
-                                                             stats.getExecutionCount(),
-                                                             stats.getExecutionTotalTime(),
-                                                             stats.getExecutionMaxTime(),
-                                                             stats.getExecutionAvgTime(),
-                                                             stats.getExecutionMinTime());
+                                        if (stats.getExecutionCount() == 0) {
+                                          return null;
+                                        } else {
+                                          return String.format("%s;count=%s;dur=%s;max=%s;avg=%s;min=%s",
+                                                               q.replace("\r\n", " ").replace("\n", " ").replace("\r", " "),
+                                                               stats.getExecutionCount(),
+                                                               stats.getExecutionTotalTime(),
+                                                               stats.getExecutionMaxTime(),
+                                                               stats.getExecutionAvgTime(),
+                                                               stats.getExecutionMinTime());
+                                        }
                                       })
+                                      .filter(Objects::nonNull)
                                       .toList();
     if (this.logResult) {
       performances.forEach(LOG::info);

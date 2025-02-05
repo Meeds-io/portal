@@ -27,6 +27,9 @@ import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 
 import org.exoplatform.services.log.Log;
+
+import lombok.Synchronized;
+
 import org.exoplatform.services.log.ExoLogger;
 
 /**
@@ -124,22 +127,17 @@ public class AutoReseedRandom extends SecureRandom implements Runnable {
     /**
      * Forks the reseeding {@link Thread} if necessary.
      */
+    @Synchronized
     private void checkReseed() {
-        boolean reseed = false;
-        synchronized (this) {
-            /* only one thread can read or write nextReseed */
-            if (System.currentTimeMillis() > nextReseed) {
-                /*
-                 * we move the nextReseed further to the future already here if we did it in the forked thread we could start
-                 * several concurrent forks.
-                 */
-                nextReseed = System.currentTimeMillis() + reseedingPeriod;
-                reseed = true;
-            }
-        }
-        if (reseed) {
-            new Thread(this, RESEEDING_THREAD_NAME).start();
-        }
+      /* only one thread can read or write nextReseed */
+      if (System.currentTimeMillis() > nextReseed) {
+        /*
+         * we move the nextReseed further to the future already here if we did
+         * it in the forked thread we could start several concurrent forks.
+         */
+        nextReseed = System.currentTimeMillis() + reseedingPeriod;
+        new Thread(this, RESEEDING_THREAD_NAME).start();
+      }
     }
 
     /**

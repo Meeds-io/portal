@@ -19,31 +19,21 @@
 
 package org.exoplatform.web.security;
 
-/**
- * Created by The eXo Platform SAS Author : Tan Pham Dinh tan.pham@exoplatform.com May 6, 2009
- */
-public class GateInToken implements Token {
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-    /** . */
-    private final long expirationTimeMillis;
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class PortalToken implements Token {
 
-    /** . */
-    private final String username;
+  private long   expirationTimeMillis;
 
-    public GateInToken(long expirationTimeMillis, String username) {
-        this.expirationTimeMillis = expirationTimeMillis;
-        this.username = username;
-    }
+  private String username;
 
-    public long getExpirationTimeMillis() {
-        return expirationTimeMillis;
-    }
+  public boolean isExpired() {
+    return System.currentTimeMillis() > expirationTimeMillis;
+  }
 
-    public String getUsername() {
-        return username;
-    }
-
-    public boolean isExpired() {
-        return System.currentTimeMillis() > expirationTimeMillis;
-    }
 }
