@@ -17,6 +17,11 @@ package org.exoplatform.portal.mop.storage.cache;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
@@ -30,16 +35,29 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
+import io.meeds.portal.mop.storage.cache.model.DescriptionLocaleListCache;
+
 public class CacheDescriptionStorage extends DescriptionStorageImpl {
 
-  private static final Log                                         LOG                    =
-                                                                       ExoLogger.getExoLogger(CacheDescriptionStorage.class);
+  private static final Log                                                 LOG                           =
+                                                                               ExoLogger.getExoLogger(CacheDescriptionStorage.class);
 
-  public static final String                                       DESCRIPTION_CACHE_NAME = "portal.DescriptionService";
+  public static final DescriptionLocaleListCache                           NULL_LOCALE_LIST              =
+                                                                                            new DescriptionLocaleListCache();
 
-  private final FutureExoCache<DescriptionCacheKey, State, Object> descriptionFutureCache;
+  public static final String                                               DESCRIPTION_CACHE_NAME        =
+                                                                                                  "portal.DescriptionService";
 
-  private final ExoCache<DescriptionCacheKey, State>               descriptionCache;
+  public static final String                                               DESCRIPTION_LOCLES_CACHE_NAME =
+                                                                                                         "portal.DescriptionLocales";
+
+  private final FutureExoCache<DescriptionCacheKey, State, Object>         descriptionFutureCache;
+
+  private final ExoCache<DescriptionCacheKey, State>                       descriptionCache;
+
+  private final FutureExoCache<String, DescriptionLocaleListCache, Object> descriptionLocaleListFutureCache;
+
+  private final ExoCache<String, DescriptionLocaleListCache>               descriptionLocaleListCache;
 
   public CacheDescriptionStorage(CacheService cacheService,
                                  DescriptionDAO descriptionDAO) {
@@ -54,6 +72,14 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
         return description == null ? State.NULL_OBJECT : description;
       }
     }, descriptionCache);
+    this.descriptionLocaleListCache = cacheService.getCacheInstance(DESCRIPTION_LOCLES_CACHE_NAME);
+    this.descriptionLocaleListFutureCache = new FutureExoCache<>(new Loader<String, DescriptionLocaleListCache, Object>() {
+      @Override
+      public DescriptionLocaleListCache retrieve(Object context, String id) throws Exception {
+        Map<Locale, State> descriptions = CacheDescriptionStorage.super.getDescriptions(id);
+        return MapUtils.isEmpty(descriptions) ? NULL_LOCALE_LIST : new DescriptionLocaleListCache(descriptions.keySet());
+      }
+    }, descriptionLocaleListCache);
   }
 
   @Override
@@ -89,9 +115,23 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
     return desccription == null || desccription.isNull() ? null : desccription;
   }
 
+  @Override
+  public Map<Locale, State> getDescriptions(String id) {
+    DescriptionLocaleListCache descriptionLocaleList = descriptionLocaleListFutureCache.get(null, id);
+    return descriptionLocaleList == null
+           || CollectionUtils.isEmpty(descriptionLocaleList.getLocales()) ?
+                                                                          null :
+                                                                          descriptionLocaleList.getLocales()
+                                                                                               .stream()
+                                                                                               .collect(Collectors.toMap(Function.identity(),
+                                                                                                                         l -> getDescription(id,
+                                                                                                                                             l)));
+  }
+
   private void clearCacheEntries(String id) {
     try {
       descriptionCache.select(new DescriptionCacheSelector(id));
+      descriptionLocaleListCache.clearCache();
     } catch (Exception e) {
       LOG.warn("Error selecting cache entries to clear, clear all entries", e);
       descriptionCache.clearCache();
