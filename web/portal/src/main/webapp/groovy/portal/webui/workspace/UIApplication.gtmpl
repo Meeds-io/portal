@@ -1,5 +1,11 @@
+<%
+uicomponent.includePortletScripts();
+%>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <body>
 <%_ctx.getRequestContext().getMaximizedUIPortlet().processRender(_ctx.getRequestContext());%>
+  <script type="text/javascript" id="jsManager">
+    <%=_ctx.getRequestContext().getJavascriptManager().getJavaScripts()%>
+  </script>
 </body>
 </html>
