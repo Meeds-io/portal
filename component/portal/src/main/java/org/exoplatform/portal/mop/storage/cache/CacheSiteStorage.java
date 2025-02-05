@@ -37,17 +37,23 @@ import java.util.List;
 
 public class CacheSiteStorage extends SiteStorageImpl {
 
-  public static final String                                SITE_CACHE_NAME = "portal.SiteService";
+  public static final String                                SITE_CACHE_NAME                = "portal.SiteService";
 
   public static final String                                SITE_KEYS_BY_FILTER_CACHE_NAME = "portal.SiteKeysByFilterService";
+
+  public static final String                                SITE_KEY_BY_ID_CACHE_NAME      = "portal.SiteKeyById";
 
   private final FutureExoCache<SiteKey, PortalData, Object> siteFutureCache;
 
   private final ExoCache<SiteKey, PortalData>               siteCache;
 
-  private final FutureExoCache<SiteFilter, Object, Object>    siteKeysByFilterFutureCache;
+  private final FutureExoCache<SiteFilter, Object, Object>  siteKeysByFilterFutureCache;
 
-  private final ExoCache<SiteFilter, Object>                  siteKeysByFilterCache;
+  private final ExoCache<SiteFilter, Object>                siteKeysByFilterCache;
+
+  private final FutureExoCache<Long, SiteKey, Object>       siteKeysByIdFutureCache;
+
+  private final ExoCache<Long, SiteKey>                     siteKeysByIdCache;
 
   public CacheSiteStorage(CacheService cacheService, // NOSONAR
                           SettingService settingService,
@@ -58,7 +64,14 @@ public class CacheSiteStorage extends SiteStorageImpl {
                           SiteDAO siteDAO,
                           UploadService uploadService,
                           FileService fileService) {
-    super(settingService, configurationManager, navigationStorage, pageStorage, layoutStorage, siteDAO, uploadService, fileService);
+    super(settingService,
+          configurationManager,
+          navigationStorage,
+          pageStorage,
+          layoutStorage,
+          siteDAO,
+          uploadService,
+          fileService);
     this.siteCache = cacheService.getCacheInstance(SITE_CACHE_NAME);
     this.siteFutureCache = new FutureExoCache<>(new Loader<SiteKey, PortalData, Object>() {
       @Override
@@ -74,6 +87,14 @@ public class CacheSiteStorage extends SiteStorageImpl {
         return CacheSiteStorage.super.getSitesKeys(siteFilter);
       }
     }, siteKeysByFilterCache);
+    this.siteKeysByIdCache = cacheService.getCacheInstance(SITE_KEY_BY_ID_CACHE_NAME);
+    this.siteKeysByIdFutureCache = new FutureExoCache<>(new Loader<Long, SiteKey, Object>() {
+      @Override
+      public SiteKey retrieve(Object context, Long siteId) throws Exception {
+        PortalData site = CacheSiteStorage.super.getPortalConfig(siteId);
+        return site == null ? null : new SiteKey(site.getType(), site.getName());
+      }
+    }, siteKeysByIdCache);
   }
 
   @Override
@@ -113,6 +134,13 @@ public class CacheSiteStorage extends SiteStorageImpl {
   }
 
   @Override
+  public PortalData getPortalConfig(long siteId) {
+    SiteKey siteKey = siteKeysByIdFutureCache.get(null, siteId);
+    return siteKey == null ? null : getPortalConfig(siteKey);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
   public List<SiteKey> getSitesKeys(SiteFilter siteFilter) {
     return (List<SiteKey>) siteKeysByFilterFutureCache.get(null, siteFilter);
   }
