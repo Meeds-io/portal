@@ -90,6 +90,12 @@ public interface NavigationConfigurationService {
    */
   List<TopbarApplication> getDefaultTopbarApplications();
 
+
+  /**
+   * Check whether a given site is a meta site navigation
+   */
+  boolean isMetaSiteNavigation(String siteName);
+
   /**
    * @return true if Users can have personal home URL, else false
    */
