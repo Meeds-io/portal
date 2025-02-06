@@ -101,6 +101,10 @@ public class Branding implements Serializable {
 
   @Getter
   @Setter
+  private String              pageBackgroundEffect;
+
+  @Getter
+  @Setter
   private String              pageWidth;
 
   @Getter

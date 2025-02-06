@@ -134,6 +134,18 @@ public interface BrandingService {
   String getPageBackgroundPath();
 
   /**
+   * @return the page background Effect
+   */
+  String getPageBackgroundEffect();
+
+  /**
+   * Returns the URL to retrieve the page background, including the background effect.
+   *
+   * @return the URL of the page background image
+   */
+  String getPageBackgroundImageUrl();
+
+  /**
    * @return Page width
    */
   String getPageWidth();
