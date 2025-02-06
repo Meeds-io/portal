@@ -29,7 +29,7 @@
     </init-params>
 
     <ui-component-root>org.exoplatform.portal.webui.workspace.UIPortalApplication</ui-component-root>
-    <state-manager>org.exoplatform.portal.application.PortalStateManager</state-manager>
+    <state-manager>io.meeds.portal.application.StaticPortalStateManager</state-manager>
 
     <application-lifecycle-listeners>
       <listener>org.exoplatform.portal.application.PortalLogoutLifecycle</listener>

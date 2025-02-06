@@ -164,6 +164,9 @@ public class PortalRequestContext extends WebuiRequestContext {
   private Boolean                          draftPage;
 
   @Setter
+  private Boolean                          draftSite;
+
+  @Setter
   private Boolean                          noCache;
 
   private boolean                          forceFullUpdate     = false;
@@ -385,10 +388,21 @@ public class PortalRequestContext extends WebuiRequestContext {
     return noCache.booleanValue();
   }
 
+  public boolean isDraftSite() {
+    if (draftSite == null) {
+      draftSite = portalConfig != null && PortalConfig.DRAFT.equals(portalConfig.getType());
+    }
+    return draftSite.booleanValue();
+  }
+
   public boolean isDraftPage() {
     if (draftPage == null) {
-      UserNode navigationNode = getNavigationNode();
-      draftPage = navigationNode != null && navigationNode.getVisibility() == Visibility.DRAFT;
+      if (portalConfig != null && PortalConfig.DRAFT.equals(portalConfig.getType())) {
+        draftPage = true;
+      } else {
+        UserNode navigationNode = getNavigationNode();
+        draftPage = navigationNode != null && navigationNode.getVisibility() == Visibility.DRAFT;
+      }
     }
     return draftPage.booleanValue();
   }
@@ -402,13 +416,30 @@ public class PortalRequestContext extends WebuiRequestContext {
     if (!noCache && userNode != null) {
       return userNode;
     }
-    UserPortal userPortal = getUserPortalConfig().getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(siteKey);
-    if (navigation != null) {
-      userNode = portalConfigService.getSiteNodeOrGlobalNode(siteKey.getTypeName(),
-                                                             siteKey.getName(),
-                                                             nodePath,
+    if (siteKey.getType() == SiteType.DRAFT) {
+      userNode = portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
+                                                             getMetaPortal(),
+                                                             null,
                                                              request.getRemoteUser());
+      if (userNode == null) {
+        List<String> siteNames = layoutService.getSiteNames(SiteType.PORTAL, 0, 10);
+        userNode = siteNames.stream()
+                            .map(siteName -> portalConfigService.getSiteNodeOrGlobalNode(PortalConfig.PORTAL_TYPE,
+                                                                                         siteName,
+                                                                                         null,
+                                                                                         request.getRemoteUser()))
+                            .findFirst()
+                            .orElseThrow();
+      }
+    } else {
+      UserPortal userPortal = getUserPortalConfig().getUserPortal();
+      UserNavigation navigation = userPortal.getNavigation(siteKey);
+      if (navigation != null) {
+        userNode = portalConfigService.getSiteNodeOrGlobalNode(siteKey.getTypeName(),
+                                                               siteKey.getName(),
+                                                               nodePath,
+                                                               request.getRemoteUser());
+      }
     }
     return userNode;
   }
@@ -433,7 +464,7 @@ public class PortalRequestContext extends WebuiRequestContext {
       portalName = getSiteName();
     }
     if (portalName == null) {
-      portalName = portalConfigService.getMetaPortal();
+      portalName = getMetaPortal();
     }
     return portalName;
   }
@@ -639,6 +670,10 @@ public class PortalRequestContext extends WebuiRequestContext {
     return siteKey;
   }
 
+  public long getSiteId() {
+    return portalConfig == null ? 0l : portalConfig.getId();
+  }
+
   public String getSiteLabel() {
     if (siteLabel == null) {
       UIPortal portal = getUiPortal();
@@ -667,7 +702,7 @@ public class PortalRequestContext extends WebuiRequestContext {
     if (portal != null && portal.getPortalName() != null) {
       return portal.getPortalName();
     } else {
-      return portalConfigService.getMetaPortal();
+      return getMetaPortal();
     }
   }
 
@@ -676,6 +711,13 @@ public class PortalRequestContext extends WebuiRequestContext {
    */
   public String getMetaPortal() {
     return portalConfigService.getMetaPortal();
+  }
+
+  /**
+   * @return global portal name
+   */
+  public String getGlobalPortal() {
+    return portalConfigService.getGlobalPortal();
   }
 
   public String getNodePath() {
@@ -719,10 +761,10 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public final void sendRedirect(String url) throws IOException {
     setResponseComplete(true);
-    if (url.contains(portalConfigService.getGlobalPortal())) {
-      String globalSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + portalConfigService.getGlobalPortal();
+    if (url.contains(getGlobalPortal())) {
+      String globalSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + getGlobalPortal();
       if (url.startsWith(globalSiteURI)) {
-        String metaSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + portalConfigService.getMetaPortal();
+        String metaSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + getMetaPortal();
         url = url.replace(globalSiteURI, metaSiteURI);
         LOG.warn("An URI was sent with global site name, it will be replaced by default site to avoid returning HTTP 404");
       }
@@ -783,6 +825,10 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public boolean isMaximizePortlet() {
     return StringUtils.isNotBlank(getMaximizedPortletId());
+  }
+
+  public boolean isFullRendering() {
+    return !isMaximizePortlet() || StringUtils.equals(getRequest().getParameter("fullRender"), "true");
   }
 
   public boolean isShowMaxWindow() {
@@ -856,8 +902,11 @@ public class PortalRequestContext extends WebuiRequestContext {
       uiPortal.clearUIPage(pageReference);
       this.uiPage = null;
     } else {
-      boolean isDraftPage = pageNode.getVisibility() == Visibility.DRAFT;
-      setDraftPage(isDraftPage);
+      if (getPortalConfig() != null && PortalConfig.DRAFT.equals(portalConfig.getType())) {
+        setDraftPage(true);
+      } else {
+        setDraftPage(pageNode.getVisibility() == Visibility.DRAFT);
+      }
       if (this.page == null) {
         this.page = layoutService.getPage(pageReference);
       }

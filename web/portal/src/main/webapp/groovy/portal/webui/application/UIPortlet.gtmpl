@@ -26,10 +26,8 @@
   		cssStyle = " style=\"" + cssStyle + "\"";
     }
     String cssClass = uicomponent.getCssClass() == null ? "" : " " + uicomponent.getCssClass();
- %>
-  	<div id="$portletId" $hiddenClass>
-  		<div class="PORTLET-FRAGMENT$cssClass" $cssStyle>
-  			<% println portletContent; %>
-  		</div>
-  	</div>	
-<% } %>
+ %><div id="$portletId" $hiddenClass>
+	<div class="PORTLET-FRAGMENT$cssClass" $cssStyle>
+		<% println portletContent; %>
+	</div>
+</div><% } %>

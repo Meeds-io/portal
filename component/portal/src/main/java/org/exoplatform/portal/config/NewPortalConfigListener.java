@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 
@@ -89,8 +90,8 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   private volatile List<NewPortalConfig> configs;
 
   /**
-   * @deprecated Site Templates has been changed to be stored in database to make
-   *             it dynamically managed by UI rather than statis pages and
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
    *             navigation from source files
    */
   @Deprecated(forRemoval = true, since = "7.0")
@@ -225,44 +226,27 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   public void run() throws Exception {
     boolean prepareImport = performImport();
     for (NewPortalConfig ele : configs) {
-      RequestLifeCycle.begin(PortalContainer.getInstance());
-      try {
-        if (ele.getOverrideMode() || prepareImport) {
-          initPortalConfigDB(ele);
-        }
-      } catch (Exception e) {
-        log.error("NewPortalConfig error: " + e.getMessage(), e);
-      } finally {
-        RequestLifeCycle.end();
-      }
+      initPortalConfigDB(ele, prepareImport);
     }
     for (NewPortalConfig ele : configs) {
-      RequestLifeCycle.begin(PortalContainer.getInstance());
-      try {
-        if (ele.getOverrideMode() || prepareImport) {
-          initPageDB(ele);
-        }
-      } catch (Exception e) {
-        log.error("NewPortalConfig error: " + e.getMessage(), e);
-      } finally {
-        RequestLifeCycle.end();
-      }
+      initPageDB(ele, prepareImport);
     }
     for (NewPortalConfig ele : configs) {
-      RequestLifeCycle.begin(PortalContainer.getInstance());
-      try {
-        if (ele.getOverrideMode() || prepareImport) {
-          initPageNavigationDB(ele);
-        }
-      } catch (Exception e) {
-        log.error("NewPortalConfig error: " + e.getMessage(), e);
-      } finally {
-        RequestLifeCycle.end();
-      }
+      initPageNavigationDB(ele, prepareImport);
     }
 
     //
     touchImport();
+  }
+
+  public NewPortalConfig getPortalConfig(String type, String name) {
+    return CollectionUtils.isNotEmpty(configs) ? configs.stream()
+                                                        .filter(c -> StringUtils.equalsIgnoreCase(c.getOwnerType(), type)
+                                                                     && CollectionUtils.isNotEmpty(c.getPredefinedOwner())
+                                                                     && c.getPredefinedOwner().contains(name))
+                                                        .findFirst()
+                                                        .orElse(null) :
+                                               null;
   }
 
   /**
@@ -314,6 +298,19 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     }
   }
 
+  public void initPortalConfigDB(NewPortalConfig ele, boolean prepareImport) {
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      if (ele.getOverrideMode() || prepareImport) {
+        initPortalConfigDB(ele);
+      }
+    } catch (Exception e) {
+      log.error("NewPortalConfig error: " + e.getMessage(), e);
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
   public void initPortalConfigDB(NewPortalConfig config) {
     for (String owner : config.getPredefinedOwner()) {
       if (createPortalConfig(config, owner)) {
@@ -327,11 +324,37 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     }
   }
 
+  public void initPageDB(NewPortalConfig ele, boolean prepareImport) {
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      if (ele.getOverrideMode() || prepareImport) {
+        initPageDB(ele);
+      }
+    } catch (Exception e) {
+      log.error("NewPortalConfig error: " + e.getMessage(), e);
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
   public void initPageDB(NewPortalConfig config) {
     for (String owner : config.getPredefinedOwner()) {
       if (this.createdOwners.contains(owner)) {
         createPage(config, owner);
       }
+    }
+  }
+
+  public void initPageNavigationDB(NewPortalConfig ele, boolean prepareImport) {
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      if (ele.getOverrideMode() || prepareImport) {
+        initPageNavigationDB(ele);
+      }
+    } catch (Exception e) {
+      log.error("NewPortalConfig error: " + e.getMessage(), e);
+    } finally {
+      RequestLifeCycle.end();
     }
   }
 
@@ -481,6 +504,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
       case "user": {
         yield "user";
       }
+      case "portal_template": {
+        yield "portal_template";
+      }
+      case "group_template": {
+        yield "group_template";
+      }
       default:
         throw new IllegalArgumentException("Unexpected value: " + portalType);
       };
@@ -564,8 +593,8 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    * @param type
    * @param name
    * @return
-   * @deprecated Site Templates has been changed to be stored in database to make
-   *             it dynamically managed by UI rather than statis pages and
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
    *             navigation from source files
    */
   @Deprecated(forRemoval = true, since = "7.0")
@@ -586,8 +615,8 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    *
    * @param siteType (portal, group, user)
    * @return set of template name
-   * @deprecated Site Templates has been changed to be stored in database to make
-   *             it dynamically managed by UI rather than statis pages and
+   * @deprecated Site Templates has been changed to be stored in database to
+   *             make it dynamically managed by UI rather than statis pages and
    *             navigation from source files
    */
   @Deprecated(forRemoval = true, since = "7.0")

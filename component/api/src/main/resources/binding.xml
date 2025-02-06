@@ -8,10 +8,12 @@
   modify it under the terms of the GNU Lesser General Public
   License as published by the Free Software Foundation; either
   version 3 of the License, or (at your option) any later version.
+
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
   Lesser General Public License for more details.
+
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, write to the Free Software Foundation,
   Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -126,6 +128,49 @@
     </collection>
   </mapping>
 
+  <mapping name="banner-cell" label="banner-cell" class="org.exoplatform.portal.config.serialize.model.BannerCell">
+    <value name="id" usage="optional" field="id" style="attribute"/>
+    <value name="width" usage="optional" field="width" style="attribute"/>
+    <value name="h-align" usage="optional" field="hAlign" style="attribute"/>
+    <value name="v-align" usage="optional" field="vAlign" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <value
+      name="access-permissions"
+      field="accessPermissions"
+      usage="optional"
+      default="Everyone"
+      serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
+      deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children" ordered="false">
+      <structure map-as="org.exoplatform.portal.config.serialize.PortletApplication" usage="optional"/>
+    </collection>
+  </mapping>
+
+  <mapping name="sidebar-cell" label="sidebar-cell" class="org.exoplatform.portal.config.serialize.model.SidebarCell">
+    <value name="id" usage="optional" field="id" style="attribute"/>
+    <value name="width" usage="optional" field="width" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <value name="profiles" field="profiles" usage="optional" style="attribute"/>
+    <value
+      name="access-permissions"
+      field="accessPermissions"
+      usage="optional"
+      default="Everyone"
+      serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
+      deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children" ordered="false">
+      <structure map-as="org.exoplatform.portal.config.serialize.PortletApplication" usage="optional"/>
+    </collection>
+  </mapping>
+
   <mapping name="section-grid" label="section-grid" class="org.exoplatform.portal.config.serialize.model.GridSection">
     <value name="id" usage="optional" field="id" style="attribute"/>
     <value name="cols" field="colsCount" usage="optional" style="attribute"/>
@@ -139,6 +184,10 @@
       default="Everyone"
       serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
       deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
     <collection field="children" ordered="false">
       <structure map-as="org.exoplatform.portal.config.serialize.model.Cell" usage="optional"/>
     </collection>
@@ -158,8 +207,80 @@
       default="Everyone"
       serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
       deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
     <collection field="children" ordered="false">
       <structure map-as="org.exoplatform.portal.config.serialize.model.Column" usage="optional"/>
+    </collection>
+  </mapping>
+
+  <mapping name="section-banner" label="section-banner" class="org.exoplatform.portal.config.serialize.model.BannerSection">
+    <value name="id" usage="optional" field="id" style="attribute"/>
+    <value name="height" usage="optional" field="height" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <value name="sticky-beahvior" field="stickyBeahvior" usage="optional" style="attribute"/>
+    <value name="top-bar" field="topBar" usage="optional" style="attribute"/>
+    <value name="profiles" field="profiles" usage="optional" style="attribute"/>
+    <value
+      name="access-permissions"
+      field="accessPermissions"
+      usage="optional"
+      default="Everyone"
+      serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
+      deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children">
+      <structure map-as="org.exoplatform.portal.config.serialize.model.BannerCell" />
+    </collection>
+  </mapping>
+
+  <mapping name="section-sidebar" label="section-sidebar" class="org.exoplatform.portal.config.serialize.model.SidebarSection">
+    <value name="id" usage="optional" field="id" style="attribute"/>
+    <value name="width" usage="optional" field="width" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <value name="sticky-beahvior" field="stickyBeahvior" usage="optional" style="attribute"/>
+    <value name="profiles" field="profiles" usage="optional" style="attribute"/>
+    <value
+      name="access-permissions"
+      field="accessPermissions"
+      usage="optional"
+      default="Everyone"
+      serializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.serializePermissions"
+      deserializer="org.exoplatform.portal.config.serialize.JibxArraySerialize.deserializePermissions" />
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children">
+      <structure map-as="org.exoplatform.portal.config.serialize.model.SidebarCell" />
+    </collection>
+  </mapping>
+
+  <mapping name="portal-layout" label="portal-layout" class="org.exoplatform.portal.config.serialize.model.SiteLayout">
+    <value name="id" field="id" usage="optional" style="attribute"/>
+    <value
+      name="template"
+      field="template"
+      default="system:/groovy/portal/webui/container/UIContainer.gtmpl"
+      usage="optional"
+      style="attribute" />
+    <value name="width" usage="optional" field="width" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children" ordered="false">
+      <structure map-as="org.exoplatform.portal.config.serialize.model.SiteMiddleBody" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.serialize.model.SidebarSection" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.model.Container" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.model.PageBody" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.serialize.PortletApplication" usage="optional"/>
     </collection>
   </mapping>
 
@@ -198,6 +319,32 @@
       <structure map-as="org.exoplatform.portal.config.model.PageBody" usage="optional"/>
       <structure map-as="org.exoplatform.portal.config.model.SiteBody" usage="optional"/>
       <structure map-as="org.exoplatform.portal.config.serialize.PortletApplication" usage="optional"/>
+    </collection>
+  </mapping>
+
+  <mapping name="site-middle-section" label="site-middle-section" class="org.exoplatform.portal.config.serialize.model.SiteMiddleBody">
+    <value name="id" field="id" usage="optional" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children" ordered="false">
+      <structure map-as="org.exoplatform.portal.config.serialize.model.BannerSection" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.serialize.model.SiteMiddleCenterBody" usage="optional"/>
+    </collection>
+  </mapping>
+
+  <mapping name="site-middle-center-section" label="site-middle-center-section" class="org.exoplatform.portal.config.serialize.model.SiteMiddleCenterBody">
+    <value name="id" field="id" usage="optional" style="attribute"/>
+    <value name="cssClass" field="cssClass" usage="optional" style="attribute"/>
+    <structure
+      field="cssStyle"
+      map-as="org.exoplatform.portal.config.model.ModelStyle"
+      usage="optional" />
+    <collection field="children" ordered="false">
+      <structure map-as="org.exoplatform.portal.config.serialize.model.SidebarSection" usage="optional"/>
+      <structure map-as="org.exoplatform.portal.config.model.PageBody" usage="optional"/>
     </collection>
   </mapping>
 
@@ -259,7 +406,7 @@
     <value name="displayed" field="displayed" default="true"/>
     <value name="display-order" field="displayOrder" default="0"/>
     <structure field="properties" usage="optional"/>
-    <structure name="portal-layout" using="container" field="portalLayout" usage="optional"/>
+    <structure map-as="org.exoplatform.portal.config.serialize.model.SiteLayout" field="portalLayout" usage="optional" />
   </mapping>
 
   <mapping name="page-set" class="org.exoplatform.portal.config.model.Page$PageSet">

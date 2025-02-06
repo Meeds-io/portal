@@ -46,12 +46,16 @@ import org.gatein.portal.controller.resource.script.Module;
 import org.gatein.portal.controller.resource.script.ScriptResource;
 import org.json.JSONObject;
 
+import org.exoplatform.commons.addons.AddOnService;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.branding.BrandingService;
 import org.exoplatform.portal.config.UserPortalConfigService;
+import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.config.model.TransientApplicationState;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.user.UserNode;
@@ -66,11 +70,13 @@ import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.portal.UISharedLayout;
 import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.portal.webui.util.Util;
+import org.exoplatform.services.listener.Asynchronous;
+import org.exoplatform.services.listener.Listener;
+import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.web.application.JavascriptManager;
-import org.exoplatform.web.application.javascript.JavascriptConfigParser;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 import org.exoplatform.web.url.MimeType;
 import org.exoplatform.web.url.navigation.NavigationResource;
@@ -98,6 +104,8 @@ import lombok.SneakyThrows;
 public class UIPortalApplication extends UIApplication {
 
   private static final long       serialVersionUID          = 4289299002617728318L;
+
+  public static final String      PORTAL_BODY_END_CONTAINER = "body-end-container";
 
   public static final String      PORTAL_PORTLETS_SKIN_ID   = "portalPortletSkins";
 
@@ -175,19 +183,23 @@ public class UIPortalApplication extends UIApplication {
     NO_EDIT, EDIT_SITE, EDIT_PAGE
   }
 
-  private static SkinService             skinService;            // NOSONAR
+  private static SkinService             skinService;                       // NOSONAR
 
-  private static UserPortalConfigService portalConfigService;    // NOSONAR
+  private static AddOnService            addOnService;                      // NOSONAR
 
-  private static LayoutService           layoutService;          // NOSONAR
+  private static UserPortalConfigService portalConfigService;               // NOSONAR
 
-  private static SkinVisitor             skinVisitor;            // NOSONAR
+  private static LayoutService           layoutService;                     // NOSONAR
 
-  protected UIWorkingWorkspace           uiWorkingWorkspace;     // NOSONAR
+  private static SkinVisitor             skinVisitor;                       // NOSONAR
 
-  private Map<SiteKey, UIPortal>         all_UIPortals;          // NOSONAR
+  protected UIWorkingWorkspace           uiWorkingWorkspace;                // NOSONAR
 
-  private UIComponentDecorator           uiViewWorkingWorkspace; // NOSONAR
+  private Map<SiteKey, UIPortal>         all_UIPortals;                     // NOSONAR
+
+  private UIComponentDecorator           uiViewWorkingWorkspace;            // NOSONAR
+
+  private List<String>                   bodyEndContainerPortletContentIds; // NOSONAR
 
   /**
    * The constructor of this class is used to build the tree of UI components
@@ -212,11 +224,15 @@ public class UIPortalApplication extends UIApplication {
       skinVisitor = getApplicationComponent(SkinVisitor.class); // NOSONAR
       layoutService = getApplicationComponent(LayoutService.class); // NOSONAR
       portalConfigService = getApplicationComponent(UserPortalConfigService.class); // NOSONAR
+      addOnService = getApplicationComponent(AddOnService.class); // NOSONAR
     }
     context.setUIApplication(this);
 
     this.all_UIPortals = new HashMap<>();
     initWorkspaces(context.getPortalOwner());
+    // Listen to storage to update cached pages when updated
+    ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, new RefreshUIPortalListener());
   }
 
   /**
@@ -246,25 +262,12 @@ public class UIPortalApplication extends UIApplication {
     return cachedUIPortal;
   }
 
-  /**
-   * Returns a cached UIPortal matching to OwnerType and OwnerId if any
-   *
-   * @param ownerType
-   * @param ownerId
-   * @return
-   */
-  public UIPortal getCachedUIPortal(String ownerType, String ownerId) {
-    if (ownerType == null || ownerId == null) {
-      return null;
-    }
-    return this.all_UIPortals.get(new SiteKey(ownerType, ownerId));
-  }
-
   public UIPortal getCachedUIPortal(SiteKey key) {
-    if (key == null) {
+    if (key == null || isDraftSite() || isNoCache()) {
       return null;
+    } else {
+      return this.all_UIPortals.get(key);
     }
-    return this.all_UIPortals.get(key);
   }
 
   /**
@@ -274,10 +277,11 @@ public class UIPortalApplication extends UIApplication {
    * @param uiPortal
    */
   public void putCachedUIPortal(UIPortal uiPortal) {
-    SiteKey siteKey = uiPortal.getSiteKey();
-
-    if (siteKey != null) {
-      this.all_UIPortals.put(siteKey, uiPortal);
+    if (!isDraftSite()) {
+      SiteKey siteKey = uiPortal.getSiteKey();
+      if (siteKey != null) {
+        this.all_UIPortals.put(siteKey, uiPortal);
+      }
     }
   }
 
@@ -288,10 +292,9 @@ public class UIPortalApplication extends UIApplication {
    * @param ownerId
    */
   public void removeCachedUIPortal(String ownerType, String ownerId) {
-    if (ownerType == null || ownerId == null) {
-      return;
+    if (ownerType != null && ownerId != null) {
+      this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
     }
-    this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
   }
 
   /**
@@ -444,18 +447,27 @@ public class UIPortalApplication extends UIApplication {
    */
   public Set<Skin> getPortletSkins() {
     String skin = getSkin();
-    List<SkinConfig> portletSkins =
-                                  getCurrentPortlets().stream().map(this::getPortletSkinConfig).filter(Objects::nonNull).toList();
-    List<SkinConfig> additionalSkins = portletSkins.stream()
-                                                   .filter(portletSkin -> portletSkin instanceof SkinConfig skinConfig
-                                                                          && CollectionUtils.isNotEmpty(skinConfig.getAdditionalModules()))
-                                                   .map(SkinConfig::getAdditionalModules)
-                                                   .flatMap(List::stream)
-                                                   .distinct()
-                                                   .map(module -> skinService.getPortalSkin(module, skin))
-                                                   .filter(Objects::nonNull)
-                                                   .toList();
-    return Stream.concat(portletSkins.stream(), additionalSkins.stream())
+    List<SkinConfig> portletSkins = getCurrentPortlets().stream()
+                                                        .map(this::getPortletSkinConfig)
+                                                        .filter(Objects::nonNull)
+                                                        .toList();
+    // Load static body-end-container applications added on UIPortalApplication
+    // Body independently from SharedLayout Display State and from displayed
+    // Page/Site
+    List<SkinConfig> bodyEndPortletSkins = getBodyEndContainerContentIds().stream()
+                                                                          .map(this::getPortletSkinConfig)
+                                                                          .filter(Objects::nonNull)
+                                                                          .toList();
+    List<SkinConfig> additionalSkins = Stream.concat(portletSkins.stream(), bodyEndPortletSkins.stream())
+                                             .filter(portletSkin -> portletSkin instanceof SkinConfig skinConfig
+                                                                    && CollectionUtils.isNotEmpty(skinConfig.getAdditionalModules()))
+                                             .map(SkinConfig::getAdditionalModules)
+                                             .flatMap(List::stream)
+                                             .distinct()
+                                             .map(module -> skinService.getPortalSkin(module, skin))
+                                             .filter(Objects::nonNull)
+                                             .toList();
+    return Stream.concat(Stream.concat(portletSkins.stream(), bodyEndPortletSkins.stream()), additionalSkins.stream())
                  .filter(Objects::nonNull)
                  .filter(c -> !(c instanceof SkinConfig skinConfig) || skinConfig.getCSSPath() != null)
                  .sorted((s1, s2) -> s1.getCSSPriority() - s2.getCSSPriority())
@@ -525,11 +537,25 @@ public class UIPortalApplication extends UIApplication {
 
   private SkinConfig getPortletSkinConfig(UIPortlet portlet) {
     String portletId = portlet.getSkinId();
-    if (portletId != null) {
-      return skinService.getSkin(portletId, getSkin());
+    return getPortletSkinConfig(portletId);
+  }
+
+  private SkinConfig getPortletSkinConfig(String contentId) {
+    if (contentId != null) {
+      return skinService.getSkin(contentId, getSkin());
     } else {
       return null;
     }
+  }
+
+  private List<String> getBodyEndContainerContentIds() {
+    if (bodyEndContainerPortletContentIds == null) {
+      List<Application> applications = addOnService.getApplications(PORTAL_BODY_END_CONTAINER);
+      bodyEndContainerPortletContentIds = applications.stream()
+                                                      .map(app -> ((TransientApplicationState) app.getState()).getContentId())
+                                                      .toList();
+    }
+    return bodyEndContainerPortletContentIds;
   }
 
   /**
@@ -658,28 +684,20 @@ public class UIPortalApplication extends UIApplication {
                                                          .orElseThrow(() -> new IllegalStateException(String.format("Portlet with id %s to maximize wasn't found in page with title '%s'",
                                                                                                                     maximizedPortletId,
                                                                                                                     getCurrentPage().getTitle())));
-      UIPage uiPage = findFirstComponentOfType(UIPage.class);
+      UIPage uiPage = getCurrentPage();
       uiPage.normalizePortletWindowStates();
       portalRequestContext.setMaximizedUIPortlet(maximizedUiPortlet);
     }
     try {
       portalRequestContext.setAttribute("requestStartTime", System.currentTimeMillis());
 
-      JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
-      // Add JS resource of current portal
-      String portalOwner = portalRequestContext.getPortalOwner();
-      jsManager.loadScriptResource(ResourceScope.PORTAL, portalOwner);
-
       //
-      Writer w = portalRequestContext.getWriter();
       if (!portalRequestContext.useAjax()) {
-        // Support for legacy resource declaration
-        jsManager.loadScriptResource(ResourceScope.SHARED, JavascriptConfigParser.LEGACY_JAVA_SCRIPT);
-        // Need to add bootstrap as immediate since it contains the loader
-        jsManager.loadScriptResource(ResourceScope.SHARED, "bootstrap");
-
         super.processRender(portalRequestContext);
       } else {
+        Writer w = portalRequestContext.getWriter();
+        JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
+
         UIMaskWorkspace uiMaskWS = getChildById(UIPortalApplication.UI_MASK_WS_ID);
         if (uiMaskWS.isUpdated()) {
           portalRequestContext.addUIComponentToUpdateByAjax(uiMaskWS);
@@ -746,7 +764,7 @@ public class UIPortalApplication extends UIApplication {
       }
     } finally {
       if (StringUtils.isNotBlank(maximizedPortletId)) {
-        UIPage uiPage = findFirstComponentOfType(UIPage.class);
+        UIPage uiPage = getCurrentPage();
         uiPage.normalizePortletWindowStates();
         portalRequestContext.setMaximizedUIPortlet(null);
       }
@@ -842,6 +860,16 @@ public class UIPortalApplication extends UIApplication {
         }
       }
     }
+    // Load static body-end-container applications added on UIPortalApplication
+    // Body independently from SharedLayout Display State and from displayed
+    // Page/Site
+    getBodyEndContainerContentIds().forEach(contentId -> {
+      try {
+        jsMan.loadScriptResource(ResourceScope.PORTLET, contentId);
+      } catch (Exception e) {
+        LOG.warn("Can't load JS resource for portlet {}", contentId, e);
+      }
+    });
   }
 
   public UIPage getCurrentPage() {
@@ -856,6 +884,14 @@ public class UIPortalApplication extends UIApplication {
 
   private boolean isDraftPage() {
     return getPortalRequestContext().isDraftPage();
+  }
+
+  private boolean isDraftSite() {
+    return getPortalRequestContext().isDraftSite();
+  }
+
+  public boolean isNoCache() {
+    return getPortalRequestContext().isNoCache();
   }
 
   public boolean isMaximizePortlet() {
@@ -883,7 +919,7 @@ public class UIPortalApplication extends UIApplication {
         UIPage currentPage = getCurrentPage();
         if (currentPage == null) {
           return Collections.emptyList();
-        } else if (!requestContext.isMaximizePortlet() && !currentPage.isShowMaxWindow()) {
+        } else if (!currentPage.isShowMaxWindow()) {
           getCurrentSite().findComponentOfType(uiPortlets, UIPortlet.class);
         } else {
           currentPage.findComponentOfType(uiPortlets, UIPortlet.class);
@@ -894,4 +930,21 @@ public class UIPortalApplication extends UIApplication {
     return uiPortlets;
   }
 
+  @Asynchronous
+  public class RefreshUIPortalListener extends Listener<LayoutService, PortalConfig> {
+    @Override
+    public void onEvent(org.exoplatform.services.listener.Event<LayoutService, PortalConfig> event) throws Exception {
+      PortalConfig site = event.getData();
+      if (site == null) {
+        return;
+      }
+      SiteKey siteKey = site.getSiteKey();
+      if (siteKey == null) {
+        return;
+      }
+      if (all_UIPortals != null && all_UIPortals.containsKey(siteKey)) {
+        all_UIPortals.remove(siteKey);
+      }
+    }
+  }
 }

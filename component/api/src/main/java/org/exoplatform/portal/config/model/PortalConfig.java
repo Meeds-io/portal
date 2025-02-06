@@ -26,11 +26,15 @@ import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.portal.config.serialize.model.SiteLayout;
+import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+@Data
 @EqualsAndHashCode(callSuper = true)
 public class PortalConfig extends ModelObject implements Cloneable {
 
@@ -49,6 +53,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
   public static final String    GROUP_TEMPLATE  = SiteType.GROUP_TEMPLATE.getName();
 
   public static final String    PORTAL_TEMPLATE = SiteType.PORTAL_TEMPLATE.getName();
+
+  public static final String    DRAFT           = SiteType.DRAFT.getName();
 
   public static final Container DEFAULT_LAYOUT  = initDefaultLayout();
 
@@ -71,11 +77,11 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   private String                skin;
 
-  private Container             portalLayout;
+  private SiteLayout            portalLayout;
 
   private boolean               defaultLayout;
 
-  private boolean               displayed       = true;
+  private boolean               displayed;
 
   private int                   displayOrder;
 
@@ -101,7 +107,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     //
     this.type = type;
     this.name = ownerId;
-    this.portalLayout = new Container();
+    this.portalLayout = new SiteLayout();
   }
 
   public PortalConfig(PortalData data) {
@@ -117,7 +123,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.editPermission = data.getEditPermission();
     this.properties = data.getProperties() == null ? new Properties() : new Properties(data.getProperties());
     this.skin = data.getSkin();
-    this.portalLayout = new Container(data.getPortalLayout());
+    this.portalLayout = data.getPortalLayout() == null ? new SiteLayout() : new SiteLayout(data.getPortalLayout());
     this.defaultLayout = data.isDefaultLayout();
     this.displayed = data.isDisplayed();
     this.displayOrder = data.getDisplayOrder();
@@ -132,76 +138,8 @@ public class PortalConfig extends ModelObject implements Cloneable {
     }
   }
 
-  public String getType() {
-    return type;
-  }
-
-  public void setType(String type) {
-    this.type = type;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String s) {
-    name = s;
-  }
-
-  public String getLocale() {
-    return locale;
-  }
-
-  public void setLocale(String s) {
-    locale = s;
-  }
-
-  public String[] getAccessPermissions() {
-    return accessPermissions;
-  }
-
-  public void setAccessPermissions(String[] s) {
-    accessPermissions = s;
-  }
-
-  public String getEditPermission() {
-    return editPermission;
-  }
-
-  public void setEditPermission(String editPermission) {
-    this.editPermission = editPermission;
-  }
-
-  public String getSkin() {
-    return skin;
-  }
-
-  public void setSkin(String s) {
-    skin = s;
-  }
-
-  public Container getPortalLayout() {
-    return portalLayout;
-  }
-
   public void setPortalLayout(Container container) {
-    portalLayout = container;
-  }
-
-  public boolean isDefaultLayout() {
-    return defaultLayout;
-  }
-
-  public void setDefaultLayout(boolean defaultLayout) {
-    this.defaultLayout = defaultLayout;
-  }
-
-  public Properties getProperties() {
-    return properties;
-  }
-
-  public void setProperties(Properties props) {
-    properties = props;
+    portalLayout = container == null ? new SiteLayout() : new SiteLayout(container);
   }
 
   public String getProperty(String name) {
@@ -211,7 +149,9 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public boolean isRemovable() {
-    return !StringUtils.equals(getProperty(REMOVABLE_PROP), "false");
+    return properties == null
+           || StringUtils.equalsIgnoreCase(getType(), PortalConfig.DRAFT)
+           || !StringUtils.equals(properties.get(PortalConfig.REMOVABLE_PROP), "false");
   }
 
   public void setRemovable(boolean removable) {
@@ -250,54 +190,6 @@ public class PortalConfig extends ModelObject implements Cloneable {
     if (properties != null) {
       properties.remove(name);
     }
-  }
-
-  public void setDescription(String description) {
-    this.description = description;
-  }
-
-  public String getDescription() {
-    return description;
-  }
-
-  public void setLabel(String label) {
-    this.label = label;
-  }
-
-  public String getLabel() {
-    return label;
-  }
-
-  public boolean isDisplayed() {
-    return displayed;
-  }
-
-  public void setDisplayed(boolean displayed) {
-    this.displayed = displayed;
-  }
-
-  public int getDisplayOrder() {
-    return displayOrder;
-  }
-
-  public void setDisplayOrder(int displayOrder) {
-    this.displayOrder = displayOrder;
-  }
-
-  public String getBannerUploadId() {
-    return bannerUploadId;
-  }
-
-  public void setBannerUploadId(String bannerUploadId) {
-    this.bannerUploadId = bannerUploadId;
-  }
-
-  public long getBannerFileId() {
-    return bannerFileId;
-  }
-
-  public void setBannerFileId(long bannerFileId) {
-    this.bannerFileId = bannerFileId;
   }
 
   @Override
@@ -367,6 +259,13 @@ public class PortalConfig extends ModelObject implements Cloneable {
    */
   public void setDefaultSite(boolean defaultSite) {
     setProperty("NO_DEFAULT_PATH", String.valueOf(!defaultSite));
+  }
+
+  /**
+   * @return the associated {@link SiteKey}
+   */
+  public SiteKey getSiteKey() {
+    return new SiteKey(type, name);
   }
 
 }

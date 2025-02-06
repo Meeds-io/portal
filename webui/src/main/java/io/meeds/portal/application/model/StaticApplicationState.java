@@ -1,4 +1,4 @@
-/*
+/**
  * This file is part of the Meeds project (https://meeds.io/).
  *
  * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
@@ -17,24 +17,21 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package org.exoplatform.portal.mop;
+package io.meeds.portal.application.model;
 
-public enum SiteType {
+import java.io.Serializable;
 
-  PORTAL, GROUP, USER, SPACE, GROUP_TEMPLATE, PORTAL_TEMPLATE, DRAFT;
+import org.exoplatform.webui.core.UIApplication;
 
-  final String name;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
-  SiteType() {
-    this.name = name().toLowerCase();
-  }
+@Data
+@AllArgsConstructor
+public class StaticApplicationState implements Serializable {
 
-  public String getName() {
-    return name;
-  }
+  private static final long serialVersionUID = -6783129751974767508L;
 
-  public SiteKey key(String name) {
-    return new SiteKey(this, name);
-  }
+  private UIApplication     application;
 
 }

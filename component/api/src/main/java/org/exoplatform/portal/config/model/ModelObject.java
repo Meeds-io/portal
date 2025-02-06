@@ -77,7 +77,7 @@ public abstract class ModelObject {
     } else if (data instanceof BodyData bodyData) {
       switch (bodyData.getType()) {
       case PAGE:
-        return new PageBody(data.getStorageId());
+        return new PageBody(bodyData);
       case SITE:
         return new SiteBody(data.getStorageId());
       default:

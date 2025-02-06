@@ -166,7 +166,9 @@ public class PortalData extends ModelData {
   }
 
   public boolean isRemovable() {
-    return properties == null || !StringUtils.equals(properties.get(PortalConfig.REMOVABLE_PROP), "false");
+    return properties == null
+        || StringUtils.equalsIgnoreCase(getType(), PortalConfig.DRAFT)
+        || !StringUtils.equals(properties.get(PortalConfig.REMOVABLE_PROP), "false");
   }
 
 }

@@ -19,11 +19,15 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.exoplatform.portal.application.PortalRequestContext;
+import org.exoplatform.portal.config.UserPortalConfig;
+import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.webui.container.UIContainer;
+import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.page.UISiteBody;
-import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 
@@ -31,6 +35,8 @@ import org.exoplatform.webui.config.annotation.ComponentConfig;
 
 )
 public class UISharedLayout extends UIContainer {
+
+  private String metaPortal;
 
   @Override
   public void processRender(WebuiRequestContext context) throws Exception {
@@ -49,15 +55,16 @@ public class UISharedLayout extends UIContainer {
 
   public boolean isShowSharedLayout(PortalRequestContext requestContext) {
     boolean showSharedLayout = !requestContext.isHideSharedLayout()
-                               && !hidePageSharedLayout();
-    if (requestContext.getUserPortalConfig() != null
-        && requestContext.getUserPortalConfig().getPortalConfig() != null) {
+                               && !hidePageSharedLayout(requestContext.getUiPage());
+    UserPortalConfig userPortalConfig = requestContext.getUserPortalConfig();
+    if (userPortalConfig != null && userPortalConfig.getPortalConfig() != null) {
       showSharedLayout = showSharedLayout
                          && requestContext.getSiteType() != SiteType.GROUP_TEMPLATE
                          && requestContext.getSiteType() != SiteType.PORTAL_TEMPLATE
+                         && requestContext.getSiteType() != SiteType.DRAFT
                          && (requestContext.getSiteType() != SiteType.PORTAL
-                             || showSiteSharedLayout(requestContext)
-                             || showPageSharedLayout());
+                             || showSiteSharedLayout(userPortalConfig.getPortalConfig())
+                             || showPageSharedLayout(requestContext.getUiPage()));
     }
     return showSharedLayout;
   }
@@ -71,16 +78,24 @@ public class UISharedLayout extends UIContainer {
     super.processRender(context);
   }
 
-  private boolean showSiteSharedLayout(PortalRequestContext requestContext) {
-    return requestContext.getUserPortalConfig().getPortalConfig().isDisplayed();
+  private boolean showSiteSharedLayout(PortalConfig site) {
+    return StringUtils.equals(site.getName(), getMataPortal())
+           || site.isDisplayed();
   }
 
-  private boolean hidePageSharedLayout() {
-    return Util.getUIPage() != null && Util.getUIPage().isHideSharedLayout();
+  private boolean hidePageSharedLayout(UIPage uiPage) {
+    return uiPage != null && uiPage.isHideSharedLayout();
   }
 
-  private boolean showPageSharedLayout() {
-    return !hidePageSharedLayout() && Util.getUIPage() != null && Util.getUIPage().isShowSharedLayout();
+  private boolean showPageSharedLayout(UIPage uiPage) {
+    return uiPage != null && !uiPage.isHideSharedLayout() && uiPage.isShowSharedLayout();
+  }
+
+  private String getMataPortal() {
+    if (metaPortal == null) {
+      metaPortal = PortalRequestContext.getCurrentInstance().getMetaPortal();
+    }
+    return metaPortal;
   }
 
 }

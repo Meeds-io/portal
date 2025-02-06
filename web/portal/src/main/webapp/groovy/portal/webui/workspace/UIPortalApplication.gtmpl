@@ -123,7 +123,9 @@
     %><meta name="<%=metaName%>" content="<%=metaContent%>" /><% 
          }
       }
-      _ctx.includeTemplates("UIPortalApplication-Start-head"); %>
+      if (!rcontext.isMaximizePortlet()) {
+        _ctx.includeTemplates("UIPortalApplication-Start-head");
+      }%>
     <link rel="shortcut icon" href="<%= org.exoplatform.portal.branding.Utils.getFaviconPath() %>" />
     <%/* Styles */%>
     <link id="brandingSkin" rel="stylesheet" type="text/css" href="<%=uicomponent.getBrandingUrl()%>">
@@ -236,20 +238,23 @@
        }
      }
    </script>
-   <%/* 508 Compliancy */%>
-
-   <%/* Include extensible templates configured by Kernel configuration to be imported in Page Header */%>
-   <% _ctx.includeTemplates("UIPortalApplication-head") %>
+   <%/* 508 Compliancy */
+   /* Include extensible templates configured by Kernel configuration to be imported in Page Header */
+   if (!rcontext.isMaximizePortlet()) {
+       _ctx.includeTemplates("UIPortalApplication-head");
+   }%>
  </head>
-
  <body style="height: 100%;$bodyStyle" class="$bodyClasses" onload="eXo.env.portal.onLoad()">
-   <%/* Include extensible templates configured by Kernel configuration to be imported in the beginning of the body section of the Page */%>
-   <% _ctx.includeTemplates("UIPortalApplication-Start-body") %>
    <div class="visible-tablet"></div>
    <div class="visible-tabletL"></div>
    <div class="visible-phone"></div>
    <div class="visible-phone-small"></div>
    <div class="VuetifyApp"><div data-app="true" class="v-application v-application--is-<%= orientation == Orientation.RT ? "rtl" : "ltr"  %> transparent theme--light" id="vuetify-apps"></div></div>
+   <div class="VuetifyApp"><div data-app="true" class="v-application v-application--is-<%= orientation == Orientation.RT ? "rtl" : "ltr"  %> transparent theme--light" id="drawers-overlay"></div></div><%
+   /* Include extensible templates configured by Kernel configuration to be imported in the beginning of the body section of the Page */
+   if (!rcontext.isMaximizePortlet()) {
+     _ctx.includeTemplates("UIPortalApplication-Start-body");
+   }%>
    <div class="$uicomponent.skin" id="UIPortalApplication" style="!height: 100%;">
      <div class="ajaxLoadingMask clearfix" id="AjaxLoadingMask" style="display: none; margin: auto;">
        <a onclick="javascript:ajaxAbort();" class="uiIconClose uiIconWhite pull-right"></a>

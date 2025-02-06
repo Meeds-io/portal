@@ -1,12 +1,13 @@
 /**
  * This file is part of the Meeds project (https://meeds.io/).
  *
- * Copyright (C) 2020 - 2024 Meeds Association contact@meeds.io
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 3 of the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
@@ -18,43 +19,50 @@
  */
 package org.exoplatform.portal.config.serialize.model;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.exoplatform.portal.config.model.Container;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * Used for deserializing from pages.xml using JibX
  */
-@Setter
-@Getter
+@Data
 @EqualsAndHashCode(callSuper = true)
-public class GridSection extends Container {
+public class BannerCell extends Container {
 
-  private int colsCount;
+  private String hAlign;
 
-  private int rowsCount;
+  private String vAlign;
 
   @Override
   public String getCssClass() {
     StringBuilder cssClasses = new StringBuilder();
+    if (cssStyle != null) {
+      cssClasses.append(cssStyle.getCssClass(cssClass, true, 0));
+      cssClasses.append(" ");
+    }
     if (cssClass != null) {
       cssClasses.append(cssClass);
     }
-    cssClasses.append(" d-flex flex-column d-md-grid grid-cols grid-rows");
-    cssClasses.append(" grid-cols-md-").append(colsCount);
-    cssClasses.append(" grid-cols-lg-").append(colsCount);
-    cssClasses.append(" grid-cols-xl-").append(colsCount);
-    cssClasses.append(" grid-rows-md-").append(rowsCount);
-    cssClasses.append(" grid-rows-lg-").append(rowsCount);
-    cssClasses.append(" grid-rows-xl-").append(rowsCount);
+    if (StringUtils.equalsIgnoreCase(vAlign, "right")) {
+      cssClasses.append(" application-align-v-right");
+    } else if (StringUtils.equalsIgnoreCase(vAlign, "center")) {
+      cssClasses.append(" application-align-v-center");
+    }
+    if (StringUtils.equalsIgnoreCase(hAlign, "right")) {
+      cssClasses.append(" application-align-h-right");
+    } else if (StringUtils.equalsIgnoreCase(hAlign, "center")) {
+      cssClasses.append(" application-align-h-center");
+    }
     return cssClasses.toString();
   }
 
   @Override
   public String getTemplate() {
-    return "GridContainer";
+    return "BannerCell";
   }
 
 }

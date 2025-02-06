@@ -22,6 +22,7 @@ package org.exoplatform.portal.config;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -146,6 +147,55 @@ public class UserPortalConfigService implements Startable {
                            ImportMode.valueOf(getParam(params, "default.import.mode", ImportMode.CONSERVE.name()).toUpperCase());
     this.globalPortal = getParam(params, "global.portal", DEFAULT_GLOBAL_PORTAL);
     this.portalSiteFilter.setExcludedSiteName(globalPortal);
+  }
+
+  public boolean canRestore(String type, String name) {
+    if (newPortalConfigListener == null) {
+      return false;
+    }
+    return newPortalConfigListener.getPortalConfig(type, name) != null;
+  }
+
+  public boolean restoreSite(String type,
+                             String name,
+                             ImportMode importMode,
+                             boolean restoreSiteLayout,
+                             boolean restorePages,
+                             boolean restoreNavigationTree) {
+    if (!canRestore(type, name)) {
+      return false;
+    }
+    NewPortalConfig config = newPortalConfigListener.getPortalConfig(type, name);
+    config = config.clone();
+    config.setImportMode(importMode.name());
+    config.setOverrideMode(true);
+    HashSet<String> ownerName = new HashSet<>();
+    ownerName.add(name);
+    config.setPredefinedOwner(ownerName);
+    if (restoreSiteLayout) {
+      PortalConfig previousSite = layoutService.getPortalConfig(type, name);
+      newPortalConfigListener.initPortalConfigDB(config, true);
+      PortalConfig site = layoutService.getPortalConfig(type, name);
+      if (previousSite != null) {
+        // Preserve previous version or properties
+        site.setLabel(previousSite.getLabel());
+        site.setDescription(previousSite.getDescription());
+        site.setAccessPermissions(previousSite.getAccessPermissions());
+        site.setEditPermission(previousSite.getEditPermission());
+        site.setDisplayed(previousSite.isDisplayed());
+        site.setDisplayOrder(previousSite.getDisplayOrder());
+        site.setIcon(previousSite.getIcon());
+        site.setProperties(previousSite.getProperties());
+        layoutService.save(site);
+      }
+    }
+    if (restorePages) {
+      newPortalConfigListener.initPageDB(config, true);
+    }
+    if (restoreNavigationTree) {
+      newPortalConfigListener.initPageNavigationDB(config, true);
+    }
+    return true;
   }
 
   public LayoutService getDataStorage() {
@@ -401,6 +451,8 @@ public class UserPortalConfigService implements Startable {
         return portalConfigList.stream()
                                .filter(PortalConfig::isDefaultSite)
                                .filter(p -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(p.getType()))
+                               .filter(p -> p.isDisplayed() || StringUtils.equals(p.getName(), getMetaPortal()))
+                               .filter(p -> navigationService.loadNode(new SiteKey(p.getType(), p.getName())) != null)
                                .filter(Objects::nonNull)
                                .findFirst()
                                .orElse(null);
