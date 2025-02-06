@@ -150,6 +150,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_PAGE_BG_REPEAT_KEY        = "page.backgroundRepeat";
 
+  public static final String   BRANDING_PAGE_BG_EFFECT_KEY        = "page.backgroundEffect";
+
   public static final String   BRANDING_PAGE_WIDTH_KEY            = "page.width";
 
   public static final String   BRANDING_PAGE_BG_POSITION_KEY      = "page.backgroundPosition";
@@ -315,6 +317,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageBackgroundPosition(getPageBackgroundPosition());
     branding.setPageBackgroundSize(getPageBackgroundSize());
     branding.setPageBackgroundRepeat(getPageBackgroundRepeat());
+    branding.setPageBackgroundEffect(getPageBackgroundEffect());
     branding.setPageWidth(getPageWidth());
     branding.setThemeStyle(getThemeStyle());
     branding.setLoginTitle(getLoginTitle());
@@ -388,6 +391,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
       updatePageBackgroundSize(branding.getPageBackgroundSize(), false);
       updatePageBackgroundPosition(branding.getPageBackgroundPosition(), false);
+      updatePageBackgroundEffect(branding.getPageBackgroundEffect(), false);
       updatePageBackgroundRepeat(branding.getPageBackgroundRepeat(), false);
       updatePageWidth(branding.getPageWidth(), false);
       Map<String, String> themeStyles = branding.getThemeStyle();
@@ -430,6 +434,33 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getPageBackgroundRepeat() {
     return getPropertyValue(BRANDING_PAGE_BG_REPEAT_KEY);
+  }
+
+  @Override
+  public String getPageBackgroundEffect() {
+    return getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY);
+  }
+
+  @Override
+  public String getPageBackgroundImageUrl() {
+    if (getPageBackgroundEffect() == null && getPageBackgroundPath() == null) {
+      return null;
+    }
+    StringBuilder backgroundImageUrl = new StringBuilder();
+    if (getPageBackgroundPath() != null) {
+      backgroundImageUrl.append("url(");
+      backgroundImageUrl.append(getPageBackgroundPath());
+      if (getPageBackgroundEffect() != null) {
+        backgroundImageUrl.append("), ");
+        backgroundImageUrl.append(getPageBackgroundEffect());
+        backgroundImageUrl.append(";");
+      } else {
+        backgroundImageUrl.append(");");
+      }
+    } else if (getPageBackgroundEffect()!=null) {
+      return getPageBackgroundEffect().concat("; ");
+    }
+    return backgroundImageUrl.toString();
   }
 
   @Override
@@ -933,6 +964,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private void updatePageBackgroundRepeat(String value, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_PAGE_BG_REPEAT_KEY, value, updateLastUpdatedTime);
+  }
+
+  private void updatePageBackgroundEffect(String effect, boolean updateLastUpdatedTime) {
+    updatePropertyValue(BRANDING_PAGE_BG_EFFECT_KEY, effect, updateLastUpdatedTime);
   }
 
   private void updatePageWidth(String value, boolean updateLastUpdatedTime) {

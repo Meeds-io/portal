@@ -83,8 +83,8 @@
   if (brandingService.getPageBackgroundColor() != null) {
     bodyStyle += "--allPagesBackgroundColor: " + brandingService.getPageBackgroundColor() + ";";
   }
-  if (brandingService.getPageBackgroundPath() != null) {
-    bodyStyle += "--allPagesBackgroundImage: url(" + brandingService.getPageBackgroundPath() + ");";
+  if (brandingService.getPageBackgroundImageUrl() != null) {
+    bodyStyle += "--allPagesBackgroundImage: " + brandingService.getPageBackgroundImageUrl();
   }
   if (brandingService.getPageBackgroundRepeat() != null) {
     bodyStyle += "--allPagesBackgroundRepeat: " + brandingService.getPageBackgroundRepeat() + ";";
