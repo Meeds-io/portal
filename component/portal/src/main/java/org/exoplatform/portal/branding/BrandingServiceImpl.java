@@ -78,13 +78,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_RESET_ATTACHMENT_ID       = "0";
 
-  public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";             // NOSONAR
+  public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";            // NOSONAR
 
-  public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";          // NOSONAR
+  public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";         // NOSONAR
 
-  public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v=";  // NOSONAR
+  public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v="; // NOSONAR
 
-  public static final String   BRANDING_PAGE_BG_BASE_PATH         = "/portal/rest/v1/platform/branding/pageBackground?v=";   // NOSONAR
+  public static final String   BRANDING_PAGE_BG_BASE_PATH         = "/portal/rest/v1/platform/branding/pageBackground?v=";  // NOSONAR
 
   public static final String   BRANDING_TOP_BAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/topBarBackground?v=";
 
@@ -150,9 +150,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_PAGE_BG_REPEAT_KEY        = "page.backgroundRepeat";
 
-  public static final String   BRANDING_PAGE_WIDTH_KEY            = "page.width";
+  public static final String   BRANDING_PAGE_BG_EFFECT_KEY        = "page.backgroundEffect";
 
-  public static final String   BRANDING_CUSTOM_CSS                = "page.customCss";
+  public static final String   BRANDING_PAGE_WIDTH_KEY            = "page.width";
 
   public static final String   BRANDING_PAGE_BG_POSITION_KEY      = "page.backgroundPosition";
 
@@ -176,11 +176,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
-  public static final String   BRANDING_CUSTOM_STYLE_FEATURE      = "customStylesheet";
+  public static final String   BRANDING_DEFAULT_LOGO_PATH         = "/skin/images/logo/DefaultLogo.png";                    // NOSONAR
 
-  public static final String   BRANDING_DEFAULT_LOGO_PATH         = "/skin/images/logo/DefaultLogo.png";                     // NOSONAR
-
-  public static final String   BRANDING_DEFAULT_FAVICON_PATH      = "/skin/images/favicon.ico";                              // NOSONAR
+  public static final String   BRANDING_DEFAULT_FAVICON_PATH      = "/skin/images/favicon.ico";                             // NOSONAR
 
   public static final Context  BRANDING_CONTEXT                   = Context.GLOBAL.id("BRANDING");
 
@@ -319,6 +317,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageBackgroundPosition(getPageBackgroundPosition());
     branding.setPageBackgroundSize(getPageBackgroundSize());
     branding.setPageBackgroundRepeat(getPageBackgroundRepeat());
+    branding.setPageBackgroundEffect(getPageBackgroundEffect());
     branding.setPageWidth(getPageWidth());
     branding.setThemeStyle(getThemeStyle());
     branding.setLoginTitle(getLoginTitle());
@@ -392,6 +391,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
       updatePageBackgroundSize(branding.getPageBackgroundSize(), false);
       updatePageBackgroundPosition(branding.getPageBackgroundPosition(), false);
+      updatePageBackgroundEffect(branding.getPageBackgroundEffect(), false);
       updatePageBackgroundRepeat(branding.getPageBackgroundRepeat(), false);
       updatePageWidth(branding.getPageWidth(), false);
       Map<String, String> themeStyles = branding.getThemeStyle();
@@ -434,6 +434,33 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getPageBackgroundRepeat() {
     return getPropertyValue(BRANDING_PAGE_BG_REPEAT_KEY);
+  }
+
+  @Override
+  public String getPageBackgroundEffect() {
+    return getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY);
+  }
+
+  @Override
+  public String getPageBackgroundImageUrl() {
+    if (getPageBackgroundEffect() == null && getPageBackgroundPath() == null) {
+      return null;
+    }
+    StringBuilder backgroundImageUrl = new StringBuilder();
+    if (getPageBackgroundPath() != null) {
+      backgroundImageUrl.append("url(");
+      backgroundImageUrl.append(getPageBackgroundPath());
+      if (getPageBackgroundEffect() != null) {
+        backgroundImageUrl.append("), ");
+        backgroundImageUrl.append(getPageBackgroundEffect());
+        backgroundImageUrl.append(";");
+      } else {
+        backgroundImageUrl.append(");");
+      }
+    } else if (getPageBackgroundEffect()!=null) {
+      return getPageBackgroundEffect().concat("; ");
+    }
+    return backgroundImageUrl.toString();
   }
 
   @Override
@@ -671,14 +698,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public String getTopBarBackgroundPath() {
     Background background = getTopBarBackground();
     return background == null
-           || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+            || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
   public String getSideBarBackgroundPath() {
     Background background = getSideBarBackground();
     return background == null
-           || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+            || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
@@ -939,6 +966,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     updatePropertyValue(BRANDING_PAGE_BG_REPEAT_KEY, value, updateLastUpdatedTime);
   }
 
+  private void updatePageBackgroundEffect(String effect, boolean updateLastUpdatedTime) {
+    updatePropertyValue(BRANDING_PAGE_BG_EFFECT_KEY, effect, updateLastUpdatedTime);
+  }
+
   private void updatePageWidth(String value, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_PAGE_WIDTH_KEY, value, updateLastUpdatedTime);
   }
@@ -1019,19 +1050,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private void updateTopBarBackground(Background topBarBackground, boolean updateLastUpdatedTime) {
-    updateBrandingFile(topBarBackground,
-                       TOP_BAR_BACKGROUND_NAME,
-                       this.getTopBarBackgroundId(),
-                       BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
+    updateBrandingFile(topBarBackground, TOP_BAR_BACKGROUND_NAME, this.getTopBarBackgroundId(), BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
     this.topBarBackground = null;
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
   private void updateSideBarBackground(Background sideBarBackground, boolean updateLastUpdatedTime) {
-    updateBrandingFile(sideBarBackground,
-                       SIDEBAR_BACKGROUND_NAME,
-                       this.getSideBarBackgroundId(),
-                       BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
+    updateBrandingFile(sideBarBackground, SIDEBAR_BACKGROUND_NAME, this.getSideBarBackgroundId(), BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
     this.sideBarBackground = null;
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
