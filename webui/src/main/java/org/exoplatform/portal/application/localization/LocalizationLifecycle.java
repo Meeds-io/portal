@@ -132,7 +132,7 @@ public class LocalizationLifecycle extends BaseComponentPlugin implements Applic
   public void onEndRequest(Application app, WebuiRequestContext context) throws Exception {
     // if onStartRequest survived the cast, this one should as well - no check
     // necessary
-    PortalRequestContext reqCtx = (PortalRequestContext) context;
+    PortalRequestContext reqCtx = PortalRequestContext.getCurrentInstance();
     Locale loc = reqCtx.getLocale();
 
     // if locale changed since previous request

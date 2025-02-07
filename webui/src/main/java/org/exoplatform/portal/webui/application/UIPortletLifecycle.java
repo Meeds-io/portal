@@ -182,7 +182,7 @@ public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
     PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
     String key = "UIPortlet_" + uicomponent.getApplicationId().split("/")[1] + "_" + uicomponent.getStorageId();
     boolean started = portalRequestContext.startServerTime(key);
-    PortalRequestContext prcontext = (PortalRequestContext) context;
+    PortalRequestContext prcontext = PortalRequestContext.getCurrentInstance();
     Text markup = null;
     try {
       Map<String, String[]> paramMap = prcontext.getRequest().getParameterMap();
