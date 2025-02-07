@@ -187,19 +187,23 @@ public class UIContainer extends UIComponent {
   @Override
   public <T extends UIComponent> T findFirstComponentOfType(Class<T> type) {
     List<UIComponent> subComponents = getChildren();
-    if (type.isInstance(this)) {
+    return findFirstComponentOfType(type, subComponents);
+  }
+
+  public <T extends UIComponent> T findFirstComponentOfType(Class<T> type, List<UIComponent> components) {
+    if (components == null) {
+      return null;
+    } else if (type.isInstance(this)) {
       return type.cast(this);
-    }
-    if (children == null) {
+    } else {
+      for (UIComponent uichild : components) {
+        T found = uichild.findFirstComponentOfType(type);
+        if (found != null) {
+          return found;
+        }
+      }
       return null;
     }
-    for (UIComponent uichild : subComponents) {
-      T found = uichild.findFirstComponentOfType(type);
-      if (found != null) {
-        return found;
-      }
-    }
-    return null;
   }
 
   @Override
