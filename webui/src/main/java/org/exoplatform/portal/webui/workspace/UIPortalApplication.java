@@ -604,7 +604,7 @@ public class UIPortalApplication extends UIApplication {
    */
   @Override
   public void processAction(WebuiRequestContext context) throws Exception {
-    PortalRequestContext pcontext = (PortalRequestContext) context;
+    PortalRequestContext pcontext = PortalRequestContext.getCurrentInstance();
     UserNode targetNode = pcontext.getNavigationNode();
     if (targetNode == null) {
       // If unauthenticated users have no permission on PORTAL node and

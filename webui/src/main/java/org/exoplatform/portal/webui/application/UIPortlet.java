@@ -702,7 +702,7 @@ public class UIPortlet extends UIApplication {
    * @see PortletExceptionHandleService
    */
   public Text generateRenderMarkup(PortletInvocationResponse pir, WebuiRequestContext context) {
-    PortalRequestContext prcontext = (PortalRequestContext) context;
+    PortalRequestContext prcontext = PortalRequestContext.getCurrentInstance();
 
     Text markup = null;
     if (pir instanceof FragmentResponse fragmentResponse) {

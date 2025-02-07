@@ -45,7 +45,7 @@ public class UIPortalApplicationLifecycle extends Lifecycle<UIPortalApplication>
     if (uiTarget == null) {
       context.addUIComponentToUpdateByAjax(uicomponent.<UIComponent> getChildById(UIPortalApplication.UI_WORKING_WS_ID));
       context.addUIComponentToUpdateByAjax(uicomponent.getChild(UIMaskWorkspace.class));
-      ((PortalRequestContext) context).ignoreAJAXUpdateOnPortlets(true);
+      PortalRequestContext.getCurrentInstance().ignoreAJAXUpdateOnPortlets(true);
       return;
     }
     if (uiTarget == uicomponent) {
@@ -78,7 +78,7 @@ public class UIPortalApplicationLifecycle extends Lifecycle<UIPortalApplication>
 
   @Override
   public void processRender(UIPortalApplication uicomponent, WebuiRequestContext context) throws Exception {
-    PortalRequestContext portalRequestContext = (PortalRequestContext) context;
+    PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
     OutputStream responseOutputStream = portalRequestContext.getResponse().getOutputStream();
     PortalPrinter parentWriter = new PortalPrinter(responseOutputStream, true, 5000);
 

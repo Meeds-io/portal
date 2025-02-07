@@ -76,8 +76,7 @@ public class PortalLogoutLifecycle implements ApplicationLifecycle<WebuiRequestC
             param.put(LoginError.ERROR_PARAM, error.toString());
         }
 
-        PortalRequestContext prContext = (PortalRequestContext)context;
-        prContext.requestAuthenticationLogin(param);
+        PortalRequestContext.getCurrentInstance().requestAuthenticationLogin(param);
     }
 
     public void onFailRequest(Application app, WebuiRequestContext context, RequestFailure failureType) {
