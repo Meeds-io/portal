@@ -19,6 +19,7 @@ package org.exoplatform.portal.branding;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.Map;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.Consumes;
@@ -76,6 +77,19 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     return Response.ok(brandingInformation).build();
   }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/default")
+  @RolesAllowed("administrators")
+  @Operation(summary = "Get default theme style", description = "Get default theme style", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+  })
+  public Response getDefaultBrandingThemeStyle() {
+    Map<String, String> defaultThemeStyle = brandingService.getDefaultThemeStyle();
+    return Response.ok(defaultThemeStyle).build();
+  }
+
   @PUT
   @RolesAllowed("administrators")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -122,6 +136,57 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                     @QueryParam("v")
                                     String version) {
     return getBrandingFileResponse(brandingService.getPageBackground(), request, version);
+  }
+
+  @GET
+  @Path("/topBarBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default top bar Background image", description = "Get Default top bar Background image", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getTopBarBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getTopBarBackground(), request, version);
+  }
+
+  @GET
+  @Path("/sideBarBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default sidebar Background image", description = "Get Default sidebar Background image", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getSideBarBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getSideBarBackground(), request, version);
+  }
+
+  @GET
+  @Path("/drawerBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default drawer Background image", description = "Get Default drawer Background image", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getDrawerBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getDrawerBackground(), request, version);
   }
 
   @GET

@@ -30,6 +30,51 @@
 @welcomePagesBackground: @secondaryColor;
 
 @textColor: #333333;
+@topBarTextColor: #20282C;
+@topBarTextFontSize: 16px;
+@topBarTextFontStyle: normal;
+@topBarTextFontWeight: normal;
+@topBarBackgroundColor: #FFFFFFFF;
+@topBarBackgroundPosition: left top;
+@topBarBackgroundSize: cover;
+@topBarBackgroundRepeat: repeat;
+@topBarBackgroundImage: none;
+
+@sideBarTextColor: #20282C;
+@sideBarTextFontSize: 16px;
+@sideBarTextFontStyle: normal;
+@sideBarTextFontWeight: normal;
+@sideBarTextSubtitleColor: #20282C;
+@sideBarTextSubtitleFontSize: 12px;
+@sideBarTextSubtitleFontStyle: normal;
+@sideBarTextSubtitleFontWeight: normal;
+@sideBarBackgroundColor: #FFFFFFFF;
+@sideBarBackgroundPosition: left top;
+@sideBarBackgroundSize: cover;
+@sideBarBackgroundRepeat: repeat;
+@sideBarBackgroundImage: none;
+
+@drawerTextTitleColor: #20282C;
+@drawerTextTitleFontSize: 20px;
+@drawerTextTitleFontStyle: normal;
+@drawerTextTitleFontWeight: normal;
+@drawerTextHeaderColor: #707070;
+@drawerTextHeaderFontSize: 18px;
+@drawerTextHeaderFontStyle: normal;
+@drawerTextHeaderFontWeight: normal;
+@drawerTextColor: #20282c;
+@drawerTextFontSize: 16px;
+@drawerTextFontStyle: normal;
+@drawerTextFontWeight: normal;
+@drawerTextSubtitleColor: #707070;
+@drawerTextSubtitleFontSize: 12px;
+@drawerTextSubtitleFontStyle: normal;
+@drawerTextSubtitleFontWeight: normal;
+@drawerBackgroundColor: #FFFFFFFF;
+@drawerBackgroundPosition: left top;
+@drawerBackgroundSize: cover;
+@drawerBackgroundImage: none;
+@drawerBackgroundRepeat: repeat;
 
 @allPagesPrimaryColor: ~"--allPagesPrimaryColor";
 @allPagesPrimaryColorLight: ~"--allPagesPrimaryColorLight";
@@ -57,6 +102,52 @@
 @allPagesBaseTextColor: ~"--allPagesBaseTextColor";
 @allPagesBorderRadius: ~"--allPagesBorderRadius";
 
+@allPagesTopBarTextColor: ~"--allPagesTopBarTextColor";
+@allPagesTopBarTextFontSize: ~"--allPagesTopBarTextFontSize";
+@allPagesTopBarTextFontStyle: ~"--allPagesTopBarTextFontStyle";
+@allPagesTopBarTextFontWeight: ~"--allPagesTopBarTextFontWeight";
+@allPagesTopBarBackgroundColor: ~"--allPagesTopBarBackgroundColor";
+@allPagesTopBarBackgroundImage: ~"--allPagesTopBarBackgroundImage";
+@allPagesTopBarBackgroundPosition: ~"--allPagesTopBarBackgroundPosition";
+@allPagesTopBarBackgroundRepeat: ~"--allPagesTopBarBackgroundRepeat";
+@allPagesTopBarBackgroundSize: ~"--allPagesTopBarBackgroundSize";
+
+@allPagesSideBarTextColor: ~"--allPagesSideBarTextColor";
+@allPagesSideBarTextFontSize: ~"--allPagesSideBarTextFontSize";
+@allPagesSideBarTextFontStyle: ~"--allPagesSideBarTextFontStyle";
+@allPagesSideBarTextFontWeight: ~"--allPagesSideBarTextFontWeight";
+@allPagesSideBarTextSubtitleColor: ~"--allPagesSideBarTextSubtitleColor";
+@allPagesSideBarTextSubtitleFontSize: ~"--allPagesSideBarTextSubtitleFontSize";
+@allPagesSideBarTextSubtitleFontStyle: ~"--allPagesSideBarTextSubtitleFontStyle";
+@allPagesSideBarTextSubtitleFontWeight: ~"--allPagesSideBarTextSubtitleFontWeight";
+@allPagesSideBarBackgroundColor: ~"--allPagesSideBarBackgroundColor";
+@allPagesSideBarBackgroundImage: ~"--allPagesSideBarBackgroundImage";
+@allPagesSideBarBackgroundPosition: ~"--allPagesSideBarBackgroundPosition";
+@allPagesSideBarBackgroundRepeat: ~"--allPagesSideBarBackgroundRepeat";
+@allPagesSideBarBackgroundSize: ~"--allPagesSideBarBackgroundSize";
+
+@allPagesDrawerTextTitleColor: ~"--allPagesDrawerTextTitleColor";
+@allPagesDrawerTextTitleFontSize: ~"--allPagesDrawerTextTitleFontSize";
+@allPagesDrawerTextTitleFontStyle: ~"--allPagesDrawerTextTitleFontStyle";
+@allPagesDrawerTextTitleFontWeight: ~"--allPagesDrawerTextTitleFontWeight";
+@allPagesDrawerTextHeaderColor: ~"--allPagesDrawerTextHeaderColor";
+@allPagesDrawerTextHeaderFontSize: ~"--allPagesDrawerTextHeaderFontSize";
+@allPagesDrawerTextHeaderFontStyle: ~"--allPagesDrawerTextHeaderFontStyle";
+@allPagesDrawerTextHeaderFontWeight: ~"--allPagesDrawerTextHeaderFontWeight";
+@allPagesDrawerTextColor: ~"--allPagesDrawerTextColor";
+@allPagesDrawerTextFontSize: ~"--allPagesDrawerTextFontSize";
+@allPagesDrawerTextFontStyle: ~"--allPagesDrawerTextFontStyle";
+@allPagesDrawerTextFontWeight: ~"--allPagesDrawerTextFontWeight";
+@allPagesDrawerTextSubtitleColor: ~"--allPagesDrawerTextSubtitleColor";
+@allPagesDrawerTextSubtitleFontSize: ~"--allPagesDrawerTextSubtitleFontSize";
+@allPagesDrawerTextSubtitleFontStyle: ~"--allPagesDrawerTextSubtitleFontStyle";
+@allPagesDrawerTextSubtitleFontWeight: ~"--allPagesDrawerTextSubtitleFontWeight";
+@allPagesDrawerBackgroundColor: ~"--allPagesDrawerBackgroundColor";
+@allPagesDrawerBackgroundPosition: ~"--allPagesDrawerBackgroundPosition";
+@allPagesDrawerBackgroundSize: ~"--allPagesDrawerBackgroundSize";
+@allPagesDrawerBackgroundImage: ~"--allPagesDrawerBackgroundImage";
+@allPagesDrawerBackgroundRepeat: ~"--allPagesDrawerBackgroundRepeat";
+
 :root {
     @{allPagesPrimaryColor}: @primaryColor;
     @{allPagesPrimaryColorLight}: @primaryColorLight;
@@ -83,4 +174,51 @@
     @{allPagesGreyColorLighten1Opacity1}: @greyColorLighten1Opacity1;
     @{allPagesBaseTextColor}: @textColor;
     @{allPagesBorderRadius}: @borderRadius;
+
+    @{allPagesTopBarTextColor}: @topBarTextColor;
+    @{allPagesTopBarTextFontStyle}: @topBarTextFontStyle;
+    @{allPagesTopBarTextFontSize}: @topBarTextFontSize;
+    @{allPagesTopBarTextFontWeight}: @topBarTextFontWeight;
+    @{allPagesTopBarBackgroundColor}: @topBarBackgroundColor;
+    @{allPagesTopBarBackgroundImage}: @topBarBackgroundImage;
+    @{allPagesTopBarBackgroundPosition}: @topBarBackgroundPosition;
+    @{allPagesTopBarBackgroundSize}: @topBarBackgroundSize;
+    @{allPagesTopBarBackgroundRepeat}: @topBarBackgroundRepeat;
+
+    @{allPagesSideBarTextColor}: @sideBarTextColor;
+    @{allPagesSideBarTextFontSize}: @sideBarTextFontSize;
+    @{allPagesSideBarTextFontStyle}: @sideBarTextFontStyle;
+    @{allPagesSideBarTextFontWeight}: @sideBarTextFontWeight;
+    @{allPagesSideBarTextSubtitleColor}: @sideBarTextSubtitleColor;
+    @{allPagesSideBarTextSubtitleFontSize}: @sideBarTextSubtitleFontSize;
+    @{allPagesSideBarTextSubtitleFontStyle}: @sideBarTextSubtitleFontStyle;
+    @{allPagesSideBarTextSubtitleFontWeight}: @sideBarTextSubtitleFontWeight;
+    @{allPagesSideBarBackgroundColor}: @sideBarBackgroundColor;
+    @{allPagesSideBarBackgroundImage}: @sideBarBackgroundImage;
+    @{allPagesSideBarBackgroundPosition}: @sideBarBackgroundPosition;
+    @{allPagesSideBarBackgroundRepeat}: @sideBarBackgroundRepeat;
+    @{allPagesSideBarBackgroundSize}: @sideBarBackgroundSize;
+
+    @{allPagesDrawerTextTitleColor}: @drawerTextTitleColor;
+    @{allPagesDrawerTextTitleFontSize}: @drawerTextTitleFontSize;
+    @{allPagesDrawerTextTitleFontStyle}: @drawerTextTitleFontStyle;
+    @{allPagesDrawerTextTitleFontWeight}: @drawerTextTitleFontWeight;
+    @{allPagesDrawerTextHeaderColor}: @drawerTextHeaderColor;
+    @{allPagesDrawerTextHeaderFontSize}: @drawerTextHeaderFontSize;
+    @{allPagesDrawerTextHeaderFontStyle}: @drawerTextHeaderFontStyle;
+    @{allPagesDrawerTextHeaderFontWeight}: @drawerTextHeaderFontWeight;
+    @{allPagesDrawerTextColor}: @drawerTextColor;
+    @{allPagesDrawerTextFontSize}: @drawerTextFontSize;
+    @{allPagesDrawerTextFontStyle}: @drawerTextFontStyle;
+    @{allPagesDrawerTextFontWeight}: @drawerTextFontWeight;
+    @{allPagesDrawerTextSubtitleColor}: @drawerTextSubtitleColor;
+    @{allPagesDrawerTextSubtitleFontSize}: @drawerTextSubtitleFontSize;
+    @{allPagesDrawerTextSubtitleFontStyle}: @drawerTextSubtitleFontStyle;
+    @{allPagesDrawerTextSubtitleFontWeight}: @drawerTextSubtitleFontWeight;
+    @{allPagesDrawerBackgroundColor}: @drawerBackgroundColor;
+    @{allPagesDrawerBackgroundPosition}: @drawerBackgroundPosition;
+    @{allPagesDrawerBackgroundSize}: @drawerBackgroundSize;
+    @{allPagesDrawerBackgroundImage}: @drawerBackgroundImage;
+    @{allPagesDrawerBackgroundRepeat}: @drawerBackgroundRepeat;
+
 }

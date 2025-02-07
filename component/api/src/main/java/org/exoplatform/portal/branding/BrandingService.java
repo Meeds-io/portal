@@ -134,6 +134,18 @@ public interface BrandingService {
   String getPageBackgroundPath();
 
   /**
+   * @return the page background Effect
+   */
+  String getPageBackgroundEffect();
+
+  /**
+   * Returns the URL to retrieve the page background, including the background effect.
+   *
+   * @return the URL of the page background image
+   */
+  String getPageBackgroundImageUrl();
+
+  /**
    * @return Page width
    */
   String getPageWidth();
@@ -207,6 +219,12 @@ public interface BrandingService {
   Map<String, String> getThemeStyle();
 
   /**
+   * @return {@link Map} with variable name as key and variable value as map
+   *         value
+   */
+  Map<String, String> getDefaultThemeStyle();
+
+  /**
    * @return {@link Map} of login titles per language
    */
   Map<String, String> getLoginTitle();
@@ -232,5 +250,51 @@ public interface BrandingService {
    * @return default platform language
    */
   String getDefaultLanguage();
+
+  /**
+   * @return Top bar Background File technical identifier
+   */
+  Long getTopBarBackgroundId();
+
+  /**
+   * @return Top bar Background File technical identifier
+   */
+  Background getTopBarBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve top bar background
+   */
+  String getTopBarBackgroundPath();
+
+  /**
+   * @return Sidebar Background File technical identifier
+   */
+  Long getSideBarBackgroundId();
+
+  /**
+   * @return Sidebar Background File technical identifier
+   */
+  Background getSideBarBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve sideBar background
+   */
+  String getSideBarBackgroundPath();
+
+  /**
+   * @return Drawer Background File technical identifier
+   */
+  Long getDrawerBackgroundId();
+
+  /**
+   * @return Drawer Background File technical identifier
+   */
+  Background getDrawerBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve drawer background
+   */
+  String getDrawerBackgroundPath();
+
 
 }

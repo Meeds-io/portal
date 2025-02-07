@@ -65,6 +65,18 @@ public class Branding implements Serializable {
 
   @Getter
   @Setter
+  private Background          topBarBackground;
+
+  @Getter
+  @Setter
+  private Background          sideBarBackground;
+
+  @Getter
+  @Setter
+  private Background          drawerBackground;
+
+  @Getter
+  @Setter
   private String              loginBackgroundTextColor;
 
   @Getter
@@ -86,6 +98,10 @@ public class Branding implements Serializable {
   @Getter
   @Setter
   private String              pageBackgroundPosition;
+
+  @Getter
+  @Setter
+  private String              pageBackgroundEffect;
 
   @Getter
   @Setter
