@@ -140,15 +140,15 @@ public class PortalDataMapper {
     uiPage.findComponentOfType(portlets, UIPortlet.class);
   }
 
-  public static void toUIPortal(UIPortal uiPortal, PortalConfig model) throws Exception {
+  public static void toUIPortal(UIPortal uiPortal, PortalConfig model) {
     buildUIPortal(uiPortal, model, false);
   }
 
-  public static void toUIPortalWithMetaLayout(UIPortal uiPortal, PortalConfig model) throws Exception {
+  public static void toUIPortalWithMetaLayout(UIPortal uiPortal, PortalConfig model) {
     buildUIPortal(uiPortal, model, true);
   }
 
-  private static void buildUIPortal(UIPortal uiPortal, PortalConfig model, boolean metaLayout) throws Exception {
+  private static void buildUIPortal(UIPortal uiPortal, PortalConfig model, boolean metaLayout) {
     uiPortal.setSiteKey(new SiteKey(model.getType(), model.getName()));
     uiPortal.setStorageId(model.getStorageId());
     uiPortal.setName(model.getName());
@@ -183,14 +183,10 @@ public class PortalDataMapper {
     UIComponent uiComponent = null;
     WebuiRequestContext context = Util.getPortalRequestContext();
 
-    if (model instanceof SiteBody siteBody) {
-      UISiteBody uiSiteBody = uiContainer.createUIComponent(context, UISiteBody.class, null, null);
-      uiSiteBody.setStorageId(siteBody.getStorageId());
-      uiComponent = uiSiteBody;
-    } else if (model instanceof PageBody pageBody) {
-      UIPageBody uiPageBody = uiContainer.createUIComponent(context, UIPageBody.class, null, null);
-      uiPageBody.setStorageId(pageBody.getStorageId());
-      uiComponent = uiPageBody;
+    if (model instanceof SiteBody) {
+      uiComponent = uiContainer.createUIComponent(context, UISiteBody.class, null, null);
+    } else if (model instanceof PageBody) {
+      uiComponent = uiContainer.createUIComponent(context, UIPageBody.class, null, null);
     } else if (model instanceof Application application) {
       UIPortlet uiPortlet = uiContainer.createUIComponent(context, UIPortlet.class, null, null);
       uiPortlet.setStorageId(application.getStorageId());

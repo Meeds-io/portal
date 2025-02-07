@@ -19,8 +19,6 @@
 
 package org.exoplatform.portal.webui.workspace;
 
-import org.exoplatform.portal.webui.page.UISiteBody;
-import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIContainer;
 
@@ -30,25 +28,4 @@ import org.exoplatform.webui.core.UIContainer;
 
 @ComponentConfig(id = "UIWorkingWorkspace", template = "system:/groovy/portal/webui/workspace/UIWorkingWorkspace.gtmpl")
 public class UIWorkingWorkspace extends UIContainer {
-
-    private UIPortal backupUIPortal = null;
-
-    public UIPortal getBackupUIPortal() {
-        return backupUIPortal;
-    }
-
-    public void setBackupUIPortal(UIPortal uiPortal) {
-        backupUIPortal = uiPortal;
-    }
-
-    public UIPortal restoreUIPortal() {
-        UIPortal result = backupUIPortal;
-        if (result == null) {
-            throw new IllegalStateException("backupUIPortal not available");
-        } else {
-            UISiteBody siteBody = findFirstComponentOfType(UISiteBody.class);
-            siteBody.setUIComponent(result);
-            return result;
-        }
-    }
 }

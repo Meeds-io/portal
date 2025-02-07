@@ -19,6 +19,9 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.application.PortalRequestContext;
@@ -28,28 +31,21 @@ import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.webui.container.UIContainer;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.page.UISiteBody;
-import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
+import org.exoplatform.webui.core.UIComponent;
 
-@ComponentConfig(
-
-)
+@ComponentConfig
 public class UISharedLayout extends UIContainer {
 
   private String metaPortal;
 
   @Override
-  public void processRender(WebuiRequestContext context) throws Exception {
+  public List<UIComponent> getChildren() {
     PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
-    portalRequestContext.startServerTime("UISharedLayout");
-    try {
-      if (isShowSharedLayout(portalRequestContext)) {
-        processContainerRender(context);
-      } else {
-        processSiteBodyRender(context);
-      }
-    } finally {
-      portalRequestContext.endServerTime("UISharedLayout");
+    if (isShowSharedLayout(portalRequestContext)) {
+      return getSharedLayoutChildren();
+    } else {
+      return getSiteLayoutChildren();
     }
   }
 
@@ -69,13 +65,13 @@ public class UISharedLayout extends UIContainer {
     return showSharedLayout;
   }
 
-  protected void processSiteBodyRender(WebuiRequestContext context) throws Exception {
-    UISiteBody uiSiteBody = findFirstComponentOfType(UISiteBody.class);
-    uiSiteBody.processRender(context);
+  protected List<UIComponent> getSiteLayoutChildren() {
+    UISiteBody uiSiteBody = findFirstComponentOfType(UISiteBody.class, getSharedLayoutChildren());
+    return Collections.singletonList(uiSiteBody);
   }
 
-  protected void processContainerRender(WebuiRequestContext context) throws Exception {
-    super.processRender(context);
+  protected List<UIComponent> getSharedLayoutChildren() {
+    return super.getChildren();
   }
 
   private boolean showSiteSharedLayout(PortalConfig site) {

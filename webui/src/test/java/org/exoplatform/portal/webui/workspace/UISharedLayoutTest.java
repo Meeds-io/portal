@@ -21,6 +21,8 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.AfterClass;
@@ -33,8 +35,10 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.webui.portal.UISharedLayout;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.webui.application.WebuiRequestContext;
+import org.exoplatform.webui.core.UIComponent;
 
 @RunWith(MockitoJUnitRunner.class)
 public class UISharedLayoutTest {
@@ -51,7 +55,7 @@ public class UISharedLayoutTest {
 
   @Before
   public void setUp() {
-    PORTAL_REQUEST_CONTEXT.when(() -> RequestContext.getCurrentInstance()).thenReturn(pcontext);
+    PORTAL_REQUEST_CONTEXT.when(RequestContext::getCurrentInstance).thenReturn(pcontext);
   }
 
   @Test
@@ -59,32 +63,47 @@ public class UISharedLayoutTest {
     AtomicInteger siteBodyRenderCount = new AtomicInteger(0);
     AtomicInteger overallRenderCount = new AtomicInteger(0);
 
-    UISharedLayout sharedLayout = new UISharedLayout() {
-      @Override
-      protected void processSiteBodyRender(WebuiRequestContext context) throws Exception {
-        siteBodyRenderCount.incrementAndGet();
-      }
+    ConversationState.setCurrent(new ConversationState(null));
+    try {
 
-      @Override
-      protected void processContainerRender(WebuiRequestContext context) throws Exception {
-        overallRenderCount.incrementAndGet();
-      }
+      UISharedLayout sharedLayout = new UISharedLayout() {
 
-      @Override
-      public boolean isShowSharedLayout(PortalRequestContext requestContext) {
-        return !pcontext.isHideSharedLayout();
-      }
-    };
-    sharedLayout.processRender(pcontext);
+        @Override
+        public void processRender(WebuiRequestContext context) throws Exception {
+          renderChildren();
+        }
 
-    assertEquals(1, overallRenderCount.get());
-    assertEquals(0, siteBodyRenderCount.get());
+        @Override
+        public boolean isShowSharedLayout(PortalRequestContext requestContext) {
+          return !pcontext.isHideSharedLayout();
+        }
 
-    when(pcontext.isHideSharedLayout()).thenReturn(true);
-    sharedLayout.processRender(pcontext);
+        @Override
+        protected List<UIComponent> getSiteLayoutChildren() {
+          siteBodyRenderCount.incrementAndGet();
+          return Collections.emptyList();
+        }
 
-    assertEquals(1, overallRenderCount.get());
-    assertEquals(1, siteBodyRenderCount.get());
+        @Override
+        protected List<UIComponent> getSharedLayoutChildren() {
+          overallRenderCount.incrementAndGet();
+          return Collections.emptyList();
+        }
+
+      };
+      sharedLayout.processRender(pcontext);
+
+      assertEquals(1, overallRenderCount.get());
+      assertEquals(0, siteBodyRenderCount.get());
+
+      when(pcontext.isHideSharedLayout()).thenReturn(true);
+      sharedLayout.processRender(pcontext);
+
+      assertEquals(1, overallRenderCount.get());
+      assertEquals(1, siteBodyRenderCount.get());
+    } finally {
+      ConversationState.setCurrent(null);
+    }
   }
 
 }

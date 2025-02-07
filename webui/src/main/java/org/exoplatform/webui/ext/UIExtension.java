@@ -238,7 +238,7 @@ public class UIExtension implements Comparable<UIExtension> {
         }
       }
     }
-    throw new UnsupportedDataTypeException("The expected type is a list of objects of type UIExtensionFilter");
+    throw new UnsupportedDataTypeException(String.format("The expected type is a list of objects of type UIExtensionFilter. found: %s", returnType));
   }
   
   /**

@@ -19,25 +19,25 @@
 
 package org.exoplatform.portal.webui.application;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import javax.portlet.MimeResponse;
 import javax.portlet.PortletMode;
 import javax.portlet.WindowState;
 import javax.xml.namespace.QName;
 
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.common.i18n.LocalizedString;
 import org.gatein.common.net.media.MediaType;
@@ -60,11 +60,11 @@ import org.gatein.pc.api.invocation.EventInvocation;
 import org.gatein.pc.api.invocation.PortletInvocation;
 import org.gatein.pc.api.invocation.RenderInvocation;
 import org.gatein.pc.api.invocation.ResourceInvocation;
+import org.gatein.pc.api.invocation.response.ContentResponse;
 import org.gatein.pc.api.invocation.response.ErrorResponse;
 import org.gatein.pc.api.invocation.response.FragmentResponse;
 import org.gatein.pc.api.invocation.response.PortletInvocationResponse;
 import org.gatein.pc.api.state.PropertyChange;
-import org.gatein.pc.portlet.impl.info.ContainerPortletInfo;
 import org.gatein.pc.portlet.impl.spi.AbstractClientContext;
 import org.gatein.pc.portlet.impl.spi.AbstractPortalContext;
 import org.gatein.pc.portlet.impl.spi.AbstractRequestContext;
@@ -135,6 +135,9 @@ import lombok.Setter;
   @EventConfig(phase = Phase.PROCESS, listeners = ServeResourceActionListener.class, csrfCheck = false),
   @EventConfig(phase = Phase.PROCESS, listeners = ProcessEventsActionListener.class, csrfCheck = false),
 })
+@SuppressWarnings("unchecked")
+@Getter
+@Setter
 public class UIPortlet extends UIApplication {
 
   protected static final Log                 LOG                   = ExoLogger.getLogger("portal:UIPortlet");
@@ -147,64 +150,46 @@ public class UIPortlet extends UIApplication {
                                                                                                                         "javax.portlet.markup.head.element.support",
                                                                                                                         "true"));
 
-  /** . */
   private String                             storageId;
 
-  /** . */
   private String                             storageName;
 
-  /** . */
   private ModelAdapter                       adapter;
 
-  /** . */
   private org.gatein.pc.api.Portlet          producedOfferedPortlet;
 
-  /** . */
   private PortletContext                     producerOfferedPortletContext;
 
-  /**
-   * A computed field that contains the runtime description of the portlet for
-   * edit mode.
-   */
   private LocalizedString                    displayName;
 
-  /** . */
   private PortletState                       state;
 
-  /** . */
   private String                             applicationId;
 
   private String                             theme;
 
   private String                             portletStyle;
 
-  private Boolean                            lazyResourcesLoading  = null;
+  private List<String>                       supportModes;
 
-  private List<String>                       supportModes_;
+  private List<QName>                        supportedProcessingEvents;
 
-  private List<QName>                        supportedProcessingEvents_;
+  private List<QName>                        supportedPublishingEvents;
 
-  private List<QName>                        supportedPublishingEvents_;
-
-  private Map<QName, String>                 supportedPublicParams_;
+  private Map<QName, String>                 supportedPublicParams;
 
   private StateString                        navigationalState;
 
   /** A field storing localized value of javax.portlet.title * */
   private String                             configuredTitle;
 
-  @Getter
-  @Setter
   private String                             cssClass;
 
-  private boolean                            showPortletMode       = true;
+  private boolean                            showPortletMode;
 
-  public String getStorageId() {
-    return storageId;
-  }
-
-  public void setStorageId(String storageId) {
-    this.storageId = storageId;
+  @Override
+  public String getId() {
+    return storageId == null ? super.getId() : storageId;
   }
 
   public String getStorageName() {
@@ -212,10 +197,6 @@ public class UIPortlet extends UIApplication {
       storageName = UUID.randomUUID().toString();
     }
     return storageName;
-  }
-
-  public void setStorageName(String storageName) {
-    this.storageName = storageName;
   }
 
   public String getWindowId() {
@@ -234,43 +215,12 @@ public class UIPortlet extends UIApplication {
     return applicationId;
   }
 
-  public String getId() {
-    return storageId == null ? super.getId() : storageId;
-  }
-
-  public String getApplicationId() {
-    return applicationId;
-  }
-
-  /**
-   * portletStyle is 'Window' when it's in WebOS project - an GateIn extension,
-   * portletStyle is null if is not in WebOS
-   * 
-   * @return a string represent current portlet style
-   */
-  public String getPortletStyle() {
-    return portletStyle;
-  }
-
-  public void setPortletStyle(String s) {
-    portletStyle = s;
-  }
-
   /**
    * @return true if portlet is configured to show control icon that allow to
    *         change portlet mode
    */
   public boolean getShowPortletMode() {
     return showPortletMode;
-  }
-
-  /**
-   * Used by portal to show the icon that allow to change portlet mode
-   * 
-   * @param b if show icon
-   */
-  public void setShowPortletMode(Boolean b) {
-    showPortletMode = b;
   }
 
   /**
@@ -288,33 +238,6 @@ public class UIPortlet extends UIApplication {
       return DEFAULT_THEME;
     }
     return theme;
-  }
-
-  public void setTheme(String theme) {
-    this.theme = theme;
-  }
-
-  private String themeMapToString(Map<String, String> themeMap) {
-    StringBuffer builder = new StringBuffer();
-    Iterator<Entry<String, String>> itr = themeMap.entrySet().iterator();
-    while (itr.hasNext()) {
-      Entry<String, String> entry = itr.next();
-      builder.append(entry.getKey()).append(":").append(entry.getValue());
-      if (itr.hasNext()) {
-        builder.append("::");
-      }
-    }
-    return builder.toString();
-  }
-
-  private Map<String, String> stringToThemeMap(String themesString) {
-    Map<String, String> themeMap = new HashMap<String, String>();
-    String[] themeIds = themesString.split("::");
-    for (String ele : themeIds) {
-      String[] strs = ele.split(":");
-      themeMap.put(strs[0], strs[1]);
-    }
-    return themeMap;
   }
 
   public PortletMode getCurrentPortletMode() {
@@ -342,22 +265,6 @@ public class UIPortlet extends UIApplication {
 
   public void setCurrentWindowState(WindowState state) {
     PortletRequestContext.setCurrentWindowState(state);
-  }
-
-  public List<QName> getSupportedProcessingEvents() {
-    return supportedProcessingEvents_;
-  }
-
-  public void setSupportedProcessingEvents(List<QName> supportedProcessingEvents) {
-    supportedProcessingEvents_ = supportedProcessingEvents;
-  }
-
-  public Map<QName, String> getSupportedPublicRenderParameters() {
-    return supportedPublicParams_;
-  }
-
-  public void setSupportedPublicRenderParameters(Map<QName, String> supportedPublicRenderParameters) {
-    supportedPublicParams_ = supportedPublicRenderParameters;
   }
 
   /**
@@ -404,19 +311,13 @@ public class UIPortlet extends UIApplication {
     }
   }
 
-  public org.gatein.pc.api.Portlet getProducedOfferedPortlet() {
-    return producedOfferedPortlet;
-  }
-
   public List<String> getSupportModes() {
-    if (supportModes_ != null) {
-      return supportModes_;
+    if (supportModes != null) {
+      return supportModes;
     }
 
-    List<String> supportModes = new ArrayList<String>();
-
+    this.supportModes = new ArrayList<>();
     org.gatein.pc.api.Portlet portlet = getProducedOfferedPortlet();
-
     // if we couldn't get the portlet that just return an empty modes list
     if (portlet == null) {
       return supportModes;
@@ -426,173 +327,10 @@ public class UIPortlet extends UIApplication {
     for (ModeInfo mode : modes) {
       supportModes.add(mode.getModeName());
     }
-
-    if (supportModes.size() > 0) {
+    if (!supportModes.isEmpty()) {
       supportModes.remove("view");
     }
-    setSupportModes(supportModes);
-
     return supportModes;
-  }
-
-  public void setSupportModes(List<String> supportModes) {
-    supportModes_ = supportModes;
-  }
-
-  /**
-   * Tells, according to the info located in portlet.xml, wether this portlet
-   * can handle a portlet event with the QName given as the method argument
-   */
-  public boolean supportsProcessingEvent(QName name) {
-
-    if (supportedProcessingEvents_ == null) {
-
-      org.gatein.pc.api.Portlet portlet = getProducedOfferedPortlet();
-
-      if (portlet == null) {
-        if (producerOfferedPortletContext != null) {
-          LOG.debug("Could not find portlet with ID : " + producerOfferedPortletContext.getId());
-        } else {
-          LOG.debug("Could not find portlet. The producerOfferedPortletContext is null");
-        }
-        return false;
-      }
-
-      Map<QName, EventInfo> consumedEvents = (Map<QName, EventInfo>) portlet.getInfo().getEventing().getConsumedEvents();
-
-      if (consumedEvents == null) {
-        return false;
-      }
-
-      supportedProcessingEvents_ = new ArrayList<QName>(consumedEvents.keySet());
-    }
-
-    for (QName eventName : supportedProcessingEvents_) {
-      if (eventName.equals(name)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("The Portlet " + producerOfferedPortletContext + " supports comsuming the event : " + name);
-        }
-        return true;
-      }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("The portlet " + producerOfferedPortletContext + " doesn't support consuming the event : " + name);
-    }
-    return false;
-  }
-
-  public boolean supportsPublishingEvent(QName name) {
-    if (supportedPublishingEvents_ == null) {
-      org.gatein.pc.api.Portlet portlet = getProducedOfferedPortlet();
-
-      if (portlet == null) {
-        LOG.info("Could not find portlet with ID : " + producerOfferedPortletContext.getId());
-        return false;
-      }
-
-      Map<QName, EventInfo> producedEvents = (Map<QName, EventInfo>) portlet.getInfo().getEventing().getProducedEvents();
-
-      if (producedEvents == null) {
-        return false;
-      }
-
-      supportedPublishingEvents_ = new ArrayList<QName>(producedEvents.keySet());
-    }
-
-    for (QName eventName : supportedPublishingEvents_) {
-      if (eventName.equals(name)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("The Portlet " + producerOfferedPortletContext + " supports producing the event : " + name);
-        }
-        return true;
-      }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("The portlet " + producerOfferedPortletContext + " doesn't support producing the event : " + name);
-    }
-    return false;
-  }
-
-  /**
-   * Tells, according to the info located in portlet.xml, wether this portlet
-   * supports the public render parameter qname given as method argument. If the
-   * qname is supported, the public render parameter id is returned otherwise
-   * false is returned.
-   *
-   * @param supportedPublicParam the supported public parameter qname
-   * @return the supported public parameter id
-   */
-  public String supportsPublicParam(QName supportedPublicParam) {
-    if (supportedPublicParams_ == null) {
-
-      //
-      if (producedOfferedPortlet == null) {
-        if (producerOfferedPortletContext != null) {
-          LOG.debug("Could not find portlet with ID : " + producerOfferedPortletContext.getId());
-        }
-        return null;
-      }
-
-      //
-      Collection<ParameterInfo> parameters = (Collection<ParameterInfo>) producedOfferedPortlet.getInfo()
-                                                                                               .getNavigation()
-                                                                                               .getPublicParameters();
-      supportedPublicParams_ = new HashMap<QName, String>();
-      for (ParameterInfo parameter : parameters) {
-        supportedPublicParams_.put(parameter.getName(), parameter.getId());
-      }
-    }
-
-    //
-    String id = supportedPublicParams_.get(supportedPublicParam);
-    if (id != null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("The Portlet " + producerOfferedPortletContext.getId() + " supports the public render parameter : " +
-            supportedPublicParam);
-      }
-      return id;
-    }
-
-    //
-    return null;
-  }
-
-  /**
-   * Tells, according to the info located in portlet.xml, wether this portlet
-   * supports the public render parameter given as a method argument
-   */
-  public boolean supportsPublicParam(String supportedPublicParam) {
-    if (supportedPublicParams_ == null) {
-
-      //
-      if (producedOfferedPortlet == null) {
-        LOG.info("Could not find portlet with ID : " + producerOfferedPortletContext.getId());
-        return false;
-      }
-
-      //
-      Collection<ParameterInfo> parameters = (Collection<ParameterInfo>) producedOfferedPortlet.getInfo()
-                                                                                               .getNavigation()
-                                                                                               .getPublicParameters();
-      supportedPublicParams_ = new HashMap<QName, String>();
-      for (ParameterInfo parameter : parameters) {
-        supportedPublicParams_.put(parameter.getName(), parameter.getId());
-      }
-    }
-
-    //
-    for (String publicParam : supportedPublicParams_.values()) {
-      if (publicParam.equals(supportedPublicParam)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("The Portlet " + producerOfferedPortletContext.getId() + " supports the public render parameter : " +
-              supportedPublicParam);
-        }
-        return true;
-      }
-    }
-
-    //
-    return false;
   }
 
   /**
@@ -646,13 +384,10 @@ public class UIPortlet extends UIApplication {
 
     // Case when portlet has not public parameters in UIPortal but there are
     // supported public parameters in URL
-    if (supportedPublicParams_ != null &&
-        portletParameters != null
-        &&
-        portletParameters.size() > 0
-        &&
-        allPublicParamsNames.size() == 0) {
-      for (QName qName : supportedPublicParams_.keySet()) {
+    if (supportedPublicParams != null
+        && MapUtils.isNotEmpty(portletParameters)
+        && allPublicParamsNames.isEmpty()) {
+      for (QName qName : supportedPublicParams.keySet()) {
         String prpId = supportsPublicParam(qName);
         if (prpId != null && portletParameters.containsKey(prpId)) {
           publicParamsMap.put(prpId, portletParameters.get(prpId));
@@ -927,7 +662,7 @@ public class UIPortlet extends UIApplication {
    * This is used by the dashboard portlet and should not be used else where. It
    * will be removed some day.
    */
-  private static final ThreadLocal<UIPortlet> currentPortlet = new ThreadLocal<UIPortlet>();
+  private static final ThreadLocal<UIPortlet> currentPortlet = new ThreadLocal<>();
 
   public static UIPortlet getCurrentUIPortlet() {
     return currentPortlet.get();
@@ -951,52 +686,6 @@ public class UIPortlet extends UIApplication {
   }
 
   /**
-   * navigationalState - internal portlet container parameter (go with portlet
-   * url). called when navigation state updated
-   * 
-   * @param navigationalState
-   */
-  void setNavigationalState(StateString navigationalState) {
-    this.navigationalState = navigationalState;
-  }
-
-  /**
-   * configuredTitle - the localized title configured in portlet.xml. This value
-   * returned ans set after portlet container invocation.
-   * 
-   * @param _configuredTitle - portlet title responsed from portlet container
-   */
-  protected void setConfiguredTitle(String _configuredTitle) {
-    this.configuredTitle = _configuredTitle;
-  }
-
-  /**
-   * Returns the title showed on the InfoBar. The title is computed in following
-   * manner. <br>
-   * 1. First, the method getTitle(), inherited from UIPortalComponent is
-   * called. The getTitle() returns what users set in the PortletSetting tab,
-   * the current method returns call result if it is not null. <br>
-   * 2. configuredTitle, which is the localized value of javax.portlet.title is
-   * returned if it is not null. <br>
-   * 3. If the method does not terminate at neither (1) nor (2), the configured
-   * display name is returned.
-   *
-   * @return
-   */
-  public String getDisplayTitle() {
-    String displayedTitle = getTitle();
-    if (displayedTitle != null && displayedTitle.trim().length() > 0) {
-      return displayedTitle;
-    }
-
-    if (configuredTitle != null) {
-      return configuredTitle;
-    }
-
-    return getDisplayName();
-  }
-
-  /**
    * Parsing response from portlet container. The response contains:<br>
    * html markup, portlet title, response properties:<br>
    * - JS resource dependency (defined in gatein-resources.xml)<br>
@@ -1016,26 +705,15 @@ public class UIPortlet extends UIApplication {
     PortalRequestContext prcontext = (PortalRequestContext) context;
 
     Text markup = null;
-    if (pir instanceof FragmentResponse) {
-      if (lazyResourcesLoading == null) {
-        PortletInfo portletInfo = producedOfferedPortlet.getInfo();
-        if (portletInfo instanceof ContainerPortletInfo containerPortletInfo) {
-          String prefetchResources = containerPortletInfo.getInitParameter("prefetch.resources");
-          lazyResourcesLoading = StringUtils.equals(prefetchResources, "true");
-        } else {
-          lazyResourcesLoading = false;
-        }
-      }
-
-      FragmentResponse fragmentResponse = (FragmentResponse) pir;
+    if (pir instanceof FragmentResponse fragmentResponse) {
       switch (fragmentResponse.getType()) {
-      case FragmentResponse.TYPE_CHARS:
+      case ContentResponse.TYPE_CHARS:
         markup = Text.create(fragmentResponse.getContent());
         break;
-      case FragmentResponse.TYPE_BYTES:
-        markup = Text.create(fragmentResponse.getBytes(), Charset.forName("UTF-8"));
+      case ContentResponse.TYPE_BYTES:
+        markup = Text.create(fragmentResponse.getBytes(), StandardCharsets.UTF_8);
         break;
-      case FragmentResponse.TYPE_EMPTY:
+      default:
         markup = Text.create("");
         break;
       }
@@ -1075,7 +753,7 @@ public class UIPortlet extends UIApplication {
           List<Element> markupElements = markupHeaders.getValues(MimeResponse.MARKUP_HEAD_ELEMENT);
           if (markupElements != null) {
             for (Element element : markupElements) {
-              if (!context.useAjax() && "title".equals(element.getNodeName().toLowerCase())
+              if (!context.useAjax() && "title".equalsIgnoreCase(element.getNodeName())
                   && element.getFirstChild() != null) {
                 String title = element.getFirstChild().getNodeValue();
                 prcontext.getRequest().setAttribute(PortalRequestContext.REQUEST_TITLE, title);
@@ -1086,36 +764,128 @@ public class UIPortlet extends UIApplication {
           }
         }
       }
-
     } else {
-
       PortletContainerException pcException;
-
-      if (pir instanceof ErrorResponse) {
-        ErrorResponse errorResponse = (ErrorResponse) pir;
+      if (pir instanceof ErrorResponse errorResponse) {
         pcException = new PortletContainerException(errorResponse.getMessage(), errorResponse.getCause());
       } else {
         pcException = new PortletContainerException("Unknown invocation response type [" + pir.getClass() +
             "]. Expected a FragmentResponse or an ErrorResponse");
       }
-
-      //
       PortletExceptionHandleService portletExceptionService = getApplicationComponent(PortletExceptionHandleService.class);
       if (portletExceptionService != null) {
         portletExceptionService.handle(pcException);
       }
-
       // Log the error
       LOG.error("Portlet render threw an exception in page {}", prcontext.getRequest().getRequestURI(), pcException);
-
       markup = Text.create(context.getApplicationResourceBundle().getString("UIPortlet.message.RuntimeError"));
     }
-
     return markup;
   }
 
-  public boolean isLazyResourcesLoading() {
-    return lazyResourcesLoading != null && lazyResourcesLoading.booleanValue();
+  /**
+   * Tells, according to the info located in portlet.xml, wether this portlet
+   * supports the public render parameter qname given as method argument. If the
+   * qname is supported, the public render parameter id is returned otherwise
+   * false is returned.
+   *
+   * @param supportedPublicParam the supported public parameter qname
+   * @return the supported public parameter id
+   */
+  public String supportsPublicParam(QName supportedPublicParam) {
+    return getSupportedPublicParams().get(supportedPublicParam);
+  }
+
+  /**
+   * Tells, according to the info located in portlet.xml, wether this portlet
+   * supports the public render parameter given as a method argument
+   */
+  public boolean supportsPublicParam(String supportedPublicParam) {
+    return getSupportedPublicParams().values().contains(supportedPublicParam);
+  }
+
+  /**
+   * Tells, according to the info located in portlet.xml, wether this portlet
+   * can handle a portlet event with the QName given as the method argument
+   */
+  public boolean supportsProcessingEvent(QName name) {
+    return getSupportedProcessingEvents().contains(name);
+  }
+
+  public boolean supportsPublishingEvent(QName name) {
+    return getSupportedPublishingEvents().contains(name);
+  }
+
+  public Map<QName, String> getSupportedPublicParams() {
+    if (supportedPublicParams == null) {
+      if (producedOfferedPortlet == null) {
+        supportedPublicParams = Collections.emptyMap();
+      } else {
+        Collection<ParameterInfo> parameters = (Collection<ParameterInfo>) producedOfferedPortlet.getInfo()
+                                                                                                 .getNavigation()
+                                                                                                 .getPublicParameters();
+        supportedPublicParams = parameters.stream().collect(Collectors.toMap(ParameterInfo::getName, ParameterInfo::getId));
+      }
+    }
+    return supportedPublicParams;
+  }
+
+  public List<QName> getSupportedProcessingEvents() {
+    if (supportedProcessingEvents == null) {
+      org.gatein.pc.api.Portlet portlet = getProducedOfferedPortlet();
+      if (portlet == null) {
+        supportedProcessingEvents = Collections.emptyList();
+      } else {
+        Map<QName, EventInfo> consumedEvents = (Map<QName, EventInfo>) portlet.getInfo().getEventing().getConsumedEvents();
+        if (MapUtils.isEmpty(consumedEvents)) {
+          supportedProcessingEvents = Collections.emptyList();
+        } else {
+          supportedProcessingEvents = new ArrayList<>(consumedEvents.keySet());
+        }
+      }
+    }
+    return supportedProcessingEvents;
+  }
+
+  public List<QName> getSupportedPublishingEvents() {
+    if (supportedPublishingEvents == null) {
+      org.gatein.pc.api.Portlet portlet = getProducedOfferedPortlet();
+      if (portlet == null) {
+        supportedPublishingEvents = Collections.emptyList();
+      } else {
+        Map<QName, EventInfo> producedEvents = (Map<QName, EventInfo>) portlet.getInfo().getEventing().getProducedEvents();
+        if (MapUtils.isEmpty(producedEvents)) {
+          supportedPublishingEvents = Collections.emptyList();
+        } else {
+          supportedPublishingEvents = new ArrayList<>(producedEvents.keySet());
+        }
+      }
+    }
+    return supportedPublishingEvents;
+  }
+
+  /**
+   * Returns the title showed on the InfoBar. The title is computed in following
+   * manner. <br>
+   * 1. First, the method getTitle(), inherited from UIPortalComponent is
+   * called. The getTitle() returns what users set in the PortletSetting tab,
+   * the current method returns call result if it is not null. <br>
+   * 2. configuredTitle, which is the localized value of javax.portlet.title is
+   * returned if it is not null. <br>
+   * 3. If the method does not terminate at neither (1) nor (2), the configured
+   * display name is returned.
+   *
+   * @return
+   */
+  public String getDisplayTitle() {
+    String displayedTitle = getTitle();
+    if (displayedTitle != null && displayedTitle.trim().length() > 0) {
+      return displayedTitle;
+    }
+    if (configuredTitle != null) {
+      return configuredTitle;
+    }
+    return getDisplayName();
   }
 
   private String getMaximizedPortletMode() {

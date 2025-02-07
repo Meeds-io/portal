@@ -24,24 +24,11 @@ import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.UIComponentDecorator;
 
-/**
- * May 19, 2006
- */
 @ComponentConfig(template = "system:/groovy/portal/webui/page/UIPageBody.gtmpl")
 public class UIPageBody extends UIComponentDecorator {
 
-  private String storageId;
-
   public UIPageBody() {
     setId("UIPageBody");
-  }
-
-  public String getStorageId() {
-    return storageId;
-  }
-
-  public void setStorageId(String storageId) {
-    this.storageId = storageId;
   }
 
   public String getPageName() {

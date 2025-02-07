@@ -19,84 +19,59 @@
 
 package org.exoplatform.portal.webui.page;
 
-import javax.portlet.WindowState;
-
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.application.PortalRequestContext;
-import org.exoplatform.portal.webui.application.UIPortlet;
 import org.exoplatform.web.application.RequestContext;
-import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.UIComponentDecorator;
 
-/**
- * May 19, 2006
- */
 @ComponentConfig(template = "system:/groovy/portal/webui/page/UISiteBody.gtmpl")
 public class UISiteBody extends UIComponentDecorator {
 
-    /** The storage id. */
-    private String storageId;
-
-    public String getStorageId() {
-        return storageId;
-    }
-
-    public void setStorageId(String storageId) {
-        this.storageId = storageId;
-    }
-
-    @Override
-    public void processRender(WebuiRequestContext context) throws Exception {
-      PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
-      portalRequestContext.startServerTime("UISiteBody");
-      try {
-        if (isShowSiteBody()) {
-          processContainerRender(context);
-        } else {
-          processPageBodyRender(context);
-        }
-      } finally {
-        portalRequestContext.endServerTime("UISiteBody");
-      }
-    }
-
-    public String getSiteClass() {
-      String portalOwner = ((PortalRequestContext) RequestContext.getCurrentInstance()).getPortalOwner();
-      if (StringUtils.isBlank(portalOwner)) {
-        return "";
+  @Override
+  public UIComponent getUIComponent() {
+    if (isShowSiteBody()) {
+      return getSiteComponent();
+    } else {
+      if (PortalRequestContext.getCurrentInstance().isMaximizePortlet()) {
+        return getMaximizedPortlet();
       } else {
-        return portalOwner.toUpperCase() + "Site";
+        return getPageComponent();
       }
     }
+  }
 
-    @Override
-    public UIComponent getUIComponent() {
-      return PortalRequestContext.getCurrentInstance().getUiPortal();
+  /**
+   * @return Site CSS class. Used in gtmpl in order to allow specifying a
+   *         specific CSS selector for current Site
+   */
+  public String getSiteClass() {
+    String portalOwner = PortalRequestContext.getCurrentInstance().getPortalOwner();
+    if (StringUtils.isBlank(portalOwner)) {
+      return "";
+    } else {
+      return portalOwner.toUpperCase() + "Site";
     }
+  }
 
-    protected boolean isShowSiteBody() {
-      PortalRequestContext requestContext = RequestContext.getCurrentInstance();
-      return !requestContext.isShowMaxWindow() && (requestContext.getUiPage() == null || !requestContext.getUiPage().isShowMaxWindow());
-    }
+  protected UIComponent getSiteComponent() {
+    return PortalRequestContext.getCurrentInstance().getUiPortal();
+  }
 
-    protected void processPageBodyRender(WebuiRequestContext context) throws Exception {
-      UIPortlet maximizedUIPortlet = PortalRequestContext.getCurrentInstance().getMaximizedUIPortlet();
-      if (maximizedUIPortlet != null) {
-        maximizedUIPortlet.setCurrentWindowState(WindowState.MAXIMIZED);
-        maximizedUIPortlet.processRender(context);
-      } else {
-        UIPageBody uiPageBody = findFirstComponentOfType(UIPageBody.class);
-        if (uiPageBody != null) {
-          uiPageBody.processRender(context);
-        }
-      }
-    }
+  protected UIComponent getPageComponent() {
+    return getSiteComponent().findFirstComponentOfType(UIPageBody.class);
+  }
 
-    protected void processContainerRender(WebuiRequestContext context) throws Exception {
-      super.processRender(context);
-    }
+  protected UIComponent getMaximizedPortlet() {
+    return PortalRequestContext.getCurrentInstance().getMaximizedUIPortlet();
+  }
+
+  protected boolean isShowSiteBody() {
+    PortalRequestContext requestContext = RequestContext.getCurrentInstance();
+    return !requestContext.isShowMaxWindow()
+           && (requestContext.getUiPage() == null || !requestContext.getUiPage().isShowMaxWindow());
+  }
 
 }
