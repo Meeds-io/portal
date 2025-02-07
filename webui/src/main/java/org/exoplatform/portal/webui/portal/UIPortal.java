@@ -150,11 +150,11 @@ public class UIPortal extends UIContainer {
   }
 
   public boolean isDraftPage() {
-    return ((PortalRequestContext) RequestContext.getCurrentInstance()).isDraftPage();
+    return PortalRequestContext.getCurrentInstance().isDraftPage();
   }
 
   public boolean isNoCache() {
-    return ((PortalRequestContext) RequestContext.getCurrentInstance()).isNoCache();
+    return PortalRequestContext.getCurrentInstance().isNoCache();
   }
 
   public void clearUIPage(String pageReference) {

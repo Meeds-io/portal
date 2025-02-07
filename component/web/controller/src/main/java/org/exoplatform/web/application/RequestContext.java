@@ -169,7 +169,15 @@ public abstract class RequestContext {
 
     public abstract UserPortal getUserPortal();
 
+    /**
+     * @param <T>
+     * @return
+     * @deprecated Use PortalRequestContext#getCurrentInstance or
+     *             PortletRequestContext#getCurrentInstance for type casting
+     *             safe instead
+     */
     @SuppressWarnings("unchecked")
+    @Deprecated(forRemoval = true, since = "7.0")
     public static <T extends RequestContext> T getCurrentInstance() {
         return (T) tlocal_.get();
     }

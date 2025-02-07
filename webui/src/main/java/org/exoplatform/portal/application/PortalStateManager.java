@@ -52,7 +52,7 @@ public class PortalStateManager extends StateManager {
 
     //
     ApplicationState appState = null;
-    HttpSession session = getSession(context);
+    HttpSession session = getSession();
     String key = getKey(context);
     if (session != null) {
       appState = (ApplicationState) session.getAttribute(APPLICATION_ATTRIBUTE_PREFIX + key);
@@ -90,7 +90,7 @@ public class PortalStateManager extends StateManager {
 
     //
     if (uiapp != null) {
-      HttpSession session = getSession(context);
+      HttpSession session = getSession();
 
       // At this point if it returns null it means that it was not possible to
       // create a session
@@ -106,23 +106,16 @@ public class PortalStateManager extends StateManager {
   }
 
   private String getKey(WebuiRequestContext webuiRC) {
-    if (webuiRC instanceof PortletRequestContext) {
-      PortletRequestContext portletRC = (PortletRequestContext) webuiRC;
+    if (webuiRC instanceof PortletRequestContext portletRC) {
       return portletRC.getApplication().getApplicationId() + "/" + portletRC.getWindowId();
     } else {
       return PortalApplication.PORTAL_APPLICATION_ID;
     }
   }
 
-  private HttpSession getSession(WebuiRequestContext webuiRC) {
-    PortalRequestContext portalRC;
-    if (webuiRC instanceof PortletRequestContext) {
-      PortletRequestContext portletRC = (PortletRequestContext) webuiRC;
-      portalRC = (PortalRequestContext) portletRC.getParentAppRequestContext();
-    } else {
-      portalRC = (PortalRequestContext) webuiRC;
-    }
-    HttpServletRequest req = portalRC.getRequest();
+  private HttpSession getSession() {
+    HttpServletRequest req = PortalRequestContext.getCurrentInstance().getRequest();
     return req.getSession(false);
   }
+
 }

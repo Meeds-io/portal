@@ -98,7 +98,7 @@ public class UIPortletActionListener {
   public static class ProcessActionActionListener<S, C extends Serializable, I> extends EventListener<UIPortlet> {
     public void execute(Event<UIPortlet> event) throws Exception {
       UIPortlet uiPortlet = event.getSource();
-      PortalRequestContext prcontext = (PortalRequestContext) event.getRequestContext();
+      PortalRequestContext prcontext = PortalRequestContext.getCurrentInstance();
 
       // set the public render parameters from the request before creating the
       // invocation
@@ -326,7 +326,7 @@ public class UIPortletActionListener {
       String resourceId = null;
 
       //
-      PortalRequestContext context = (PortalRequestContext) event.getRequestContext();
+      PortalRequestContext context = PortalRequestContext.getCurrentInstance();
       HttpServletResponse response = context.getResponse();
 
       //
@@ -482,7 +482,7 @@ public class UIPortletActionListener {
   public static class ProcessEventsActionListener extends EventListener<UIPortlet> {
     public void execute(Event<UIPortlet> event) throws Exception {
       UIPortlet uiPortlet = event.getSource();
-      PortalRequestContext context = (PortalRequestContext) event.getRequestContext();
+      PortalRequestContext context = PortalRequestContext.getCurrentInstance();
       List<UIPortlet> portletInstancesInPage = new ArrayList<UIPortlet>();
       // UIPortalApplication uiPortal =
       // uiPortlet.getAncestorOfType(UIPortalApplication.class);
