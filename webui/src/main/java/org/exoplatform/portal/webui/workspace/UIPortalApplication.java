@@ -852,12 +852,10 @@ public class UIPortalApplication extends UIApplication {
     List<UIPortlet> portlets = new ArrayList<>();
     uiViewWorkingWorkspace.findComponentOfType(portlets, UIPortlet.class);
     for (UIPortlet uiPortlet : portlets) {
-      if (!uiPortlet.isLazyResourcesLoading()) {
-        try {
-          jsMan.loadScriptResource(ResourceScope.PORTLET, uiPortlet.getApplicationId());
-        } catch (Exception e) {
-          LOG.warn("Can't load JS resource for portlet {}", uiPortlet.getName(), e);
-        }
+      try {
+        jsMan.loadScriptResource(ResourceScope.PORTLET, uiPortlet.getApplicationId());
+      } catch (Exception e) {
+        LOG.warn("Can't load JS resource for portlet {}", uiPortlet.getName(), e);
       }
     }
     // Load static body-end-container applications added on UIPortalApplication

@@ -176,7 +176,7 @@ public class UIExtensionTest extends TestCase {
   public static class MyTestUIExtensionComponent3 extends UIComponent {
     @UIExtensionFilters
     public List<UIExtensionFilter> getFilters() {
-      return Arrays.asList(new UIExtensionFilter[]{new MyTestUIExtensionFilter1(), new MyTestUIExtensionFilter1()});
+      return Arrays.asList(new MyTestUIExtensionFilter1(), new MyTestUIExtensionFilter1());
     }    
   }
   
@@ -184,15 +184,14 @@ public class UIExtensionTest extends TestCase {
     private MyTestUIExtensionComponent4(){}    
     @UIExtensionFilters
     public List<UIExtensionFilter> getFilters() {
-      return Arrays.asList(new UIExtensionFilter[]{new MyTestUIExtensionFilter1()});
+      return Arrays.asList(new MyTestUIExtensionFilter1());
     }    
   }
   
   public static class MyTestUIExtensionComponent5 extends UIComponent {
-    @SuppressWarnings("unused")
     @UIExtensionFilters
     private List<UIExtensionFilter> getFilters() {
-      return Arrays.asList(new UIExtensionFilter[]{new MyTestUIExtensionFilter1()});
+      return Arrays.asList(new MyTestUIExtensionFilter1());
     }    
   }
   

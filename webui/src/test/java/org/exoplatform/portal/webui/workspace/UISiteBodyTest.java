@@ -35,6 +35,7 @@ import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.webui.page.UISiteBody;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.webui.application.WebuiRequestContext;
+import org.exoplatform.webui.core.UIComponent;
 
 @RunWith(MockitoJUnitRunner.class)
 public class UISiteBodyTest {
@@ -61,14 +62,22 @@ public class UISiteBodyTest {
 
     UISiteBody uiSiteBody = new UISiteBody() {
       @Override
-      protected void processPageBodyRender(WebuiRequestContext context) throws Exception {
-        pageBodyRenderCount.incrementAndGet();
+      public void processRender(WebuiRequestContext context) throws Exception {
+        getUIComponent();
       }
 
       @Override
-      protected void processContainerRender(WebuiRequestContext context) throws Exception {
+      protected UIComponent getSiteComponent() {
         overallRenderCount.incrementAndGet();
+        return null;
       }
+
+      @Override
+      protected UIComponent getPageComponent() {
+        pageBodyRenderCount.incrementAndGet();
+        return null;
+      }
+
     };
     uiSiteBody.processRender(pcontext);
 
