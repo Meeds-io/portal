@@ -42,6 +42,7 @@ import com.github.sommeri.less4j.LessCompiler;
 import com.github.sommeri.less4j.LessCompiler.Configuration;
 import com.github.sommeri.less4j.core.ThreadUnsafeLessCompiler;
 
+import org.exoplatform.commons.api.settings.ExoFeatureService;
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
@@ -78,19 +79,19 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_RESET_ATTACHMENT_ID       = "0";
 
-  public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";            // NOSONAR
+  public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";             // NOSONAR
 
-  public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";         // NOSONAR
+  public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";          // NOSONAR
 
-  public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v="; // NOSONAR
+  public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v=";  // NOSONAR
 
-  public static final String   BRANDING_PAGE_BG_BASE_PATH         = "/portal/rest/v1/platform/branding/pageBackground?v=";  // NOSONAR
+  public static final String   BRANDING_PAGE_BG_BASE_PATH         = "/portal/rest/v1/platform/branding/pageBackground?v=";   // NOSONAR
 
   public static final String   BRANDING_TOP_BAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/topBarBackground?v=";
 
   public static final String   BRANDING_SIDEBAR_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/sideBarBackground?v=";
 
-  public static final String   BRANDING_DRAWER_BG_BASE_PATH      = "/portal/rest/v1/platform/branding/drawerBackground?v=";
+  public static final String   BRANDING_DRAWER_BG_BASE_PATH       = "/portal/rest/v1/platform/branding/drawerBackground?v=";
 
   public static final String   BRANDING_COMPANY_NAME_INIT_PARAM   = "exo.branding.company.name";
 
@@ -138,13 +139,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_SIDEBAR_BG_ID_SETTING_KEY = "sideBar.background";
 
-  public static final String   BRANDING_DRAWER_BG_ID_SETTING_KEY = "drawer.background";
+  public static final String   BRANDING_DRAWER_BG_ID_SETTING_KEY  = "drawer.background";
 
   public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
 
+  public static final String   BRANDING_CUSTOM_CSS                = "page.customCss";
+
   public static final String   SIDEBAR_BG_IMAGE_THEME_STYLE_KEY   = "sideBarBackgroundImage";
 
-  public static final String   DRAWER_BG_IMAGE_THEME_STYLE_KEY   = "drawerBackgroundImage";
+  public static final String   DRAWER_BG_IMAGE_THEME_STYLE_KEY    = "drawerBackgroundImage";
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -157,6 +160,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   BRANDING_PAGE_BG_POSITION_KEY      = "page.backgroundPosition";
 
   public static final String   BRANDING_PAGE_BG_SIZE_KEY          = "page.backgroundSize";
+
+  public static final String   BRANDING_CUSTOM_STYLE_FEATURE      = "customStylesheet";
 
   public static final String   BRANDING_LAST_UPDATED_TIME_KEY     = "branding.lastUpdatedTime";
 
@@ -172,13 +177,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   SIDEBAR_BACKGROUND_NAME            = "sideBarBackground.png";
 
-  public static final String   DRAWER_BACKGROUND_NAME            = "drawerBackground.png";
+  public static final String   DRAWER_BACKGROUND_NAME             = "drawerBackground.png";
 
   public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
-  public static final String   BRANDING_DEFAULT_LOGO_PATH         = "/skin/images/logo/DefaultLogo.png";                    // NOSONAR
+  public static final String   BRANDING_DEFAULT_LOGO_PATH         = "/skin/images/logo/DefaultLogo.png";                     // NOSONAR
 
-  public static final String   BRANDING_DEFAULT_FAVICON_PATH      = "/skin/images/favicon.ico";                             // NOSONAR
+  public static final String   BRANDING_DEFAULT_FAVICON_PATH      = "/skin/images/favicon.ico";                              // NOSONAR
 
   public static final Context  BRANDING_CONTEXT                   = Context.GLOBAL.id("BRANDING");
 
@@ -197,6 +202,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private UploadService        uploadService;
 
   private ConfigurationManager configurationManager;
+
+  private ExoFeatureService    featureService;
 
   private ListenerService      listenerService;
 
@@ -234,6 +241,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Logo                 logo                               = null;
 
+  private String               customCss                          = null;
+
   private Favicon              favicon                            = null;
 
   private Background           loginBackground                    = null;
@@ -244,7 +253,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Background           sideBarBackground                  = null;
 
-  private Background           drawerBackground                  = null;
+  private Background           drawerBackground                   = null;
 
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
@@ -271,6 +280,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public void start() {
     computeThemeCSS();
+    listenerService.addListener(ExoFeatureService.FEATURE_STATUS_CHANGED_EVENT, e -> {
+      if (StringUtils.equals(BRANDING_CUSTOM_STYLE_FEATURE, (String) e.getSource())) {
+        this.triggerBrandingUpdated(true, true);
+      }
+    });
   }
 
   @Override
@@ -319,6 +333,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageBackgroundRepeat(getPageBackgroundRepeat());
     branding.setPageBackgroundEffect(getPageBackgroundEffect());
     branding.setPageWidth(getPageWidth());
+    branding.setCustomCss(getCustomCss());
     branding.setThemeStyle(getThemeStyle());
     branding.setLoginTitle(getLoginTitle());
     branding.setLoginSubtitle(getLoginSubtitle());
@@ -394,6 +409,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updatePageBackgroundEffect(branding.getPageBackgroundEffect(), false);
       updatePageBackgroundRepeat(branding.getPageBackgroundRepeat(), false);
       updatePageWidth(branding.getPageWidth(), false);
+      updateCustomCss(branding.getCustomCss(), false);
       Map<String, String> themeStyles = branding.getThemeStyle();
       processThemeBackgroundImages(themeStyles);
       updateThemeStyle(themeStyles, false);
@@ -457,7 +473,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       } else {
         backgroundImageUrl.append(");");
       }
-    } else if (getPageBackgroundEffect()!=null) {
+    } else if (getPageBackgroundEffect() != null) {
       return getPageBackgroundEffect().concat("; ");
     }
     return backgroundImageUrl.toString();
@@ -466,6 +482,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getPageWidth() {
     return getPropertyValue(BRANDING_PAGE_WIDTH_KEY);
+  }
+
+  @Override
+  public String getCustomCss() {
+    return getPropertyValue(BRANDING_CUSTOM_CSS);
   }
 
   @Override
@@ -698,21 +719,21 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public String getTopBarBackgroundPath() {
     Background background = getTopBarBackground();
     return background == null
-            || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+           || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
   public String getSideBarBackgroundPath() {
     Background background = getSideBarBackground();
     return background == null
-            || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+           || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
   public String getDrawerBackgroundPath() {
     Background background = getDrawerBackground();
     return background == null
-            || background.getData() == null ? null : BRANDING_DRAWER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+           || background.getData() == null ? null : BRANDING_DRAWER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
   }
 
   @Override
@@ -723,6 +744,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       settingService.set(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY, SettingValue.create(lastUpdatedTimestamp));
     }
     this.themeCSSContent = null;
+    this.customCss = null;
   }
 
   @Override
@@ -974,6 +996,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     updatePropertyValue(BRANDING_PAGE_WIDTH_KEY, value, updateLastUpdatedTime);
   }
 
+  private void updateCustomCss(String value, boolean updateLastUpdatedTime) {
+    updatePropertyValue(BRANDING_CUSTOM_CSS, value, updateLastUpdatedTime);
+  }
+
   private void updateCompanyName(String companyName, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_COMPANY_NAME_SETTING_KEY, companyName, updateLastUpdatedTime);
   }
@@ -1050,13 +1076,19 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private void updateTopBarBackground(Background topBarBackground, boolean updateLastUpdatedTime) {
-    updateBrandingFile(topBarBackground, TOP_BAR_BACKGROUND_NAME, this.getTopBarBackgroundId(), BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
+    updateBrandingFile(topBarBackground,
+                       TOP_BAR_BACKGROUND_NAME,
+                       this.getTopBarBackgroundId(),
+                       BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
     this.topBarBackground = null;
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
   private void updateSideBarBackground(Background sideBarBackground, boolean updateLastUpdatedTime) {
-    updateBrandingFile(sideBarBackground, SIDEBAR_BACKGROUND_NAME, this.getSideBarBackgroundId(), BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
+    updateBrandingFile(sideBarBackground,
+                       SIDEBAR_BACKGROUND_NAME,
+                       this.getSideBarBackgroundId(),
+                       BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
     this.sideBarBackground = null;
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
@@ -1175,7 +1207,22 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         }
       }
     }
+    if (StringUtils.isNotBlank(getCustomCssContent())
+        && getFeatureService() != null
+        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
+      this.themeCSSContent += "\n" + this.customCss;
+    }
     return this.themeCSSContent;
+  }
+
+  private String getCustomCssContent() {
+    if (this.customCss == null) {
+      this.customCss = getCustomCss();
+      if (this.customCss == null) {
+        this.customCss = "";
+      }
+    }
+    return this.customCss;
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
@@ -1263,7 +1310,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private void validateCSSInputs(Branding branding) { // NOSONAR
-    Arrays.asList(branding.getPageBackgroundColor(),
+    Arrays.asList(branding.getCustomCss(),
+                  branding.getPageBackgroundColor(),
                   branding.getPageBackgroundPosition(),
                   branding.getPageBackgroundRepeat(),
                   branding.getPageBackgroundSize(),
@@ -1312,6 +1360,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
       themeStyles.put(styleKey, backgroundImageValue.toString());
     }
+  }
+
+  private ExoFeatureService getFeatureService() {
+    if (featureService == null) {
+      featureService = container.getComponentInstanceOfType(ExoFeatureService.class);
+    }
+    return featureService;
   }
 
 }
