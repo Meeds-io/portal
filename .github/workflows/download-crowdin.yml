@@ -6,6 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  log-step:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump variables
+        env:
+          YML_CROWDIN_LANGUAGES_ARG: ${{vars.YML_CROWDIN_LANGUAGES_ARG}}
+          CROWDIN_LANGUAGES_ARG: ${{vars.CROWDIN_LANGUAGES_ARG}}
+        run: |
+          echo "YML_CROWDIN_LANGUAGES_ARG: $YML_CROWDIN_LANGUAGES_ARG"
+          echo "CROWDIN_LANGUAGES_ARG: $CROWDIN_LANGUAGES_ARG"
   download-crowdin:
     name: CI Build
     uses: exoplatform/swf-scripts/.github/workflows/download-crowdin-exoplatform.yml@master
