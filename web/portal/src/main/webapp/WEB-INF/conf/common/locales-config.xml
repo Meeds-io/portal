@@ -29,41 +29,6 @@
     encoding: ISO-8859-1 
   -->
   <locale-config>
-    <locale>en</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for english locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>fr</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the french locale</description>
-  </locale-config>
-  
-  <locale-config>
-    <locale>es_ES</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the spanish locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>cs</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Czech locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>ja</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the japanese locale</description>
-  </locale-config>
-
-  <locale-config>
     <locale>ar</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
@@ -80,10 +45,171 @@
   </locale-config>
 
   <locale-config>
+    <locale>ca</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Catalan locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>zh_CN</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the chinese simplified locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>zh_TW</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the chinese simplified locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>co</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Corsican locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>hr</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Croatian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>cs</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Czech locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>nl</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Dutch locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>en</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for english locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>et</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Estonian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>fil</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Filipino locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>fi</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Finnish locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>fr</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the french locale</description>
+  </locale-config>
+
+  <locale-config>
     <locale>de</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
     <description>Default configuration for the german locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>el</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Greek locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>he</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Hebrew locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>hu</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Hungarian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>id</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Indonesian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>it</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the italian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>ja</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the japanese locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>ko</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Korean locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>lt</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Lithuanian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>no</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Norwegian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>fa</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Persian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>pl</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Polish locale</description>
   </locale-config>
 
   <locale-config>
@@ -101,66 +227,24 @@
   </locale-config>
 
   <locale-config>
-    <locale>it</locale>
+    <locale>ro</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the italian locale</description>
+    <description>Default configuration for the Romanian locale</description>
   </locale-config>
-  
+
   <locale-config>
     <locale>ru</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
     <description>Default configuration for the russian locale</description>
-  </locale-config> 
-  
-  <locale-config>
-    <locale>tr</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the turkish locale</description>
-  </locale-config>
-  
-  <locale-config>
-    <locale>zh_CN</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the chinese simplified locale</description>
   </locale-config>
 
   <locale-config>
-    <locale>uk</locale>
+    <locale>sk</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Ukrainian locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>pl</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Polish locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>fa</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Persian locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>ca</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Catalan locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>nl</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Dutch locale</description>
+    <description>Default configuration for the Slovak locale</description>
   </locale-config>
 
   <locale-config>
@@ -171,24 +255,10 @@
   </locale-config>
 
   <locale-config>
-    <locale>id</locale>
+    <locale>es_ES</locale>
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Indonesian locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>fil</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Filipino locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>ro</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for the Romanian locale</description>
+    <description>Default configuration for the spanish locale</description>
   </locale-config>
 
   <locale-config>
@@ -198,4 +268,31 @@
     <description>Default configuration for the Swedish locale</description>
   </locale-config>
 
+  <locale-config>
+    <locale>th</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Thaï locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>tr</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the turkish locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>uk</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Ukrainian locale</description>
+  </locale-config>
+
+  <locale-config>
+    <locale>vi</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for the Vietnamese locale</description>
+  </locale-config>
 </locales-config>
