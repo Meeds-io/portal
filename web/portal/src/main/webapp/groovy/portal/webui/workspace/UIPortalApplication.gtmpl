@@ -37,7 +37,7 @@
   String language = rcontext.getLocale().getLanguage();
   String country = rcontext.getLocale().getCountry();
   if (country != null && country.length() > 0) {
-    language += "-" + country;
+    language += "_" + country;
   }
   String docBase =  rcontext.getRequestContextPath() ;
   String skin = uicomponent.getSkin();
