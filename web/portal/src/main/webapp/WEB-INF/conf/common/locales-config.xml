@@ -26,8 +26,17 @@
     The encoding parameter will be used for the request  response stream.
     The input-encoding parameter will be used for request setCharacterEncoding(..) 
 
-    encoding: ISO-8859-1 
+    encoding: ISO-8859-1
+
+    The first defined locale is used as default locale in the platform => keep en as first
   -->
+  <locale-config>
+    <locale>en</locale>
+    <output-encoding>UTF-8</output-encoding>
+    <input-encoding>UTF-8</input-encoding>
+    <description>Default configuration for english locale</description>
+  </locale-config>
+
   <locale-config>
     <locale>ar</locale>
     <output-encoding>UTF-8</output-encoding>
@@ -91,13 +100,6 @@
     <output-encoding>UTF-8</output-encoding>
     <input-encoding>UTF-8</input-encoding>
     <description>Default configuration for the Dutch locale</description>
-  </locale-config>
-
-  <locale-config>
-    <locale>en</locale>
-    <output-encoding>UTF-8</output-encoding>
-    <input-encoding>UTF-8</input-encoding>
-    <description>Default configuration for english locale</description>
   </locale-config>
 
   <locale-config>
