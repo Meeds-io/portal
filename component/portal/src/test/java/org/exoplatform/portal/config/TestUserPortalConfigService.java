@@ -44,6 +44,7 @@ import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.Utils;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
@@ -745,6 +746,24 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   }
 
   public void testGetSiteNodeOrGlobalNode() {
+    UserNode userNode = userPortalConfigService.getDefaultSiteNode("classic", null);
+    assertEquals("home", userNode.getURI());
+
+    Page homePage = layoutService.getPage(userNode.getPageRef());
+    String[] accessPermissions = homePage.getAccessPermissions();
+    try {
+      homePage.setAccessPermissions(new String[] {"*:/platform/administrators"});
+      layoutService.save(new PageContext(homePage.getPageKey(), Utils.toPageState(homePage)));
+
+      userNode = userPortalConfigService.getDefaultSiteNode("classic", null);
+      assertEquals("home/subnode", userNode.getURI());
+    } finally {
+      homePage.setAccessPermissions(accessPermissions);
+      layoutService.save(new PageContext(homePage.getPageKey(), Utils.toPageState(homePage)));
+    }
+  }
+
+  public void testGetSiteNodeNoHomePageAccess() {
     UserNode userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", null);
     assertEquals("home", userNode.getURI());
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "Notfound", null);

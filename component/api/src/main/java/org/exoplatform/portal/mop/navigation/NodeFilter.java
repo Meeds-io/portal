@@ -38,4 +38,10 @@ public interface NodeFilter {
      */
     boolean accept(int depth, String id, String name, NodeState state);
 
+    /**
+     * @return true if the node should be hidden only when not having access to
+     *         page and not having children, else false
+     */
+    boolean isHideOnlyPage();
+
 }

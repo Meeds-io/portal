@@ -53,12 +53,15 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.importer.ImportMode;
+import org.exoplatform.portal.mop.navigation.NavigationContext;
+import org.exoplatform.portal.mop.navigation.NodeContext;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
+import org.exoplatform.portal.mop.user.UserNodeContext;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig;
 import org.exoplatform.portal.mop.user.UserNodeFilterConfig.Builder;
 import org.exoplatform.portal.mop.user.UserPortal;
@@ -394,11 +397,11 @@ public class UserPortalConfigService implements Startable {
       return null;
     } else {
       do {
-        if (isAccessiblePage(targetUserNode, username)) {
+        if (isAccessiblePageNoDraft(targetUserNode, username)) {
           return targetUserNode;
         } else if (CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
           UserNode childUserNode = getNodeOrFirstChildWithPage(targetUserNode.getChildren(), username);
-          if (isAccessiblePage(childUserNode, username)) {
+          if (isAccessiblePageNoDraft(childUserNode, username)) {
             return childUserNode;
           }
         }
@@ -421,18 +424,30 @@ public class UserPortalConfigService implements Startable {
     if (userPortalConfig == null) {
       return null;
     }
+    SiteKey siteKey = new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName);
+
     UserPortal userPortal = userPortalConfig.getUserPortal();
-    UserNavigation navigation = userPortal.getNavigation(new SiteKey(SiteType.valueOf(siteType.toUpperCase()), siteName));
-    if (navigation == null) {
+    UserNavigation navigation = userPortal.getNavigation(siteKey);
+    NavigationContext navigationContext = getNavigationService().loadNavigation(siteKey);
+    if (navigationContext == null) {
       return null;
     }
-    Builder builder = UserNodeFilterConfig.builder().withReadCheck().withTemporalCheck();
+    Builder builder = UserNodeFilterConfig.builder().withReadCheckNoPage().withTemporalCheck();
     if (withVisibility) {
       builder.withVisibility(Visibility.DISPLAYED, Visibility.TEMPORAL);
     } else {
       builder.withoutVisibility();
     }
-    return userPortal.getNode(navigation, org.exoplatform.portal.mop.navigation.Scope.ALL, builder.build(), null);
+    UserNodeContext userNodeContext = new UserNodeContext(navigation, builder.build());
+    NodeContext<UserNode> nodeContext = getNavigationService().loadNode(userNodeContext,
+                                                                        navigationContext,
+                                                                        org.exoplatform.portal.mop.navigation.Scope.ALL,
+                                                                        null);
+    if (nodeContext != null) {
+      return nodeContext.getNode().filter();
+    } else {
+      return null;
+    }
   }
 
   public PortalConfig getDefaultSite(String username) {
@@ -508,7 +523,11 @@ public class UserPortalConfigService implements Startable {
         }
         if (globalUserNode != null) {
           if (validSiteDepth >= validGlobalDepth) {
-            return getNodeOrFirstChildWithPage(siteUserNode, username);
+            UserNode result = getNodeOrFirstChildWithPage(siteUserNode, username);
+            if (result == null) {
+              result = getNodeOrFirstChildWithPage(rootUserNode, username);
+            }
+            return result;
           } else {
             if (globalUserNode.getPageRef() == null
                 || getPage(globalUserNode.getPageRef(), username) == null) {
@@ -720,6 +739,10 @@ public class UserPortalConfigService implements Startable {
                  }
                })
                .toList();
+  }
+
+  private boolean isAccessiblePageNoDraft(UserNode userNode, String username) {
+    return isAccessiblePage(userNode, username) && userNode.getVisibility() != Visibility.DRAFT;
   }
 
   private boolean isAccessiblePage(UserNode userNode, String username) {

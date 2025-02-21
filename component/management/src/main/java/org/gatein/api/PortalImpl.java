@@ -39,7 +39,6 @@ import org.exoplatform.services.log.Log;
 
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.portal.config.*;
-import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteKey;
