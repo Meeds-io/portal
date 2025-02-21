@@ -67,40 +67,7 @@
   </page>
 
   <page>
-    <name>add-component-test-page</name>
-    <container>
-      <name>add-component-test-container</name>
-      <portlet-application>
-        <portlet>
-          <application-ref>web</application-ref>
-          <portlet-ref>BannerPortlet</portlet-ref>
-          <preferences>
-            <preference>
-              <name>template</name>
-              <value>par:/groovy/groovy/webui/component/UIBannerPortlet.gtmpl</value>
-              <read-only>false</read-only>
-            </preference>
-          </preferences>
-        </portlet>
-        <access-permissions>Everyone</access-permissions>
-        <show-info-bar>true</show-info-bar>
-      </portlet-application>
-      <portlet-application>
-        <portlet>
-          <application-ref>web</application-ref>
-          <portlet-ref>FooterPortlet</portlet-ref>
-          <preferences>
-            <preference>
-              <name>template</name>
-              <value>par:/groovy/groovy/webui/component/UIFooterPortlet.gtmpl</value>
-              <read-only>false</read-only>
-            </preference>
-          </preferences>
-        </portlet>
-        <access-permissions>Everyone</access-permissions>
-        <show-info-bar>true</show-info-bar>
-      </portlet-application>
-    </container>
+    <name>subnode</name>
   </page>
 
 </page-set>

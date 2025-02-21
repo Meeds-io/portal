@@ -256,7 +256,7 @@ public class NavigationRest implements ResourceContainer {
 
   private static UserNodeFilterConfig getUserFilterConfig(Visibility[] visibilities, boolean temporalCheck) {
     UserNodeFilterConfig.Builder builder = UserNodeFilterConfig.builder();
-    builder.withReadWriteCheck().withVisibility(visibilities.length > 0 ? visibilities : DEFAULT_VISIBILITIES).withReadCheck();
+    builder.withReadCheckNoPage().withVisibility(visibilities.length > 0 ? visibilities : DEFAULT_VISIBILITIES).withReadCheckNoPage();
     if (temporalCheck) {
       builder.withTemporalCheck();
     }

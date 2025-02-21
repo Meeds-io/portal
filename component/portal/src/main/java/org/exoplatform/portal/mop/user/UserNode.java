@@ -70,7 +70,7 @@ public class UserNode {
     return context.getId();
   }
 
-  UserNode filter() {
+  public UserNode filter() {
     owner.filter(this);
     return this;
   }
