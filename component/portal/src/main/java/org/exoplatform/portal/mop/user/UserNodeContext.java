@@ -25,7 +25,7 @@ import org.exoplatform.portal.mop.navigation.NodeModel;
 /**
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  */
-class UserNodeContext implements NodeModel<UserNode> {
+public class UserNodeContext implements NodeModel<UserNode> {
 
     /** The related navigation. */
     final UserNavigation navigation;
@@ -36,7 +36,7 @@ class UserNodeContext implements NodeModel<UserNode> {
     /** . */
     private UserNodeFilter filter;
 
-    UserNodeContext(UserNavigation navigation, UserNodeFilterConfig filterConfig) {
+    public UserNodeContext(UserNavigation navigation, UserNodeFilterConfig filterConfig) {
         this.filterConfig = filterConfig;
         this.navigation = navigation;
     }

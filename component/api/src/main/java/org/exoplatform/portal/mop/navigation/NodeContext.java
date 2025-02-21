@@ -254,7 +254,7 @@ public final class NodeContext<N> extends ListTree<NodeContext<N>> {
                     throw new IllegalArgumentException("the node " + name + " already exist");
                 }
             } else {
-                tree.addChange(new NodeChange.Renamed<NodeContext<N>>(getParent(), this, name));
+                tree.addChange(new NodeChange.Renamed<>(getParent(), this, name));
             }
         }
     }
@@ -265,12 +265,24 @@ public final class NodeContext<N> extends ListTree<NodeContext<N>> {
      * @param filter the filter to apply
      */
     public void filter(NodeFilter filter) {
-
-        setHidden(!accept(filter));
         if (expanded) {
             for (NodeContext<N> node = getFirst(); node != null; node = node.getNext()) {
                 node.filter(filter);
             }
+        }
+        if (accept(filter)) {
+          setHidden(false);
+        } else if (filter.isHideOnlyPage() && getNodeSize() > 0) {
+          if (state != null) {
+            state = state.builder().pageRef(null).build();
+          }
+          if (data != null && data.getState() != null) {
+            data = new NodeData(this);
+            data.state = data.state.builder().pageRef(null).build();
+          }
+          setHidden(false);
+        } else {
+          setHidden(true);
         }
     }
 

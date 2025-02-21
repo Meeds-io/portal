@@ -41,6 +41,8 @@ public class UserNodeFilterConfig {
     /** . */
     public static final int AUTH_READ_WRITE = 2;
 
+    public static final int AUTH_READ_NO_PAGE = 3;
+
     /** . */
     final Set<Visibility> visibility;
 
@@ -166,6 +168,11 @@ public class UserNodeFilterConfig {
 
         public Builder withReadCheck() {
             this.withAuthorizationMode = AUTH_READ;
+            return this;
+        }
+
+        public Builder withReadCheckNoPage() {
+            this.withAuthorizationMode = AUTH_READ_NO_PAGE;
             return this;
         }
 

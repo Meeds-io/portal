@@ -32,7 +32,7 @@ import org.exoplatform.portal.mop.storage.PageStorage;
  * @author <a href="mailto:julien.viet@exoplatform.com">Julien Viet</a>
  * @version $Revision$
  */
-class UserNodeFilter implements NodeFilter {
+public class UserNodeFilter implements NodeFilter {
 
   /** . */
   private final UserPortalImpl       userPortal;
@@ -53,30 +53,12 @@ class UserNodeFilter implements NodeFilter {
     this.config = config;
   }
 
-  private boolean canRead(NodeState state) {
-    PageKey pageRef = state.getPageRef();
-    if (pageRef != null) {
-      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
-      if (page != null) {
-        UserACL userACL = ExoContainerContext.getService(UserACL.class);
-        return userACL.hasAccessPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
-      }
-    }
-    return true;
+  @Override
+  public boolean isHideOnlyPage() {
+    return config != null && config.authorizationMode == UserNodeFilterConfig.AUTH_READ_NO_PAGE;
   }
 
-  private boolean canWrite(NodeState state) {
-    PageKey pageRef = state.getPageRef();
-    if (pageRef != null) {
-      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
-      if (page != null) {
-        UserACL userACL = ExoContainerContext.getService(UserACL.class);
-        return userACL.hasEditPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
-      }
-    }
-    return false;
-  }
-
+  @Override
   public boolean accept(int depth, String id, String name, NodeState state) {
     Visibility visibility = state.getVisibility();
 
@@ -133,5 +115,29 @@ class UserNodeFilter implements NodeFilter {
 
     //
     return true;
+  }
+
+  private boolean canRead(NodeState state) {
+    PageKey pageRef = state.getPageRef();
+    if (pageRef != null) {
+      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
+      if (page != null) {
+        UserACL userACL = ExoContainerContext.getService(UserACL.class);
+        return userACL.hasAccessPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
+      }
+    }
+    return true;
+  }
+
+  private boolean canWrite(NodeState state) {
+    PageKey pageRef = state.getPageRef();
+    if (pageRef != null) {
+      PageContext page = ExoContainerContext.getService(PageStorage.class).loadPage(pageRef);
+      if (page != null) {
+        UserACL userACL = ExoContainerContext.getService(UserACL.class);
+        return userACL.hasEditPermission(page, userACL.getUserIdentity(userPortal.getUserName()));
+      }
+    }
+    return false;
   }
 }

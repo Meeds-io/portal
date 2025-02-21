@@ -31,8 +31,8 @@
       <page-reference>portal::classic::homepage</page-reference>
       <node>
         <name>subnode</name>
-        <label>#{portal.classic.home}</label>
-        <page-reference>portal::classic::homepage</page-reference>
+        <label>#{portal.classic.subnode}</label>
+        <page-reference>portal::classic::subnode</page-reference>
       </node>
     </node>
     <node>
