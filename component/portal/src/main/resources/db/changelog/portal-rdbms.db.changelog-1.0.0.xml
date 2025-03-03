@@ -403,7 +403,8 @@
       </sql>
   </changeSet>
 
-  <changeSet author="portal" id="1.0.0-42">
+  <changeSet author="portal" id="1.0.0-42" dbms="mysql">
+    <validCheckSum>ANY</validCheckSum>
     <modifyDataType tableName="PORTAL_WINDOWS" columnName="CUSTOMIZATION" newDataType="LONGBLOB" />
   </changeSet>
 
