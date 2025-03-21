@@ -245,6 +245,8 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
     User user = organizationService.getUserHandler().findUserByName(usernameOrEmail, UserStatus.ANY);
     if (user == null && usernameOrEmail.contains("@")) {
       Query query = new Query();
+      //in passwordRecovery context, we do not allow search by email with wildcard
+      usernameOrEmail=usernameOrEmail.replace("*","");
       query.setEmail(usernameOrEmail);
       ListAccess<User> list = organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY);
       if (list != null && list.getSize() > 0) {

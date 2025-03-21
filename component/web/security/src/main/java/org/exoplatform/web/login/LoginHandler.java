@@ -281,6 +281,8 @@ public class LoginHandler extends JspBasedWebHandler {
   private String getUserNameByEmail(String identifier,
                                     ControllerContext context,
                                     StringBuilder loginPath) throws Exception {
+    //in login context, we do not allow search by email with wildcard
+    identifier=identifier.replace("*","");
     UserHandler userHandler = organizationService.getUserHandler();
     if (userHandler != null) {
       Query emailQuery = new Query();
