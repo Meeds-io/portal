@@ -2013,12 +2013,18 @@ public class PatchedHibernateIdentityStoreImpl implements IdentityStore, Seriali
 
     if (attrDuctTypeText) {
       for (int i = 0; i < attribute.getValues().size(); i++) {
-        String paramName = " :value" + i;
-        queryString.append(" and").append(paramName).append(" = any elements(a.textValues)");
-
+        String paramName = ":value" + i;
+        if ("email".equals(attribute.getName())) {
+          queryString.append(" AND EXISTS (");
+          queryString.append(" SELECT 1 FROM a.textValues textValue");
+          queryString.append(" WHERE LOWER(textValue) = LOWER(").append(paramName).append(")");
+          queryString.append(")");
+        } else {
+          queryString.append(" AND ").append(paramName).append(" = ANY elements(a.textValues)");
+        }
       }
     } else {
-      queryString.append(" and :value = a.binaryValue");
+      queryString.append(" AND :value = a.binaryValue");
     }
 
     Query<HibernateIdentityObjectAttribute> q = session.createQuery(queryString.toString(), HibernateIdentityObjectAttribute.class)
