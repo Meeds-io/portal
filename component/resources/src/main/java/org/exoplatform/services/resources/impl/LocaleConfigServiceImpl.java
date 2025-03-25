@@ -201,7 +201,7 @@ public class LocaleConfigServiceImpl implements LocaleConfigService {
       //
       String country = config.getLocale().getCountry();
       if (StringUtils.isNotBlank(country)) {
-        this.configs.put(config.getLanguage() + "_" + country, config);
+        this.configs.put(config.getLanguage() + "-" + country, config);
       } else {
         this.configs.put(config.getLanguage(), config);
       }
