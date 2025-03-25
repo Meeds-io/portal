@@ -28,6 +28,7 @@
   def userName = rcontext.getRemoteUser();
   def productName = uicomponent.getApplicationComponent(ProductInformations.class).getProductName();
   def productLink = uicomponent.getApplicationComponent(ProductInformations.class).getProductLink();
+  def productEdition = uicomponent.getApplicationComponent(ProductInformations.class).getProductEdition();
   UserNode selectedUserNode = Util.getUIPortal().getSelectedUserNode();
   def selectedNodeId = selectedUserNode.getId();
   def selectedNodeUri = selectedUserNode.getURI();
@@ -177,6 +178,7 @@
      eXo.env.portal.csrfToken = "<%=CSRFTokenUtil.getToken(rcontext.getRequest())%>";
      eXo.env.portal.productName = "<%=productName%>";
      eXo.env.portal.productLink = "<%=productLink%>";
+     eXo.env.portal.productEdition = "<%=productEdition%>"
      eXo.env.portal.siteId = '<%=siteId%>';
      eXo.env.server.context = "<%=docBase%>";
      eXo.env.server.portalBaseURL = "<%=uicomponent.getBaseURL()%>";
