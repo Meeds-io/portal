@@ -245,6 +245,6 @@ public class LocaleContextInfo {
         if (locale.getCountry().length() == 0)
             return locale.getLanguage();
 
-        return locale.getLanguage() + "_" + locale.getCountry();
+        return locale.getLanguage() + "-" + locale.getCountry();
     }
 }
