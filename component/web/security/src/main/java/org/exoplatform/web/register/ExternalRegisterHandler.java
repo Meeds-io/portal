@@ -45,6 +45,7 @@ import jakarta.servlet.http.HttpSession;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.json.JSONObject;
 
 import org.exoplatform.commons.utils.ListAccess;
@@ -402,6 +403,7 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     if (!isAdministrator && securitySettingService.isRegistrationExternalUser()) {
       // Avoid incoherence by indicating an admin user As external
       deleteFromInternalUsersGroup(login);
+      restartTransaction();
       addToExternalUsersGroup(login);
     }
     return login;
@@ -641,5 +643,4 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     user.setPassword(password);
     return user;
   }
-
 }
