@@ -402,6 +402,7 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     if (!isAdministrator && securitySettingService.isRegistrationExternalUser()) {
       // Avoid incoherence by indicating an admin user As external
       deleteFromInternalUsersGroup(login);
+      restartTransaction();
       addToExternalUsersGroup(login);
     }
     return login;
@@ -641,5 +642,4 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     user.setPassword(password);
     return user;
   }
-
 }
