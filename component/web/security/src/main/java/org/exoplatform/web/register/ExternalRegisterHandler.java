@@ -45,7 +45,6 @@ import jakarta.servlet.http.HttpSession;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.json.JSONObject;
 
 import org.exoplatform.commons.utils.ListAccess;
