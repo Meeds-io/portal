@@ -19,5 +19,5 @@
 package io.meeds.portal.navigation.constant;
 
 public enum TopbarItemType {
-  APP, LINK;
+  APP, EXTENSION;
 }
