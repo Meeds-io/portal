@@ -44,6 +44,8 @@ public class TopbarApplication {
 
   private String              icon;
 
+  private String              imageUrl;
+
   private TopbarItemType      type;
 
   private boolean             enabled;
@@ -60,16 +62,17 @@ public class TopbarApplication {
       return true;
     } else if (properties == null || app.getProperties() == null) {
       return false;
-    } else {
+    } else if (properties.containsKey(CONTENT_ID_PROP_NAME)) {
       return StringUtils.equals(properties.get(CONTENT_ID_PROP_NAME),
                                 app.getProperties().get(CONTENT_ID_PROP_NAME));
+    } else {
+      return Objects.equals(properties, app.getProperties());
     }
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(properties == null ? id :
-                                           StringUtils.firstNonBlank(properties.get(CONTENT_ID_PROP_NAME), id));
+    return Objects.hash(properties == null ? id : StringUtils.firstNonBlank(properties.get(CONTENT_ID_PROP_NAME), id));
   }
 
 }
