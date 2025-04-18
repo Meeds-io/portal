@@ -129,7 +129,7 @@ public class Page extends Container {
   }
 
   public PageKey getPageKey() {
-    if (pageKey == null) {
+    if (pageKey == null && getPageId() != null) {
       pageKey = PageKey.parse(getPageId());
     }
     return pageKey;
