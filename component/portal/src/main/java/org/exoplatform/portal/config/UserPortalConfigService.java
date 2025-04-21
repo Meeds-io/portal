@@ -360,7 +360,11 @@ public class UserPortalConfigService implements Startable {
   }
 
   public String getDefaultPath(String username) {
-    String userHomePage = isAllowUserHome() && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
+    return getDefaultPath(username, true);
+  }
+
+  public String getDefaultPath(String username, boolean useUserHome) {
+    String userHomePage = useUserHome && isAllowUserHome() && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
     if (StringUtils.isNotBlank(userHomePage)) {
       return userHomePage;
     } else {
