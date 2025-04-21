@@ -73,6 +73,7 @@ import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 
 import io.meeds.common.ContainerTransactional;
+import io.meeds.portal.navigation.constant.SidebarItemType;
 import io.meeds.portal.navigation.model.SidebarConfiguration;
 import io.meeds.portal.navigation.model.SidebarItem;
 import io.meeds.portal.navigation.service.NavigationConfigurationService;
@@ -100,6 +101,10 @@ public class UserPortalConfigService implements Startable {
   public static final String             DEFAULT_GROUP_SITE_TEMPLATE    = "group";
 
   public static final String             DEFAULT_USER_SITE_TEMPLATE     = "user";
+
+  public static final String             SITE_NAME_PROP_NAME            = "siteName";
+
+  public static final String             SITE_TYPE_PROP_NAME            = "siteType";
 
   private static final Log               LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
 
@@ -360,7 +365,11 @@ public class UserPortalConfigService implements Startable {
   }
 
   public String getDefaultPath(String username) {
-    String userHomePage = isAllowUserHome() && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
+    return getDefaultPath(username, true);
+  }
+
+  public String getDefaultPath(String username, boolean useUserHome) {
+    String userHomePage = useUserHome && isAllowUserHome() && StringUtils.isNotBlank(username) ? getUserHomePage(username) : null;
     if (StringUtils.isNotBlank(userHomePage)) {
       return userHomePage;
     } else {
@@ -462,7 +471,7 @@ public class UserPortalConfigService implements Startable {
       List<PortalConfig> portalConfigList = getAccessiblePortalSites(username);
       if (CollectionUtils.isEmpty(portalConfigList)) {
         return null;
-      } else {
+      } else if (getNavigationConfigurationService() == null) {
         return portalConfigList.stream()
                                .filter(PortalConfig::isDefaultSite)
                                .filter(p -> PortalConfig.PORTAL_TYPE.equalsIgnoreCase(p.getType()))
@@ -471,8 +480,24 @@ public class UserPortalConfigService implements Startable {
                                .filter(Objects::nonNull)
                                .findFirst()
                                .orElse(null);
+      } else {
+        SidebarConfiguration sidebarConfiguration = getNavigationConfigurationService().getSidebarConfiguration(username,
+                                                                                                                Locale.ENGLISH);
+        SiteKey defaultSiteKey = sidebarConfiguration.getItems()
+                                                     .stream()
+                                                     .filter(s -> SidebarItemType.SITE == s.getType())
+                                                     .filter(SidebarItem::isDefaultPath)
+                                                     .map(this::getSiteKey)
+                                                     .findFirst()
+                                                     .orElseGet(() -> SiteKey.portal(getMetaPortal()));
+        return layoutService.getPortalConfig(defaultSiteKey);
       }
     }
+  }
+
+  private SiteKey getSiteKey(SidebarItem item) {
+    return new SiteKey(item.getProperties().get(SITE_TYPE_PROP_NAME),
+                       item.getProperties().get(SITE_NAME_PROP_NAME));
   }
 
   public UserNode getSiteNodeOrGlobalNode(String portalType, // NOSONAR
