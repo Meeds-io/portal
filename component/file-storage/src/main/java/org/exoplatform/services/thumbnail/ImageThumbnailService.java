@@ -48,5 +48,35 @@ public interface ImageThumbnailService {
    */
   FileItem getOrCreateThumbnail(ImageResizeService resizeSupplier, FileItem file, int width, int height) throws Exception;
 
+  /**
+   * Retrieves a thumbnail by given fileId, fileType, width and height or creates a thumbnail
+   * image and get it if not exist
+   *
+   * @param id file id
+   * @param fileType file fileType
+   * @param width target thumbnail width
+   * @param height target thumbnail height
+   * @return {@link FileItem}
+   * @throws Exception
+   */
+   FileItem  getOrCreateThumbnail( String id, String fileType, String userName, int width, int height) throws Exception;
+
+
+  void deleteThumbnails(String fileId);
   void deleteThumbnails(Long fileId);
+
+  /**
+   * Add a new {@link ImageThumbnailPlugin} for a given file Type
+   *
+   * @param imageThumbnailPlugin {@link ImageThumbnailPlugin}
+   */
+  void addPlugin(ImageThumbnailPlugin imageThumbnailPlugin);
+
+  /**
+   * Removes a {@link ImageThumbnailPlugin} identified by its file type
+   *
+   * @param fileType File type
+   */
+  void removePlugin(String fileType);
+
 }
