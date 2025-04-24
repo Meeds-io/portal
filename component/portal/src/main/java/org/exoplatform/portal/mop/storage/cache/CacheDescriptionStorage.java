@@ -17,11 +17,12 @@ package org.exoplatform.portal.mop.storage.cache;
 
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
@@ -123,9 +124,14 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
                                                                           null :
                                                                           descriptionLocaleList.getLocales()
                                                                                                .stream()
-                                                                                               .collect(Collectors.toMap(Function.identity(),
-                                                                                                                         l -> getDescription(id,
-                                                                                                                                             l)));
+                                                                                               .filter(Objects::nonNull)
+                                                                                               .map(l -> Pair.of(l,
+                                                                                                                 getDescription(id,
+                                                                                                                                l)))
+                                                                                               .filter(p -> p.getKey()
+                                                                                                   != null && p.getValue() != null)
+                                                                                               .collect(Collectors.toMap(Pair::getKey,
+                                                                                                                         Pair::getValue));
   }
 
   private void clearCacheEntries(String id) {
