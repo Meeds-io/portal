@@ -76,7 +76,6 @@ public interface ImageThumbnailService {
    * Delete all thumbnails by fileId
    *
    * @param fileId file id
-   * @throws Exception
    */
   void deleteThumbnails(String fileId);
 
@@ -84,7 +83,6 @@ public interface ImageThumbnailService {
    * Delete all thumbnails by fileId
    *
    * @param fileId file id
-   * @throws Exception
    */
   void deleteThumbnails(Long fileId);
 
