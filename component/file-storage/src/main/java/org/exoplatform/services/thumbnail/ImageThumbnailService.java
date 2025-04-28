@@ -76,8 +76,9 @@ public interface ImageThumbnailService {
    * Delete all thumbnails by fileId
    *
    * @param fileId file id
+   * @param fileType file Type
    */
-  void deleteThumbnails(String fileId);
+  void deleteThumbnails(String fileType, String fileId);
 
   /**
    * Delete all thumbnails by fileId
