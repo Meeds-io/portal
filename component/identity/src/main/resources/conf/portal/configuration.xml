@@ -8,4 +8,9 @@
     <key>org.exoplatform.services.security.Authenticator</key>
     <type>org.exoplatform.services.organization.auth.OrganizationAuthenticatorImpl</type>
   </component>
+
+  <component>
+    <type>org.exoplatform.services.security.IdentityRegistry</type>
+  </component>
+
 </configuration>
