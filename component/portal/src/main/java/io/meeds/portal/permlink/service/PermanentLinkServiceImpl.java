@@ -153,6 +153,11 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
     }
   }
 
+  @Override
+  public void addPlugin(PermanentLinkPlugin plugin) {
+    plugins.put(plugin.getObjectType(), plugin);
+  }
+
   protected void initPlugins() {
     plugins = container.getComponentInstancesOfType(PermanentLinkPlugin.class)
                        .stream()
