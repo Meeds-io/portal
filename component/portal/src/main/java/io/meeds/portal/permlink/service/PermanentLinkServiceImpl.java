@@ -25,10 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.codec.binary.Base64;
@@ -80,7 +79,7 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
   /**
    * {@link Map} of Object Type with associated plugin
    */
-  private Map<String, PermanentLinkPlugin> plugins;
+  private Map<String, PermanentLinkPlugin> plugins                  = new ConcurrentHashMap<>();
 
   @Getter
   private String                           salt;
@@ -153,15 +152,15 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
     }
   }
 
+  protected void initPlugins() {
+    container.getComponentInstancesOfType(PermanentLinkPlugin.class)
+             .stream()
+             .forEach(p -> plugins.put(p.getObjectType(), p));
+  }
+
   @Override
   public void addPlugin(PermanentLinkPlugin plugin) {
     plugins.put(plugin.getObjectType(), plugin);
-  }
-
-  protected void initPlugins() {
-    plugins = container.getComponentInstancesOfType(PermanentLinkPlugin.class)
-                       .stream()
-                       .collect(Collectors.toMap(PermanentLinkPlugin::getObjectType, Function.identity()));
   }
 
   protected void initSalt() {
