@@ -19,39 +19,58 @@
  */
 package io.meeds.kernel.test;
 
+import java.util.Objects;
+
+import org.apache.commons.lang3.ObjectUtils;
+
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.component.test.KernelBootstrap;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.RootContainer;
 import org.exoplatform.container.component.RequestLifeCycle;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @ConfiguredBy({
-  @ConfigurationUnit(scope = ContainerScope.ROOT,
-      path = "conf/configuration.xml"),
-  @ConfigurationUnit(scope = ContainerScope.PORTAL,
-      path = "conf/portal/configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),
+  @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
 })
 public abstract class AbstractSpringTest {
 
   @Setter
   @Getter
-  private static Class<?>                      testClass;
+  private static Class<?>        testClass;
 
-  private static KernelBootstrap               bootstrap;
+  private static KernelBootstrap bootstrap;
 
   public static PortalContainer bootContainer(Class<?> clazz) {
+    Class<? extends Object> bootTestClass = ObjectUtils.firstNonNull(clazz,
+                                                                     testClass,
+                                                                     AbstractSpringTest.class);
     if (isPortalContainerPresent()) {
-      return PortalContainer.getInstanceIfPresent();
+      if (isPortalContainerIncludingSpring(bootTestClass)) {
+        PortalContainer container = PortalContainer.getInstanceIfPresent();
+        ExoContainerContext.setCurrentContainer(container);
+        return container;
+      } else {
+        RootContainer rootContainer = RootContainer.getInstance();
+        rootContainer.stop();
+        rootContainer.dispose();
+        RootContainer.setInstance(null);
+        PortalContainer.setInstance(null);
+      }
     }
     bootstrap = new KernelBootstrap(Thread.currentThread().getContextClassLoader());
-    bootstrap.addConfiguration(clazz);
+    bootstrap.addConfiguration(bootTestClass);
     bootstrap.boot();
-    return bootstrap.getContainer();
+    PortalContainer container = bootstrap.getContainer();
+    ExoContainerContext.setCurrentContainer(container);
+    container.registerComponentInstance(SpringLoadFlag.class);
+    return container;
   }
 
   public PortalContainer getContainer() {
@@ -59,9 +78,15 @@ public abstract class AbstractSpringTest {
   }
 
   protected PortalContainer bootContainer() {
-    PortalContainer container = bootContainer(getClass());
-    ExoContainerContext.setCurrentContainer(container);
-    return container;
+    if (isPortalContainerPresent()) {
+      PortalContainer container = PortalContainer.getInstanceIfPresent();
+      ExoContainerContext.setCurrentContainer(container);
+      return container;
+    } else {
+      PortalContainer container = bootContainer(getClass());
+      ExoContainerContext.setCurrentContainer(container);
+      return container;
+    }
   }
 
   protected void begin() {
@@ -97,4 +122,18 @@ public abstract class AbstractSpringTest {
     return ExoContainerContext.getCurrentContainerIfPresent() != null && PortalContainer.getInstanceIfPresent() != null;
   }
 
+  protected static boolean isPortalContainerIncludingSpring(Class<?> testClass) {
+    SpringLoadFlag springLoadFlag = isPortalContainerPresent() ? PortalContainer.getInstance()
+                                                                                .getComponentInstanceOfType(SpringLoadFlag.class) :
+                                                               null;
+    return springLoadFlag != null && Objects.equals(testClass, springLoadFlag.getTestClass());
+  }
+
+  public class SpringLoadFlag { // NOSONAR
+
+    @Getter
+    @Setter
+    private Class<?> testClass;
+
+  }
 }
