@@ -32,10 +32,14 @@ import lombok.NoArgsConstructor;
 public class FileContent {
 
   private String      id;
+
   private String      name;
+
   private String      mimeType;
+
   private InputStream content;
-  private Date updatedDate;
+
+  private Date        updatedDate;
 
   public FileContent(String id, String name, String mimeType, InputStream content) {
     this.id = id;
