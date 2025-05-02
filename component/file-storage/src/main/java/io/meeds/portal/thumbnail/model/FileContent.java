@@ -20,6 +20,7 @@
 package io.meeds.portal.thumbnail.model;
 
 import java.io.InputStream;
+import java.util.Date;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,11 +32,16 @@ import lombok.NoArgsConstructor;
 public class FileContent {
 
   private String      id;
-
   private String      name;
-
   private String      mimeType;
-
   private InputStream content;
+  private Date updatedDate;
+
+  public FileContent(String id, String name, String mimeType, InputStream content) {
+    this.id = id;
+    this.name = name;
+    this.mimeType = mimeType;
+    this.content = content;
+  }
 
 }
