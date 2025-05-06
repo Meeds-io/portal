@@ -43,6 +43,8 @@ import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.services.security.IdentityRegistry;
 
+import io.meeds.portal.plugin.AclPlugin;
+
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -77,6 +79,8 @@ public class UserACL {
   @Getter
   @Setter
   private String                             adminMSType;
+
+  private Map<String, AclPlugin>             aclPlugins             = new HashMap<>();
 
   private Map<String, GroupVisibilityPlugin> groupVisibilityPlugins = new HashMap<>();
 
@@ -412,6 +416,55 @@ public class UserACL {
   public boolean isAnonymousUser(String username) {
     return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username)
            || IdentityConstants.SYSTEM.equals(username);
+  }
+
+  public boolean hasAccessPermission(String objectType,
+                                     String objectId,
+                                     String username) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.VIEW_PERMISSION_TYPE,
+                         username);
+  }
+
+  public boolean hasEditPermission(String objectType,
+                                   String objectId,
+                                   String username) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.EDIT_PERMISSION_TYPE,
+                         username);
+  }
+
+  public boolean hasDeletePermission(String objectType,
+                                     String objectId,
+                                     String username) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.DELETE_PERMISSION_TYPE,
+                         username);
+  }
+
+  public boolean hasPermission(String objectType,
+                               String objectId,
+                               String permissionType,
+                               String username) {
+    AclPlugin aclPlugin = getAclPlugin(objectType);
+    return aclPlugin.hasPermission(objectId,
+                                   permissionType,
+                                   StringUtils.isBlank(username) ? null : getUserIdentity(username));
+  }
+
+  public void addAclPlugin(AclPlugin aclPlugin) {
+    this.aclPlugins.put(aclPlugin.getObjectType(), aclPlugin);
+  }
+
+  public AclPlugin getAclPlugin(String objectType) {
+    AclPlugin aclPlugin = this.aclPlugins.get(objectType);
+    if (aclPlugin == null) {
+      throw new IllegalArgumentException(String.format("ACL Plugin of type '%s' doesn't exist", objectType));
+    }
+    return aclPlugin;
   }
 
   public Authenticator getAuthenticator() {
