@@ -43,6 +43,8 @@ import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.services.security.IdentityRegistry;
 
+import io.meeds.portal.plugin.AclPlugin;
+
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -77,6 +79,8 @@ public class UserACL {
   @Getter
   @Setter
   private String                             adminMSType;
+
+  private Map<String, AclPlugin>             aclPlugins             = new HashMap<>();
 
   private Map<String, GroupVisibilityPlugin> groupVisibilityPlugins = new HashMap<>();
 
@@ -214,10 +218,10 @@ public class UserACL {
    * @return true if have edit permission else false
    */
   public boolean hasEditPermission(PortalConfig portalConfig, Identity identity) {
-    return hasEditPermission(identity,
-                             portalConfig.getType(),
-                             portalConfig.getName(),
-                             portalConfig.getEditPermission());
+    return portalConfig != null && hasEditPermission(identity,
+                                                     portalConfig.getType(),
+                                                     portalConfig.getName(),
+                                                     portalConfig.getEditPermission());
   }
 
   /**
@@ -229,10 +233,10 @@ public class UserACL {
    * @return true if have edit permission else false
    */
   public boolean hasEditPermission(Page page, Identity identity) {
-    return hasEditPermission(identity,
-                             page.getOwnerType(),
-                             page.getOwnerId(),
-                             page.getEditPermission());
+    return page != null && hasEditPermission(identity,
+                                             page.getOwnerType(),
+                                             page.getOwnerId(),
+                                             page.getEditPermission());
   }
 
   /**
@@ -244,10 +248,10 @@ public class UserACL {
    * @return true if have edit permission else false
    */
   public boolean hasEditPermission(PageContext pageContext, Identity identity) {
-    return hasEditPermission(identity,
-                             pageContext.getKey().getSite().getTypeName(),
-                             pageContext.getKey().getSite().getName(),
-                             pageContext.getState().getEditPermission());
+    return pageContext != null && hasEditPermission(identity,
+                                                    pageContext.getKey().getSite().getTypeName(),
+                                                    pageContext.getKey().getSite().getName(),
+                                                    pageContext.getState().getEditPermission());
   }
 
   /**
@@ -259,10 +263,10 @@ public class UserACL {
    * @return true if have access permission else false
    */
   public boolean hasAccessPermission(PortalConfig portalConfig, Identity identity) {
-    return hasAccessPermission(identity,
-                               portalConfig.getType(),
-                               portalConfig.getName(),
-                               portalConfig.getAccessPermissions())
+    return (portalConfig != null && hasAccessPermission(identity,
+                                                        portalConfig.getType(),
+                                                        portalConfig.getName(),
+                                                        portalConfig.getAccessPermissions()))
            || hasEditPermission(portalConfig, identity);
   }
 
@@ -275,10 +279,10 @@ public class UserACL {
    * @return true if have access permission else false
    */
   public boolean hasAccessPermission(Page page, Identity identity) {
-    return hasAccessPermission(identity,
-                               page.getOwnerType(),
-                               page.getOwnerId(),
-                               page.getAccessPermissions())
+    return (page != null && hasAccessPermission(identity,
+                                                page.getOwnerType(),
+                                                page.getOwnerId(),
+                                                page.getAccessPermissions()))
            || hasEditPermission(page, identity);
   }
 
@@ -291,10 +295,10 @@ public class UserACL {
    * @return true if have access permission else false
    */
   public boolean hasAccessPermission(PageContext pageContext, Identity identity) {
-    return hasAccessPermission(identity,
-                               pageContext.getKey().getSite().getTypeName(),
-                               pageContext.getKey().getSite().getName(),
-                               pageContext.getState().getAccessPermissions())
+    return (pageContext != null && hasAccessPermission(identity,
+                                                       pageContext.getKey().getSite().getTypeName(),
+                                                       pageContext.getKey().getSite().getName(),
+                                                       pageContext.getState().getAccessPermissions()))
            || hasEditPermission(pageContext, identity);
   }
 
@@ -412,6 +416,75 @@ public class UserACL {
   public boolean isAnonymousUser(String username) {
     return StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username)
            || IdentityConstants.SYSTEM.equals(username);
+  }
+
+  public boolean hasAccessPermission(String objectType,
+                                     String objectId,
+                                     String username) {
+    Identity identity = StringUtils.isBlank(username) ? null : getUserIdentity(username);
+    return hasAccessPermission(objectType, objectId, identity);
+  }
+
+  public boolean hasAccessPermission(String objectType, String objectId, Identity identity) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.VIEW_PERMISSION_TYPE,
+                         identity);
+  }
+
+  public boolean hasEditPermission(String objectType,
+                                   String objectId,
+                                   String username) {
+    Identity identity = StringUtils.isBlank(username) ? null : getUserIdentity(username);
+    return hasEditPermission(objectType, objectId, identity);
+  }
+
+  public boolean hasEditPermission(String objectType, String objectId, Identity identity) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.EDIT_PERMISSION_TYPE,
+                         identity);
+  }
+
+  public boolean hasDeletePermission(String objectType,
+                                     String objectId,
+                                     String username) {
+    Identity identity = StringUtils.isBlank(username) ? null : getUserIdentity(username);
+    return hasDeletePermission(objectType, objectId, identity);
+  }
+
+  public boolean hasDeletePermission(String objectType, String objectId, Identity identity) {
+    return hasPermission(objectType,
+                         objectId,
+                         AclPlugin.DELETE_PERMISSION_TYPE,
+                         identity);
+  }
+
+  public boolean hasPermission(String objectType,
+                               String objectId,
+                               String permissionType,
+                               String username) {
+    Identity identity = StringUtils.isBlank(username) ? null : getUserIdentity(username);
+    return hasPermission(objectType, objectId, permissionType, identity);
+  }
+
+  public boolean hasPermission(String objectType, String objectId, String permissionType, Identity identity) {
+    AclPlugin aclPlugin = getAclPlugin(objectType);
+    return aclPlugin.hasPermission(objectId,
+                                   permissionType,
+                                   identity);
+  }
+
+  public void addAclPlugin(AclPlugin aclPlugin) {
+    this.aclPlugins.put(aclPlugin.getObjectType(), aclPlugin);
+  }
+
+  public AclPlugin getAclPlugin(String objectType) {
+    AclPlugin aclPlugin = this.aclPlugins.get(objectType);
+    if (aclPlugin == null) {
+      throw new IllegalArgumentException(String.format("ACL Plugin of type '%s' doesn't exist", objectType));
+    }
+    return aclPlugin;
   }
 
   public Authenticator getAuthenticator() {
