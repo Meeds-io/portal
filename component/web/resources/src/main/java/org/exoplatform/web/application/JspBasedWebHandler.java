@@ -117,6 +117,7 @@ public abstract class JspBasedWebHandler extends WebRequestHandler {
     params.put("authenticationTextColor", brandingService.getLoginBackgroundTextColor());
     params.put("authenticationTitle", brandingService.getLoginTitle(locale));
     params.put("authenticationSubtitle", brandingService.getLoginSubtitle(locale));
+    params.put("loginBackgroundAltText", brandingService.getLoginBackgroundAltText());
 
     if (extendUIParameters != null) {
       extendUIParameters.accept(params);

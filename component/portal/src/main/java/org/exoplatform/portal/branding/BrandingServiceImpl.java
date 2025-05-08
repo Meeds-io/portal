@@ -117,6 +117,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_LOGIN_TEXT_COLOR_KEY      = "authentication.loginBackgroundTextColor";
 
+  public static final String   BRANDING_LOGIN_ALT_TEXT_KEY        = "authentication.loginBackgroundAltText";
+
   public static final String   BRANDING_TITLE_SETTING_KEY         = "authentication.title.";
 
   public static final String   BRANDING_SUBTITLE_SETTING_KEY      = "authentication.subtitle.";
@@ -326,6 +328,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setSideBarBackground(getSideBarBackground());
     branding.setDrawerBackground(getDrawerBackground());
     branding.setLoginBackgroundTextColor(getLoginBackgroundTextColor());
+    branding.setLoginBackgroundAltText(getLoginBackgroundAltText());
     branding.setPageBackground(getPageBackground());
     branding.setPageBackgroundColor(getPageBackgroundColor());
     branding.setPageBackgroundPosition(getPageBackgroundPosition());
@@ -402,6 +405,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updateSideBarBackground(branding.getSideBarBackground(), false);
       updateDrawerBackground(branding.getDrawerBackground(), false);
       updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
+      updateLoginBackgroundAltText(branding.getLoginBackgroundAltText(), false);
       updatePageBackground(branding.getPageBackground(), false);
       updatePageBackgroundColor(branding.getPageBackgroundColor(), false);
       updatePageBackgroundSize(branding.getPageBackgroundSize(), false);
@@ -505,6 +509,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public String getLoginBackgroundAltText() {
+    return getPropertyValue(BRANDING_LOGIN_ALT_TEXT_KEY);
+  }
+
+  @Override
   public void updateCompanyName(String companyName) {
     updateCompanyName(companyName, true);
   }
@@ -522,6 +531,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public void updateLoginBackgroundTextColor(String textColor) {
     updateLoginBackgroundTextColor(textColor, true);
+  }
+
+  @Override
+  public void updateLoginBackgroundAltText(String altText) {
+    updateLoginBackgroundAltText(altText, true);
   }
 
   @Override
@@ -970,6 +984,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private void updateLoginBackgroundTextColor(String textColor, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_LOGIN_TEXT_COLOR_KEY, textColor, updateLastUpdatedTime);
+  }
+
+  private void updateLoginBackgroundAltText(String altText, boolean updateLastUpdatedTime) {
+    updatePropertyValue(BRANDING_LOGIN_ALT_TEXT_KEY, altText, updateLastUpdatedTime);
   }
 
   private void updatePageBackgroundColor(String color, boolean updateLastUpdatedTime) {
