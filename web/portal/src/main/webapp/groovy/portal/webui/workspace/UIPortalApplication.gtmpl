@@ -57,21 +57,19 @@
       remoteScripts.put(module);
     }
   }
-  def title = rcontext.getTitle();
 
   BrandingService brandingService = uicomponent.getApplicationComponent(BrandingService.class);
   SiteKey siteKey = portal.getSiteKey();
   String siteName = siteKey.getName();
   String siteType = siteKey.getTypeName();
-  if (siteKey.getType() == org.exoplatform.portal.mop.SiteType.PORTAL) {
-    ResourceBundleService resourceBundleService = uicomponent.getApplicationComponent(ResourceBundleService.class);
-    ResourceBundle bundle = resourceBundleService.getResourceBundle("locale.portlet.Portlets", rcontext.getLocale());
-    if ("public".equals(siteName)) {
-      title = brandingService.getCompanyName() + " - " + bundle.getString("publicSite.title.suffix");
-    } else if ("administration".equals(siteName)) {
-      title = title + " - " + brandingService.getCompanyName();
-    }
+  String companyName = brandingService.getCompanyName();
+  String metaPortalName = rcontext.getMetaPortal();
+  
+  def title = rcontext.getTitle() + " - ";
+  if (!metaPortalName.equals(siteName)) {
+    title = title + rcontext.getSiteLabel() + " - ";
   }
+  title = title + companyName;
 
   def metaInformation = rcontext.getMetaInformation();
 
