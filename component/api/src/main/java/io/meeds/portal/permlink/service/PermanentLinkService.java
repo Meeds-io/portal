@@ -23,6 +23,7 @@ import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.services.security.Identity;
 
 import io.meeds.portal.permlink.model.PermanentLinkObject;
+import io.meeds.portal.permlink.plugin.PermanentLinkPlugin;
 
 /**
  * A service to get permanent link to an object in order to reference it
@@ -54,5 +55,10 @@ public interface PermanentLinkService {
    * @throws ObjectNotFoundException
    */
   String getLink(PermanentLinkObject object) throws ObjectNotFoundException;
+
+  /**
+   * @param plugin {@link PermanentLinkPlugin}
+   */
+  void addPlugin(PermanentLinkPlugin plugin);
 
 }
