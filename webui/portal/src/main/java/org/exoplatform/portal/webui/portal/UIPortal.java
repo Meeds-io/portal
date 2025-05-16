@@ -19,6 +19,8 @@
 
 package org.exoplatform.portal.webui.portal;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.config.model.*;
@@ -346,8 +348,8 @@ public class UIPortal extends UIContainer {
             cookie.setPath(req.getContextPath());
             cookie.setMaxAge(0);
             prContext.getResponse().addCookie(cookie);
-
-            prContext.sendRedirect("/");
+            String redirect = !StringUtils.isBlank(req.getParameter("redirect")) ? req.getParameter("redirect") : "/";
+            prContext.sendRedirect(redirect);
         }
 
         private String getTokenCookie(HttpServletRequest req) {
