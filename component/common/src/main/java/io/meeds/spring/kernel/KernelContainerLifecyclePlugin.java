@@ -127,7 +127,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
     LOG.info("2. Add Spring Beans of all contexts into Kernel");
     addSpringToKernel(portalContainer, springBeansByContext);
     LOG.info("3. Add Spring Beans into each other context");
-    addSpringToEachOther(springBeansByContext);
+    addSpringToEachOther(portalContainer, springBeansByContext);
     LOG.info("End spring integration with Kernel Container within {}ms", System.currentTimeMillis() - start);
   }
 
@@ -188,7 +188,8 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
     });
   }
 
-  public static void addSpringToEachOther(Map<String, Map<String, BeanDefinition>> springBeansByContext) {
+  public static void addSpringToEachOther(PortalContainer portalContainer,
+                                          Map<String, Map<String, BeanDefinition>> springBeansByContext) {
     springContexts.forEach((senderServletContextName, senderApplicationContext) -> {
       Map<String, BeanDefinition> beansMap = springBeansByContext.get(senderServletContextName);
       springBeanRegistries.entrySet()
@@ -196,7 +197,8 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
                           .filter(e -> !StringUtils.equals(senderServletContextName, e.getKey()))
                           .collect(Collectors.toMap(Entry::getKey, Entry::getValue))
                           .forEach((receiverServletContextName,
-                                    receiverBeanRegistry) -> addSpringBeansToEachOtherContexts(senderServletContextName,
+                                    receiverBeanRegistry) -> addSpringBeansToEachOtherContexts(portalContainer,
+                                                                                               senderServletContextName,
                                                                                                receiverServletContextName,
                                                                                                senderApplicationContext,
                                                                                                receiverBeanRegistry,
@@ -251,7 +253,8 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
   }
 
   @SuppressWarnings({ "rawtypes", "unchecked" })
-  private static void addSpringBeansToEachOtherContexts(String senderServletContextName,
+  private static void addSpringBeansToEachOtherContexts(PortalContainer portalContainer,
+                                                        String senderServletContextName,
                                                         String receiverServletContextName,
                                                         ApplicationContext senderApplicationContext,
                                                         BeanDefinitionRegistry receiverBeanRegistry,
@@ -271,6 +274,8 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
                   receiverServletContextName);
         RootBeanDefinition receiverBeanDefinition = createBeanDefinition(beanName,
                                                                          beanClassNameInterface,
+                                                                         senderBeanDefinition,
+                                                                         portalContainer,
                                                                          senderApplicationContext,
                                                                          receiverServletContextName);
         receiverBeanRegistry.registerBeanDefinition(beanClassNameInterface.getName(), receiverBeanDefinition);
@@ -301,18 +306,24 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
 
   private static RootBeanDefinition createBeanDefinition(String beanName,
                                                          Class<Object> beanClassName,
+                                                         BeanDefinition originatingBeanDefinition,
+                                                         PortalContainer portalContainer,
                                                          ApplicationContext senderApplicationContext,
                                                          String receiverServletContextName) {
     RootBeanDefinition receiverBeanDefinition = new RootBeanDefinition(beanClassName,
                                                                        () -> getBeanInstance(senderApplicationContext,
+                                                                                             portalContainer,
                                                                                              beanName,
+                                                                                             beanClassName,
                                                                                              receiverServletContextName));
     receiverBeanDefinition.setLazyInit(true);
     receiverBeanDefinition.setAutowireCandidate(true);
-    receiverBeanDefinition.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
+    receiverBeanDefinition.setSynthetic(true);
+    receiverBeanDefinition.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_NO);
     receiverBeanDefinition.setScope(ConfigurableBeanFactory.SCOPE_SINGLETON);
     receiverBeanDefinition.setDependencyCheck(AbstractBeanDefinition.DEPENDENCY_CHECK_NONE);
     receiverBeanDefinition.setBeanClass(beanClassName);
+    receiverBeanDefinition.setOriginatingBeanDefinition(originatingBeanDefinition);
     return receiverBeanDefinition;
   }
 
@@ -409,6 +420,24 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
            && !StringUtils.equals(componentClass.getName(), "org.exoplatform.commons.cluster.StartableClusterAware");
   }
 
+  private static Object getBeanInstance(ApplicationContext applicationContext,
+                                        PortalContainer portalContainer,
+                                        String beanName,
+                                        Class<Object> beanClassName,
+                                        String contextName) {
+    boolean beanExistsInKernel = portalContainer.getComponentAdapter(beanClassName) != null;
+    LOG.trace("Retrieve Bean with name '{}' from Kernel Container using class '{}' in detstination to '{}'. Found = {}",
+              beanName,
+              beanClassName,
+              contextName,
+              beanExistsInKernel);
+    if (beanExistsInKernel) {
+      return portalContainer.getComponentInstanceOfType(beanClassName);
+    } else {
+      return getBeanInstance(applicationContext, beanName, contextName);
+    }
+  }
+
   private static Object getBeanInstance(ApplicationContext applicationContext, String beanName, String contextName) {
     LOG.trace("Retrieve Bean with name '{}' from Spring to Kernel using Application context '{}' in detstination to '{}'",
               beanName,
@@ -421,8 +450,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
     LOG.trace("Getting Kernel Service '{}' requested by a Spring Bean.",
               keyClass);
     try {
-      T instance =
-                 portalContainer.getComponentInstanceOfType(keyClass);
+      T instance = portalContainer.getComponentInstanceOfType(keyClass);
       if (instance == null) {
         LOG.trace("Kernel Service '{}' requested by a Spring Bean wasn't",
                   keyClass);
