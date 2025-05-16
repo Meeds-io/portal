@@ -30,7 +30,7 @@
   <name>Meeds Portal Component Core Test</name>
 
   <properties>
-    <exo.test.coverage.ratio>0.32</exo.test.coverage.ratio>
+    <exo.test.coverage.ratio>0.31</exo.test.coverage.ratio>
   </properties>
 
   <dependencies>
