@@ -81,6 +81,10 @@ public class Branding implements Serializable {
 
   @Getter
   @Setter
+  private String              loginBackgroundAltText;
+
+  @Getter
+  @Setter
   private Background          pageBackground;
 
   @Getter

@@ -114,6 +114,11 @@ public interface BrandingService {
   String getLoginBackgroundTextColor();
 
   /**
+   * @return Login alt Text displayed on the Background
+   */
+  String getLoginBackgroundAltText();
+
+  /**
    * @return {@link Logo} URL to retrieve logo image
    */
   String getLogoPath();
@@ -216,6 +221,9 @@ public interface BrandingService {
    * @param textColor text color in hex representation like #fff
    */
   void updateLoginBackgroundTextColor(String textColor);
+
+
+  void updateLoginBackgroundAltText(String altText);
 
   /**
    * @return {@link Map} with variable name as key and variable value as map
