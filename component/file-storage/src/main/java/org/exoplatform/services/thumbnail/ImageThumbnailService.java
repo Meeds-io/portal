@@ -19,25 +19,31 @@
  */
 package org.exoplatform.services.thumbnail;
 
+import io.meeds.portal.thumbnail.model.FileContent;
 import org.exoplatform.commons.file.model.FileItem;
+
+import io.meeds.portal.thumbnail.plugin.ImageThumbnailPlugin;
 
 public interface ImageThumbnailService {
 
   /**
    * Retrieves a thumbnail by given width and height or creates a thumbnail
-   * image and get it if not exist
+   * image and create it if not exist
    * 
    * @param file Image file
    * @param width target thumbnail width
    * @param height target thumbnail height
    * @return {@link FileItem}
    * @throws Exception
+   * @deprecated use {@link ImageThumbnailService#getOrCreateThumbnail(String fileType, String id, String userName, int width, int height)} instead
    */
+
+  @Deprecated(forRemoval = true, since = "7.1.0")
   FileItem getOrCreateThumbnail(FileItem file, int width, int height) throws Exception;
 
   /**
    * Retrieves a thumbnail by given width and height or creates a thumbnail
-   * image and get it if not exist
+   * image and create it if not exist
    * 
    * @param resizeSupplier if resizeSupplier is null then use {@link ImageResizeService}
    * @param file Image file
@@ -45,8 +51,80 @@ public interface ImageThumbnailService {
    * @param height target thumbnail height
    * @return {@link FileItem}
    * @throws Exception
+   * @deprecated use {@link ImageThumbnailService#getOrCreateThumbnail(String fileType, String id, String userName, int width, int height)} instead
    */
+
+  @Deprecated(forRemoval = true, since = "7.1.0")
   FileItem getOrCreateThumbnail(ImageResizeService resizeSupplier, FileItem file, int width, int height) throws Exception;
 
+  /**
+   * Retrieves a thumbnail by given fileId, fileType, width and height or creates a thumbnail
+   * image and create it if not exist
+   *
+   * @param fileType file fileType
+   * @param id       file id
+   * @param width    target thumbnail width
+   * @param height   target thumbnail height
+   * @return {@link FileItem}
+   * @throws Exception
+   */
+
+
+  FileItem getOrCreateThumbnail(String fileType, String id, String userName, int width, int height) throws Exception;
+
+
+  /**
+   * Retrieves a thumbnail by given fileId, width and height or creates a thumbnail
+   *
+   * @param id       file id
+   * @param width    target thumbnail width
+   * @param height   target thumbnail height
+   * @return {@link FileItem}
+   * @throws Exception
+   */
+
+  FileItem getThumbnail(String id, int width, int height) throws Exception;
+
+  /**
+   * Create a thumbnail for given fileId thith given width and height.
+   *
+   * @param id       file id
+   * @param width    target thumbnail width
+   * @param height   target thumbnail height
+   * @return {@link FileItem}
+   * @throws Exception
+   */
+
+  FileItem createThumbnail(String id, FileContent fileContent, String userName, int width, int height) throws Exception;
+
+
+  /**
+   * Delete all thumbnails by fileId
+   *
+   * @param fileId file id
+   * @param fileType file Type
+   */
+  void deleteThumbnails(String fileType, String fileId);
+
+  /**
+   * Delete all thumbnails by fileId
+   *
+   * @param fileId file id
+   */
   void deleteThumbnails(Long fileId);
+
+  /**
+   * Add a new {@link ImageThumbnailPlugin} for a given file Type
+   *
+   * @param imageThumbnailPlugin {@link ImageThumbnailPlugin}
+   */
+  void addPlugin(ImageThumbnailPlugin imageThumbnailPlugin);
+
+  /**
+   * Removes a {@link ImageThumbnailPlugin} identified by its file type
+   *
+   * @param fileType File type
+   */
+  void removePlugin(String fileType);
+
 }
