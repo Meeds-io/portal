@@ -514,56 +514,23 @@ public class UserPortalConfigService implements Startable {
       if (rootUserNode == null) {
         return null;
       } else {
-        UserNode globalRootUserNode = getSiteRootNode(PortalConfig.PORTAL_TYPE,
-                                                      globalPortal,
-                                                      username,
-                                                      false);
-        UserNode siteUserNode = rootUserNode;
-        UserNode globalUserNode = globalRootUserNode;
-        int validGlobalDepth = 0;
-        int validSiteDepth = 0;
-        int currentDepth = 0;
-
-        String[] nodeNames = Utils.parsePath(nodePath);
-        Iterator<String> iterator = Arrays.stream(nodeNames).iterator();
-        while (iterator.hasNext()
-               && (validSiteDepth == currentDepth
-                   || validGlobalDepth == currentDepth)) {
-          String path = iterator.next();
-          if (validSiteDepth == currentDepth) {
-            UserNode childUserNode = siteUserNode.getChild(path);
-            if (childUserNode != null) {
-              siteUserNode = childUserNode;
-              validSiteDepth++;
-            }
-          }
-          if (globalUserNode != null && validGlobalDepth == currentDepth) {
-            UserNode childGlobalUserNode = globalUserNode.getChild(path);
-            if (childGlobalUserNode != null) {
-              globalUserNode = childGlobalUserNode;
-              validGlobalDepth++;
-            }
-          }
-          currentDepth++;
+        UserNode exactUserNode = getExactUserNode(rootUserNode, nodePath, username);
+        boolean isDefaultPath = exactUserNode == null
+                                || exactUserNode.getParent() == null
+                                || exactUserNode.getParent().getId().equals(rootUserNode.getId());
+        if (isDefaultPath) {
+          String[] nodePathParts = nodePath.split("/");
+          return Arrays.asList(nodePathParts)
+                       .reversed()
+                       .stream()
+                       .map(nodeName -> getChildNodeWithName(rootUserNode,
+                                                             nodeName,
+                                                             username))
+                       .filter(Objects::nonNull)
+                       .findFirst()
+                       .orElse(exactUserNode);
         }
-        if (globalUserNode != null) {
-          if (validSiteDepth >= validGlobalDepth) {
-            UserNode result = getNodeOrFirstChildWithPage(siteUserNode, username);
-            if (result == null) {
-              result = getNodeOrFirstChildWithPage(rootUserNode, username);
-            }
-            return result;
-          } else {
-            if (globalUserNode.getPageRef() == null
-                || getPage(globalUserNode.getPageRef(), username) == null) {
-              return null;
-            } else {
-              return globalUserNode;
-            }
-          }
-        } else {
-          return getNodeOrFirstChildWithPage(siteUserNode, username);
-        }
+        return exactUserNode;
       }
     }
   }
@@ -717,6 +684,74 @@ public class UserPortalConfigService implements Startable {
       } finally {
         RequestLifeCycle.end();
       }
+    }
+  }
+
+  private UserNode getExactUserNode(UserNode rootUserNode, String nodePath, String username) { // NOSONAR
+    UserNode globalRootUserNode = getSiteRootNode(PortalConfig.PORTAL_TYPE,
+                                                  globalPortal,
+                                                  username,
+                                                  false);
+    UserNode siteUserNode = rootUserNode;
+    UserNode globalUserNode = globalRootUserNode;
+    int validGlobalDepth = 0;
+    int validSiteDepth = 0;
+    int currentDepth = 0;
+
+    String[] nodeNames = Utils.parsePath(nodePath);
+    Iterator<String> iterator = Arrays.stream(nodeNames).iterator();
+    while (iterator.hasNext()
+           && (validSiteDepth == currentDepth
+               || validGlobalDepth == currentDepth)) {
+      String path = iterator.next();
+      if (validSiteDepth == currentDepth) {
+        UserNode childUserNode = siteUserNode.getChild(path);
+        if (childUserNode != null) {
+          siteUserNode = childUserNode;
+          validSiteDepth++;
+        }
+      }
+      if (globalUserNode != null && validGlobalDepth == currentDepth) {
+        UserNode childGlobalUserNode = globalUserNode.getChild(path);
+        if (childGlobalUserNode != null) {
+          globalUserNode = childGlobalUserNode;
+          validGlobalDepth++;
+        }
+      }
+      currentDepth++;
+    }
+    if (globalUserNode != null) {
+      if (validSiteDepth >= validGlobalDepth) {
+        UserNode result = getNodeOrFirstChildWithPage(siteUserNode, username);
+        if (result == null) {
+          result = getNodeOrFirstChildWithPage(rootUserNode, username);
+        }
+        return result;
+      } else {
+        if (globalUserNode.getPageRef() == null
+            || getPage(globalUserNode.getPageRef(), username) == null) {
+          return null;
+        } else {
+          return globalUserNode;
+        }
+      }
+    } else {
+      return getNodeOrFirstChildWithPage(siteUserNode, username);
+    }
+  }
+
+  private UserNode getChildNodeWithName(UserNode userNode, String nodeName, String username) {
+    if (StringUtils.equals(userNode.getName(), nodeName)) {
+      return userNode;
+    } else if (userNode.getChildrenCount() > 0) {
+      return userNode.getChildren()
+                     .stream()
+                     .map(n -> getChildNodeWithName(n, nodeName, username))
+                     .filter(Objects::nonNull)
+                     .findFirst()
+                     .orElse(null);
+    } else {
+      return null;
     }
   }
 
