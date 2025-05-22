@@ -783,6 +783,9 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode", "john");
     assertEquals("home/subnode", userNode.getURI());
 
+    userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "subnode", "john");
+    assertEquals("home/subnode", userNode.getURI());
+
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home/subnode2", "john");
     assertEquals("home/subnode2", userNode.getURI());
 
