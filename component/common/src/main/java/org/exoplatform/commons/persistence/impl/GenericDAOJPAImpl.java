@@ -124,27 +124,19 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
   @ExoTransactional
   public void delete(E entity) {
     EntityManager em = getEntityManager();
-    em.remove(em.merge(entity));
+    entity = em.merge(entity);
+    em.remove(entity);
   }
 
   @Override
-  @ExoTransactional
   public void deleteAll(List<E> entities) {
-    EntityManager em = getEntityManager();
-    for (E entity : entities) {
-      em.remove(entity);
-    }
+    entities.forEach(this::delete);
   }
 
   @Override
-  @ExoTransactional
   public void deleteAll() {
     List<E> entities = findAll();
-
-    EntityManager em = getEntityManager();
-    for (E entity : entities) {
-      em.remove(entity);
-    }
+    deleteAll(entities);
   }
 
   /**
