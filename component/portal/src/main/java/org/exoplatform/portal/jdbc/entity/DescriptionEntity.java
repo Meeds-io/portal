@@ -47,7 +47,7 @@ public class DescriptionEntity implements Serializable {
   @ElementCollection(fetch = FetchType.LAZY)
   @CollectionTable(name="PORTAL_DESCRIPTION_LOCALIZED", joinColumns = @JoinColumn(name = "DESCRIPTION_ID"))
   @MapKeyColumn(name="LOCALE")
-  private Map<String, DescriptionState> localized = new HashMap<String, DescriptionState>();
+  private Map<String, DescriptionState> localized = new HashMap<>();
   
   public DescriptionEntity() {
   }
