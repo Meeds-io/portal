@@ -118,14 +118,6 @@
   </component>
 
   <external-component-plugins>
-    <target-component>org.exoplatform.services.listener.ListenerService</target-component>
-    <component-plugin>
-      <name>org.exoplatform.portal.jdbc.entity.NodeEntity.removed</name>
-      <set-method>addListener</set-method>
-      <type>org.exoplatform.portal.mop.storage.listener.NodeDescriptionListener</type>
-    </component-plugin>    
-  </external-component-plugins>
-  <external-component-plugins>
     <target-component>org.exoplatform.commons.file.services.NameSpaceService</target-component>
     <component-plugin>
       <name>SitesNameSpacePlugin</name>

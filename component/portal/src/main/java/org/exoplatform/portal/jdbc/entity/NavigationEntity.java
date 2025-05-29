@@ -20,16 +20,26 @@ package org.exoplatform.portal.jdbc.entity;
 
 import java.io.Serializable;
 
-import jakarta.persistence.*;
-
 import org.exoplatform.portal.mop.SiteType;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity(name = "GateInNavigation")
 @Table(name = "PORTAL_NAVIGATIONS")
-@NamedQueries({
-  @NamedQuery(name = "NavigationEntity.findByOwner", query = "SELECT nav FROM GateInNavigation nav INNER JOIN nav.owner s WHERE s.siteType = :ownerType AND s.name = :ownerId"),
-  @NamedQuery(name = "NavigationEntity.findByRootNode", query = "SELECT nav FROM GateInNavigation nav INNER JOIN nav.rootNode r WHERE r.id = :rootNodeId")
-})
+@NamedQuery(name = "NavigationEntity.findByOwner", query = "SELECT nav FROM GateInNavigation nav INNER JOIN nav.owner s WHERE s.siteType = :ownerType AND s.name = :ownerId")
+@NamedQuery(name = "NavigationEntity.findByRootNode", query = "SELECT nav FROM GateInNavigation nav INNER JOIN nav.rootNode r WHERE r.id = :rootNodeId")
 public class NavigationEntity implements Serializable {
 
   private static final long serialVersionUID = 3811683620903785319L;
