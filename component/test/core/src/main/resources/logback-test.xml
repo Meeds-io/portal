@@ -19,7 +19,7 @@
 -->
 <configuration debug="false">
   <property scope="context" name="COLORIZER_COLORS" value="boldred@white,yellow@black,green@,blue@,cyan@" />
-  <conversionRule conversionWord="colorize" converterClass="org.tuxdude.logback.extensions.LogColorizer" />
+  <conversionRule conversionWord="colorize" class="org.tuxdude.logback.extensions.LogColorizer" />
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>%date{ISO8601} | %highlight(%-5level) | %msg %green([%logger{40}){}%cyan(&lt;%thread&gt;){}%green(]){} %n%xEx</pattern>
