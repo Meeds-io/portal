@@ -11,6 +11,7 @@ import org.exoplatform.portal.mop.navigation.NavigationData;
 import org.exoplatform.portal.mop.navigation.NavigationState;
 import org.exoplatform.portal.mop.navigation.NodeData;
 import org.exoplatform.portal.mop.navigation.NodeState;
+import org.exoplatform.portal.mop.storage.DescriptionStorage;
 import org.exoplatform.portal.mop.storage.NavigationStorageImpl;
 import org.exoplatform.portal.mop.storage.cache.model.NavigationCacheSelector;
 import org.exoplatform.portal.mop.storage.cache.model.NavigationDataCacheSelector;
@@ -37,11 +38,12 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
   private final ExoCache<Long, NodeData>                        nodeCache;
 
   public CacheNavigationStorage(CacheService cacheService,
+                                DescriptionStorage descriptionStorage,
                                 NavigationDAO navigationDAO,
                                 SiteDAO siteDAO,
                                 NodeDAO nodeDAO,
                                 PageDAO pageDAO) {
-    super(navigationDAO, siteDAO, nodeDAO, pageDAO);
+    super(descriptionStorage, navigationDAO, siteDAO, nodeDAO, pageDAO);
     this.navigationCache = cacheService.getCacheInstance(NAVIGATION_CACHE_NAME);
     this.navigationFutureCache = new FutureExoCache<>(new Loader<SiteKey, NavigationData, Object>() {
       @Override
