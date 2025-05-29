@@ -28,31 +28,27 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.Arrays;
-import java.util.Date;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.exoplatform.commons.file.model.FileItem;
-import org.exoplatform.commons.file.services.FileService;
-import org.exoplatform.portal.mop.SiteFilter;
-import org.exoplatform.services.security.IdentityConstants;
-import org.exoplatform.upload.UploadResource;
-import org.exoplatform.upload.UploadService;
 import org.jibx.runtime.BindingDirectory;
 import org.jibx.runtime.IBindingFactory;
 import org.jibx.runtime.impl.UnmarshallingContext;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
+import org.exoplatform.commons.file.model.FileItem;
+import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.commons.utils.IOUtil;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.portal.config.NoSuchDataException;
@@ -61,6 +57,7 @@ import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.jdbc.entity.ComponentEntity;
 import org.exoplatform.portal.jdbc.entity.PermissionEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
+import org.exoplatform.portal.mop.SiteFilter;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.dao.SiteDAO;
@@ -71,6 +68,9 @@ import org.exoplatform.portal.pom.data.PortalData;
 import org.exoplatform.portal.pom.data.PortalKey;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.services.security.IdentityConstants;
+import org.exoplatform.upload.UploadResource;
+import org.exoplatform.upload.UploadService;
 
 public class SiteStorageImpl implements SiteStorage {
 
@@ -98,7 +98,7 @@ public class SiteStorageImpl implements SiteStorage {
 
   private final FileService    fileService;
 
-  public SiteStorageImpl(SettingService settingService,
+  public SiteStorageImpl(SettingService settingService, // NOSONAR
                          ConfigurationManager configurationManager,
                          NavigationStorage navigationStorage,
                          PageStorage pageStorage,
@@ -166,7 +166,6 @@ public class SiteStorageImpl implements SiteStorage {
   }
 
   @Override
-  @ExoTransactional
   public void remove(SiteKey siteKey) {
     PortalData config = getPortalConfig(siteKey);
     if (config != null && config.isRemovable()) {
@@ -384,7 +383,7 @@ public class SiteStorageImpl implements SiteStorage {
     if (uploadResource == null) {
       throw new IllegalStateException("Can't find uploaded resource with id : " + uploadId);
     }
-    try {
+    try { // NOSONAR
       InputStream inputStream = new FileInputStream(uploadResource.getStoreLocation());
       FileItem fileItem = new FileItem(null,
               uploadResource.getFileName(),

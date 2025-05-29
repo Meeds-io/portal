@@ -46,18 +46,22 @@ import org.exoplatform.portal.mop.page.PageKey;
 
 public class NavigationStorageImpl implements NavigationStorage {
 
-  private NavigationDAO navigationDAO;
+  private DescriptionStorage descriptionStorage;
 
-  private SiteDAO       siteDAO;
+  private NavigationDAO      navigationDAO;
 
-  private NodeDAO       nodeDAO;
+  private SiteDAO            siteDAO;
 
-  private PageDAO       pageDAO;
+  private NodeDAO            nodeDAO;
 
-  public NavigationStorageImpl(NavigationDAO navigationDAO,
+  private PageDAO            pageDAO;
+
+  public NavigationStorageImpl(DescriptionStorage descriptionStorage,
+                               NavigationDAO navigationDAO,
                                SiteDAO siteDAO,
                                NodeDAO nodeDAO,
                                PageDAO pageDAO) {
+    this.descriptionStorage = descriptionStorage;
     this.navigationDAO = navigationDAO;
     this.siteDAO = siteDAO;
     this.nodeDAO = nodeDAO;
@@ -282,6 +286,7 @@ public class NavigationStorageImpl implements NavigationStorage {
     SiteKey siteKey = data.getSiteKey();
     NavigationEntity navEntity = navigationDAO.findByOwner(siteKey.getType(), siteKey.getName());
     if (navEntity != null) {
+      removeDescriptions(navEntity.getRootNode());
       navigationDAO.delete(navEntity);
       return true;
     } else {
@@ -404,4 +409,15 @@ public class NavigationStorageImpl implements NavigationStorage {
       return siteKey;
     }
   }
+
+  private void removeDescriptions(NodeEntity node) {
+    if (node != null) {
+      descriptionStorage.setDescription(node.getId().toString(), null);
+      List<NodeEntity> children = node.getChildren();
+      if (children != null) {
+        children.forEach(this::removeDescriptions);
+      }
+    }
+  }
+
 }

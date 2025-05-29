@@ -169,8 +169,7 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
     options.setWarningLevel(DiagnosticGroups.NON_STANDARD_JSDOC, CheckLevel.OFF);
     options.setStrictModeInput(false);
     options.setLanguageIn(CompilerOptions.LanguageMode.ECMASCRIPT_2021);
-    options.setLanguageOut(CompilerOptions.LanguageMode.ECMASCRIPT5);
-    options.setExternExports(true);
+    options.setLanguageOut(CompilerOptions.LanguageMode.STABLE);
     level.setOptionsForCompilationLevel(options);
 
     StringWriter code = new StringWriter();
