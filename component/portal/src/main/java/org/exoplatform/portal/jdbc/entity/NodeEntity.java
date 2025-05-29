@@ -22,6 +22,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.exoplatform.portal.mop.NodeTarget;
+import org.exoplatform.portal.mop.Visibility;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -33,25 +36,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedQueries;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
-import jakarta.persistence.PreRemove;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
-import org.exoplatform.container.ExoContainer;
-import org.exoplatform.container.ExoContainerContext;
-import org.exoplatform.portal.mop.NodeTarget;
-import org.exoplatform.portal.mop.Visibility;
-import org.exoplatform.services.listener.ListenerService;
-
 @Entity(name = "GateInNavigationNode")
 @Table(name = "PORTAL_NAVIGATION_NODES")
-@NamedQueries({
-    @NamedQuery(name = "NodeEntity.findByPage", query = "SELECT n FROM GateInNavigationNode n INNER JOIN n.page p WHERE p.id = :pageId") })
+@NamedQuery(name = "NodeEntity.findByPage", query = "SELECT n FROM GateInNavigationNode n INNER JOIN n.page p WHERE p.id = :pageId")
 public class NodeEntity implements Serializable {
 
   private static final long serialVersionUID = 8630708630711337929L;
@@ -222,16 +216,4 @@ public class NodeEntity implements Serializable {
     this.navigationEntity = navigationEntity;
   }
 
-  public static final String REMOVED_EVENT = "org.exoplatform.portal.jdbc.entity.NodeEntity.removed";
-
-  @PreRemove
-  public void preRemove() throws Exception {
-    ExoContainer container = ExoContainerContext.getCurrentContainer();
-    if (container != null) {
-      ListenerService listenerService = container.getComponentInstanceOfType(ListenerService.class);
-      if (listenerService != null) {
-        listenerService.broadcast(REMOVED_EVENT, this, this.getId());
-      }
-    }
-  }
 }
