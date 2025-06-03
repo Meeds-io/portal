@@ -42,4 +42,9 @@
                     columnName="PASSWORD"
                     newDataType="NVARCHAR(500)"/>
   </changeSet>
+  <changeSet author="portal-token" id="1.0.0-mip-187-01">
+    <modifyDataType tableName="PORTAL_TOKENS"
+                    columnName="USERNAME"
+                    newDataType="LONGTEXT"/>
+  </changeSet>
 </databaseChangeLog>
