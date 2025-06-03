@@ -46,9 +46,9 @@
   </properties>
 
   <scm>
-    <connection>scm:git:git://github.com/meeds-io/gatein-portal.git</connection>
-    <developerConnection>scm:git:git@github.com:meeds-io/gatein-portal.git</developerConnection>
-    <url>https://github.com/meeds-io/gatein-portal</url>
+    <connection>scm:git:git://github.com/meeds-io/portal.git</connection>
+    <developerConnection>scm:git:git@github.com:meeds-io/portal.git</developerConnection>
+    <url>https://github.com/meeds-io/portal</url>
     <tag>HEAD</tag>
   </scm>
 
