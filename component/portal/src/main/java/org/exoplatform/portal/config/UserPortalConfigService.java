@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -376,12 +377,20 @@ public class UserPortalConfigService implements Startable {
       if (getNavigationConfigurationService() != null && StringUtils.isNotBlank(username)) {
         SidebarConfiguration sidebarConfiguration = getNavigationConfigurationService().getSidebarConfiguration(username,
                                                                                                                 Locale.ENGLISH);
-        String userDefaultPath = sidebarConfiguration.getItems()
-                                                     .stream()
-                                                     .filter(SidebarItem::isDefaultPath)
-                                                     .map(SidebarItem::getUrl)
-                                                     .findFirst()
-                                                     .orElse(null);
+          String userDefaultPath = sidebarConfiguration.getItems()
+                                                       .stream()
+                                                       .flatMap(item -> {
+                                                         if (CollectionUtils.isNotEmpty(item.getItems())) {
+                                                           return Stream.concat(Stream.of(item), item.getItems().stream());
+                                                         } else {
+                                                           return Stream.of(item);
+                                                         }
+                                                       })
+                                                       .filter(SidebarItem::isDefaultPath)
+                                                       .map(SidebarItem::getUrl)
+                                                       .filter(StringUtils::isNotBlank)
+                                                       .findFirst()
+                                                       .orElse(null);
         if (StringUtils.isNotBlank(userDefaultPath)) {
           return userDefaultPath;
         }
