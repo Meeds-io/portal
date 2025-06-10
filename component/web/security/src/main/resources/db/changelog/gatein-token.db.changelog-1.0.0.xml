@@ -47,7 +47,7 @@
                     columnName="USERNAME"
                     newDataType="LONGTEXT"/>
   </changeSet>
-  <changeSet author="portal-token" id="1.0.0-mip-187-02">
+  <changeSet author="portal-token" id="1.0.0-mip-187-02" dbms="mysql">
     <sql>
       ALTER TABLE PORTAL_TOKENS MODIFY COLUMN USERNAME longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     </sql>
