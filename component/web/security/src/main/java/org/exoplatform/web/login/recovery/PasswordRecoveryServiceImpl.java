@@ -68,9 +68,30 @@ import org.exoplatform.web.security.security.RemindPasswordTokenService;
  */
 public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
-  public static final String AUTHENTICATION_ATTEMPTS = "authenticationAttempts";
+  private static final String                  USER_FIRST_NAME_PARAM            = "${FIRST_NAME}";
 
-  protected static Log log = ExoLogger.getLogger(PasswordRecoveryServiceImpl.class);
+  private static final String                  LOGIN_LINK_PARAM                 = "${LOGIN_LINK}";
+
+  private static final String                  USERNAME_PARAM                   = "${USERNAME}";
+
+  private static final String                  DISPLAY_NAME_PARAM               = "${DISPLAY_NAME}";
+
+  private static final String                  EXTERNAL_REGISTRATION_LINK_PARAM = "${EXTERNAL_REGISTRATION_LINK}";
+
+  private static final String                  SPACE_DISPLAY_NAME_PARAM         = "${SPACE_DISPLAY_NAME}";
+
+  private static final String                  SENDER_DISPLAY_NAME_PARAM        = "${SENDER_DISPLAY_NAME}";
+
+  private static final String                  RESET_PASSWORD_LINK_PARAM        = "${RESET_PASSWORD_LINK}";
+
+  private static final String                  USER_DISPLAY_NAME_PARAM          = "${USER_DISPLAY_NAME}";
+
+  private static final String                  COMPANY_NAME_PARAM               = "${COMPANY_NAME}";
+
+  public static final String                   AUTHENTICATION_ATTEMPTS          = "authenticationAttempts";
+
+  protected static Log                         log                              =
+                                                   ExoLogger.getLogger(PasswordRecoveryServiceImpl.class);
 
   private final OrganizationService            orgService;
 
@@ -86,7 +107,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   private final WebAppController               webController;
 
-  public static final String                   CONFIGURED_DOMAIN_URL_KEY = "gatein.email.domain.url";
+  public static final String                   CONFIGURED_DOMAIN_URL_KEY        = "gatein.email.domain.url";
 
   private String                               changePasswordConnectorName;
 
@@ -236,9 +257,9 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replaceAll("\\$\\{USER_DISPLAY_NAME\\}", user == null ? "" : user.getDisplayName());
-    content = content.replaceAll("\\$\\{COMPANY_NAME\\}", brandingService.getCompanyName());
-    content = content.replaceAll("\\$\\{RESET_PASSWORD_LINK\\}", link);
+    content = content.replace(USER_DISPLAY_NAME_PARAM, user == null || user.getDisplayName() == null ? "" : user.getDisplayName());
+    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
+    content = content.replace(RESET_PASSWORD_LINK_PARAM, link);
 
     return content;
   }
@@ -312,10 +333,10 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replaceAll("\\$\\{SENDER_DISPLAY_NAME\\}", sender);
-    content = content.replaceAll("\\$\\{COMPANY_NAME\\}", brandingService.getCompanyName());
-    content = content.replaceAll("\\$\\{SPACE_DISPLAY_NAME\\}", space);
-    content = content.replaceAll("\\$\\{EXTERNAL_REGISTRATION_LINK\\}", link);
+    content = content.replace(SENDER_DISPLAY_NAME_PARAM, sender);
+    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
+    content = content.replace(SPACE_DISPLAY_NAME_PARAM, space);
+    content = content.replace(EXTERNAL_REGISTRATION_LINK_PARAM, link);
 
     return content;
   }
@@ -417,15 +438,15 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replaceAll("\\$\\{DISPLAY_NAME\\}", dispalyName);
-    content = content.replaceAll("\\$\\{COMPANY_NAME\\}", brandingService.getCompanyName());
-    content = content.replaceAll("\\$\\{USERNAME\\}", username);
-    content = content.replaceAll("\\$\\{LOGIN_LINK\\}", link);
+    content = content.replace(DISPLAY_NAME_PARAM, dispalyName);
+    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
+    content = content.replace(USERNAME_PARAM, username);
+    content = content.replace(LOGIN_LINK_PARAM, link);
 
     return content;
   }
 
-  private String buildExternalVerificationAccountEmailBody(String dispalyName,
+  private String buildExternalVerificationAccountEmailBody(String displayName,
                                                            String username,
                                                            String link,
                                                            ResourceBundle bundle) {
@@ -439,10 +460,10 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replaceAll("\\$\\{DISPLAY_NAME\\}", dispalyName);
-    content = content.replaceAll("\\$\\{COMPANY_NAME\\}", brandingService.getCompanyName());
-    content = content.replaceAll("\\$\\{USERNAME\\}", username);
-    content = content.replaceAll("\\$\\{LOGIN_LINK\\}", link);
+    content = content.replace(DISPLAY_NAME_PARAM, displayName);
+    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
+    content = content.replace(USERNAME_PARAM, username);
+    content = content.replace(LOGIN_LINK_PARAM, link);
 
     return content;
   }
@@ -521,10 +542,10 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replaceAll("\\$\\{FIRST_NAME\\}", user.getFirstName());
-    content = content.replaceAll("\\$\\{COMPANY_NAME\\}", brandingService.getCompanyName());
-    content = content.replaceAll("\\$\\{USERNAME\\}", user.getUserName());
-    content = content.replaceAll("\\$\\{RESET_PASSWORD_LINK\\}", link);
+    content = content.replace(USER_FIRST_NAME_PARAM, user.getFirstName());
+    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
+    content = content.replace(USERNAME_PARAM, user.getUserName());
+    content = content.replace(RESET_PASSWORD_LINK_PARAM, link);
 
     return content;
   }
