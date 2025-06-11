@@ -348,6 +348,11 @@
             <name>pagedResultsExtensionSupported</name>
             <value>${exo.ldap.search.pagedResult.enabled:true}</value>
           </option>
+          <option>
+            <name>customJNDIConnectionParameters</name>
+            <value>com.sun.jndi.ldap.read.timeout=${com.sun.jndi.ldap.read.timeout:60000}</value>
+            <value>com.sun.jndi.ldap.connect.timeout=${com.sun.jndi.ldap.connect.timeout:60000}</value>
+          </option>
         </options>
       </identity-store>
     </identity-stores>
