@@ -89,7 +89,7 @@ public class LocaleContextInfoUtils {
     Locale sessionLocale = previousLocale == null ? getSessionLocale(request) : previousLocale;
     localeCtx.setSessionLocale(sessionLocale);
     // continue setting localCtx with data fetched from request
-    localeCtx.setUserProfileLocale(getUserLocale(username));
+    localeCtx.setUserProfileLocale(getUserPreferredLocale(username));
     localeCtx.setBrowserLocales(request.getLocales() == null ? null : Collections.list(request.getLocales()));
     localeCtx.setCookieLocales(getCookieLocales(request));
     localeCtx.setRemoteUser(username);
@@ -105,7 +105,7 @@ public class LocaleContextInfoUtils {
   public static LocaleContextInfo buildLocaleContextInfo(String userId) {
     LocaleContextInfo localeCtx = new LocaleContextInfo();
     localeCtx.setSupportedLocales(getSupportedLocales());
-    localeCtx.setUserProfileLocale(getUserLocale(userId));
+    localeCtx.setUserProfileLocale(getUserPreferredLocale(userId));
     localeCtx.setRemoteUser(userId);
     return localeCtx;
   }
@@ -172,6 +172,11 @@ public class LocaleContextInfoUtils {
    * @return user locale
    */
   public static Locale getUserLocale(String username) {
+    Locale locale = getUserPreferredLocale(username);
+    return locale == null ? getDefaultLocale() : locale;
+  }
+
+  public static Locale getUserPreferredLocale(String username) {
     String lang = "";
     UserProfile profile = null;
     //
@@ -195,7 +200,7 @@ public class LocaleContextInfoUtils {
     if (lang != null && lang.trim().length() > 0) {
       return LocaleUtils.toLocale(lang);
     } else {
-      return getDefaultLocale();
+      return null;
     }
   }
 
