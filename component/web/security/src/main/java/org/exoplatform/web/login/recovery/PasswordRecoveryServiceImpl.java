@@ -297,8 +297,8 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       UserHandler uHandler = orgService.getUserHandler();
       String senderFullName = uHandler.findUserByName(sender).getDisplayName();
       emailBody = buildExternalEmailBody(senderFullName, space, redirectUrl.toString(), bundle);
-      emailSubject = senderFullName + " " + bundle.getString("external.email.subject") + " "
-          + brandingService.getCompanyName() + (space != null ? " : " + space : "");
+      emailSubject = bundle.getString("external.email.subject") + " " + (space != null ? space : "")
+          + " " + bundle.getString("external.email.on") + " " + brandingService.getCompanyName() ;
     } else {
       emailBody = buildOnboardingEmailBody(null, bundle, redirectUrl.toString());
       emailSubject = bundle.getString("onboarding.email.header") + " " + brandingService.getCompanyName();
