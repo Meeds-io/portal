@@ -255,12 +255,12 @@ public class LoginHandler extends JspBasedWebHandler {
         response.sendRedirect(response.encodeRedirectURL(initialURI));
       }
     } else {
-      handleSsoRequest(context, wrappedRequest, loginPath, status, initialURI);
+      return handleSsoRequest(context, wrappedRequest, loginPath, status, initialURI);
     }
     return true;
   }
 
-  private void handleSsoRequest(ControllerContext context,
+  private boolean handleSsoRequest(ControllerContext context,
                                 HttpServletRequest request,
                                 StringBuilder loginPath,
                                 LoginStatus status,
@@ -274,6 +274,7 @@ public class LoginHandler extends JspBasedWebHandler {
     boolean meetDisabledUser = disabledUser != null;
     if (ssoHelper.skipJSPRedirection() && meetDisabledUser) {
       dispatch(context, loginJspPath, LoginStatus.DISABLED_USER);
+      return true;
     } else if (ssoHelper.skipJSPRedirection()) {
       String ssoRedirectUrl = request.getContextPath() + ssoHelper.getSSORedirectURLSuffix();
       ssoRedirectUrl = response.encodeRedirectURL(ssoRedirectUrl);
@@ -281,6 +282,7 @@ public class LoginHandler extends JspBasedWebHandler {
         LOG.trace("Redirected to SSO login URL: " + ssoRedirectUrl);
       }
       response.sendRedirect(ssoRedirectUrl);
+      return true;
     } else {
       if (meetDisabledUser) {
         status = LoginStatus.DISABLED_USER;
@@ -289,7 +291,7 @@ public class LoginHandler extends JspBasedWebHandler {
       if (ssoStatus != null) {
         status = LoginStatus.valueOf((String) ssoStatus);
       }
-      dispatch(context, loginPath.toString(), status);
+      return false;
     }
   }
 
@@ -367,7 +369,7 @@ public class LoginHandler extends JspBasedWebHandler {
 
   /**
    * Get exact username from database
-   * 
+   *
    * @param username
    * @return
    */
@@ -399,7 +401,7 @@ public class LoginHandler extends JspBasedWebHandler {
                           additionalCSSModules,
                           params -> extendUIParameters(controllerContext, status, params));
 
-    servletContext.getRequestDispatcher(dispatchPath).include(request, response);
+    request.getRequestDispatcher(dispatchPath).forward(request, response);
   }
 
   private List<String> getExtendedJSModules() {
