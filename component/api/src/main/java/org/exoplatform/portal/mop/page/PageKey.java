@@ -1,6 +1,7 @@
 package org.exoplatform.portal.mop.page;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -62,8 +63,8 @@ public class PageKey implements Serializable {
   public String format() {
     if (ref == null) {
       ref = String.format("%s::%s::%s",
-                          site.getType().getName(),
-                          site.getName(),
+                          site == null ? "" : site.getType().getName(),
+                          site == null ? "" : site.getName(),
                           name);
     }
     return ref;
@@ -78,5 +79,22 @@ public class PageKey implements Serializable {
   @Override
   public String toString() {
     return format();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj)
+      return true;
+    if (obj == null)
+      return false;
+    if (getClass() != obj.getClass())
+      return false;
+    PageKey other = (PageKey) obj;
+    return Objects.equals(format(), other.format());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(format());
   }
 }
