@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.exoplatform.gatein.portal</groupId>
     <artifactId>exo.portal.parent</artifactId>
-    <version>6.5.6-exo</version>
+    <version>6.5.6-exo-patched</version>
   </parent>
 
   <artifactId>exo.portal.webui</artifactId>
