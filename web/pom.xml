@@ -37,6 +37,7 @@
   <modules>
     <module>portal</module>
     <module>rest</module>
+    <module>digest</module>
   </modules>
 
 </project>
