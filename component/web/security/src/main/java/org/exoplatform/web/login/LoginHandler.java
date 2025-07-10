@@ -218,6 +218,19 @@ public class LoginHandler extends JspBasedWebHandler {
         } catch (Exception e) {
           LOG.debug("User {} authentication failed.", username, e);
           status = LoginStatus.FAILED;
+          String referer = request.getHeader("Referer");
+          if (referer!=null && !referer.contains("/portal/login?")) {
+            // If the request comes from a different page, we redirect to the login page
+            // with the error message
+            try {
+              String redirectUrl = referer.contains("?") ? "&" : "?";
+              redirectUrl = referer+redirectUrl+"error=" + status.getErrorCode();
+              response.sendRedirect(response.encodeRedirectURL(redirectUrl));
+              return true;
+            } catch (Exception ex) {
+              LOG.error("Failed to redirect to referer page: " + referer, ex);
+            }
+          } 
         }
       }
       if (request.getRemoteUser() != null) {
