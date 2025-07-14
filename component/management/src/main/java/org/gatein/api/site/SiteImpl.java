@@ -1,25 +1,21 @@
-/*
- * JBoss, Home of Professional Open Source.
- * Copyright 2012, Red Hat, Inc., and individual contributors
- * as indicated by the @author tags. See the copyright.txt file in the
- * distribution for a full listing of individual contributors.
+/**
+ * This file is part of the Meeds project (https://meeds.io/).
  *
- * This is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
  *
- * This software is distributed in the hope that it will be useful,
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this software; if not, write to the Free
- * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
 package org.gatein.api.site;
 
 import java.io.IOException;
@@ -43,13 +39,6 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.pom.data.PortalData;
 
-/**
- * @author <a href="mailto:nscavell@redhat.com">Nick Scavelli</a>
- * @deprecated should be removed since the Portal API is defined using Service
- *             Layers instead of contextual API which doesn't help to get
- *             stateless mode. This is kept for now until removing ecms from
- *             eXo addons
- */
 @Deprecated(forRemoval = true, since = "7.0")
 public class SiteImpl implements Site {
     private static final long serialVersionUID = -5352376442491205465L;
