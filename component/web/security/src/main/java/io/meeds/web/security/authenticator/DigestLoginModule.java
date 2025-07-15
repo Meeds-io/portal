@@ -1,4 +1,3 @@
-
 /**
  * This file is part of the Meeds project (https://meeds.io/).
  *
