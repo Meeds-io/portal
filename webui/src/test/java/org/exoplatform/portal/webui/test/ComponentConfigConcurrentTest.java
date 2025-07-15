@@ -1,7 +1,7 @@
 /**
  * This file is part of the Meeds project (https://meeds.io/).
  *
- * Copyright (C) 2020 - 2023 Meeds Association contact@meeds.io
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -11,6 +11,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -34,8 +35,6 @@ import org.exoplatform.webui.config.Event;
 /**
  * Unit test for concurrent read of event from UI component configuration.
  *
- * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
- * @version $Revision$
  */
 public class ComponentConfigConcurrentTest extends AbstractGateInTest {
     private static final int WORKERS_COUNT = 50;
