@@ -36,9 +36,10 @@ import org.springframework.security.config.annotation.web.configurers.CsrfConfig
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.CacheControlConfig;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.ContentTypeOptionsConfig;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.HstsConfig;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.XXssConfig;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.config.annotation.web.configurers.JeeConfigurer;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -88,6 +89,7 @@ public class WebSecurityConfiguration implements ServletContextAware {
                  headers.frameOptions(FrameOptionsConfig::disable);
                  headers.xssProtection(XXssConfig::disable);
                  headers.contentTypeOptions(ContentTypeOptionsConfig::disable);
+                 headers.httpStrictTransportSecurity(HstsConfig::disable);
                })
                .authorizeHttpRequests(customizer -> {
                  try {
