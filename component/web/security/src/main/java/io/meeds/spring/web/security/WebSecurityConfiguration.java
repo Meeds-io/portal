@@ -33,12 +33,9 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.CacheControlConfig;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.ContentTypeOptionsConfig;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.XXssConfig;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.annotation.web.configurers.JeeConfigurer;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -83,12 +80,7 @@ public class WebSecurityConfiguration implements ServletContextAware {
     return http.authenticationProvider(authenticationProvider)
                .jee(JeeConfigurer::and) // NOSONAR no method replacement
                .csrf(CsrfConfigurer::disable)
-               .headers(headers -> {
-                 headers.cacheControl(CacheControlConfig::disable);
-                 headers.frameOptions(FrameOptionsConfig::disable);
-                 headers.xssProtection(XXssConfig::disable);
-                 headers.contentTypeOptions(ContentTypeOptionsConfig::disable);
-               })
+               .headers(HeadersConfigurer::disable)
                .authorizeHttpRequests(customizer -> {
                  try {
                    customizer.requestMatchers(restRequestMatcher)
