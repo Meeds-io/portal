@@ -64,6 +64,8 @@ import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.services.resources.ResourceBundleManager;
 import org.exoplatform.web.ControllerContext;
@@ -679,16 +681,29 @@ public class PortalRequestContext extends WebuiRequestContext {
       if (portal == null) {
         siteLabel = "";
       } else {
-        siteLabel = portal.getLabel();
-        if (ExpressionUtil.isResourceBindingExpression(siteLabel)) {
-          ResourceBundleManager bundleManager = ExoContainerContext.getService(ResourceBundleManager.class);
-          ResourceBundle navigationResourceBundle = bundleManager.getNavigationResourceBundle(getLocale().toLanguageTag(),
-                                                                                              siteKey.getTypeName(),
-                                                                                              siteKey.getName());
-          String resolvedTitle = ExpressionUtil.getExpressionValue(navigationResourceBundle, siteLabel);
-          // testing to see if the label was translated correctly
-          if (StringUtils.isNotBlank(resolvedTitle) && !resolvedTitle.equals(siteLabel)) {
-            siteLabel = resolvedTitle;
+        SiteType siteType = portal.getSiteKey().getType();
+        if (siteType == SiteType.PORTAL) {
+          siteLabel = portal.getLabel();
+          if (ExpressionUtil.isResourceBindingExpression(siteLabel)) {
+            ResourceBundleManager bundleManager = ExoContainerContext.getService(ResourceBundleManager.class);
+            ResourceBundle navigationResourceBundle = bundleManager.getNavigationResourceBundle(getLocale().toLanguageTag(),
+                                                                                                siteKey.getTypeName(),
+                                                                                                siteKey.getName());
+            String resolvedTitle = ExpressionUtil.getExpressionValue(navigationResourceBundle, siteLabel);
+            // testing to see if the label was translated correctly
+            if (StringUtils.isNotBlank(resolvedTitle) && !resolvedTitle.equals(siteLabel)) {
+              siteLabel = resolvedTitle;
+            }
+          }
+        } else if (siteType == SiteType.GROUP) {
+          OrganizationService organizationService = ExoContainerContext.getService(OrganizationService.class);
+          try {
+            Group siteGroup = organizationService.getGroupHandler().findGroupById(siteKey.getName());
+            if (siteGroup != null) {
+              siteLabel = siteGroup.getLabel();
+            }
+          } catch (Exception e) {
+            LOG.error("Exception on getting site label: " + e.getMessage(), e);
           }
         }
       }
