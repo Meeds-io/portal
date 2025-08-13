@@ -70,4 +70,22 @@
       ALTER TABLE PORTAL_TOKENS MODIFY COLUMN USERNAME longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     </sql>
   </changeSet>
+
+  <changeSet author="portal" id="1.0.0-exip-21-1" dbms="oracle,postgresql,hsqldb">
+    <createSequence sequenceName="SEQ_API_KEYS_ID_GENERATOR" startValue="1"/>
+  </changeSet>
+
+  <changeSet author="portal" id="1.0.0-exip-21-2">
+    <createTable tableName="PORTAL_API_KEYS">
+      <column name="ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="1">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_API_KEYS"/>
+      </column>
+      <column name="USERNAME" type="NVARCHAR(255)" />
+      <column name="PASSWORD" type="NVARCHAR(255)"/>
+      <column name="CREATION_DATE" type="TIMESTAMP"/>
+    </createTable>
+    <modifySql dbms="mysql">
+      <append value=" ENGINE=INNODB CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci" />
+    </modifySql>
+  </changeSet>
 </databaseChangeLog>

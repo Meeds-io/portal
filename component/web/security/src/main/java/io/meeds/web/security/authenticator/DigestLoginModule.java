@@ -38,6 +38,8 @@ import org.exoplatform.services.security.jaas.AbstractLoginModule;
 import org.exoplatform.services.security.jaas.RolePrincipal;
 import org.exoplatform.services.security.jaas.UserPrincipal;
 
+import io.meeds.web.security.service.DigestAuthenticatorService;
+
 import lombok.SneakyThrows;
 
 public class DigestLoginModule extends AbstractLoginModule {
@@ -99,7 +101,15 @@ public class DigestLoginModule extends AbstractLoginModule {
         digestA2 = ((TextInputCallback) callbacks[7]).getText();
         algorithm = ((TextInputCallback) callbacks[8]).getText();
 
-        username = getDigestAuthenticatorService().validateUser(username, password, nonce, nc, cnonce, qop, realmName, digestA2, algorithm);
+        username = getDigestAuthenticatorService().validateUser(username,
+                                                                password,
+                                                                nonce,
+                                                                nc,
+                                                                cnonce,
+                                                                qop,
+                                                                realmName,
+                                                                digestA2,
+                                                                algorithm);
         if (StringUtils.isBlank(username)) {
           return false;
         }
@@ -108,7 +118,7 @@ public class DigestLoginModule extends AbstractLoginModule {
         subject.getPublicCredentials().add(new UsernameCredential(username));
       }
       return username != null;
-    } catch (final Exception e) {
+    } catch (Exception e) {
       LOG.warn("Login error for user {}", username);
       return false;
     }
@@ -116,18 +126,24 @@ public class DigestLoginModule extends AbstractLoginModule {
 
   @Override
   public boolean commit() throws LoginException {
-    try {
-      getIdentityRegistry().register(identity);
-      Set<Principal> principals = subject.getPrincipals();
-      for (String role : identity.getRoles()) {
-        principals.add(new RolePrincipal(role));
+    if (identity == null) {
+      return false;
+    } else {
+      try {
+        getIdentityRegistry().register(identity);
+        Set<Principal> principals = subject.getPrincipals();
+        for (String role : identity.getRoles()) {
+          principals.add(new RolePrincipal(role));
+        }
+        principals.add(new UserPrincipal(identity.getUserId()));
+      } catch (Exception e) {
+        LOG.debug("Error committing authenticated user identity {}", identity.getUserId(), e);
+        throw new LoginException(String.format("Error committing authenticated user identity %s. Error: %s",
+                                               identity.getUserId(),
+                                               e.getMessage()));
       }
-      principals.add(new UserPrincipal(identity.getUserId()));
-    } catch (final Exception e) {
-      LOG.error(e.getLocalizedMessage());
-      throw new LoginException(e.getMessage());
+      return true;
     }
-    return true;
   }
 
   @Override
