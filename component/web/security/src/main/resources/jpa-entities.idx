@@ -1,1 +1,2 @@
 io.meeds.web.security.entity.TokenEntity
+io.meeds.web.security.entity.ApiKeyEntity
