@@ -20,7 +20,7 @@ package org.gatein.portal.controller.resource;
 
 import java.io.File;
 
-import com.mchange.io.FileUtils;
+import org.exoplatform.commons.utils.IOUtil;
 
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -59,7 +59,7 @@ public class ScriptContent {
     if (this.bytes != null && this.bytes.length > 0) {
       return this.bytes;
     } else if (file != null) {
-      return FileUtils.getBytes(file);
+      return IOUtil.getFileContentAsBytes(file.getAbsolutePath());
     } else {
       return null; // NOSONAR
     }
