@@ -46,7 +46,6 @@
     </init-params>
   </component>
   
-  
   <external-component-plugins>
     <target-component>org.exoplatform.web.login.recovery.PasswordRecoveryService</target-component>
     <component-plugin>

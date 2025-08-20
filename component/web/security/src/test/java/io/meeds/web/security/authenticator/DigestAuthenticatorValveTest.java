@@ -1,0 +1,66 @@
+/**
+ * This file is part of the Meeds project (https://meeds.io/).
+ *
+ * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+package io.meeds.web.security.authenticator;
+
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.authenticator.DigestAuthenticator.AuthDigest;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.junit.MockitoJUnitRunner;
+
+@RunWith(MockitoJUnitRunner.class)
+public class DigestAuthenticatorValveTest {
+
+  private DigestAuthenticatorValve valve;
+
+  private static final String      EXPECTED_KEY  = "DigestAuthenticator";
+
+  private static final String      EXPECTED_ALGO = AuthDigest.MD5.getRfcName();
+
+  @Before
+  public void setUp() {
+    valve = new DigestAuthenticatorValve();
+  }
+
+  @Test
+  public void testStartInternalSetsCorrectValues() throws LifecycleException {
+    // GIVEN
+    DigestAuthenticatorValve spyValve = spy(valve);
+
+    // WHEN
+    try {
+      spyValve.startInternal();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // THEN
+    verify(spyValve).setKey(EXPECTED_KEY);
+    verify(spyValve).setValidateUri(false);
+    verify(spyValve).setChangeSessionIdOnAuthentication(false);
+    verify(spyValve).setAlgorithms(EXPECTED_ALGO);
+    verify(spyValve, times(1)).startInternal();
+  }
+
+}
