@@ -644,7 +644,7 @@ public class PatchedHibernateIdentityStoreImpl implements IdentityStore, Seriali
 
     Session hibernateSession = getHibernateSession(ctx);
     try {
-      StringBuilder hqlBuilderSelect = new StringBuilder("select distinct io from HibernateIdentityObject io");
+      StringBuilder hqlBuilderSelect = new StringBuilder("select distinct io from HibernateIdentityObject io LEFT JOIN io.attributes attr LEFT JOIN attr.textValues val");
       Map<String, Object> queryParams = new HashMap<>();
 
       StringBuilder hqlBuilderConditions = new StringBuilder(" where io.realm=:realm");
@@ -671,9 +671,9 @@ public class PatchedHibernateIdentityStoreImpl implements IdentityStore, Seriali
         }
         if (isAllowNotCaseSensitiveSearch()) {
           attrValue = attrValue.toLowerCase();
-          hqlBuilderConditions.append(" and lower(io.name) " + operator + " :ioName");
+          hqlBuilderConditions.append(" and ( lower(io.name) " + operator + " :ioName OR ((attr.name) = 'label' AND lower(val) " + operator + " :ioName))");
         } else {
-          hqlBuilderConditions.append(" and io.name " + operator + " :ioName");
+          hqlBuilderConditions.append(" and ( io.name " + operator + " :ioName OR ((attr.name) = 'label' AND val " + operator + " :ioName))");
         }
         queryParams.put("ioName", attrValue);
       }
