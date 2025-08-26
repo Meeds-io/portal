@@ -58,9 +58,7 @@ import org.exoplatform.services.resources.ResourceBundleService;
 
 import jakarta.servlet.ServletContext;
 
-/**
- * Created by The eXo Platform SAS Mar 9, 2007
- */
+
 public abstract class BaseResourceBundleService implements ResourceBundleService, Startable {
 
   protected static final Log                                                  LOG         =

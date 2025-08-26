@@ -25,9 +25,7 @@ import org.exoplatform.web.application.URLBuilder;
 import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.core.UIComponent;
 
-/**
- * Created by The eXo Platform SAS Apr 3, 2007
- */
+
 public class PortletURLBuilder extends URLBuilder<UIComponent> {
 
     /** . */

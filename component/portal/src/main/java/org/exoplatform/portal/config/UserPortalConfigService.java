@@ -83,8 +83,8 @@ import lombok.Setter;
 import lombok.Synchronized;
 
 /**
- * Created by The eXo Platform SAS Apr 19, 2007 This service is used to load the
- * PortalConfig, Page config and Navigation config for a given user.
+ * This service is used to load the PortalConfig, Page config and Navigation
+ * config for a given user.
  */
 public class UserPortalConfigService implements Startable {
 

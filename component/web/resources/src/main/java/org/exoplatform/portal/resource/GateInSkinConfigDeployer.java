@@ -31,10 +31,6 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.services.log.ExoLogger;
 import org.gatein.wci.WebApp;
 
-/**
- * Created by eXoPlatform SAS Author: Minh Hoang TO - hoang281283@gmail.com Sep
- * 16, 2009
- */
 public class GateInSkinConfigDeployer extends AbstractResourceDeployer {
 
   /** . */

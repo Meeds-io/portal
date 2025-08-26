@@ -30,7 +30,6 @@ import org.exoplatform.webui.core.lifecycle.UIContainerLifecycle;
 import org.exoplatform.webui.event.Event;
 import org.exoplatform.webui.event.EventListener;
 
-/** Created by The eXo Platform SAS May 7, 2006 */
 @ComponentConfig(lifecycle = UIContainerLifecycle.class)
 @Serialized
 public class UIContainer extends UIComponent {

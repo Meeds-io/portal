@@ -36,9 +36,7 @@ import org.exoplatform.web.WebRequestHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/**
- * Created by The eXo Platform SARL Author : Nhu Dinh Thuan nhudinhthuan@exoplatform.com Dec 9, 2006
- */
+
 public class UploadHandler extends WebRequestHandler {
 
     private static final String RESTRICT_PUBLIC_PARAM = "public-access-restriction";

@@ -26,10 +26,6 @@ import org.exoplatform.webui.application.WebuiRequestContext;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.lifecycle.Lifecycle;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen
- * tuan08@users.sourceforge.net May 7, 2006 The decorator of a component
- */
 @ComponentConfig(lifecycle = UIComponentDecorator.UIComponentDecoratorLifecycle.class)
 @Serialized
 public class UIComponentDecorator extends UIComponent {

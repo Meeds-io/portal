@@ -29,9 +29,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Utils class offers build file tree with take account concurrency access.
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
  */
-
 public final class TreeFileUtils {
   private static final ConcurrentMap<String, Lock> locks   = new ConcurrentHashMap<String, Lock>(64, 0.75f, 64);
 

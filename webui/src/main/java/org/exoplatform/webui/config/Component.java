@@ -30,7 +30,6 @@ import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.lifecycle.Lifecycle;
 import org.exoplatform.webui.event.EventListener;
 
-/** Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net May 4, 2006 */
 @Converted(ComponentConfigConverter.class)
 public class Component {
 

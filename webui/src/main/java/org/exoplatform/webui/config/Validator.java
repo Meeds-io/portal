@@ -18,9 +18,7 @@
  */
 package org.exoplatform.webui.config;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net May 4, 2006
- */
+
 public class Validator {
 
     private String type;

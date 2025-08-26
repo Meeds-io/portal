@@ -28,8 +28,6 @@ import jakarta.servlet.ServletResponse;
 
 /**
  * This interface defines a Filter that cans be added to the {@link ExtensibleFilter}
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public interface Filter {
     /**

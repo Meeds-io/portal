@@ -38,9 +38,7 @@ import org.exoplatform.management.jmx.annotations.NameTemplate;
 import org.exoplatform.management.jmx.annotations.Property;
 import org.exoplatform.management.rest.annotations.RESTEndpoint;
 
-/**
- * Created by The eXo Platform SAS Author : tam.nguyen tamndrok@gmail.com Mar 17, 2009
- */
+
 
 @Managed
 @ManagedDescription("Template statistic service")

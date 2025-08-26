@@ -29,9 +29,7 @@ import org.exoplatform.commons.file.storage.dao.NameSpaceDAO;
 import org.exoplatform.commons.file.storage.entity.FileInfoEntity;
 import org.exoplatform.commons.file.storage.entity.NameSpaceEntity;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class DataStorage {
 
   private FileInfoDAO   fileInfoDAO;

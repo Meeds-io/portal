@@ -18,10 +18,6 @@
  */
 package org.exoplatform.web.application;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen
- * tuan08@users.sourceforge.net May 9, 2006
- */
 public interface ApplicationLifecycle<E extends RequestContext> {
 
   default void onInit(Application app) throws Exception {

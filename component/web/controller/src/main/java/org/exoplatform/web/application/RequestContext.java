@@ -31,8 +31,6 @@ import org.exoplatform.web.url.ResourceType;
 import org.exoplatform.web.url.URLFactory;
 
 /**
- * Created by The eXo Platform SAS May 7, 2006
- *
  * This abstract class is a wrapper on top of the request information such as the Locale in use, the application (for instance
  * PortalApplication, PortletApplication...), an access to the JavascriptManager as well as a reference to the URLBuilder in
  * use.

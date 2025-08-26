@@ -32,7 +32,6 @@ import org.exoplatform.services.log.Log;
  *
  * Hence every call to this ResourceResolver will in fact be delegated to one of the resolver it aggregates.
  *
- * Created by The eXo Platform SAS Oct 24, 2006
  */
 public class ApplicationResourceResolver extends ResourceResolver {
 

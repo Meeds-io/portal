@@ -22,9 +22,6 @@ import org.exoplatform.portal.pom.data.BodyData;
 import org.exoplatform.portal.pom.data.BodyType;
 import org.exoplatform.portal.pom.data.ModelData;
 
-/**
- * Created by The eXo Platform SAS Apr 25, 2007
- */
 public class PageBody extends ModelObject {
 
   public PageBody(BodyData bodyData) {

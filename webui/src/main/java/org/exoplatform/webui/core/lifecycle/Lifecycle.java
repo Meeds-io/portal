@@ -18,28 +18,21 @@
  */
 package org.exoplatform.webui.core.lifecycle;
 
-import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.groovyscript.text.TemplateService;
-import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.resolver.ResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.webui.application.WebuiRequestContext;
-import org.exoplatform.webui.core.UIApplication;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.event.Event;
 
-/**
- * Created by The eXo Platform SAS May 7, 2006
- */
 public class Lifecycle<E extends UIComponent> {
 
     protected static Log log = ExoLogger.getLogger("portal:Lifecycle");
 
-    private static final boolean DEVELOPPING = PropertyManager.isDevelopping();
-
     public void processDecode(E uicomponent, WebuiRequestContext context) throws Exception {
+      // Empty method
     }
 
     public void processAction(E uicomponent, WebuiRequestContext context) throws Exception {
@@ -94,18 +87,6 @@ public class Lifecycle<E extends UIComponent> {
         bcontext.put("locale", context.getLocale());
         ExoContainer pcontainer = context.getApplication().getApplicationServiceContainer();
         TemplateService service = pcontainer.getComponentInstanceOfType(TemplateService.class);
-        ResourceResolver resolver = bcontext.getResourceResolver();
-
-        if (DEVELOPPING) {
-          PortalRequestContext rootContext = PortalRequestContext.getCurrentInstance();
-          UIApplication uiApplication = rootContext.getUIApplication();
-          long lastAccess = uiApplication.getLastAccessApplication();
-          if (lastAccess == 0 || resolver.isModified(template, lastAccess)) {
-            service.getTemplatesCache().clearCache();
-            uiApplication.setLastAccessApplication(System.currentTimeMillis());
-          }
-        }
-
         try {
             service.merge(template, bcontext);
         } catch (NullPointerException e) {

@@ -42,8 +42,7 @@ import org.exoplatform.services.log.Log;
 
 /**
  * File Service which stores the file metadata in a database, and uses a
- * BinaryProvider to store the file binary. Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
+ * BinaryProvider to store the file binary.
  */
 public class FileServiceImpl implements FileService {
 

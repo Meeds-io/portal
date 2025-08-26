@@ -33,182 +33,162 @@ import org.exoplatform.web.application.URLBuilder;
 import org.exoplatform.webui.core.UIApplication;
 import org.exoplatform.webui.core.UIComponent;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
- * Created by The eXo Platform SAS May 7, 2006
- *
- * The main class to manage the request context in a webui environment
- *
- * It adds: - some access to the root UI component (UIApplication) - access to the request and response objects - information
- * about the current state of the request - the list of object to be updated in an AJAX way - an access to the ResourceResolver
- * bound to an uri scheme - the reference on the StateManager object
+ * The main class to manage the request context in a webui environment It adds:
+ * - some access to the root UI component (UIApplication) - access to the
+ * request and response objects - information about the current state of the
+ * request - the list of object to be updated in an AJAX way - an access to the
+ * ResourceResolver bound to an uri scheme - the reference on the StateManager
+ * object
  */
 public abstract class WebuiRequestContext extends RequestContext {
 
-    public static final char NAME_DELIMITER = '-';
+  public static final char   NAME_DELIMITER = '-';
 
-    protected UIApplication uiApplication_;
+  @Getter
+  @Setter
+  protected String           sessionId;
 
-    protected String sessionId_;
+  @Getter
+  @Setter
+  protected StateManager     stateManager;
 
-    protected ResourceBundle appRes_;
+  @Getter
+  @Setter
+  protected boolean          responseComplete;
 
-    private StateManager stateManager_;
+  @Getter
+  @Setter
+  protected boolean          processRender;
 
-    private boolean responseComplete_ = false;
+  protected UIApplication    uiApplication;
 
-    private boolean processRender_ = false;
+  protected ResourceBundle   appRes;
 
-    private Set<UIComponent> uicomponentToUpdateByAjax;
+  protected Set<UIComponent> uicomponentToUpdateByAjax;
 
-    public WebuiRequestContext(Application app) {
-        super(app);
+  protected WebuiRequestContext(Application application) {
+    super(application);
+  }
+
+  protected WebuiRequestContext(RequestContext parentAppRequestContext, Application application) {
+    super(parentAppRequestContext, application);
+  }
+
+  @Override
+  public ResourceBundle getApplicationResourceBundle() {
+    Application application = getApplication();
+    if (appRes == null && application != null) {
+      try {
+        Locale locale = getLocale();
+        appRes = application.getResourceBundle(locale);
+      } catch (Exception e) {
+        throw new IllegalStateException(e);
+      }
     }
+    return appRes;
+  }
 
-    protected WebuiRequestContext(RequestContext parentAppRequestContext, Application app_) {
-        super(parentAppRequestContext, app_);
+  public void setUIApplication(UIApplication uiApplication) {
+    this.uiApplication = uiApplication;
+    this.appRes = null;
+  }
+
+  public UIApplication getUIApplication() {
+    return uiApplication;
+  }
+
+  public String getActionParameterName() {
+    return ACTION;
+  }
+
+  public String getUIComponentIdParameterName() {
+    return UIComponent.UICOMPONENT;
+  }
+
+  @Override
+  public abstract URLBuilder<UIComponent> getURLBuilder();
+
+  public abstract String getRequestContextPath();
+
+  /**
+   * Returns the context path of the portal or null if it does not execute in
+   * the context of an aggregated portal request.
+   *
+   * @return the portal context path
+   */
+  public abstract String getPortalContextPath();
+
+  public abstract <T> T getRequest();
+
+  public abstract <T> T getResponse();
+
+  public abstract void sendRedirect(String url);
+
+  public Set<UIComponent> getUIComponentToUpdateByAjax() {
+    return uicomponentToUpdateByAjax;
+  }
+
+  public void addUIComponentToUpdateByAjax(UIComponent uicomponent) {
+    if (uicomponentToUpdateByAjax == null) {
+      uicomponentToUpdateByAjax = new LinkedHashSet<>();
     }
+    uicomponentToUpdateByAjax.add(uicomponent);
+  }
 
-    public String getSessionId() {
-        return sessionId_;
+  public ResourceResolver getResourceResolver(String uri) {
+    Application app = getApplication();
+    RequestContext pcontext = this;
+    while (app != null) {
+      ApplicationResourceResolver appResolver = app.getResourceResolver();
+      ResourceResolver resolver = appResolver.getResourceResolver(uri);
+      if (resolver != null) {
+        return resolver;
+      }
+      pcontext = pcontext.getParentAppRequestContext();
+      if (pcontext != null) {
+        app = pcontext.getApplication();
+      } else {
+        app = null;
+      }
     }
+    return null;
+  }
 
-    protected void setSessionId(String id) {
-        sessionId_ = id;
-    }
+  public JavascriptManager getJavascriptManager() {
+    // Yes nasty cast
+    return ((WebuiRequestContext) getParentAppRequestContext()).getJavascriptManager();
+  }
 
-    public UIApplication getUIApplication() {
-        return uiApplication_;
-    }
-
-    public void setUIApplication(UIApplication uiApplication) throws Exception {
-        uiApplication_ = uiApplication;
-        appRes_ = null;
-    }
-
-    public ResourceBundle getApplicationResourceBundle() {
-        Application application = getApplication();
-        if (appRes_ == null && application != null) {
-            try {
-                Locale locale = getLocale();
-                appRes_ = application.getResourceBundle(locale);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }
-        return appRes_;
-    }
-
-    public String getActionParameterName() {
-        return WebuiRequestContext.ACTION;
-    }
-
-    public String getUIComponentIdParameterName() {
-        return UIComponent.UICOMPONENT;
-    }
-
-    @Override
-    public abstract URLBuilder<UIComponent> getURLBuilder();
-
-    public abstract String getRequestContextPath();
-
-    /**
-     * Returns the context path of the portal or null if it does not execute in the context of an aggregated portal request.
-     *
-     * @return the portal context path
+  public static String generateUUID(String prefix) {
+    String uuid = UUID.randomUUID().toString();
+    /*
+     * The following is equivalent to prefix.length() + 1 + uuid.length() - 4
+     * where + 1 is for the additional minus and -4 is for the number of minus
+     * signs removed from uuid you may want to look into the source of
+     * UUID.toString() to see that there are 4 minus signs in a default UUID
      */
-    public abstract String getPortalContextPath();
-
-    public abstract <T> T getRequest();
-
-    public abstract <T> T getResponse();
-
-    public boolean isResponseComplete() {
-        return responseComplete_;
+    int uuidLen = uuid.length();
+    StringBuilder result = new StringBuilder(prefix.length() + uuidLen - 3);
+    result.append(prefix).append(NAME_DELIMITER);
+    for (int i = 0; i < uuidLen; i++) {
+      char ch = uuid.charAt(i);
+      if (ch != NAME_DELIMITER) {
+        result.append(ch);
+      }
     }
+    return result.toString();
+  }
 
-    public void setResponseComplete(boolean b) {
-        responseComplete_ = b;
+  public static String stripUUIDSuffix(String name) {
+    int lastMinus = name.lastIndexOf(NAME_DELIMITER);
+    if (lastMinus >= 0) {
+      return name.substring(0, lastMinus);
+    } else {
+      return name;
     }
-
-    public abstract void sendRedirect(String url) throws Exception;
-
-    public boolean getProcessRender() {
-        return processRender_;
-    }
-
-    public void setProcessRender(boolean b) {
-        processRender_ = b;
-    }
-
-    public Set<UIComponent> getUIComponentToUpdateByAjax() {
-        return uicomponentToUpdateByAjax;
-    }
-
-    public void addUIComponentToUpdateByAjax(UIComponent uicomponent) {
-        if (uicomponentToUpdateByAjax == null) {
-            uicomponentToUpdateByAjax = new LinkedHashSet<UIComponent>();
-        }
-        uicomponentToUpdateByAjax.add(uicomponent);
-    }
-
-    public ResourceResolver getResourceResolver(String uri) {
-        Application app = getApplication();
-        RequestContext pcontext = this;
-        while (app != null) {
-            ApplicationResourceResolver appResolver = app.getResourceResolver();
-            ResourceResolver resolver = appResolver.getResourceResolver(uri);
-            if (resolver != null) {
-                return resolver;
-            }
-            pcontext = pcontext.getParentAppRequestContext();
-            if (pcontext != null) {
-                app = pcontext.getApplication();
-            } else {
-                app = null;
-            }
-        }
-        return null;
-    }
-
-    public StateManager getStateManager() {
-        return stateManager_;
-    }
-
-    public void setStateManager(StateManager manager) {
-        stateManager_ = manager;
-    }
-
-    public JavascriptManager getJavascriptManager() {
-        // Yes nasty cast
-        return ((WebuiRequestContext) getParentAppRequestContext()).getJavascriptManager();
-    }
-
-    public static String generateUUID(String prefix) {
-        String uuid = UUID.randomUUID().toString();
-        /* The following is equivalent to prefix.length() + 1 + uuid.length() - 4
-         * where
-         *  + 1 is for the additional minus and
-         *  -4 is for the number of minus signs removed from uuid
-         *    you may want to look into the source of UUID.toString() to see that there are 4
-         *    minus signs in a default UUID */
-        int uuidLen = uuid.length();
-        StringBuilder result = new StringBuilder(prefix.length() + uuidLen  - 3);
-        result.append(prefix).append(NAME_DELIMITER);
-        for (int i = 0; i < uuidLen; i++) {
-            char ch = uuid.charAt(i);
-            if (ch != NAME_DELIMITER) {
-                result.append(ch);
-            }
-        }
-        return result.toString();
-    }
-
-    public static String stripUUIDSuffix(String name) {
-        int lastMinus = name.lastIndexOf(NAME_DELIMITER);
-        if (lastMinus >= 0) {
-            return name.substring(0, lastMinus);
-        } else {
-            return name;
-        }
-    }
+  }
 }

@@ -49,10 +49,6 @@ import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.storage.PageStorage;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 
-/**
- * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Nov
- * 13, 2007
- */
 public class TestLoadedPOM extends AbstractConfigTest {
 
   /** . */

@@ -20,7 +20,6 @@ package org.exoplatform.commons.file.services;
 
 /**
  * An exception that represents any type of exception persisted File Storage
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
  */
 public class FileStorageException extends Exception {
 

@@ -21,11 +21,6 @@ package org.exoplatform.download;
 import java.io.InputStream;
 
 /**
- * Created by The eXo Platform SARL
- * Author : Tuan Nguyen
- *          tuan08@users.sourceforge.net
- * Dec 26, 2005
- *
  * @deprecated It is better to avoid using this download resource
  */
 public class InputStreamDownloadResource extends DownloadResource {

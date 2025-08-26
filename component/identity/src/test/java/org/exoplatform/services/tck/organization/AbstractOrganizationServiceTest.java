@@ -42,12 +42,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Created by The eXo Platform SAS.
- * 
- *    <br>Date: 2011
- *
- */
 public abstract class AbstractOrganizationServiceTest extends TestCase {
 
    protected GroupHandler gHandler;

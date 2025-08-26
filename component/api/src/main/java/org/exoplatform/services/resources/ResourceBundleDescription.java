@@ -21,9 +21,6 @@ package org.exoplatform.services.resources;
 import java.io.Serializable;
 
 
-/**
- * Created by The eXo Platform SAS . Author : Tuan Nguyen tuan08@users.sourceforge.net Date: May 14, 2004 Time: 1:12:22 PM
- */
 @SuppressWarnings("serial")
 public class ResourceBundleDescription implements Serializable {
 

@@ -25,8 +25,6 @@ import org.exoplatform.container.xml.InitParams;
 
 /**
  * This class is used to add new {@link FilterDefinition}
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public class FilterDefinitionPlugin extends BaseComponentPlugin {
 

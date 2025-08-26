@@ -21,9 +21,7 @@ package org.exoplatform.webui.exception;
 import org.exoplatform.web.application.AbstractApplicationMessage;
 import org.exoplatform.web.application.ApplicationMessage;
 
-/**
- * Created by The eXo Platform SARL Author : Dang Van Minh minhdv81@yahoo.com Jun 7, 2006
- */
+
 
 @SuppressWarnings("serial")
 public class MessageException extends Exception {

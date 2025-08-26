@@ -20,11 +20,6 @@ package org.exoplatform.portal.webui.container;
 
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 
-/**
- * Created by The eXo Platform SAS Author : Nguyen Duc Khoi
- * khoi.nguyen@exoplatform.com Jul 29, 2010
- */
-
 @ComponentConfig(template = "system:/groovy/portal/webui/container/UIColumnContainer.gtmpl")
 public class UIColumnContainer extends UIContainer {
 

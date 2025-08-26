@@ -22,14 +22,6 @@ import org.exoplatform.commons.api.event.EventListener;
 import org.exoplatform.services.listener.Listener;
 
 /**
- * Created by The eXo Platform SARL
- * Author : Dang Van Minh
- *          minh.dang@exoplatform.com
- * Nov 21, 2012
- * 1:45:40 PM  
- */
-
-/**
  * An abstract listener to be extended by the dedicated listeners.
  * @param <S> This is a generic object of source, it can be a File/Folder/Content or something else 
  * which should be extended from <code>BaseObject</code>.

@@ -210,7 +210,6 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
             // Don't rethrow the exception to be compatible with other Org Service implementations
             log.debug("Can NOT find any user with username is NULL");
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -223,7 +222,6 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         try {
             attrs = getIdentitySession().getAttributesManager().getAttributes(userName);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -278,7 +276,6 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         try {
             getIdentitySession().getAttributesManager().updateAttributes(userName, attrArray);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         } finally {
           orgService.flush();
@@ -296,7 +293,6 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         try {
             getIdentitySession().getAttributesManager().removeAttributes(userName, attrKeys);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         } finally {
           orgService.flush();

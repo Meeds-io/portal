@@ -26,9 +26,7 @@ import org.exoplatform.commons.persistence.impl.GenericDAOJPAImpl;
 
 import jakarta.persistence.NoResultException;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class FileInfoDAOImpl extends GenericDAOJPAImpl<FileInfoEntity, Long> implements FileInfoDAO {
 
   @Override

@@ -38,8 +38,6 @@ import org.exoplatform.services.log.Log;
 
 /**
  * This class allows the rest of the platform to define new filters thanks to the external plugins.
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public class ExtensibleFilter {
 

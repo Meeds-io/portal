@@ -35,8 +35,6 @@ import org.exoplatform.container.web.AbstractFilter;
 /**
  * This filter allows the rest of the platform to add their own filters without changing the web.xml file. It is based on
  * {@link ExtensibleFilter} which is a component that supports plugin.
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public class GenericFilter extends AbstractFilter {
 

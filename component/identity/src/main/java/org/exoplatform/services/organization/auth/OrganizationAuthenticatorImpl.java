@@ -47,12 +47,6 @@ import java.util.*;
 
 import javax.security.auth.login.LoginException;
 
-/**
- * Created by The eXo Platform SAS . An authentication wrapper over Organization
- * service
- * 
- */
-
 public class OrganizationAuthenticatorImpl implements Authenticator
 {
     

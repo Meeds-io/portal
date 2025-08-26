@@ -66,19 +66,16 @@ public class MockApplication extends WebuiApplication {
 
     @Override
     public ExoContainer getApplicationServiceContainer() {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public String getApplicationGroup() {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public String getApplicationType() {
-        // TODO Auto-generated method stub
         return null;
     }
 }

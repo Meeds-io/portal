@@ -50,7 +50,6 @@
   <import>war:/conf/portal/files-configuration.xml</import>
   <import>war:/conf/portal/controller-configuration.xml</import>
   <import>war:/conf/portal/web-configuration.xml</import>
-  <import>war:/conf/portal/module-configuration.xml</import>
 
   <import>war:/conf/branding/branding-configuration.xml</import>
 

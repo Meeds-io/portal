@@ -30,12 +30,6 @@ import jakarta.persistence.NamedQuery;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
-/**
- * Created by The eXo Platform SAS
- * Author : eXoPlatform
- *          exo@exoplatform.com
- * Mar 07, 2017
- */
 @Entity(name = "SettingsEntity")
 @Table(name = "STG_SETTINGS")
 @NamedQueries({

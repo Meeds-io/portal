@@ -36,7 +36,6 @@ import org.exoplatform.webui.event.Event;
 import org.exoplatform.webui.event.Event.Phase;
 import org.exoplatform.webui.event.EventListener;
 
-/** Created by The eXo Platform SAS May 7, 2006 */
 @Serialized
 public abstract class UIComponent {
 
@@ -95,17 +94,6 @@ public abstract class UIComponent {
         this.rendered = b;
         return (T) this;
     }
-
-    //
-    // public void processInit(WebuiRequestContext context) throws Exception {
-    // MonitorEvent<UIComponent> mevent = createMonitorEvent(Event.Phase.INIT, context);
-    // config.getUIComponentLifecycle().init(this, context) ;
-    // if(mevent != null) {
-    // mevent.setEndExecutionTime(System.currentTimeMillis()) ;
-    // mevent.broadcast() ;
-    // }
-    // }
-    //
 
     public void processDecode(WebuiRequestContext context) throws Exception {
       getLifecycle().processDecode(this, context);

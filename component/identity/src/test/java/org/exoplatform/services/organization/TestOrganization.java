@@ -35,9 +35,7 @@ import org.exoplatform.services.organization.idm.cache.CacheableGroupHandlerImpl
 import org.exoplatform.services.organization.idm.cache.CacheableUserProfileHandlerImpl;
 import org.exoplatform.services.organization.impl.UserProfileImpl;
 
-/**
- * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Nov 13, 2007
- */
+
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.identity-configuration-new-user-listener.xml"),
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/services/organization/TestOrganization-configuration.xml"),
@@ -279,24 +277,6 @@ public class TestOrganization extends AbstractKernelTest {
         uHandler.saveUser(john, false);
         john = uHandler.findUserByName("john");
         assertEquals("John Anthony", john.getFullName());
-
-        // TODO: GTNPORTAL-2358 uncomment once displayName will be available
-        // // Test that "root" and "john" have displayName but demo not.
-        // Assert.assertEquals("Root Root", root.getDisplayName());
-        // Assert.assertEquals("john@localhost", john.getDisplayName());
-        // Assert.assertNull(demo.getDisplayName());
-        //
-        // // Change displayName of john and test that it's changed
-        // john.setDisplayName("John Anthony");
-        // uHandler.saveUser(john, false);
-        // john = uHandler.findUserByName("john");
-        // Assert.assertEquals("John Anthony", john.getDisplayName());
-        //
-        // // Assign displayName to demo and test that it's changed
-        // demo.setDisplayName("Demo Demo");
-        // uHandler.saveUser(demo, false);
-        // demo = uHandler.findUserByName("demo");
-        // Assert.assertEquals("Demo Demo", demo.getDisplayName());
     }
 
     public void testCreateDuplicateMembershipType() throws Exception {

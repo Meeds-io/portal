@@ -24,9 +24,7 @@ import org.exoplatform.commons.file.model.FileItem;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public interface FileService {
   /**
    * Get only the file info of the given id

@@ -18,9 +18,6 @@
  */
 package org.exoplatform.services.chars;
 
-/**
- * Created by The eXo Platform SARL Author : Nhu Dinh Thuan thuan.nhu@exoplatform.com Sep 13, 2006
- */
 public final class CharsUtil {
 
     public static int indexOf(char[] value, char[] c, int start) {

@@ -28,14 +28,6 @@ import org.exoplatform.portal.resource.config.xml.SkinConfigParser;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-/**
- *
- * Created by eXoPlatform SAS
- *
- * Author: Minh Hoang TO - hoang281283@gmail.com
- *
- * Sep 16, 2009
- */
 public class ThemeTask implements SkinConfigTask {
 
     private String styleName;

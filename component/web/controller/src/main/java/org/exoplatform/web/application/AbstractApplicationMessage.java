@@ -26,9 +26,7 @@ import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SARL Author : Dang Van Minh minhdv81@yahoo.com Jun 7, 2006
- */
+
 public abstract class AbstractApplicationMessage implements Serializable {
     private static Log log = ExoLogger.getLogger(ApplicationMessage.class);
 

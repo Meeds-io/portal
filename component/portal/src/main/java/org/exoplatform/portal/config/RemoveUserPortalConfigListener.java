@@ -27,9 +27,7 @@ import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
 
-/**
- * Created by The eXo Platform SARL Author : Tung.Pham tung.pham@exoplatform.com Aug 1, 2007
- */
+
 public class RemoveUserPortalConfigListener extends Listener<UserHandler, User> {
 
     @Override
