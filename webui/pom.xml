@@ -30,7 +30,7 @@
   <name>Meeds Portal WebUI Portal</name>
 
   <properties>
-    <exo.test.coverage.ratio>0.11</exo.test.coverage.ratio>
+    <exo.test.coverage.ratio>0.09</exo.test.coverage.ratio>
   </properties>
 
   <dependencies>

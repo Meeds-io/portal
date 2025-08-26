@@ -34,8 +34,6 @@ import org.exoplatform.commons.file.resource.RdbmsResourceProvider;
 
 /**
  * Rdbms Resource Provider test class.
- * Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
  */
 public class RdbmsResourceProviderTest extends CommonsJPAIntegrationTest {
 

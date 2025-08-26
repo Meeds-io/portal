@@ -25,7 +25,6 @@ import org.exoplatform.webui.config.EventInterceptor;
 import org.exoplatform.webui.config.InitParams;
 import org.exoplatform.webui.config.Validator;
 
-/** Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net May 4, 2006 */
 public class ComponentMetaData {
 
     private String id;

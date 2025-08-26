@@ -34,10 +34,6 @@ import org.picocontainer.Startable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * NameSpace service Created by The eXo Platform SAS Author : eXoPlatform
- * exo@exoplatform.com
- */
 public class NameSpaceServiceImpl implements NameSpaceService, Startable {
   private static final Log      LOG                    = ExoLogger.getLogger(NameSpaceService.class);
 

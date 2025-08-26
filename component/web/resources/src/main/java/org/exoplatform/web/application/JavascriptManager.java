@@ -32,9 +32,7 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 
-/**
- * Created by The eXo Platform SAS Mar 27, 2007
- */
+
 public class JavascriptManager {
 
     public static final boolean USE_WEBUI_RESOURCES = Boolean.parseBoolean(System.getProperty("io.meeds.useWebuiResources", "true"));

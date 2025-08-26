@@ -29,9 +29,6 @@ import jakarta.servlet.ServletContext;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SAS Mar 15, 2006
- */
 public class ServletResourceResolver extends ResourceResolver {
 
     protected static Log log = ExoLogger.getLogger("portal:ServletResourceResolver");

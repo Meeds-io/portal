@@ -22,9 +22,7 @@ import org.exoplatform.resolver.ResourceResolver;
 import org.gatein.common.concurrent.AtomicPositiveLong;
 import org.gatein.common.concurrent.LongSampler;
 
-/**
- * Created by The eXo Platform SAS Author : tam.nguyen tam.nguyen@exoplatform.com Mar 17, 2009
- */
+
 
 public class TemplateStatistic {
 

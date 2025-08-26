@@ -27,10 +27,7 @@ import javax.portlet.WindowState;
 import org.exoplatform.commons.serialization.api.annotations.Serialized;
 import org.exoplatform.webui.application.WebuiApplication;
 import org.exoplatform.webui.application.WebuiRequestContext;
-import org.exoplatform.webui.application.portlet.PortletApplication;
-import org.exoplatform.webui.application.portlet.PortletApplicationController;
 import org.exoplatform.webui.application.portlet.PortletRequestContext;
-import org.exoplatform.webui.core.lifecycle.UIApplicationLifecycle;
 
 /**
  * Root UI component of portlets written using GateIn WebUI framework should extends this class <br>
@@ -44,16 +41,11 @@ import org.exoplatform.webui.core.lifecycle.UIApplicationLifecycle;
  * Use ComponentConfig annotation to config lifecycle class for WebUI component. <br>
  *
  * This class also provides machanism to show a WebUI popup message
- *
- * @see UIApplicationLifecycle
- * @see PortletApplicationController
- * @see PortletApplication
  */
 @Serialized
 public abstract class UIPortletApplication extends UIApplication {
-    private int minWidth = 300;
 
-    private int minHeight = 300;
+  private static final long serialVersionUID = -2343595321472731526L;
 
     public static String VIEW_MODE = "ViewMode";
 
@@ -62,40 +54,6 @@ public abstract class UIPortletApplication extends UIApplication {
     public static String HELP_MODE = "HelpMode";
 
     public static String CONFIG_MODE = "ConfigMode";
-
-    public UIPortletApplication() throws Exception {
-    }
-
-    @Override
-    public UIPopupMessages getUIPopupMessages() {
-      if (USE_WEBUI_RESOURCES) {
-        WebuiRequestContext context = PortletRequestContext.getCurrentInstance();
-        WebuiRequestContext portalContext = (WebuiRequestContext) context.getParentAppRequestContext();
-        return portalContext.getUIApplication().getUIPopupMessages();
-      } else {
-        return null;
-      }
-    }
-
-    @Deprecated
-    public int getMinWidth() {
-        return minWidth;
-    }
-
-    @Deprecated
-    public void setMinWidth(int minWidth) {
-        this.minWidth = minWidth;
-    }
-
-    @Deprecated
-    public int getMinHeight() {
-        return minHeight;
-    }
-
-    @Deprecated
-    public void setMinHeight(int minHeight) {
-        this.minHeight = minHeight;
-    }
 
     //
     @Override
@@ -144,7 +102,7 @@ public abstract class UIPortletApplication extends UIApplication {
      *
      * @param context - WebUI context
      */
-    public void serveResource(WebuiRequestContext context) throws Exception {
+    public void serveResource(WebuiRequestContext context) {
         if (!(context.getRequest() instanceof ResourceRequest)) {
             throw new IllegalStateException("serveSource can only be called in portlet context");
         }

@@ -505,7 +505,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         try {
             allGroups = getIdentitySession().getRelationshipManager().findRelatedGroups(user, null, null);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -547,7 +546,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       try {
         allGroups = getIdentitySession().getRelationshipManager().findRelatedGroups(user, groupType, identitySearchCriteria);
       } catch (Exception e) {
-        // TODO:
         handleException("Identity operation error: ", e);
       }
       List<Group> exoGroups = new LinkedList<Group>();
@@ -578,7 +576,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             plGroups.addAll(getIdentitySession().getRelationshipManager()
                     .findAssociatedGroups(getRootGroup(), null, true, true));
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -588,7 +585,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
                 try {
                     plGroups.addAll(getIdentitySession().getPersistenceManager().findGroup(type));
                 } catch (Exception e) {
-                    // TODO:
                     handleException("Identity operation error: ", e);
                 }
             }
@@ -724,7 +720,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
               try {
                   plGroups.addAll(getIdentitySession().getPersistenceManager().findGroup(type, identitySearchCriteria));
               } catch (Exception e) {
-                  // TODO:
                   handleException("Identity operation error: ", e);
               }
           }
@@ -776,7 +771,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
               jbidGroup = getIdentitySession().getPersistenceManager().findGroup(plGroupName,
                       orgService.getConfiguration().getGroupType(group.getParentId()));
           } catch (Exception e) {
-              // TODO:
               handleException("Identity operation error: ", e);
           }
       }
@@ -793,7 +787,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         try {
             attrs = getIdentitySession().getAttributesManager().getAttributes(jbidGroup);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -869,7 +862,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         try {
             parents = getIdentitySession().getRelationshipManager().findAssociatedGroups(jbidGroup, null, false, false);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -933,9 +925,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
         // All groups not connected to the root should be just below the root
         return "/" + gtnGroupName;
-
-        // TODO: make it configurable
-        // throw new IllegalStateException("Group present that is not connected to the root: " + jbidGroup.getName());
     }
 
     private org.picketlink.idm.api.Group persistGroup(Group exoGroup) throws Exception{
@@ -948,7 +937,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             jbidGroup = getIdentitySession().getPersistenceManager().findGroup(plGroupName,
                     orgService.getConfiguration().getGroupType(exoGroup.getParentId()));
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -994,7 +982,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             try {
                 getIdentitySession().getAttributesManager().updateAttributes(jbidGroup, attrs);
             } catch (Exception e) {
-                // TODO:
                 handleException("Identity operation error: ", e);
             } finally {
               orgService.flush();
@@ -1011,8 +998,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
      * @return
      */
     private String getCacheNS() {
-        // TODO: refactor to remove cast. For now to avoid adding new config option and share existing cache instannce
-        // TODO: it should be there.
         return ((PicketLinkIDMServiceImpl) service_).getRealmName();
     }
 
@@ -1040,7 +1025,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
             rootGroup = getIdentitySession().getPersistenceManager().findGroup(
                     orgService.getConfiguration().getRootGroupName(), orgService.getConfiguration().getGroupType("/"));
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 

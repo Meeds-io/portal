@@ -21,8 +21,7 @@ package org.exoplatform.portal.resource;
 import java.util.List;
 
 /**
- * Extends a skin with additional information. Created by The eXo Platform SAS
- * Jan 19, 2007
+ * Extends a skin with additional information.
  */
 public interface SkinConfig extends Skin {
 

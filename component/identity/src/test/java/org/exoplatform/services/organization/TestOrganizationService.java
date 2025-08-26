@@ -24,9 +24,7 @@ import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.component.test.KernelLifeCycle;
 import org.junit.ClassRule;
 
-/**
- * Created by The eXo Platform SAS Author : Hoa Pham hoapham@exoplatform.com,phamvuxuanhoa@yahoo.com Oct 27, 2005
- */
+
 
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),

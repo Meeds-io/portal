@@ -472,7 +472,7 @@ public class PortalRequestContext extends WebuiRequestContext {
 
   public UIPortal getUiPortal() {
     if (uiPortal == null) {
-      uiPortal = ((UIPortalApplication) uiApplication_).getUiPortal(siteKey);
+      uiPortal = ((UIPortalApplication) uiApplication).getUiPortal(siteKey);
     }
     return uiPortal;
   }
@@ -501,7 +501,7 @@ public class PortalRequestContext extends WebuiRequestContext {
   }
 
   public void refreshResourceBundle() {
-    appRes_ = getApplication().getResourceBundle(getLocale());
+    appRes = getApplication().getResourceBundle(getLocale());
   }
 
   public void requestAuthenticationLogin() {
@@ -773,7 +773,8 @@ public class PortalRequestContext extends WebuiRequestContext {
     response.sendError(sc);
   }
 
-  public final void sendRedirect(String url) throws IOException {
+  @SneakyThrows
+  public final void sendRedirect(String url) {
     setResponseComplete(true);
     if (url.contains(getGlobalPortal())) {
       String globalSiteURI = "/" + PortalContainer.getCurrentPortalContainerName() + "/" + getGlobalPortal();

@@ -22,9 +22,7 @@ import org.exoplatform.commons.testing.BaseTestCase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public abstract class BaseTest extends BaseTestCase {
   public void setUp() {
     begin();

@@ -26,8 +26,6 @@ import org.exoplatform.container.xml.ValuesParam;
 
 /**
  * This class is used to define new resource bundles
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 24 sept. 2009
  */
 public class BaseResourceBundlePlugin extends BaseComponentPlugin {
 

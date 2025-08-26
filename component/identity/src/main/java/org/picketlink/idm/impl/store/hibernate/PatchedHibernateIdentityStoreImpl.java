@@ -2421,9 +2421,6 @@ public class PatchedHibernateIdentityStoreImpl implements IdentityStore, Seriali
     return null;
   }
 
-  // TODO: this kills performance and is present here only as "quick" hack to
-  // have the feature present and let to add test cases
-  // TODO: needs to be redone at the hibernate query level
   @SuppressWarnings("rawtypes")
   private void filterByAttributesValues(Collection<IdentityObject> objects, IdentityObjectSearchCriteria criteria) {
     Set<IdentityObject> toRemove = new HashSet<>();
@@ -2488,7 +2485,6 @@ public class PatchedHibernateIdentityStoreImpl implements IdentityStore, Seriali
     }
   }
 
-  // TODO: need to be implemented at HQL level
   private <T> List<T> cutPageFromResults(List<T> objects, IdentityObjectSearchCriteria criteria) {
     List<T> results = new LinkedList<>();
     if (criteria.getMaxResults() == 0) {

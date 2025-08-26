@@ -37,7 +37,6 @@ import org.gatein.pc.api.invocation.resolver.AttributeResolver;
 import org.gatein.pc.api.invocation.resolver.PrincipalAttributeResolver;
 import org.gatein.pc.api.spi.UserContext;
 
-// TODO: needs to be tested
 class ExoUserContext implements UserContext {
     /** . */
     private static final Map<String, String> EMPTY_STRING_TO_STRING_MAP = Collections.emptyMap();

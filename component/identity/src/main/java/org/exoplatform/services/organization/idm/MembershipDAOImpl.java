@@ -174,7 +174,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             hasRole = getIdentitySession().getRoleManager().hasRole(m.getUserName(), groupId, m.getMembershipType());
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -250,7 +249,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             hasRole = getIdentitySession().getRoleManager().hasRole(m.getUserName(), groupId, m.getMembershipType());
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -259,7 +257,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             associated = getIdentitySession().getRelationshipManager().isAssociatedByKeys(groupId, m.getUserName());
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -280,7 +277,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
               try {
                   getIdentitySession().getRoleManager().removeRole(m.getMembershipType(), m.getUserName(), groupId);
               } catch (Exception e) {
-                  // TODO:
                   handleException("Identity operation error: ", e);
               }
           }
@@ -291,7 +287,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
               try {
                   getIdentitySession().getRelationshipManager().disassociateUsersByKeys(groupId, keys);
               } catch (Exception e) {
-                  // TODO:
                   handleException("Identity operation error: ", e);
               }
           }
@@ -317,7 +312,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             roles = getIdentitySession().getRoleManager().findRoles(userName, null);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -354,7 +348,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             try {
                 groups = getIdentitySession().getRelationshipManager().findAssociatedGroups(userName, null);
             } catch (Exception e) {
-                // TODO:
                 handleException("Identity operation error: ", e);
             }
 
@@ -365,14 +358,12 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                 try {
                     getIdentitySession().getRelationshipManager().disassociateUsersByKeys(group.getKey(), keys);
                 } catch (Exception e) {
-                    // TODO:
                     handleException("Identity operation error: ", e);
                 }
             }
 
         }
 
-        // TODO: Exo UI has hardcoded casts to List
         return new LinkedList(memberships);
 
     }
@@ -395,7 +386,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             associated = getIdentitySession().getRelationshipManager().isAssociatedByKeys(gid, userName);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -408,7 +398,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             role = getIdentitySession().getRoleManager().getRole(type, userName, gid);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -461,7 +450,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             roleTypes = getIdentitySession().getRoleManager().findRoleTypes(userName, gid, null);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -482,7 +470,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             associated = getIdentitySession().getRelationshipManager().isAssociatedByKeys(gid, userName);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -494,7 +481,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             memberships.add(m);
         }
 
-        // TODO: Exo UI has hardcoded casts to List
         Collection result = new LinkedList(memberships);
 
         if (log.isTraceEnabled()) {
@@ -514,7 +500,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             roles = getIdentitySession().getRoleManager().findRoles(userName, null);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -545,7 +530,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             try {
                 groups = getIdentitySession().getRelationshipManager().findAssociatedGroups(userName, null);
             } catch (Exception e) {
-                // TODO:
                 handleException("Identity operation error: ", e);
             }
 
@@ -614,7 +598,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         try {
             roles = getIdentitySession().getRoleManager().findRoles(gid, null);
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -639,7 +622,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
             try {
                 users = getIdentitySession().getRelationshipManager().findAssociatedUsers(gid, false, null);
             } catch (Exception e) {
-                // TODO:
                 handleException("Identity operation error: ", e);
             }
 
@@ -653,7 +635,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
 
         }
 
-        // TODO: Exo UI has harcoded casts to List
         List<MembershipImpl> results = new LinkedList<MembershipImpl>(memberships);
 
         if (orgService.getConfiguration().isSortMemberships()) {
@@ -688,7 +669,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                 return m;
             }
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 
@@ -702,7 +682,6 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                 return m;
             }
         } catch (Exception e) {
-            // TODO:
             handleException("Identity operation error: ", e);
         }
 

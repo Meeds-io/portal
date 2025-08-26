@@ -35,13 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Created by The eXo Platform SARL
- * Author : Dang Van Minh
- *          minh.dang@exoplatform.com
- * Nov 14, 2012
- * 3:49:21 PM  
- */
 public class EventManagerImpl<S, D> extends ListenerService implements EventManager<S, D> {
 
     private Map<String, List<ListenerBase<S, D>>> listenerMap = new HashMap<>();

@@ -31,8 +31,6 @@ import org.exoplatform.webui.event.Event;
 import org.exoplatform.webui.event.EventListener;
 
 /**
- * Created by The eXo Platform SAS May 7, 2006
- *
  * This abstract class defines several methods to abstract the differnt type of web application the eXo web framework can
  * provide such as portal or portlet.
  */

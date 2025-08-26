@@ -25,9 +25,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-/**
- * Created by The eXo Platform SAS . Author : Tuan Nguyen tuan08@users.sourceforge.net Date: May 14, 2004 Time: 1:12:22 PM
- */
 @SuppressWarnings("serial")
 public class ResourceBundleData extends ResourceBundleDescription implements Serializable {
 

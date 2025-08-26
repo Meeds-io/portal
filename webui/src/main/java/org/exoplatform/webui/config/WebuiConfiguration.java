@@ -22,9 +22,7 @@ import java.util.ArrayList;
 
 import org.exoplatform.webui.config.metadata.ComponentMetaData;
 
-/**
- * Created by The eXo Platform SAS May 4, 2006
- */
+
 public class WebuiConfiguration {
 
     private ArrayList<String> annotationClasses;

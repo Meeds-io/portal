@@ -22,9 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
-/**
- * Created by The eXo Platform SARL Author : Nhu Dinh Thuan nhudinhthuan@exoplatform.com Jun 2, 2007
- */
 public class JibxArraySerialize {
   
     /**
@@ -60,7 +57,7 @@ public class JibxArraySerialize {
             if (text.length() == 0) {
                 return new String[0];
             } else {
-                List<String> list = new ArrayList<String>(5);
+                List<String> list = new ArrayList<>(5);
                 StringTokenizer st = new StringTokenizer(text, ";");
                 while (st.hasMoreTokens()) {
                     String token = st.nextToken().trim();

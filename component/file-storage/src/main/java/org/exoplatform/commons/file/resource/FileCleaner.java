@@ -28,10 +28,6 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SAS.
- * 
- */
 public class FileCleaner extends WorkerThread {
 
   protected static final long                                       DEFAULT_TIMEOUT    = 30000;

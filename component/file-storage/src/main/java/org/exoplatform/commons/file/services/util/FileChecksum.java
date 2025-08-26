@@ -25,9 +25,6 @@ import java.security.MessageDigest;
 
 /**
  * Offers to calculate Checksum
- * Created by The eXo Platform SAS
- * Author : eXoPlatform
- *          exo@exoplatform.com
  */
 public final class FileChecksum {
 

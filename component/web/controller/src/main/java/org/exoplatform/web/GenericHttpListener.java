@@ -40,8 +40,6 @@ import org.exoplatform.services.log.Log;
 /**
  * This class is used to broadcast any "HttpEvent" to allow the rest of the platform to be notified without changing the web.xml
  * file.
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public class GenericHttpListener extends AbstractHttpSessionListener implements ServletContextListener {
 

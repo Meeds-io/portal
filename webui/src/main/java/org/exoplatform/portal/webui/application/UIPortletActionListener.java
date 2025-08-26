@@ -69,7 +69,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-/** May 29, 2006 */
 public class UIPortletActionListener {
 
   public static final String PORTLET_EVENTS            = "PortletEvents";

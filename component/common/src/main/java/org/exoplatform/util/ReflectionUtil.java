@@ -23,9 +23,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Jun 16, 2006
- */
+
 public class ReflectionUtil {
 
     public static Object[] EMPTY_ARGS = {};

@@ -38,10 +38,6 @@ import java.util.stream.Collectors;
 import static org.exoplatform.settings.jpa.EntityConverter.convertContextToContextEntity;
 import static org.exoplatform.settings.jpa.EntityConverter.convertScopeToScopeEntity;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com Mar
- * 07, 2017
- */
 public class JPASettingServiceImpl implements SettingService {
 
   private static final Log                                           LOG = ExoLogger.getLogger(JPASettingServiceImpl.class);

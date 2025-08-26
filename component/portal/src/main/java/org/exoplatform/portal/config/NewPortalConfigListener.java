@@ -63,11 +63,6 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.LocaleConfigService;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen
- * tuan08@users.sourceforge.net May 22, 2006
- */
-
 public class NewPortalConfigListener extends BaseComponentPlugin {
 
   private static final Log               LOG                 = ExoLogger.getLogger(NewPortalConfigListener.class);

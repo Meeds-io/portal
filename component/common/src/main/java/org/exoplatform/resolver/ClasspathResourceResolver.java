@@ -25,9 +25,6 @@ import java.util.Enumeration;
 import java.util.List;
 
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Mar 15, 2006
- */
 public class ClasspathResourceResolver extends ResourceResolver {
 
     public URL getResource(String url) throws Exception {

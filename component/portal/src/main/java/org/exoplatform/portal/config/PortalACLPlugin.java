@@ -25,9 +25,7 @@ import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.container.xml.ValuesParam;
 
-/**
- * Created by The eXo Platform SAS Author : Hoa Pham hoa.phamvu@exoplatform.com Nov 19, 2008
- */
+
 public class PortalACLPlugin extends BaseComponentPlugin {
     private List<String> portalCreationRoles = null;
 

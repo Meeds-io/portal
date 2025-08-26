@@ -77,12 +77,9 @@ import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.application.UserProfileLifecycle;
 import org.exoplatform.portal.application.state.ContextualPropertyManager;
-import org.exoplatform.portal.config.NoSuchDataException;
-import org.exoplatform.portal.module.ModuleRegistry;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.pc.ExoPortletState;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
-import org.exoplatform.portal.portlet.PortletExceptionHandleService;
 import org.exoplatform.portal.webui.application.UIPortletActionListener.ChangePortletModeActionListener;
 import org.exoplatform.portal.webui.application.UIPortletActionListener.ChangeWindowStateActionListener;
 import org.exoplatform.portal.webui.application.UIPortletActionListener.ProcessActionActionListener;
@@ -107,6 +104,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 
 /**
  * This UI component represent a portlet window on a page. <br>
@@ -149,11 +147,11 @@ public class UIPortlet extends UIApplication {
                                                                                                                         "javax.portlet.markup.head.element.support",
                                                                                                                         "true"));
 
+  private PortletInvoker                     portletInvoker;
+
   private String                             storageId;
 
   private String                             storageName;
-
-  private ModelAdapter                       adapter;
 
   private org.gatein.pc.api.Portlet          producedOfferedPortlet;
 
@@ -423,9 +421,8 @@ public class UIPortlet extends UIApplication {
    * @param prc the portal request context
    * @param <I> the invocation type
    * @return the portlet invocation
-   * @throws Exception any exception
    */
-  public <I extends PortletInvocation> I create(Class<I> type, PortalRequestContext prc) throws Exception {
+  public <I extends PortletInvocation> I create(Class<I> type, PortalRequestContext prc) {
     ExoPortletInvocationContext pic = new ExoPortletInvocationContext(prc, this);
 
     //
@@ -537,21 +534,13 @@ public class UIPortlet extends UIApplication {
     return invocation;
   }
 
-  public void update(PropertyChange... changes) throws Exception {
+  public void update(PropertyChange... changes) throws PortletInvokerException {
     PortletContext portletContext = getPortletContext();
-
-    //
-    PortletInvoker portletInvoker = getApplicationComponent(PortletInvoker.class);
-
     // Get marshalled version
-    StatefulPortletContext<ExoPortletState> updatedCtx = (StatefulPortletContext<ExoPortletState>) portletInvoker
-                                                                                                                 .setProperties(portletContext,
-                                                                                                                                changes);
-
-    //
+    StatefulPortletContext<ExoPortletState> updatedCtx =
+                                                       (StatefulPortletContext<ExoPortletState>) getPortletInvoker().setProperties(portletContext,
+                                                                                                                                   changes);
     ExoPortletState updateState = updatedCtx.getState();
-
-    // Now save it
     update(updateState);
   }
 
@@ -559,39 +548,21 @@ public class UIPortlet extends UIApplication {
     return state;
   }
 
+  @SneakyThrows
   public void setState(PortletState state) {
     if (state != null) {
+      LayoutService layoutService = getApplicationComponent(LayoutService.class);
+      this.applicationId = layoutService.getId(state.getApplicationState());
       try {
-        PortletInvoker portletInvoker = getApplicationComponent(PortletInvoker.class);
-        LayoutService layoutService = getApplicationComponent(LayoutService.class);
-        String applicationId = layoutService.getId(state.getApplicationState());
-        ModelAdapter adapter = ModelAdapter.getAdapter();
-        PortletContext producerOfferedPortletContext = adapter.getProducerOfferedPortletContext(applicationId);
-
-        ModuleRegistry moduleRegistry = getApplicationComponent(ModuleRegistry.class);
-        if (moduleRegistry.isPortletActive(applicationId)) {
-          try {
-            this.producedOfferedPortlet = portletInvoker.getPortlet(producerOfferedPortletContext);
-          } catch (Exception e) {
-            // Whenever couldn't invoke the portlet object, set the request
-            // portlet to null for the error tobe
-            // properly handled and displayed when the portlet is rendered
-            this.producedOfferedPortlet = null;
-            LOG.error(e.getMessage(), e);
-          }
-        }
-
-        this.adapter = adapter;
-        this.producerOfferedPortletContext = producerOfferedPortletContext;
-        this.applicationId = applicationId;
-      } catch (NoSuchDataException e) {
-        LOG.error(e.getMessage());
-        throw e;
+        this.producedOfferedPortlet = getPortletInvoker().getPortlet(getProducerOfferedPortletContext(applicationId));
       } catch (Exception e) {
+        // Whenever couldn't invoke the portlet object, set the request
+        // portlet to null for the error tobe
+        // properly handled and displayed when the portlet is rendered
+        this.producedOfferedPortlet = null;
         LOG.error(e.getMessage(), e);
       }
     } else {
-      this.adapter = null;
       this.producedOfferedPortlet = null;
       this.producerOfferedPortletContext = null;
       this.applicationId = null;
@@ -603,36 +574,33 @@ public class UIPortlet extends UIApplication {
    * Returns the state of the portlet as a set of preferences.
    *
    * @return the preferences of the portlet
-   * @throws Exception any exception
    */
-  public Portlet getPreferences() throws Exception {
+  public Portlet getPreferences() {
     RequestContext context = RequestContext.getCurrentInstance();
     ExoContainer container = context.getApplication().getApplicationServiceContainer();
-    return adapter.getState(container, state.getApplicationState());
+    return PortletModelAdapter.getInstance().getState(container, state.getApplicationState());
   }
 
   /**
    * Returns the portlet context of the portlet.
    *
    * @return the portlet context
-   * @throws Exception any exception
    */
-  public StatefulPortletContext<ExoPortletState> getPortletContext() throws Exception {
+  public StatefulPortletContext<ExoPortletState> getPortletContext() {
     RequestContext context = RequestContext.getCurrentInstance();
     ExoContainer container = context.getApplication().getApplicationServiceContainer();
-    return adapter.getPortletContext(container, applicationId, state.getApplicationState());
+    return PortletModelAdapter.getInstance().getPortletContext(container, applicationId, state.getApplicationState());
   }
 
   /**
    * Update the state of the portlet.
    *
    * @param updateState the state update
-   * @throws Exception any exception
    */
-  public void update(ExoPortletState updateState) throws Exception {
+  public void update(ExoPortletState updateState) {
     RequestContext context = RequestContext.getCurrentInstance();
     ExoContainer container = context.getApplication().getApplicationServiceContainer();
-    state.setApplicationState(adapter.update(container, updateState, state.getApplicationState()));
+    state.setApplicationState(PortletModelAdapter.getInstance().update(container, updateState, state.getApplicationState()));
     setState(state);
   }
 
@@ -640,10 +608,9 @@ public class UIPortlet extends UIApplication {
    * Return modifed portlet stated (after portlet action invovation)
    * 
    * @param modifiedContext
-   * @throws Exception
    */
-  public ExoPortletState getModifiedState(PortletContext modifiedContext) throws Exception {
-    return adapter.getStateFromModifiedContext(this.getPortletContext(), modifiedContext);
+  public ExoPortletState getModifiedState(PortletContext modifiedContext)  {
+    return PortletModelAdapter.getInstance().getStateFromModifiedContext(this.getPortletContext(), modifiedContext);
   }
 
   /**
@@ -651,10 +618,9 @@ public class UIPortlet extends UIApplication {
    * method is used in case WSRP
    * 
    * @param clonedContext
-   * @throws Exception
    */
-  public ExoPortletState getClonedState(PortletContext clonedContext) throws Exception {
-    return adapter.getstateFromClonedContext(this.getPortletContext(), clonedContext);
+  public ExoPortletState getClonedState(PortletContext clonedContext) {
+    return PortletModelAdapter.getInstance().getStateFromClonedContext(this.getPortletContext(), clonedContext);
   }
 
   /**
@@ -675,10 +641,9 @@ public class UIPortlet extends UIApplication {
    * @throws PortletInvokerException any invoker exception
    */
   public PortletInvocationResponse invoke(PortletInvocation invocation) throws PortletInvokerException {
-    PortletInvoker portletInvoker = getApplicationComponent(PortletInvoker.class);
     currentPortlet.set(this);
     try {
-      return portletInvoker.invoke(invocation);
+      return getPortletInvoker().invoke(invocation);
     } finally {
       currentPortlet.remove();
     }
@@ -698,9 +663,8 @@ public class UIPortlet extends UIApplication {
    * @param pir - response object from portlet container
    * @param context - request context
    * @return markup to render on browser
-   * @see PortletExceptionHandleService
    */
-  public Text generateRenderMarkup(PortletInvocationResponse pir, WebuiRequestContext context) {
+  public Text generateRenderMarkup(PortletInvocationResponse pir, WebuiRequestContext context) { // NOSONAR
     PortalRequestContext prcontext = PortalRequestContext.getCurrentInstance();
 
     Text markup = null;
@@ -770,10 +734,6 @@ public class UIPortlet extends UIApplication {
       } else {
         pcException = new PortletContainerException("Unknown invocation response type [" + pir.getClass() +
             "]. Expected a FragmentResponse or an ErrorResponse");
-      }
-      PortletExceptionHandleService portletExceptionService = getApplicationComponent(PortletExceptionHandleService.class);
-      if (portletExceptionService != null) {
-        portletExceptionService.handle(pcException);
       }
       // Log the error
       LOG.error("Portlet render threw an exception in page {}", prcontext.getRequest().getRequestURI(), pcException);
@@ -885,6 +845,20 @@ public class UIPortlet extends UIApplication {
       return configuredTitle;
     }
     return getDisplayName();
+  }
+
+  private PortletInvoker getPortletInvoker() {
+    if (portletInvoker == null) {
+      portletInvoker = getApplicationComponent(PortletInvoker.class);
+    }
+    return portletInvoker;
+  }
+
+  private PortletContext getProducerOfferedPortletContext(String applicationId) {
+    if (producerOfferedPortletContext == null) {
+      producerOfferedPortletContext = PortletModelAdapter.getInstance().getProducerOfferedPortletContext(applicationId);
+    }
+    return producerOfferedPortletContext;
   }
 
   private String getMaximizedPortletMode() {

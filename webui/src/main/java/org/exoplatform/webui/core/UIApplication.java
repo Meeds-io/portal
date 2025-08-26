@@ -24,11 +24,7 @@ import java.io.Writer;
 import org.exoplatform.commons.serialization.api.annotations.Serialized;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.web.application.AbstractApplicationMessage;
-import org.exoplatform.web.application.ApplicationMessage;
 import org.exoplatform.webui.application.WebuiRequestContext;
-import org.exoplatform.webui.exception.CSRFException;
-import org.exoplatform.webui.exception.MessageException;
 
 /**
  * This is abstract class for Root WebUI component of applications in GateIn.
@@ -39,94 +35,35 @@ import org.exoplatform.webui.exception.MessageException;
 @Serialized
 public abstract class UIApplication extends UIContainer implements Serializable {
 
-  protected static final Log  LOG            = ExoLogger.getLogger("portal:UIApplication");
+  private static final String DIV_BLOCK_TO_UPDATE_DATA = "<div class=\"BlockToUpdateData\">";
 
-  private long                lastAccessApplication_;
+  private static final String DIV_BLOCK_TO_UPDATE_ID   = "<div class=\"BlockToUpdateId\">";
 
-  private UIPopupMessages     uiPopupMessages_;
+  private static final String DIV_BLOCK_TO_UPDATE      = "<div class=\"BlockToUpdate\">";
 
-  private static final String UI_APPLICATION = "uiapplication";
+  private static final String END_DIV                  = "</div>";
 
-  /**
-   * Return the common UIPopupMessages
-   *
-   * @return UIPopupMessages
-   */
-  public UIPopupMessages getUIPopupMessages() {
-    if (USE_WEBUI_RESOURCES && uiPopupMessages_ == null) {
-      try {
-        uiPopupMessages_ = createUIComponent(UIPopupMessages.class, null, null);
-        uiPopupMessages_.setId("_" + uiPopupMessages_.hashCode());
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-      }
-    }
-    return uiPopupMessages_;
-  }
+  private static final long   serialVersionUID         = -8410121291107766699L;
 
-  public void addMessage(AbstractApplicationMessage message) {
-    if (USE_WEBUI_RESOURCES) {
-      getUIPopupMessages().addMessage(message);
-    }
-  }
+  protected static final Log  LOG                      = ExoLogger.getLogger("portal:UIApplication");
 
-  public void addMessage(ApplicationMessage message) {
-    if (USE_WEBUI_RESOURCES) {
-      addMessage((AbstractApplicationMessage) message);
-    }
-  }
-
-  public void clearMessages() {
-    if (USE_WEBUI_RESOURCES) {
-      getUIPopupMessages().clearMessages();
-    }
-  }
-
-  public long getLastAccessApplication() {
-    return lastAccessApplication_;
-  }
-
-  public void setLastAccessApplication(long time) {
-    lastAccessApplication_ = time;
-  }
+  private static final String UI_APPLICATION           = "uiapplication";
 
   @Override
   public String getUIComponentName() {
     return UI_APPLICATION;
   }
 
-  @SuppressWarnings("unchecked")
-  public <T extends UIComponent> T findComponentById(String lookupId) {
-    if (USE_WEBUI_RESOURCES && getUIPopupMessages().getId().equals(lookupId))
-      return (T) getUIPopupMessages();
-    return (T) super.findComponentById(lookupId);
-  }
-
-  public void renderChildren() throws Exception {
-    super.renderChildren();
-    if (!USE_WEBUI_RESOURCES || getUIPopupMessages() == null) {
-      return;
-    }
-    WebuiRequestContext context = WebuiRequestContext.getCurrentInstance();
-    getUIPopupMessages().processRender(context);
-  }
-
   /**
-   * Wrap the action processing by a try catch, if there is exceptions, show a
-   * popup message if no exception the processAction will be delegate to the
-   * target of the action request
+   * Wrap the action processing by a try catch, if there is exceptions, add a
+   * Log Trace only
    */
+  @Override
   public void processAction(WebuiRequestContext context) throws Exception {
     try {
       super.processAction(context);
-    } catch (MessageException ex) {
-      addMessage(ex.getDetailMessage());
-    } catch (CSRFException e) {
-      context.getJavascriptManager().getRequireJS().addScripts("location.reload();");
-    } catch (Throwable t) {
-      ApplicationMessage msg = new ApplicationMessage("UIApplication.msg.unknown-error", null, ApplicationMessage.ERROR);
-      addMessage(msg);
-      LOG.error("Error during the processAction phase", t);
+    } catch (Exception e) {
+      LOG.error("Error during the processAction phase", e);
     }
   }
 
@@ -136,11 +73,11 @@ public abstract class UIApplication extends UIContainer implements Serializable 
    * response
    */
   public void renderBlockToUpdate(UIComponent uicomponent, WebuiRequestContext context, Writer w) throws Exception {
-    w.write("<div class=\"BlockToUpdate\">");
-    w.append("<div class=\"BlockToUpdateId\">").append(uicomponent.getId()).append("</div>");
-    w.write("<div class=\"BlockToUpdateData\">");
+    w.write(DIV_BLOCK_TO_UPDATE);
+    w.append(DIV_BLOCK_TO_UPDATE_ID).append(uicomponent.getId()).append(END_DIV);
+    w.write(DIV_BLOCK_TO_UPDATE_DATA);
     uicomponent.processRender(context);
-    w.write("</div>");
-    w.write("</div>");
+    w.write(END_DIV);
+    w.write(END_DIV);
   }
 }

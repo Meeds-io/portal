@@ -27,9 +27,7 @@ import org.exoplatform.web.application.ApplicationLifecycle;
 import org.exoplatform.webui.Util;
 import org.exoplatform.webui.event.EventListener;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net May 7, 2006
- */
+
 public class Application {
 
     private InitParams initParams;

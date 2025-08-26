@@ -22,9 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Dec 26, 2005
- */
 public abstract class DownloadResource {
 
     private String downloadType_;

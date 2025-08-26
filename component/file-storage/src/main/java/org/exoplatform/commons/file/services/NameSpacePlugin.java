@@ -28,9 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class NameSpacePlugin extends BaseComponentPlugin {
 
   private Map<String, String> nameSpaceList = new HashMap<>();

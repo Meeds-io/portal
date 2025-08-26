@@ -21,9 +21,7 @@ package org.exoplatform.portal.webui.application;
 import org.exoplatform.portal.config.model.Properties;
 import org.exoplatform.portal.webui.portal.UIPortalComponent;
 
-/**
- * Created by The eXo Platform SARL Author : Pham Dung Ha ha.pham@exoplatform.com Jun 14, 2007
- */
+
 public class UIApplication extends UIPortalComponent {
 
     private Properties properties;

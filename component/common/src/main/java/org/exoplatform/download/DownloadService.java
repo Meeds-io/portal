@@ -25,12 +25,6 @@ import org.exoplatform.services.cache.concurrent.ConcurrentFIFOExoCache;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by The eXo Platform SARL
- * Author : Tuan Nguyen
- *          tuan08@users.sourceforge.net
- * Dec 26, 2005
- */
 public class DownloadService {
 
     private final ExoCache<String, DownloadResource> downloadResources_;

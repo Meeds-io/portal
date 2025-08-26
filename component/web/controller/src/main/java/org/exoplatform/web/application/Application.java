@@ -28,9 +28,7 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.BaseComponentPlugin;
 import org.exoplatform.resolver.ApplicationResourceResolver;
 
-/**
- * Created by The eXo Platform SAS May 7, 2006
- */
+
 public abstract class Application extends BaseComponentPlugin {
 
     public static final String JSR168_APPLICATION_TYPE = "jsr168Application";

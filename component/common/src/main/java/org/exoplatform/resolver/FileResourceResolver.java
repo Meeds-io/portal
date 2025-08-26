@@ -26,9 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Mar 15, 2006
- */
 public class FileResourceResolver extends ResourceResolver {
 
     static String FILE_PREFIX = "file:";

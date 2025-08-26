@@ -25,8 +25,6 @@ import javax.portlet.PortletRequest;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * Created by The eXo Platform SAS May 10, 2006
- *
  * A utility class that provides static methods to create new objects, of a given type
  */
 public class Util {

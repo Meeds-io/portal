@@ -21,11 +21,6 @@ package org.exoplatform.commons.testing;
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.container.PortalContainer;
 
-/**
- * Created by The eXo Platform SAS
- * Author : trongtt@exoplatform.com
- *
- */
 public abstract class BaseTestCase extends AbstractKernelTest {
   protected PortalContainer      container;
 

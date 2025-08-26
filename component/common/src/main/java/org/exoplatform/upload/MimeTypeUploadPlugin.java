@@ -29,9 +29,7 @@ import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SAS Author : Nguyen Thanh Hai haint@exoplatform.com Jun 29, 2011
- */
+
 public class MimeTypeUploadPlugin extends BaseComponentPlugin {
   private static final Log    log              = ExoLogger.getLogger(MimeTypeUploadPlugin.class);
     private static final String MIMETYPE_PATH = "mimetype-path";

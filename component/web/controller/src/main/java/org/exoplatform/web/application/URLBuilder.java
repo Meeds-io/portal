@@ -21,9 +21,7 @@ package org.exoplatform.web.application;
 import java.util.Locale;
 
 
-/**
- * Created by The eXo Platform SAS Mar 29, 2007
- */
+
 public abstract class URLBuilder<T> {
 
     /** . */

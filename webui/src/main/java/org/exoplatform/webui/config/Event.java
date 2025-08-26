@@ -24,9 +24,7 @@ import java.util.List;
 import org.exoplatform.webui.event.Event.Phase;
 import org.exoplatform.webui.event.EventListener;
 
-/**
- * Created by The eXo Platform SAS May 9, 2006
- */
+
 public class Event {
 
     private String name;

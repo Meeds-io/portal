@@ -28,7 +28,6 @@ import java.net.URL;
 /**
  * When implementing a resource store you should implement equals and hashCode
  * method. A store is equals to another if the store location is the same.
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
  */
 public interface BinaryProvider {
 

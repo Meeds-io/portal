@@ -21,9 +21,7 @@ package org.exoplatform.webui.config;
 import java.util.ArrayList;
 
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net May 9, 2006
- */
+
 public class InitParams {
 
     private ArrayList<Param> params;

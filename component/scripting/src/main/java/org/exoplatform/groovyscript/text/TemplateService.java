@@ -55,9 +55,7 @@ import org.picocontainer.Startable;
 import groovy.lang.Writable;
 import groovy.text.Template;
 
-/**
- * Created by The eXo Platform SAS Dec 26, 2005
- */
+
 @Managed
 @NameTemplate({ @Property(key = "view", value = "portal"), @Property(key = "service", value = "management"),
         @Property(key = "type", value = "template") })

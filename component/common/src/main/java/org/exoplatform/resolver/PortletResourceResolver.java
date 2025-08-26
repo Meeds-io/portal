@@ -32,9 +32,6 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SAS Mar 15, 2006
- */
 public class PortletResourceResolver extends ResourceResolver {
 
   protected static Log   log = ExoLogger.getLogger(PortletResourceResolver.class);

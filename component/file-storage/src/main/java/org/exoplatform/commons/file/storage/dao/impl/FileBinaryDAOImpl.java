@@ -26,8 +26,7 @@ import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
 /**
- * Data Access Object layer for binary data files. Created by The eXo Platform
- * SAS Author : eXoPlatform exo@exoplatform.com
+ * Data Access Object layer for binary data files.
  */
 public class FileBinaryDAOImpl extends GenericDAOJPAImpl<FileBinaryEntity, Long> implements FileBinaryDAO {
 

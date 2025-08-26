@@ -29,9 +29,7 @@ import java.util.List;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class NameSpaceDAOTest extends CommonsJPAIntegrationTest {
   @Override
   @Before

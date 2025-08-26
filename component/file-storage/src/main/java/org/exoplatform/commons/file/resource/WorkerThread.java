@@ -21,11 +21,6 @@ package org.exoplatform.commons.file.resource;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
-/**
- * Created by The eXo Platform SAS.
- * 
- */
-
 public abstract class WorkerThread extends Thread
 {
    /**
