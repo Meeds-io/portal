@@ -23,9 +23,7 @@ import org.exoplatform.web.application.URLBuilder;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.url.ComponentURL;
 
-/**
- * Created by The eXo Platform SAS Apr 3, 2007
- */
+
 public class PortalURLBuilder extends URLBuilder<UIComponent> {
 
     /** . */

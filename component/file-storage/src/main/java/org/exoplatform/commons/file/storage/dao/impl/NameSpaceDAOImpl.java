@@ -29,9 +29,7 @@ import java.util.List;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class NameSpaceDAOImpl extends GenericDAOJPAImpl<NameSpaceEntity, Long> implements NameSpaceDAO {
 
   private static final Log LOG = ExoLogger.getLogger(NameSpaceDAOImpl.class);

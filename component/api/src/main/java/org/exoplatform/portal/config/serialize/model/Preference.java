@@ -22,11 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-
-/**
- * Created by The eXo Platform SARL Author : Mestrallet Benjamin benjmestrallet@users.sourceforge.net Date: Jul 27, 2003 Time:
- * 9:21:41 PM
- */
 public class Preference {
 
     private String name;

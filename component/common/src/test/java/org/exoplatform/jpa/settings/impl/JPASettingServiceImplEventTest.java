@@ -32,10 +32,6 @@ import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.settings.jpa.JPASettingServiceImpl;
 
-/**
- * test the events Created by The eXo Platform SAS Author : Nguyen Viet Bang
- * bangnv@exoplatform.com Nov 28, 2012
- */
 public class JPASettingServiceImplEventTest extends CommonsDAOJPAImplTest {
 
   protected static JPASettingServiceImpl            settingService;

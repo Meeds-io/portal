@@ -571,10 +571,6 @@ public class UIPortalApplication extends UIApplication {
     }
     this.uiWorkingWorkspace = this.addChild(UIWorkingWorkspace.class, UIPortalApplication.UI_WORKING_WS_ID, null);
     this.uiViewWorkingWorkspace = this.uiWorkingWorkspace.addChild(UIComponentDecorator.class, null, UI_VIEWING_WS_ID);
-
-    if (this.getChildById(UIPortalApplication.UI_MASK_WS_ID) == null) {
-      this.addChild(UIMaskWorkspace.class, UIPortalApplication.UI_MASK_WS_ID, null);
-    }
     initSharedLayout(portalName);
   }
 
@@ -627,11 +623,7 @@ public class UIPortalApplication extends UIApplication {
       js.append(url).append("\";");
 
       JavascriptManager javascriptManager = pcontext.getJavascriptManager();
-      if (USE_WEBUI_RESOURCES) {
-        javascriptManager.require("SHARED/base").addScripts(js.toString());
-      } else {
-        javascriptManager.addJavascript(js.toString());
-      }
+      javascriptManager.addJavascript(js.toString());
 
       uiWorkingWorkspace.setRenderedChild(UIPortalApplication.UI_VIEWING_WS_ID);
       pcontext.ignoreAJAXUpdateOnPortlets(!pcontext.useAjax());
@@ -696,15 +688,6 @@ public class UIPortalApplication extends UIApplication {
       } else {
         Writer w = portalRequestContext.getWriter();
         JavascriptManager jsManager = portalRequestContext.getJavascriptManager();
-
-        UIMaskWorkspace uiMaskWS = getChildById(UIPortalApplication.UI_MASK_WS_ID);
-        if (uiMaskWS.isUpdated()) {
-          portalRequestContext.addUIComponentToUpdateByAjax(uiMaskWS);
-        }
-        if (USE_WEBUI_RESOURCES && getUIPopupMessages().hasMessage()) {
-          portalRequestContext.addUIComponentToUpdateByAjax(getUIPopupMessages());
-        }
-
         Set<UIComponent> list = portalRequestContext.getUIComponentToUpdateByAjax();
         List<UIPortlet> uiPortlets = new ArrayList<>(3);
         List<UIComponent> uiDataComponents = new ArrayList<>(5);

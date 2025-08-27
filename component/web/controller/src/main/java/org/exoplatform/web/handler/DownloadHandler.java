@@ -34,9 +34,7 @@ import org.exoplatform.web.WebRequestHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/**
- * Created by The eXo Platform SARL Author : LeBienThuy thuy.le@exoplatform.com Dec 9, 2006
- */
+
 public class DownloadHandler extends WebRequestHandler {
 
   private final Log log = ExoLogger.getLogger(DownloadHandler.class);

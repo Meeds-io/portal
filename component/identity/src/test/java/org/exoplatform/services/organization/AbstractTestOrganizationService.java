@@ -44,9 +44,7 @@ import org.exoplatform.services.organization.idm.Config;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
-/**
- * Created by The eXo Platform SAS Author : Hoa Pham hoapham@exoplatform.com,phamvuxuanhoa@yahoo.com Oct 27, 2005
- */
+
 public abstract class AbstractTestOrganizationService {
     private static String Group1 = "Group1";
 

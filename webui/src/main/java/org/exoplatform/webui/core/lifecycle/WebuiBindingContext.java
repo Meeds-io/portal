@@ -25,24 +25,23 @@ import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.groovyscript.text.BindingContext;
 import org.exoplatform.groovyscript.text.TemplateService;
-import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.resolver.ResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.resources.Orientation;
 import org.exoplatform.web.url.navigation.NodeURL;
 import org.exoplatform.webui.application.WebuiRequestContext;
-import org.exoplatform.webui.core.UIApplication;
 import org.exoplatform.webui.core.UIComponent;
 import org.exoplatform.webui.core.UIComponentDecorator;
 import org.exoplatform.webui.core.UIContainer;
 
 import groovy.lang.Closure;
 
-@SuppressWarnings("serial")
 public class WebuiBindingContext extends BindingContext {
 
-    protected static Log log = ExoLogger.getLogger("portal:WebuiBindingContext");
+    protected static Log         log              = ExoLogger.getLogger("portal:WebuiBindingContext");
+
+    private static final long    serialVersionUID = 2275177098391702873L;
 
     private static final boolean DEVELOPPING = PropertyManager.isDevelopping();
 
@@ -56,11 +55,11 @@ public class WebuiBindingContext extends BindingContext {
         rcontext_ = context;
 
         // Closure nodeurl()
-        put("nodeurl", new Closure(this) {
-            @Override
-            public Object call(Object[] args) {
-                return context.createURL(NodeURL.TYPE);
-            }
+        put("nodeurl", new Closure<>(this) {
+          @Override
+          public Object call(Object[] args) {
+            return context.createURL(NodeURL.TYPE);
+          }
         });
 
         // Add Orientation specific information
@@ -87,7 +86,8 @@ public class WebuiBindingContext extends BindingContext {
         return rcontext_.getPortalContextPath();
     }
 
-    public BindingContext clone() {
+    @Override
+    public BindingContext clone() { // NOSONAR
         BindingContext newContext = new WebuiBindingContext(resolver_, writer_, uicomponent_, rcontext_);
         newContext.putAll(this);
         newContext.setGroovyTemplateService(service_);
@@ -109,20 +109,19 @@ public class WebuiBindingContext extends BindingContext {
     }
 
     public void renderChildren() throws Exception {
-        if (uicomponent_ instanceof UIComponentDecorator) {
-            UIComponentDecorator uiComponentDecorator = (UIComponentDecorator) uicomponent_;
-            if (uiComponentDecorator.getUIComponent() == null)
-                return;
-            uiComponentDecorator.getUIComponent().processRender(rcontext_);
-            return;
+      if (uicomponent_ instanceof UIComponentDecorator uiComponentDecorator) {
+        if (uiComponentDecorator.getUIComponent() != null) {
+          uiComponentDecorator.getUIComponent().processRender(rcontext_);
         }
+      } else {
         UIContainer uicontainer = (UIContainer) uicomponent_;
         List<UIComponent> children = uicontainer.getChildren();
         for (UIComponent child : children) {
-            if (child.isRendered()) {
-                child.processRender(rcontext_);
-            }
+          if (child.isRendered()) {
+            child.processRender(rcontext_);
+          }
         }
+      }
     }
 
     public void renderChild(String id) throws Exception {
@@ -145,21 +144,7 @@ public class WebuiBindingContext extends BindingContext {
         uiChild.processRender(rcontext_);
     }
 
-    @SuppressWarnings("unused")
-    public void userRes(String mesgKey) {
-
-    }
-
     public void include(String name, ResourceResolver resourceResolver) throws Exception {
-        if (DEVELOPPING) {
-          PortalRequestContext rootContext = PortalRequestContext.getCurrentInstance();
-          UIApplication uiApplication = rootContext.getUIApplication();
-          long lastAccess = uiApplication.getLastAccessApplication();
-          if (lastAccess == 0 || resourceResolver.isModified(name, lastAccess)) {
-            service_.getTemplatesCache().clearCache();
-            uiApplication.setLastAccessApplication(System.currentTimeMillis());
-          }
-        }
         service_.include(name, clone(), resourceResolver);
     }
 

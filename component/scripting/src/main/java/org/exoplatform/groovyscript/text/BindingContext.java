@@ -23,9 +23,7 @@ import java.util.HashMap;
 
 import org.exoplatform.resolver.ResourceResolver;
 
-/**
- * Created by The eXo Platform SAS May 8, 2006
- */
+
 @SuppressWarnings("serial")
 public class BindingContext extends HashMap<String, Object> {
 

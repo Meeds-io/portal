@@ -30,9 +30,7 @@ import jakarta.persistence.NonUniqueResultException;
 import jakarta.persistence.TypedQuery;
 import java.util.List;
 
-/**
- * Created by exo on 3/8/17.
- */
+
 public class SettingsDAO extends GenericDAOJPAImpl<SettingsEntity, Long> implements org.exoplatform.settings.jpa.SettingsDAO {
   private static final Log LOG = ExoLogger.getLogger(SettingsDAO.class);
 

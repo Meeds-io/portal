@@ -28,8 +28,6 @@ import java.util.List;
 
 /**
  * File Binary DAO test class.
- * Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
  */
 public class FileBinaryDAOTest extends CommonsJPAIntegrationTest {
     @Override

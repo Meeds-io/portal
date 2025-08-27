@@ -271,7 +271,6 @@ public class InMemoryUserHandler implements UserHandler {
     return new InMemoryListAccess<>(users, new User[0]);
   }
 
-  // TODO Not Overridden but used, should be part of API in core module !!!
   public User findUserByUniqueAttribute(String attributeName, String attributeValue, UserStatus userStatus) {
     InMemoryUserProfileHandler userProfileHandler = (InMemoryUserProfileHandler) organizationService.getUserProfileHandler();
     List<UserProfile> profiles = userProfileHandler.findUserProfiles()

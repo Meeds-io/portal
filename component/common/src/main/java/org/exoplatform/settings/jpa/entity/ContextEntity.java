@@ -32,12 +32,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
-/**
- * Created by The eXo Platform SAS
- * Author : eXoPlatform
- *          exo@exoplatform.com
- * Mar 07, 2017
- */
 @Entity(name = "SettingsContextEntity")
 @Table(name = "STG_CONTEXTS")
 @NamedQueries({

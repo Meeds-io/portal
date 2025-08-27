@@ -44,6 +44,7 @@ import org.exoplatform.webui.core.UIComponent;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.SneakyThrows;
 import lombok.EqualsAndHashCode.Exclude;
 
 @Data
@@ -112,9 +113,9 @@ public class PortletRequestContext extends WebuiRequestContext {
   }
 
   @Override
-  public void setUIApplication(UIApplication uiApplication) throws Exception {
-    uiApplication_ = uiApplication;
-    appRes_ = getApplication().getResourceBundle(getParentAppRequestContext().getLocale());
+  public void setUIApplication(UIApplication uiApplication) {
+    this.uiApplication = uiApplication;
+    this.appRes = getApplication().getResourceBundle(getParentAppRequestContext().getLocale());
   }
 
   @Override
@@ -166,7 +167,8 @@ public class PortletRequestContext extends WebuiRequestContext {
     return getParentAppRequestContext().useAjax();
   }
 
-  public void sendRedirect(String url) throws Exception {
+  @SneakyThrows
+  public void sendRedirect(String url) {
     setResponseComplete(true);
     if (response instanceof ActionResponse actionResponse) {
       actionResponse.sendRedirect(url);

@@ -26,15 +26,9 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.cache.ObjectCacheInfo;
 
 /**
- * Created by The eXo Platform SAS
- * Author : Nguyen Viet Bang
- *          bangnv@exoplatform.com
- * Nov 27, 2012  
  * This class allows to select all setting cache objects which are in a specified Context or Scope.
  * The callback function of this selector is to remove all selected setting object.
- * @LevelAPI Experimental
  */
-
 public class SettingCacheSelector implements CachedObjectSelector<SettingKey,Object>{
   private SettingContext provider;
   

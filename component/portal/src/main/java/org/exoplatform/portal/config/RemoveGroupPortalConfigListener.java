@@ -27,9 +27,7 @@ import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
 
-/**
- * Created by The eXo Platform SARL Author : Tung.Pham tung.pham@exoplatform.com Jul 31, 2007
- */
+
 public class RemoveGroupPortalConfigListener extends Listener<GroupHandler, Group> {
 
     @Override

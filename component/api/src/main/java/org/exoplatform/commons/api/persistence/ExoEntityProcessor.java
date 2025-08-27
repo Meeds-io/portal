@@ -40,10 +40,6 @@ import org.apache.commons.collections.CollectionUtils;
  * This Annotation Processor (see JSR 269) creates an index that contains the list of all
  * the JPA entities annotated with @ExoEntity of the module.
  * This index is stored in the file “exo-jpa-entities/entities.idx” of the generated jar.
- *
- * Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
- * 7/22/15
  */
 @SupportedAnnotationTypes("org.exoplatform.commons.api.persistence.ExoEntity")
 @SupportedSourceVersion(SourceVersion.RELEASE_21)

@@ -29,10 +29,6 @@ import jakarta.servlet.ServletContext;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * Created by eXoPlatform SAS Author: Minh Hoang TO - hoang281283@gmail.com Sep
- * 16, 2009
- */
 public class PortalSkinTask extends AbstractSkinModule implements SkinConfigTask {
 
   @Getter

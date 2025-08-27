@@ -22,9 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-/**
- * Created by The eXo Platform SARL Author : Nhu Dinh Thuan nhudinhthuan@exoplatform.com Jun 2, 2007
- */
 @SuppressWarnings("serial")
 public class Properties extends HashMap<String, String> {
 

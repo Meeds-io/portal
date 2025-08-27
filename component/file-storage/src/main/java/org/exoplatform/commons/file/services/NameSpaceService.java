@@ -18,9 +18,7 @@
  */
 package org.exoplatform.commons.file.services;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public interface NameSpaceService {
     void createNameSpace(String name, String description);
 

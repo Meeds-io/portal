@@ -33,10 +33,6 @@ import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.settings.cache.CacheSettingServiceImpl;
 
-/** test just for the cache
- * Created by The eXo Platform SAS Author : eXoPlatform bangnv@exoplatform.com
- * Nov 22, 2012
- */
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),

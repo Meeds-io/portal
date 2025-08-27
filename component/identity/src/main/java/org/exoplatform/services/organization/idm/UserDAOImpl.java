@@ -871,9 +871,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
    * @return
    */
   private String getCacheNS() {
-    // TODO: refactor to remove cast. For now to avoid adding new config option
-    // and share existing cache instannce
-    // TODO: it should be there.
     return ((PicketLinkIDMServiceImpl) service_).getRealmName();
   }
 

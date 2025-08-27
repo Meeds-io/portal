@@ -27,9 +27,7 @@ import org.junit.Test;
 
 import java.util.*;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
+
 public class FileInfoDAOTest extends CommonsJPAIntegrationTest {
   @Override
   @Before

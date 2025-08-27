@@ -20,9 +20,7 @@ package org.exoplatform.upload;
 
 import lombok.AllArgsConstructor;
 
-/**
- * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Dec 26, 2005
- */
+
 @AllArgsConstructor
 public class UploadResource {
 

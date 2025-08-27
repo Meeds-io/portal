@@ -30,9 +30,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 
-/**
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
- */
+
 public class TestExtensibleFilter extends AbstractGateInTest {
 
     public void testDoFilter() throws IOException, ServletException {

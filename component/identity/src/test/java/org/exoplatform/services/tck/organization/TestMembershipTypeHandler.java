@@ -26,10 +26,6 @@ import org.exoplatform.services.organization.MembershipTypeHandler;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created by The eXo Platform SAS.
- * 
- */
 public class TestMembershipTypeHandler extends AbstractOrganizationServiceTest
 {
    private MyMembershipTypeEventListener listener;

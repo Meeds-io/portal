@@ -24,9 +24,7 @@ import junit.framework.TestCase;
 import java.util.Locale;
 
 
-/**
- * Created by exo on 6/14/16.
- */
+
 public class ScriptKeyTest extends TestCase {
 
     final ResourceId id = new ResourceId(ResourceScope.PORTAL, "platformNavigation/UIGroupsNavigationPortlet");

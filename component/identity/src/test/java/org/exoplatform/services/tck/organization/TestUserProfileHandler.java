@@ -24,10 +24,6 @@ import org.exoplatform.services.organization.UserProfileEventListenerHandler;
 
 import java.util.List;
 
-/**
- * Created by The eXo Platform SAS.
- * 
- */
 public class TestUserProfileHandler extends AbstractOrganizationServiceTest
 {
    private MyUserProfileEventListener listener;

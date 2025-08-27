@@ -31,14 +31,12 @@ import org.exoplatform.Constants;
 import org.exoplatform.commons.utils.Text;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.config.NoSuchDataException;
-import org.exoplatform.portal.portlet.PortletExceptionHandleService;
 import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.portal.webui.workspace.UIPortalApplication;
 import org.exoplatform.resolver.ApplicationResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.services.portletcontainer.PortletContainerException;
 import org.exoplatform.web.application.AbstractApplicationMessage;
 import org.exoplatform.web.application.ApplicationMessage;
 import org.exoplatform.webui.application.WebuiApplication;
@@ -49,9 +47,6 @@ import org.exoplatform.webui.core.lifecycle.WebuiBindingContext;
 import org.exoplatform.webui.event.Event;
 import org.exoplatform.webui.exception.MessageException;
 
-/**
- * Created by The eXo Platform SAS May 8, 2006
- */
 public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
 
   protected static final Log LOG = ExoLogger.getLogger("portal:UIPortletLifecycle"); // NOSONAR
@@ -152,13 +147,8 @@ public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
     } catch (NoSuchDataException e) {
       UIPortalApplication uiApp = Util.getUIPortalApplication();
       uiApp.refreshCachedUI();
-      ApplicationMessage msg = new ApplicationMessage("UIPortlet.message.staleData",
-                                                      null,
-                                                      AbstractApplicationMessage.WARNING);
-      uiApp.addMessage(msg);
     } catch (Exception e) {
       String message = e.getLocalizedMessage();
-      LOG.error("Error processing the action: " + message, e);
       Object[] args = { message };
       context.addUIComponentToUpdateByAjax(uicomponent);
       throw new MessageException(new ApplicationMessage("UIPortletLifecycle.msg.process-error",
@@ -206,27 +196,15 @@ public class UIPortletLifecycle extends Lifecycle<UIPortlet> {
           markup = Text.create("");
         }
       }
+    } catch (NoSuchDataException e) {
+      UIPortalApplication uiApp = Util.getUIPortalApplication();
+      uiApp.refreshCachedUI();
+      markup = Text.create(context.getApplicationResourceBundle().getString("UIPortlet.message.staleData"));
+    } catch (NoSuchPortletException e) {
+      markup = Text.create("");
     } catch (Exception e) {
-      PortletContainerException pcException = new PortletContainerException(e);
-      PortletExceptionHandleService portletExceptionService = uicomponent
-                                                                         .getApplicationComponent(PortletExceptionHandleService.class);
-      if (portletExceptionService != null) {
-        portletExceptionService.handle(pcException);
-      }
-
-      if (e instanceof NoSuchDataException) {
-        UIPortalApplication uiApp = Util.getUIPortalApplication();
-        uiApp.refreshCachedUI();
-        markup = Text.create(context.getApplicationResourceBundle().getString("UIPortlet.message.staleData"));
-      } else if (e instanceof NoSuchPortletException) {
-        markup = Text.create("");
-      } else {
-        // Log the error
-        LOG.error("Portlet render threw an exception in page {}", prcontext.getRequest().getRequestURI(), pcException);
-
-        //
-        markup = Text.create(context.getApplicationResourceBundle().getString("UIPortlet.message.RuntimeError"));
-      }
+      LOG.error("Portlet render threw an exception in page {}", prcontext.getRequest().getRequestURI(), e);
+      markup = Text.create(context.getApplicationResourceBundle().getString("UIPortlet.message.RuntimeError"));
     }
 
     //

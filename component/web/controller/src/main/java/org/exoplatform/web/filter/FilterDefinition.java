@@ -26,8 +26,6 @@ import java.util.regex.Pattern;
 
 /**
  * This class defined all the variables needed to define a {@link Filter}
- *
- * Created by The eXo Platform SAS Author : Nicolas Filotto nicolas.filotto@exoplatform.com 25 sept. 2009
  */
 public class FilterDefinition {
 

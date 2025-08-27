@@ -18,9 +18,7 @@
  */
 package org.exoplatform.webui.event;
 
-/**
- * Created by The eXo Platform SAS May 10, 2006
- */
+
 public abstract class EventListener<T> {
     public static final String RESULT_OK = "OK";
 

@@ -34,10 +34,6 @@ import org.exoplatform.services.organization.impl.NewUserEventListener;
 import java.util.Calendar;
 import java.util.List;
 
-/**
- * Created by The eXo Platform SAS.
- *
- */
 public class TestUserHandler extends AbstractOrganizationServiceTest
 {
    private MyUserEventListener listener;

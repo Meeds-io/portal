@@ -48,10 +48,6 @@ import org.exoplatform.services.resources.ResourceBundleData;
 
 import lombok.SneakyThrows;
 
-/**
- * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Dec
- * 1, 2007
- */
 public class SimpleResourceBundleService extends BaseResourceBundleService {
 
   // This depends on Crowdin Default language and not Platform Default

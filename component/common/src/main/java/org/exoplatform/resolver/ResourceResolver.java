@@ -40,7 +40,6 @@ import java.util.List;
  * or override the createResourceKey method of abstract class ResourceResolver<br>
  * and return the same ResourceKey for the same resource url<br>
  * <br>
- * Created by The eXo Platform SAS Mar 15, 2006
  */
 public abstract class ResourceResolver {
 

@@ -45,9 +45,6 @@ import org.gatein.common.util.Base64.EncodingOption;
 import org.picocontainer.Startable;
 
 /**
- * Created by The eXo Platform SAS Author : liem.nguyen ncliam@gmail.com Jun 5,
- * 2009
- *
  * @param <T> the token type
  * @param <K> the token key type
  */

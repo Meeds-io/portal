@@ -31,9 +31,7 @@ import org.jibx.runtime.JiBXException;
 import org.jibx.runtime.impl.MarshallingContext;
 import org.jibx.runtime.impl.UnmarshallingContext;
 
-/**
- * Created by The eXo Platform SARL Author : Nhu Dinh Thuan nhudinhthuan@exoplatform.com Jun 2, 2007
- */
+
 public class JibxPropertiesMapper implements IMarshaller, IUnmarshaller, IAliasable {
 
     private static final String SIZE_ATTRIBUTE_NAME = "size";

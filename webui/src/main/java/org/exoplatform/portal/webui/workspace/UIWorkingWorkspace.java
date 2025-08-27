@@ -21,9 +21,7 @@ package org.exoplatform.portal.webui.workspace;
 import org.exoplatform.webui.config.annotation.ComponentConfig;
 import org.exoplatform.webui.core.UIContainer;
 
-/**
- * Created by The eXo Platform SARL Author : Dang Van Minh minhdv81@yahoo.com Jun 12, 2006
- */
+
 
 @ComponentConfig(id = "UIWorkingWorkspace", template = "system:/groovy/portal/webui/workspace/UIWorkingWorkspace.gtmpl")
 public class UIWorkingWorkspace extends UIContainer {

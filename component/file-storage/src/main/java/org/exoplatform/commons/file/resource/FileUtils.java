@@ -25,8 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * This is an utility class : File operation Created by The eXo Platform SAS
- * Author : eXoPlatform exo@exoplatform.com
+ * This is an utility class : File operation
  */
 public final class FileUtils {
 

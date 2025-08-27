@@ -35,9 +35,7 @@ import org.picketlink.idm.impl.api.SimpleAttribute;
 
 import java.util.*;
 
-/**
- * Created by exo on 5/5/16.
- */
+
 @ConfiguredBy({
     @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.identity-ldap-configuration.xml"),
     @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/services/organization/TestOrganization-configuration.xml") })

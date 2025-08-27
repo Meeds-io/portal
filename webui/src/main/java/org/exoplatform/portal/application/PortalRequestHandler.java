@@ -49,7 +49,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Created by The eXo Platform SAS Dec 9, 2006<br>
  * This is 'portal' handler, it handle the request of URLs that are routed by
  * navigation controller (using urls parameter). This handler is registered to
  * WebAppController by xml configuration.
@@ -241,27 +240,28 @@ public class PortalRequestHandler extends WebRequestHandler {
         responseWrapper.setWrapMethods(true);
       }
       UIApplication uiApp = app.getStateManager().restoreUIRootComponent(context);
-      if (context.getUIApplication() != uiApp)
+      if (context.getUIApplication() != uiApp) {
         context.setUIApplication(uiApp);
-      for (ApplicationLifecycle lifecycle : lifecycles)
+      }
+      for (ApplicationLifecycle lifecycle : lifecycles) {
         lifecycle.onStartRequest(app, context);
+      }
 
       if (uiApp != null) {
         uiApp.processDecode(context);
-      }
 
-      if (!context.isResponseComplete() && !context.getProcessRender()) {
-        startRequestPhaseLifecycle(app, context, lifecycles, Phase.ACTION);
-        uiApp.processAction(context);
-        endRequestPhaseLifecycle(app, context, lifecycles, Phase.ACTION);
-      }
+        if (!context.isResponseComplete() && !context.isProcessRender()) {
+          startRequestPhaseLifecycle(app, context, lifecycles, Phase.ACTION);
+          uiApp.processAction(context);
+          endRequestPhaseLifecycle(app, context, lifecycles, Phase.ACTION);
+        }
 
-      if (!context.isResponseComplete()) {
-        startRequestPhaseLifecycle(app, context, lifecycles, Phase.RENDER);
-        uiApp.processRender(context);
-        endRequestPhaseLifecycle(app, context, lifecycles, Phase.RENDER);
+        if (!context.isResponseComplete()) {
+          startRequestPhaseLifecycle(app, context, lifecycles, Phase.RENDER);
+          uiApp.processRender(context);
+          endRequestPhaseLifecycle(app, context, lifecycles, Phase.RENDER);
+        }
       }
-
       // Store ui root
       app.getStateManager().storeUIRootComponent(context);
     } catch (StaleModelException e) {
