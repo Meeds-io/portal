@@ -163,8 +163,6 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
 
   public static final String             INITIAL_URI_PARAM                   = "initialURI";
 
-  private PortalContainer                container;
-
   private ServletContext                 servletContext;
 
   private RemindPasswordTokenService     remindPasswordTokenService;
@@ -188,7 +186,6 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
                                  JavascriptConfigService javascriptConfigService,
                                  SkinService skinService) {
     super(localeConfigService, brandingService, javascriptConfigService, skinService);
-    this.container = container;
     this.servletContext = container.getPortalContext();
     this.remindPasswordTokenService = remindPasswordTokenService;
     this.passwordRecoveryService = passwordRecoveryService;
@@ -394,16 +391,18 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
       user.setUserName(login);
     }
     organizationService.getUserHandler().createUser(user, true);
+    RequestLifeCycle.restartTransaction();
 
-    Collection<Membership> memberships = organizationService.getMembershipHandler()
-                                                            .findMembershipsByUserAndGroup(login, ADMINISTRATORS_GROUP);
-
-    boolean isAdministrator = CollectionUtils.isNotEmpty(memberships);
-    if (!isAdministrator && securitySettingService.isRegistrationExternalUser()) {
-      // Avoid incoherence by indicating an admin user As external
-      deleteFromInternalUsersGroup(login);
-      restartTransaction();
-      addToExternalUsersGroup(login);
+    if (securitySettingService.isRegistrationExternalUser()) {
+      Collection<Membership> memberships = organizationService.getMembershipHandler()
+                                                              .findMembershipsByUserAndGroup(login, ADMINISTRATORS_GROUP);
+      boolean isAdministrator = CollectionUtils.isNotEmpty(memberships);
+      if (!isAdministrator) {
+        // Avoid incoherence by indicating an admin user As external
+        deleteFromInternalUsersGroup(login);
+        RequestLifeCycle.restartTransaction();
+        addToExternalUsersGroup(login);
+      }
     }
     return login;
   }
@@ -427,7 +426,7 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
         organizationService.getMembershipHandler().removeMembership(usersMemberhip.getId(), true);
       }
     }
-    
+
     organizationService.getMembershipHandler()
                        .linkMembership(organizationService.getUserHandler().findUserByName(username),
                                        organizationService.getGroupHandler().findGroupById(EXTERNAL_USERS_GROUP),
@@ -571,7 +570,7 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
                                      String initialUri,
                                      String username,
                                      String password) throws ServletException, IOException {
-    restartTransaction();
+    RequestLifeCycle.restartTransaction();
     HttpServletRequestWrapper wrappedRequestForLogin = wrapRequestForLogin(request, username, password, initialUri);
     request.getRequestDispatcher(servletContext.getContextPath() + LOGIN).include(wrappedRequestForLogin, response);
     redirectToLoginPage(request, response, initialUri);
@@ -603,28 +602,13 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     };
   }
 
-  private void restartTransaction() {
-    int i = 0;
-    // Close transactions until no encapsulated transaction
-    boolean success = true;
-    do {
-      try {
-        RequestLifeCycle.end();
-        i++;
-      } catch (IllegalStateException e) {
-        success = false;
-      }
-    } while (success);
-
-    // Restart transactions with the same number of encapsulations
-    for (int j = 0; j < i; j++) {
-      RequestLifeCycle.begin(container);
-    }
-  }
-
   private String generateUserDetailCredential(User user) {
-    return user.getUserName() + "::" + user.getFirstName() + "::" + user.getLastName() + "::" + user.getEmail() + "::"
-        + user.getPassword();
+    return String.format("%s::%s::%s::%s::%s",
+                         user.getUserName(),
+                         user.getFirstName(),
+                         user.getLastName(),
+                         user.getEmail(),
+                         user.getPassword());
   }
 
   private User generateUserFromCredential(String data) {
