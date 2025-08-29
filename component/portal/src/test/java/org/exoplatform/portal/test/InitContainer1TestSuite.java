@@ -60,6 +60,7 @@ import org.exoplatform.portal.rest.UserRestResourcesTest;
 import org.exoplatform.portal.tree.list.TestListTree;
 import org.exoplatform.settings.rest.SettingResourceTest;
 
+import io.meeds.portal.mop.plugin.SiteAclPluginTest;
 import io.meeds.portal.permlink.service.PermanentLinkServiceTest;
 import io.meeds.portal.security.listener.DefaultUserMembershipListenerTest;
 import io.meeds.portal.security.listener.PortalRegistrationUpdateListenerTest;
@@ -108,6 +109,7 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     SettingResourceTest.class,
     TestEncoderService.class,
     NewPortalConfigListenerTest.class,
+    SiteAclPluginTest.class,
 })
 public class InitContainer1TestSuite {
 
