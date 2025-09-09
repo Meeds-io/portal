@@ -18,13 +18,54 @@
  */
 package org.exoplatform.portal.rest;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.security.RolesAllowed;
-import jakarta.servlet.http.HttpServletRequest;
-import javax.ws.rs.*;
-import javax.ws.rs.core.*;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.FormParam;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
+
+import org.apache.commons.lang3.StringUtils;
+
+import org.exoplatform.commons.ObjectAlreadyExistsException;
+import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.portal.config.UserACL;
+import org.exoplatform.portal.rest.model.MembershipRestEntity;
+import org.exoplatform.portal.rest.model.UserRestEntity;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
+import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.Membership;
+import org.exoplatform.services.organization.OrganizationService;
+import org.exoplatform.services.organization.Query;
+import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.search.UserSearchService;
+import org.exoplatform.services.rest.http.PATCH;
+import org.exoplatform.services.rest.resource.ResourceContainer;
+import org.exoplatform.services.security.ConversationState;
+import org.exoplatform.services.security.Identity;
+import org.exoplatform.services.security.MembershipEntry;
+import org.exoplatform.web.login.recovery.ChangePasswordConnector;
+import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,21 +74,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.apache.commons.lang3.StringUtils;
-import org.exoplatform.commons.ObjectAlreadyExistsException;
-import org.exoplatform.commons.utils.ListAccess;
-import org.exoplatform.portal.config.UserACL;
-import org.exoplatform.portal.rest.model.MembershipRestEntity;
-import org.exoplatform.portal.rest.model.UserRestEntity;
-import org.exoplatform.services.organization.*;
-import org.exoplatform.services.organization.search.UserSearchService;
-import org.exoplatform.services.rest.http.PATCH;
-import org.exoplatform.services.rest.resource.ResourceContainer;
-import org.exoplatform.services.security.ConversationState;
-import org.exoplatform.services.security.Identity;
-import org.exoplatform.services.rest.http.PATCH;
-import org.exoplatform.web.login.recovery.ChangePasswordConnector;
-import org.exoplatform.web.login.recovery.PasswordRecoveryService;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Path("v1/users")
 @Tag(name = "v1/users", description = "Manage User operations")
@@ -63,11 +90,13 @@ public class UserRestResourcesV1 implements ResourceContainer {
   
   public static final String             CHANGE_PASSWORD_NOT_ALLOWED = "CHANGE_PASSWORD_NOT_ALLOWED";
 
+  private static final Log               LOG                               = ExoLogger.getLogger(UserRestResourcesV1.class);
+
   private static final String            ADMINISTRATOR_GROUP            = "/platform/administrators";
 
   private static final String            DELEGATED_GROUP                = "/platform/delegated";
 
-    public static final String           UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
+  public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
 
   public static final UserFieldValidator USERNAME_VALIDATOR             = new UserFieldValidator("userName", true, false);
 
@@ -167,7 +196,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
     }
     List<UserRestEntity> userEntities = Arrays.stream(users)
                                               .map(this::toEntity)
-                                              .collect(Collectors.toList());
+                                              .toList();
     CollectionEntity<UserRestEntity> result = new CollectionEntity<>(userEntities,
                                                                      offset,
                                                                      limit,
@@ -505,7 +534,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
   @GET
   @Path("{id}/memberships")
   @Produces(MediaType.APPLICATION_JSON)
-  @RolesAllowed("administrators")
+  @RolesAllowed("users")
   @Operation(
       summary = "Gets User memberships list",
       description = "Gets User memberships list",
@@ -524,8 +553,13 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                      @Parameter(description = "Limit", required = false) @Schema(defaultValue = "20")
                                      @QueryParam("limit") int limit,
                                      @Parameter(description = "Returning the number of users found or not") @Schema(defaultValue = "false")
-                                     @QueryParam("returnSize") boolean returnSize) throws Exception {
+                                     @QueryParam("returnSize")
+                                     boolean returnSize) throws Exception {
 
+    boolean isAdmin = isMemberOfAdminGroup();
+    if (!isAdmin && !isMemberOfDelegatedGroup(userName)) {
+      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+    }
     offset = offset > 0 ? offset : 0;
     limit = limit > 0 ? limit : DEFAULT_LIMIT;
 
@@ -534,25 +568,53 @@ public class UserRestResourcesV1 implements ResourceContainer {
       return Response.status(Response.Status.NOT_FOUND).build();
     }
 
-    ListAccess<Membership> membershipsByUser = organizationService.getMembershipHandler().findAllMembershipsByUser(user);
-    int totalSize = membershipsByUser.getSize();
-    Membership[] memberships;
-    int limitToFetch = limit;
-    if (totalSize < (offset + limitToFetch)) {
-      limitToFetch = totalSize - offset;
-    }
     List<MembershipRestEntity> membershipEntities = new ArrayList<>();
-    if (limitToFetch > 0) {
-      memberships = membershipsByUser.load(offset, limitToFetch);
-      for (Membership membership : memberships) {
-        Group group = organizationService.getGroupHandler().findGroupById(membership.getGroupId());
-        membershipEntities.add(new MembershipRestEntity(membership, group, user));
+    int totalSize = 0;
+    if (isAdmin) {
+      ListAccess<Membership> membershipsByUser = organizationService.getMembershipHandler().findAllMembershipsByUser(user);
+      totalSize = membershipsByUser.getSize();
+      Membership[] memberships;
+      int limitToFetch = limit;
+      if (totalSize < (offset + limitToFetch)) {
+        limitToFetch = totalSize - offset;
       }
-      if (!returnSize) {
-        totalSize = 0;
+      if (limitToFetch > 0) {
+        memberships = membershipsByUser.load(offset, limitToFetch);
+        for (Membership membership : memberships) {
+          Group group = organizationService.getGroupHandler().findGroupById(membership.getGroupId());
+          membershipEntities.add(new MembershipRestEntity(membership, group, user));
+        }
+        if (!returnSize) {
+          totalSize = 0;
+        }
       }
-    }
+    } else {
+      Set<String> groupIds = ConversationState.getCurrent()
+                                              .getIdentity()
+                                              .getMemberships()
+                                              .stream()
+                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType())
+                                                           || StringUtils.equals("*", m.getMembershipType()))
+                                              .map(MembershipEntry::getGroup)
+                                              .collect(Collectors.toSet());
 
+      Identity userIdentity = userACL.getUserIdentity(userName);
+      List<MembershipEntry> memberships = userIdentity.getMemberships()
+                                                      .stream()
+                                                      .filter(m -> groupIds.contains(m.getGroup()))
+                                                      .skip(offset)
+                                                      .limit(limit)
+                                                      .toList();
+      totalSize = memberships.size();
+      memberships.forEach(m -> {
+        try {
+          Group group = organizationService.getGroupHandler().findGroupById(m.getGroup());
+          membershipEntities.add(new MembershipRestEntity(m.getMembershipType(), group, user));
+        } catch (Exception e) {
+          LOG.warn("Error retrieving group {}", m.getGroup(), e);
+        }
+      });
+    }
     return Response.ok(new CollectionEntity<>(membershipEntities, offset, limit, totalSize)).build();
   }
 
@@ -635,6 +697,26 @@ public class UserRestResourcesV1 implements ResourceContainer {
       return null;
     }
     return currentIdentity.getUserId();
+  }
+
+  public boolean isMemberOfAdminGroup() {
+    return ConversationState.getCurrent().getIdentity().isMemberOf(ADMINISTRATOR_GROUP);
+  }
+
+  public boolean isMemberOfDelegatedGroup(String userName) {
+    if (!ConversationState.getCurrent().getIdentity().isMemberOf(DELEGATED_GROUP)) {
+      return false;
+    } else {
+      Set<String> groupIds = ConversationState.getCurrent()
+                                              .getIdentity()
+                                              .getMemberships()
+                                              .stream()
+                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType()) || StringUtils.equals("*", m.getMembershipType()))
+                                              .map(MembershipEntry::getGroup)
+                                              .collect(Collectors.toSet());
+      Identity userIdentity = userACL.getUserIdentity(userName);
+      return groupIds.stream().anyMatch(userIdentity::isMemberOf);
+    }
   }
 
 }

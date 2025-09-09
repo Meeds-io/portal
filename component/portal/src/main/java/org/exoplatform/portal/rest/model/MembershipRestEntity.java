@@ -54,6 +54,18 @@ public class MembershipRestEntity {
     this.email = user.getEmail();
   }
 
+  public MembershipRestEntity(String membershipType, Group group, User user) {
+    this.id = String.format("%s:%s:%s", membershipType, user.getUserName(), group.getId());
+    this.membershipType = membershipType;
+    this.groupId = group.getId();
+    this.groupLabel = group.getLabel();
+    this.userName = user.getUserName();
+    this.fullName = user.getDisplayName();
+    this.firstName = user.getFirstName();
+    this.lastName = user.getLastName();
+    this.email = user.getEmail();
+  }
+
   public String getMembershipType() {
     return membershipType;
   }
