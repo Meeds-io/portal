@@ -248,6 +248,15 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
                                                null;
   }
 
+  public List<NewPortalConfig> getPortalConfigs(String type, String name) {
+    return CollectionUtils.isNotEmpty(configs) ? configs.stream()
+                                                        .filter(c -> StringUtils.equalsIgnoreCase(c.getOwnerType(), type)
+                                                            && CollectionUtils.isNotEmpty(c.getPredefinedOwner())
+                                                            && c.getPredefinedOwner().contains(name))
+                                                        .toList() :
+           Collections.emptyList();
+  }
+
   /**
    * @deprecated Site Templates has been changed to be stored in database to
    *             make it dynamically managed by UI rather than statis pages and

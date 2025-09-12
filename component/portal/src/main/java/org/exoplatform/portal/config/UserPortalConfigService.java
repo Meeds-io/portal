@@ -173,35 +173,37 @@ public class UserPortalConfigService implements Startable {
     if (!canRestore(type, name)) {
       return false;
     }
-    NewPortalConfig config = newPortalConfigListener.getPortalConfig(type, name);
-    config = config.clone();
-    config.setImportMode(importMode.name());
-    config.setOverrideMode(true);
-    HashSet<String> ownerName = new HashSet<>();
-    ownerName.add(name);
-    config.setPredefinedOwner(ownerName);
-    if (restoreSiteLayout) {
-      PortalConfig previousSite = layoutService.getPortalConfig(type, name);
-      newPortalConfigListener.initPortalConfigDB(config, true);
-      PortalConfig site = layoutService.getPortalConfig(type, name);
-      if (previousSite != null) {
-        // Preserve previous version or properties
-        site.setLabel(previousSite.getLabel());
-        site.setDescription(previousSite.getDescription());
-        site.setAccessPermissions(previousSite.getAccessPermissions());
-        site.setEditPermission(previousSite.getEditPermission());
-        site.setDisplayed(previousSite.isDisplayed());
-        site.setDisplayOrder(previousSite.getDisplayOrder());
-        site.setIcon(previousSite.getIcon());
-        site.setProperties(previousSite.getProperties());
-        layoutService.save(site);
+    List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(type, name);
+    for(NewPortalConfig config : configs) {
+      config = config.clone();
+      config.setImportMode(importMode.name());
+      config.setOverrideMode(true);
+      HashSet<String> ownerName = new HashSet<>();
+      ownerName.add(name);
+      config.setPredefinedOwner(ownerName);
+      if (restoreSiteLayout) {
+        PortalConfig previousSite = layoutService.getPortalConfig(type, name);
+        newPortalConfigListener.initPortalConfigDB(config, true);
+        PortalConfig site = layoutService.getPortalConfig(type, name);
+        if (previousSite != null) {
+          // Preserve previous version or properties
+          site.setLabel(previousSite.getLabel());
+          site.setDescription(previousSite.getDescription());
+          site.setAccessPermissions(previousSite.getAccessPermissions());
+          site.setEditPermission(previousSite.getEditPermission());
+          site.setDisplayed(previousSite.isDisplayed());
+          site.setDisplayOrder(previousSite.getDisplayOrder());
+          site.setIcon(previousSite.getIcon());
+          site.setProperties(previousSite.getProperties());
+          layoutService.save(site);
+        }
       }
-    }
-    if (restorePages) {
-      newPortalConfigListener.initPageDB(config, true);
-    }
-    if (restoreNavigationTree) {
-      newPortalConfigListener.initPageNavigationDB(config, true);
+      if (restorePages) {
+        newPortalConfigListener.initPageDB(config, true);
+      }
+      if (restoreNavigationTree) {
+        newPortalConfigListener.initPageNavigationDB(config, true);
+      }
     }
     return true;
   }
