@@ -35,8 +35,8 @@
   <name>Meeds - Portal</name>
 
   <properties>
-    <io.meeds.gatein.sso.version>7.1.x-meed-SNAPSHOT</io.meeds.gatein.sso.version>
-    <io.meeds.gatein.pc.version>7.1.x-meed-SNAPSHOT</io.meeds.gatein.pc.version>
+    <io.meeds.gatein.sso.version>7.1.0-meed-20250914</io.meeds.gatein.sso.version>
+    <io.meeds.gatein.pc.version>7.1.0-meed-20250914</io.meeds.gatein.pc.version>
 
     <!-- Sonar properties -->
     <sonar.organization>meeds-io</sonar.organization>
