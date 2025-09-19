@@ -20,6 +20,8 @@ package io.meeds.spring.kernel;
 
 import static io.meeds.spring.kernel.KernelContainerLifecyclePlugin.addSpringContext;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +46,14 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
 
   private ServletContext      servletContext;
 
-  public PortalApplicationContext(ServletContext servletContext, DefaultListableBeanFactory beanFactory) {
+  private boolean             async;
+
+  public PortalApplicationContext(ServletContext servletContext,
+                                  DefaultListableBeanFactory beanFactory,
+                                  boolean async) {
     super(beanFactory);
     this.servletContext = servletContext;
+    this.async = async;
   }
 
   @Override
@@ -54,15 +61,43 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
     // Declare spring Context for integration on Kernel when it will start
     // ( Kernel container is always started after all Spring contexts are
     // started, see "PortalContainersCreator" in Meeds-io/meeds project )
-    addSpringContext(servletContext.getServletContextName(),
-                     this,
-                     (BeanDefinitionRegistry) beanFactory,
-                     () -> finishSpringContextStartup(beanFactory));
+    if (async) {
+      addSpringContext(servletContext.getServletContextName(),
+                       this,
+                       (BeanDefinitionRegistry) beanFactory,
+                       () -> finishSpringContextStartupAsync(beanFactory));
+    } else {
+      addSpringContext(servletContext.getServletContextName(),
+                       this,
+                       (BeanDefinitionRegistry) beanFactory,
+                       () -> finishSpringContextStartup(beanFactory));
+    }
   }
 
   @Override
   protected void finishRefresh() {
     // Override to not be invoked in Context startup time
+  }
+
+  private void finishSpringContextStartupAsync(ConfigurableListableBeanFactory beanFactory) {
+    CompletableFuture.runAsync(() -> {
+      Thread currentThread = Thread.currentThread();
+      ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+      currentThread.setContextClassLoader(servletContext.getClassLoader());
+      try {
+        do {
+          Thread.sleep(3000);
+        } while (!PortalContainer.getInstance().isStarted());
+        Thread.sleep(3000);
+        finishSpringContextStartup(beanFactory);
+      } catch (InterruptedException e) {
+        currentThread.interrupt();
+      } catch (Exception e) {
+        LOG.error("Error Initializing Context: {}", servletContext.getServletContextName(), e);
+      } finally {
+        currentThread.setContextClassLoader(originalClassLoader);
+      }
+    });
   }
 
   private void finishSpringContextStartup(ConfigurableListableBeanFactory beanFactory) {

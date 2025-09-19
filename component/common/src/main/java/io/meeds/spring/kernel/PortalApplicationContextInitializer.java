@@ -56,9 +56,12 @@ public abstract class PortalApplicationContextInitializer extends SpringBootServ
     return new SpringApplicationBuilder() {
       @Override
       public SpringApplicationBuilder contextFactory(ApplicationContextFactory factory) {
-        return super.contextFactory(w -> new PortalApplicationContext(servletContext, beanFactory));
+        return super.contextFactory(w -> new PortalApplicationContext(servletContext, beanFactory, isAsync()));
       }
     };
   }
 
+  protected boolean isAsync() {
+    return false;
+  }
 }
