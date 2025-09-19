@@ -18,11 +18,14 @@
  */
 package io.meeds.spring.web.security;
 
+import java.util.List;
 import java.util.function.Supplier;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +35,7 @@ import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer.AuthorizationManagerRequestMatcherRegistry;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.annotation.web.configurers.JeeConfigurer;
@@ -47,17 +51,21 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.ServletContext;
 import lombok.Setter;
 
-@Configuration
+@Configuration("webSecurityConfiguration")
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true,
-    securedEnabled = true,
-    jsr250Enabled = true)
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 public class WebSecurityConfiguration implements ServletContextAware {
 
-  private static final Logger LOG = LoggerFactory.getLogger(WebSecurityConfiguration.class);
+  private static final Logger              LOG = LoggerFactory.getLogger(WebSecurityConfiguration.class);
+
+  @Autowired(required = false)
+  private List<WebSecurityCustomizer>      securityCustomizers;
+
+  @Autowired(required = false)
+  private List<WebAuthorizationCustomizer> authorizationCustomizers;
 
   @Setter
-  private ServletContext      servletContext;
+  private ServletContext                   servletContext;
 
   @Bean
   public static GrantedAuthorityDefaults grantedAuthorityDefaults() {
@@ -77,7 +85,8 @@ public class WebSecurityConfiguration implements ServletContextAware {
                                          AccessDeniedHandler accessDeniedHandler,
                                          @Qualifier("requestAuthorizationManager")
                                          AuthorizationManager<RequestAuthorizationContext> requestAuthorizationManager) throws Exception {
-    return http.authenticationProvider(authenticationProvider)
+    return this.customizeHttpSecurity(http)
+               .authenticationProvider(authenticationProvider)
                .jee(JeeConfigurer::and) // NOSONAR no method replacement
                .csrf(CsrfConfigurer::disable)
                .headers(HeadersConfigurer::disable)
@@ -88,6 +97,7 @@ public class WebSecurityConfiguration implements ServletContextAware {
                  } catch (Exception e) {
                    LOG.error("Error configuring REST endpoints security manager", e);
                  }
+                 this.customizeAuthorization(customizer);
                  customizer.requestMatchers(staticResourcesRequestMatcher)
                            .permitAll();
                  customizer.dispatcherTypeMatchers(DispatcherType.INCLUDE,
@@ -133,6 +143,20 @@ public class WebSecurityConfiguration implements ServletContextAware {
       // management
       return userAuthentication.isAuthenticated() ? new AuthorizationDecision(true) : new AuthorizationDecision(false);
     };
+  }
+
+  private HttpSecurity customizeHttpSecurity(HttpSecurity httpSecurity) {
+    if (CollectionUtils.isNotEmpty(securityCustomizers)) {
+      securityCustomizers.forEach(c -> c.customize(httpSecurity));
+    }
+    return httpSecurity;
+  }
+
+  @SuppressWarnings("rawtypes")
+  private void customizeAuthorization(AuthorizationManagerRequestMatcherRegistry authorizationManagerRequestMatcherRegistry) {
+    if (CollectionUtils.isNotEmpty(authorizationCustomizers)) {
+      authorizationCustomizers.forEach(c -> c.customize(authorizationManagerRequestMatcherRegistry));
+    }
   }
 
 }
