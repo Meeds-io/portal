@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -152,9 +151,6 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
 
   public static final int                CAPTCHA_HEIGHT                      = 50;
 
-  public static final String             EXTERNAL_REGISTRATION_JSP_PATH      =
-                                                                        "/WEB-INF/jsp/externalRegistration/init_account.jsp";     // NOSONAR
-
   private static final String            MEMBER                              = "member";
 
   public static final String             USERNAME_REQUEST_PARAM              = "username";
@@ -203,17 +199,15 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
   public boolean execute(ControllerContext controllerContext) throws Exception {// NOSONAR
     HttpServletRequest request = new HttpRequestLocaleWrapper(controllerContext.getRequest());
     HttpServletResponse response = controllerContext.getResponse();
-
     Map<String, Object> parameters = new HashMap<>();
     if (request.getRemoteUser() != null) {
-      parameters.put(ALREADY_AUTHENTICATED_MESSAGE_PARAM, "true");
-      return dispatch(controllerContext, request, response, parameters);
+      request.setAttribute(ALREADY_AUTHENTICATED_MESSAGE_PARAM, "true");
+      return false;
     }
 
     Locale locale = request.getLocale();
     ResourceBundle resourceBundle = resourceBundleService.getResourceBundle(resourceBundleService.getSharedResourceBundleNames(),
                                                                             locale);
-
     String serveCaptcha = controllerContext.getParameter(SERVER_CAPTCHA);
     if ("true".equals(serveCaptcha)) {
       return serveCaptchaImage(request, response);
@@ -224,7 +218,8 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
     String username = getStoredCredentials(token, requestAction);
     if (username == null) {
       // Token expired
-      return dispatch(controllerContext, request, response, Collections.singletonMap(ACTION_PARAM, EXPIRED_ACTION_NAME));
+      request.setAttribute(ACTION_PARAM, EXPIRED_ACTION_NAME);
+      return false;
     }
 
     if (VALIDATE_EXTERNAL_EMAIL_ACTION.equalsIgnoreCase(requestAction)) {
@@ -249,8 +244,9 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
 
       HttpSession session = request.getSession();
       if (!isValidCaptch(session, captcha)) {
-        parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("gatein.forgotPassword.captchaError"));
-        parameters.put(ERROR_FIELD_PARAM, CAPTCHA_PARAM);
+        returnSubmissionError(resourceBundle.getString("gatein.forgotPassword.captchaError"), CAPTCHA_PARAM, response);
+        return true;
+
       } else if (isValidUserAndPassword(username,
                                         requestUsername,
                                         requestEmail,
@@ -282,31 +278,44 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
                                                                  locale,
                                                                  getBaseUrl(request));
             parameters.put(SUCCESS_MESSAGE_PARAM, EMAIL_VERIFICATION_SENT);
+            request.setAttribute(SUCCESS_MESSAGE_PARAM, EMAIL_VERIFICATION_SENT);
             session.setAttribute(REQUIRE_EMAIL_VALIDATION, "false");
           }
         } catch (Exception e) {
           LOG.warn("Error while registering external user", e);
-          parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("external.registration.fail.create.user"));
+          returnSubmissionError(resourceBundle.getString("external.registration.fail.create.user"), null, response);
+          return true;
         }
+      } else {
+        returnSubmissionError((String)parameters.get(ERROR_MESSAGE_PARAM), (String)parameters.get(ERROR_FIELD_PARAM), response);
+        return true;
       }
-      parameters.put(EMAIL_PARAM, requestEmail);
-      parameters.put(FIRSTNAME_PARAM, firstName);
-      parameters.put(LASTNAME_PARAM, lastName);
-      parameters.put(PASSWORD_PARAM, password);
-      parameters.put(PASSWORD_CONFIRM_PARAM, confirmPass);
     }
-
     // Token can be generated using email or username (Metamask for example)
     if (StringUtils.contains(username, "@")) {
-      parameters.put(EMAIL_PARAM, escapeXssCharacters(username));
-    } else {
-      parameters.put(USERNAME_PARAM, escapeXssCharacters(username));
-    }
-    parameters.put(TOKEN_ID_PARAM, token);
-    parameters.put(INITIAL_URI_PARAM, initialUri);
+      request.setAttribute(EMAIL_PARAM, escapeXssCharacters(username));
 
-    return dispatch(controllerContext, request, response, parameters);
+    } else {
+      request.setAttribute(USERNAME_PARAM, escapeXssCharacters(username));
+    }
+
+    request.setAttribute(TOKEN_ID_PARAM, token);
+    request.setAttribute(INITIAL_URI_PARAM, initialUri);
+
+    return false;
   }
+
+  private static void returnSubmissionError(String message, String field, HttpServletResponse response) throws
+                                                                                                                         IOException {
+    response.setStatus(400);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                                .put(ERROR_MESSAGE_PARAM, message)
+                                                .put(ERROR_FIELD_PARAM, field)
+                                                .toString()
+                                                .getBytes());
+  }
+
 
   private String getStoredCredentials(String token, String requestAction) {
     if (StringUtils.isBlank(token)) {
@@ -451,22 +460,6 @@ public class ExternalRegisterHandler extends JspBasedWebHandler {
 
   protected void extendApplicationParameters(JSONObject applicationParameters, Map<String, Object> additionalParameters) {
     additionalParameters.forEach(applicationParameters::put);
-  }
-
-  private boolean dispatch(ControllerContext controllerContext,
-                           HttpServletRequest request,
-                           HttpServletResponse response,
-                           Map<String, Object> parameters) throws Exception {
-    // Invalidate the Captcha
-    request.getSession().removeAttribute(NAME);
-
-    super.prepareDispatch(controllerContext,
-                          "PORTLET/social/ExternalOnboarding",
-                          Collections.emptyList(),
-                          Collections.singletonList("portal/login"),
-                          params -> extendApplicationParameters(params, parameters));
-    servletContext.getRequestDispatcher(EXTERNAL_REGISTRATION_JSP_PATH).include(request, response);
-    return true;
   }
 
   private void redirectToLoginPage(HttpServletRequest request,
