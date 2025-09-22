@@ -38,13 +38,14 @@ import static org.exoplatform.web.register.ExternalRegisterHandler.TOKEN;
 import static org.exoplatform.web.register.ExternalRegisterHandler.TOKEN_ID_PARAM;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -52,6 +53,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -59,6 +62,8 @@ import java.util.ResourceBundle;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -70,6 +75,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import org.exoplatform.commons.utils.PropertyManager;
@@ -100,6 +106,7 @@ import org.exoplatform.web.security.security.RemindPasswordTokenService;
 import io.meeds.portal.security.service.SecuritySettingService;
 
 import nl.captcha.Captcha;
+import org.mockito.stubbing.Answer;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class ExternalRegisterHandlerTest {
@@ -213,6 +220,67 @@ public class ExternalRegisterHandlerTest {
     when(captcha.isCorrect(CAPTCHA_VALUE)).thenReturn(true);
     when(request.getParameter(CAPTCHA_PARAM)).thenReturn(CAPTCHA_VALUE);
 
+    ServletOutputStream outputStream = new ServletOutputStream() {
+      @Override
+      public void write(final int b) throws IOException {
+        // NOOP
+      }
+
+      @Override
+      public boolean isReady() {
+        return false;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+        //NOOP
+      }
+    };
+    when(response.getOutputStream()).thenReturn(outputStream);
+
+    final int[] responseStatus = { 0 };
+
+    when(response.getStatus()).thenAnswer(new Answer<Integer>() {
+      @Override
+      public Integer answer(InvocationOnMock invocation) throws Throwable {
+        return responseStatus[0];
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        int status = (Integer) args[0];
+        responseStatus[0] =status;
+        return null;
+      }
+    }).when(response).setStatus(anyInt());
+
+    Map<String, Object> requestAttributes = new HashMap<>();
+    when(request.getAttribute(anyString())).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        return requestAttributes.get(key);
+      }
+    });
+
+    when(request.getAttributeNames()).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        return Collections.enumeration(requestAttributes.keySet());
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        Object value = args[1];
+        requestAttributes.put(key,value);
+        return null;
+      }
+    }).when(request).setAttribute(anyString(),any());
+
     when(request.getLocale()).thenReturn(REQUEST_LOCALE);
     LocaleConfigImpl localeConfig = new LocaleConfigImpl();
     localeConfig.setLocale(REQUEST_LOCALE);
@@ -274,9 +342,8 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertEquals(EXPIRED_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertEquals(EXPIRED_ACTION_NAME, controllerContext.getRequest().getAttribute(ACTION_PARAM));
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -287,10 +354,9 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(EMAIL, applicationParameters.get(EMAIL_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
+    assertEquals(EMAIL,controllerContext.getRequest().getAttribute(EMAIL_PARAM));
+    assertEquals(TOKEN_VALUE,controllerContext.getRequest().getAttribute(TOKEN_ID_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -309,13 +375,9 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(EMAIL, applicationParameters.get(EMAIL_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals("gatein.forgotPassword.usernameChanged", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertNull(applicationParameters.get(ERROR_FIELD_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
+    externalRegisterHandler.execute(controllerContext);
+
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -334,13 +396,7 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(EMAIL, applicationParameters.get(EMAIL_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals("gatein.forgotPassword.confirmPasswordNotMatch", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(PASSWORD_CONFIRM_PARAM, applicationParameters.get(ERROR_FIELD_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -366,11 +422,9 @@ public class ExternalRegisterHandlerTest {
       PropertyManager.setProperty("gatein.validators.passwordpolicy.length.min", "");
     }
 
-    assertNotNull(applicationParameters);
-    assertEquals(EMAIL, applicationParameters.get(EMAIL_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals("onboarding.login.passwordCondition", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(PASSWORD_PARAM, applicationParameters.get(ERROR_FIELD_PARAM));
+    externalRegisterHandler.execute(controllerContext);
+
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -390,8 +444,7 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertEquals("EmptyFieldValidator.msg.empty-input", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(FIRSTNAME_PARAM, applicationParameters.get(ERROR_FIELD_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -411,8 +464,7 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertEquals("EmptyFieldValidator.msg.empty-input", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(LASTNAME_PARAM, applicationParameters.get(ERROR_FIELD_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -434,8 +486,7 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertEquals("external.registration.fail.create.user", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertNull(applicationParameters.get(ERROR_FIELD_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).sendAccountCreatedConfirmationEmail(any(), any(), any());
   }
@@ -448,7 +499,8 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertEquals("true", applicationParameters.get(ALREADY_AUTHENTICATED_MESSAGE_PARAM));
+    assertEquals("true", controllerContext.getRequest().getAttribute(ALREADY_AUTHENTICATED_MESSAGE_PARAM));
+
   }
 
   @Test
@@ -537,8 +589,7 @@ public class ExternalRegisterHandlerTest {
 
     externalRegisterHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(EMAIL_VERIFICATION_SENT, applicationParameters.get(SUCCESS_MESSAGE_PARAM));
+    assertEquals(EMAIL_VERIFICATION_SENT,controllerContext.getRequest().getAttribute(SUCCESS_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, times(1)).sendAccountVerificationEmail(any(), any(), any(), any(), any(), any(), any());
   }
