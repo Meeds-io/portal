@@ -38,8 +38,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,6 +49,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -55,6 +58,8 @@ import java.util.ResourceBundle;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -64,6 +69,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import org.exoplatform.commons.utils.I18N;
@@ -84,6 +90,7 @@ import org.exoplatform.web.application.javascript.JavascriptConfigService;
 import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.Router;
 import org.exoplatform.web.security.security.CookieTokenService;
+import org.mockito.stubbing.Answer;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class PasswordRecoveryHandlerTest {
@@ -174,6 +181,68 @@ public class PasswordRecoveryHandlerTest {
     when(servletContext.getRequestDispatcher(any())).thenReturn(requestDispatcher);
     when(passwordRecoveryService.getPasswordRecoverURL(null, I18N.toTagIdentifier(REQUEST_LOCALE))).thenReturn("/" + NAME);
 
+    ServletOutputStream outputStream = new ServletOutputStream() {
+      @Override
+      public void write(final int b) throws IOException {
+        // NOOP
+      }
+
+      @Override
+      public boolean isReady() {
+        return false;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+        //NOOP
+      }
+    };
+    when(response.getOutputStream()).thenReturn(outputStream);
+
+    final int[] responseStatus = { 0 };
+
+    when(response.getStatus()).thenAnswer(new Answer<Integer>() {
+      @Override
+      public Integer answer(InvocationOnMock invocation) throws Throwable {
+        return responseStatus[0];
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        int status = (Integer) args[0];
+        responseStatus[0] =status;
+        return null;
+      }
+    }).when(response).setStatus(anyInt());
+
+    Map<String, Object> requestAttributes = new HashMap<>();
+    when(request.getAttribute(anyString())).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        return requestAttributes.get(key);
+      }
+    });
+
+    when(request.getAttributeNames()).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        return Collections.enumeration(requestAttributes.keySet());
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        Object value = args[1];
+        requestAttributes.put(key,value);
+        return null;
+      }
+    }).when(request).setAttribute(anyString(),any());
+
+
     when(organizationService.getUserHandler()).thenReturn(userHandler);
 
     passwordRecoveryHandler = new PasswordRecoveryHandler(container,
@@ -203,12 +272,11 @@ public class PasswordRecoveryHandlerTest {
     prepareResetFormContext();
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(USERNAME_PARAM));
+    assertEquals(CONTEXT_PATH + "/" + NAME, controllerContext.getRequest().getAttribute(FORM_URL_PARAM));
+    assertEquals(INITIAL_URI, controllerContext.getRequest().getAttribute(INITIAL_URI_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(USERNAME_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -220,10 +288,8 @@ public class PasswordRecoveryHandlerTest {
     when(request.getParameter(ACTION_PARAM)).thenReturn(SEND_ACTION_NAME);
 
     passwordRecoveryHandler.execute(controllerContext);
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertEquals("gatein.forgotPassword.emptyUserOrEmail", applicationParameters.get(ERROR_MESSAGE_PARAM));
+
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -239,12 +305,7 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertEquals("gatein.forgotPassword.emailSendSuccessful", applicationParameters.get(SUCCESS_MESSAGE_PARAM));
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
+    assertEquals(200, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -264,12 +325,8 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertEquals("gatein.forgotPassword.emailSendSuccessful", applicationParameters.get(SUCCESS_MESSAGE_PARAM));
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertEquals(200, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -289,16 +346,11 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
-
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, times(1)).sendRecoverPasswordEmail(eq(user), eq(REQUEST_LOCALE), any(HttpServletRequest.class));
 
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
-    assertEquals("gatein.forgotPassword.emailSendFailure", applicationParameters.get(ERROR_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
   }
 
   @Test
@@ -326,16 +378,13 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(CONTEXT_PATH + "/" + NAME, applicationParameters.get(FORM_URL_PARAM));
-    assertEquals(INITIAL_URI, applicationParameters.get(INITIAL_URI_PARAM));
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
+    assertEquals(CONTEXT_PATH + "/" + NAME, controllerContext.getRequest().getAttribute(FORM_URL_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, times(1)).sendRecoverPasswordEmail(eq(user), eq(REQUEST_LOCALE), any(HttpServletRequest.class));
 
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertEquals("gatein.forgotPassword.emailSendSuccessful", applicationParameters.get(SUCCESS_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertEquals(200, controllerContext.getResponse().getStatus());
   }
 
   @Test
@@ -344,11 +393,10 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertFalse(applicationParameters.containsKey(USERNAME_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
-    assertEquals(EXPIRED_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(USERNAME_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
+    assertEquals(EXPIRED_ACTION_NAME, controllerContext.getRequest().getAttribute(ACTION_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -362,12 +410,11 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
+    assertEquals(username, controllerContext.getRequest().getAttribute(USERNAME_PARAM));
+    assertEquals(TOKEN_VALUE, controllerContext.getRequest().getAttribute(TOKEN_ID_PARAM));
+    assertEquals(RESET_PASSWORD_ACTION_NAME, controllerContext.getRequest().getAttribute(ACTION_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -388,14 +435,8 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("gatein.forgotPassword.usernameChanged", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -417,14 +458,8 @@ public class PasswordRecoveryHandlerTest {
 
     passwordRecoveryHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("gatein.forgotPassword.confirmPasswordNotMatch", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
@@ -453,12 +488,8 @@ public class PasswordRecoveryHandlerTest {
       PropertyManager.setProperty("gatein.validators.passwordpolicy.length.min", "");
     }
 
-    assertNotNull(applicationParameters);
-    assertEquals(username, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("onboarding.login.passwordCondition", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertFalse(applicationParameters.containsKey(SUCCESS_MESSAGE_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(SUCCESS_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
     verify(passwordRecoveryService, never()).sendRecoverPasswordEmail(any(), any(), any());
