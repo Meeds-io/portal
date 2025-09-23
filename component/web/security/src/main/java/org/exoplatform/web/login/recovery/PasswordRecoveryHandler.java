@@ -20,6 +20,7 @@ package org.exoplatform.web.login.recovery;
 
 import static org.exoplatform.web.security.security.CookieTokenService.FORGOT_PASSWORD_TOKEN;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -130,15 +131,14 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
     Map<String, Object> parameters = new HashMap<>();
     String contextPath = servletContext.getContextPath();
     String forgotPasswordPath = passwordRecoveryService.getPasswordRecoverURL(token, I18N.toTagIdentifier(locale));
-    parameters.put(FORM_URL_PARAM, contextPath + forgotPasswordPath);
-
+    request.setAttribute(FORM_URL_PARAM, contextPath + forgotPasswordPath);
     if (StringUtils.isNotBlank(token)) {
       // . Check tokenID is expired or not
       String username = passwordRecoveryService.verifyToken(token, FORGOT_PASSWORD_TOKEN);
       if (username == null) {
-        parameters.put(ACTION_PARAM, EXPIRED_ACTION_NAME);
-        // . TokenId is expired
-        return dispatch(controllerContext, request, response, parameters);
+        //todo : test
+        request.setAttribute(ACTION_PARAM, EXPIRED_ACTION_NAME);
+        return false;
       }
 
       if (RESET_PASSWORD_ACTION_NAME.equalsIgnoreCase(requestAction)) {
@@ -147,41 +147,53 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
         String requestedUsername = request.getParameter(USERNAME_PARAM);
         if (validateUserAndPassword(username, requestedUsername, password, confirmPass, parameters, bundle, locale)) {
           if (passwordRecoveryService.changePass(token, FORGOT_PASSWORD_TOKEN, username, password)) {
-            response.sendRedirect(contextPath + "/login");
+            //todo test : OK
+            redirectToLoginPage(request, response, username);
             return true;
           } else {
-            parameters.put(ERROR_MESSAGE_PARAM, bundle.getString("gatein.forgotPassword.resetPasswordFailure"));
+            //todo test
+            returnSubmissionError(bundle.getString("gatein.forgotPassword.resetPasswordFailure"), response);
+            return true;
           }
+        } else {
+          returnSubmissionError((String)parameters.get(ERROR_MESSAGE_PARAM), response);
+          return true;
         }
-        parameters.put(PASSWORD_PARAM, password);
-        parameters.put(PASSWORD_CONFIRM_PARAM, confirmPass);
       }
-      parameters.put(USERNAME_PARAM, escapeXssCharacters(username));
-      parameters.put(TOKEN_ID_PARAM, token);
-      parameters.put(ACTION_PARAM, RESET_PASSWORD_ACTION_NAME);
+      request.setAttribute(USERNAME_PARAM, escapeXssCharacters(username));
+      request.setAttribute(TOKEN_ID_PARAM, token);
+      request.setAttribute(ACTION_PARAM, RESET_PASSWORD_ACTION_NAME);
     } else if (SEND_ACTION_NAME.equalsIgnoreCase(requestAction)) {
       String username = request.getParameter(USERNAME_PARAM);
       if (StringUtils.isBlank(username)) {
-        parameters.put(ERROR_MESSAGE_PARAM, bundle.getString("gatein.forgotPassword.emptyUserOrEmail"));
+        //todo test : OK
+        returnSubmissionError(bundle.getString("gatein.forgotPassword.emptyUserOrEmail"), response);
+        return true;
       } else {
         User user = findUser(username);
         if (user == null || !user.isEnabled()) {
           // Send a success message even when user is not found to not inform
           // anonymous users which usernames and emails exists
-          parameters.put(SUCCESS_MESSAGE_PARAM, bundle.getString("gatein.forgotPassword.emailSendSuccessful"));
+          //todo : to test : OK
+          returnSubmissionSuccess(bundle.getString("gatein.forgotPassword.emailSendSuccessful"), response);
+          return true;
         } else if (passwordRecoveryService.sendRecoverPasswordEmail(user, locale, request)) {
-          parameters.put(SUCCESS_MESSAGE_PARAM, bundle.getString("gatein.forgotPassword.emailSendSuccessful"));
+          //todo : to test : OK
+          returnSubmissionSuccess(bundle.getString("gatein.forgotPassword.emailSendSuccessful"), response);
+          return true;
         } else {
-          parameters.put(ERROR_MESSAGE_PARAM, bundle.getString("gatein.forgotPassword.emailSendFailure"));
+          //todo : to test
+          returnSubmissionError(bundle.getString("gatein.forgotPassword.emailSendFailure"), response);
+          return true;
         }
-        parameters.put(USERNAME_PARAM, escapeXssCharacters(username));
       }
     }
 
     if (initialURI != null) {
-      parameters.put(INITIAL_URI_PARAM, initialURI);
+      request.setAttribute(INITIAL_URI_PARAM, initialURI);
     }
-    return dispatch(controllerContext, request, response, parameters);
+    return false;
+
   }
 
   @Override
@@ -196,20 +208,6 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
 
   protected void extendApplicationParameters(JSONObject applicationParameters, Map<String, Object> additionalParameters) {
     additionalParameters.forEach(applicationParameters::put);
-  }
-
-  private boolean dispatch(ControllerContext controllerContext,
-                           HttpServletRequest request,
-                           HttpServletResponse response,
-                           Map<String, Object> parameters) throws Exception {
-
-    super.prepareDispatch(controllerContext,
-                          "PORTLET/social/ForgotPassword",
-                          Collections.emptyList(),
-                          Collections.singletonList("portal/login"),
-                          params -> extendApplicationParameters(params, parameters));
-    servletContext.getRequestDispatcher(FORGOT_PASSWORD_JSP_PATH).include(request, response);
-    return true;
   }
 
   private boolean validateUserAndPassword(String tokenUsername,
@@ -262,4 +260,35 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
                                          .replace("/", "&#x2F;");
     return message;
   }
+
+  private void redirectToLoginPage(HttpServletRequest request,
+                                   HttpServletResponse response,
+                                   String initialUri) throws IOException {
+    // Invalidate the Captcha
+    request.getSession().removeAttribute(NAME);
+
+    String path = !StringUtils.startsWith(initialUri, "/") ? servletContext.getContextPath() + "/login"
+                                                           : response.encodeRedirectURL(initialUri);
+    response.sendRedirect(path);
+  }
+  private static void returnSubmissionError(String message, HttpServletResponse response) throws
+                                                                                                        IOException {
+    response.setStatus(400);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                         .put(ERROR_MESSAGE_PARAM, message)
+                                         .toString()
+                                         .getBytes());
+  }
+
+  private static void returnSubmissionSuccess(String message, HttpServletResponse response) throws
+                                                                                                        IOException {
+    response.setStatus(200);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                         .put(SUCCESS_MESSAGE_PARAM, message)
+                                         .toString()
+                                         .getBytes());
+  }
+
 }
