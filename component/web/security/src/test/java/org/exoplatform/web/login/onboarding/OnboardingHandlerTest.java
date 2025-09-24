@@ -34,8 +34,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -43,6 +45,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -50,6 +54,8 @@ import java.util.ResourceBundle;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -61,6 +67,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import org.exoplatform.commons.utils.PropertyManager;
@@ -82,6 +89,7 @@ import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 import org.exoplatform.web.security.security.CookieTokenService;
 
 import nl.captcha.Captcha;
+import org.mockito.stubbing.Answer;
 
 @RunWith(MockitoJUnitRunner.class)
 public class OnboardingHandlerTest {
@@ -160,7 +168,7 @@ public class OnboardingHandlerTest {
   private Map<String, Object>     applicationParameters;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception  {
     this.applicationParameters = null;
     ExoContainerContext.setCurrentContainer(container);
     lenient().when(container.getComponentInstanceOfType(ResourceBundleService.class)).thenReturn(resourceBundleService);
@@ -176,15 +184,72 @@ public class OnboardingHandlerTest {
     when(request.getLocale()).thenReturn(REQUEST_LOCALE);
     LocaleConfigImpl localeConfig = new LocaleConfigImpl();
     localeConfig.setLocale(REQUEST_LOCALE);
-    when(localeConfigService.getLocaleConfig(REQUEST_LOCALE.getLanguage())).thenReturn(localeConfig);
 
     when(resourceBundleService.getSharedResourceBundleNames()).thenReturn(new String[0]);
     when(resourceBundleService.getResourceBundle(any(String[].class), eq(REQUEST_LOCALE))).thenReturn(resourceBundle);
     when(resourceBundle.getString(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
 
-    when(javascriptConfigService.getJSConfig()).thenReturn(new JSONObject());
 
-    when(servletContext.getRequestDispatcher(any())).thenReturn(requestDispatcher);
+    ServletOutputStream outputStream = new ServletOutputStream() {
+      @Override
+      public void write(final int b) throws IOException {
+        // NOOP
+      }
+
+      @Override
+      public boolean isReady() {
+        return false;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+        //NOOP
+      }
+    };
+    when(response.getOutputStream()).thenReturn(outputStream);
+
+    final int[] responseStatus = { 0 };
+
+    when(response.getStatus()).thenAnswer(new Answer<Integer>() {
+      @Override
+      public Integer answer(InvocationOnMock invocation) throws Throwable {
+        return responseStatus[0];
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        int status = (Integer) args[0];
+        responseStatus[0] =status;
+        return null;
+      }
+    }).when(response).setStatus(anyInt());
+
+    Map<String, Object> requestAttributes = new HashMap<>();
+    when(request.getAttribute(anyString())).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        return requestAttributes.get(key);
+      }
+    });
+
+    when(request.getAttributeNames()).thenAnswer(new Answer<Object>() {
+      public Object answer(InvocationOnMock invocation) {
+        return Collections.enumeration(requestAttributes.keySet());
+      }
+    });
+
+    doAnswer(new Answer<Void>() {
+      public Void answer(InvocationOnMock invocation) {
+        Object[] args = invocation.getArguments();
+        String key = (String) args[0];
+        Object value = args[1];
+        requestAttributes.put(key,value);
+        return null;
+      }
+    }).when(request).setAttribute(anyString(),any());
 
     when(organizationService.getUserHandler()).thenReturn(userHandler);
     when(passwordRecoveryService.verifyToken(TOKEN_VALUE, CookieTokenService.ONBOARD_TOKEN)).thenReturn(USERNAME);
@@ -228,9 +293,8 @@ public class OnboardingHandlerTest {
 
     onboardingHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
-    assertEquals(EXPIRED_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
+    assertEquals(EXPIRED_ACTION_NAME, controllerContext.getRequest().getAttribute(ACTION_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
   }
@@ -241,11 +305,10 @@ public class OnboardingHandlerTest {
 
     onboardingHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(USERNAME, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertFalse(applicationParameters.containsKey(ERROR_MESSAGE_PARAM));
+    assertEquals(USERNAME, controllerContext.getRequest().getAttribute(USERNAME_PARAM));
+    assertEquals(TOKEN_VALUE, controllerContext.getRequest().getAttribute(TOKEN_ID_PARAM));
+    assertEquals(RESET_PASSWORD_ACTION_NAME, controllerContext.getRequest().getAttribute(ACTION_PARAM));
+    assertFalse(Collections.list(controllerContext.getRequest().getAttributeNames()).contains(ERROR_MESSAGE_PARAM));
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
   }
@@ -263,15 +326,7 @@ public class OnboardingHandlerTest {
     when(request.getParameter(PASSWORD_CONFIRM_PARAM)).thenReturn(passwordConfirm);
 
     onboardingHandler.execute(controllerContext);
-
-    assertNotNull(applicationParameters);
-    assertEquals(USERNAME, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("gatein.forgotPassword.usernameChanged", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
-
+    assertEquals(400, controllerContext.getResponse().getStatus());
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
   }
 
@@ -289,13 +344,7 @@ public class OnboardingHandlerTest {
 
     onboardingHandler.execute(controllerContext);
 
-    assertNotNull(applicationParameters);
-    assertEquals(USERNAME, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("gatein.forgotPassword.confirmPasswordNotMatch", applicationParameters.get(ERROR_MESSAGE_PARAM));
-    assertEquals(password, applicationParameters.get(PASSWORD_PARAM));
-    assertEquals(passwordConfirm, applicationParameters.get(PASSWORD_CONFIRM_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
   }
@@ -321,11 +370,8 @@ public class OnboardingHandlerTest {
       PropertyManager.setProperty("gatein.validators.passwordpolicy.length.min", "");
     }
 
-    assertNotNull(applicationParameters);
-    assertEquals(USERNAME, applicationParameters.get(USERNAME_PARAM));
-    assertEquals(TOKEN_VALUE, applicationParameters.get(TOKEN_ID_PARAM));
-    assertEquals(RESET_PASSWORD_ACTION_NAME, applicationParameters.get(ACTION_PARAM));
-    assertEquals("onboarding.login.passwordCondition", applicationParameters.get(ERROR_MESSAGE_PARAM));
+    assertEquals(400, controllerContext.getResponse().getStatus());
+
 
     verify(passwordRecoveryService, never()).changePass(any(), any(), any(), any());
   }
