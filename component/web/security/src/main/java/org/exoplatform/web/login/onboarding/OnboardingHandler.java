@@ -149,9 +149,9 @@ public class OnboardingHandler extends JspBasedWebHandler {
     Map<String, Object> parameters = new HashMap<>();
     String username = StringUtils.isBlank(token) ? null : passwordRecoveryService.verifyToken(token, ONBOARD_TOKEN);
     if (username == null) {
-      parameters.put(ACTION_PARAM, EXPIRED_ACTION_NAME);
+      request.setAttribute(ACTION_PARAM, EXPIRED_ACTION_NAME);
       // . TokenId is expired
-      return dispatch(controllerContext, request, response, parameters);
+      return false;
     }
 
     String requestAction = request.getParameter(ACTION_PARAM);
@@ -161,7 +161,8 @@ public class OnboardingHandler extends JspBasedWebHandler {
       String requestedUsername = request.getParameter(USERNAME_PARAM);
       String captcha = request.getParameter(CAPTCHA_PARAM);
       if (!isValidCaptch(request.getSession(), captcha)) {
-        parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("gatein.forgotPassword.captchaError"));
+        returnSubmissionError(resourceBundle.getString("gatein.forgotPassword.captchaError"), response);
+        return true;
       } else if (validateUserAndPassword(username,
                                          requestedUsername,
                                          password,
@@ -178,17 +179,19 @@ public class OnboardingHandler extends JspBasedWebHandler {
           response.sendRedirect(loginPath);
           return true;
         } else {
-          parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("gatein.forgotPassword.resetPasswordFailure"));
+          returnSubmissionError(resourceBundle.getString("gatein.forgotPassword.resetPasswordFailure"), response);
+          return true;
         }
+      } else {
+        returnSubmissionError((String)parameters.get(ERROR_MESSAGE_PARAM), response);
+        return true;
       }
-      parameters.put(PASSWORD_PARAM, password);
-      parameters.put(PASSWORD_CONFIRM_PARAM, confirmPass);
     }
-    parameters.put(USERNAME_PARAM, escapeXssCharacters(username));
-    parameters.put(TOKEN_ID_PARAM, token);
-    parameters.put(ACTION_PARAM, RESET_PASSWORD_ACTION_NAME);
+    request.setAttribute(USERNAME_PARAM, escapeXssCharacters(username));
+    request.setAttribute(TOKEN_ID_PARAM, token);
+    request.setAttribute(ACTION_PARAM, RESET_PASSWORD_ACTION_NAME);
 
-    return dispatch(controllerContext, request, response, parameters);
+    return false;
   }
 
   protected boolean isValidCaptch(HttpSession session, String captchaValue) {
@@ -228,22 +231,6 @@ public class OnboardingHandler extends JspBasedWebHandler {
 
   protected void extendApplicationParameters(JSONObject applicationParameters, Map<String, Object> additionalParameters) {
     additionalParameters.forEach(applicationParameters::put);
-  }
-
-  private boolean dispatch(ControllerContext controllerContext,
-                           HttpServletRequest request,
-                           HttpServletResponse response,
-                           Map<String, Object> parameters) throws Exception {
-    // Invalidate the Captcha
-    request.getSession().removeAttribute(NAME);
-
-    super.prepareDispatch(controllerContext,
-                          "PORTLET/social/InternalOnboarding",
-                          Collections.emptyList(),
-                          Collections.singletonList("portal/login"),
-                          params -> extendApplicationParameters(params, parameters));
-    servletContext.getRequestDispatcher(ONBOARDING_JSP_PATH).include(request, response);
-    return true;
   }
 
   private User findUser(String usernameOrEmail) throws Exception {
@@ -304,5 +291,15 @@ public class OnboardingHandler extends JspBasedWebHandler {
     } catch (IOException e) {
       log.error(e.getMessage(), e);
     }
+  }
+
+  private static void returnSubmissionError(String message, HttpServletResponse response) throws
+                                                                                                        IOException {
+    response.setStatus(400);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                         .put(ERROR_MESSAGE_PARAM, message)
+                                         .toString()
+                                         .getBytes());
   }
 }
