@@ -24,7 +24,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -154,7 +153,9 @@ public class RegisterHandler extends JspBasedWebHandler {
 
     // If user is already authenticated, no registration form is required
     if (request.getRemoteUser() != null) {
-      return false;
+      response.setStatus(302);
+      response.setHeader("Location", "/portal");
+      return true;
     }
 
     if (!registerUIParamsExtension.isRegisterEnabled()) {
@@ -176,35 +177,27 @@ public class RegisterHandler extends JspBasedWebHandler {
     if (StringUtils.isNotBlank(email)) {
       String captcha = request.getParameter(CAPTCHA_PARAM);
       if (!isValidCaptch(request.getSession(), captcha)) {
-        parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("gatein.forgotPassword.captchaError"));
+        returnSubmissionError(resourceBundle.getString("gatein.forgotPassword.captchaError"), response);
+        return true;
       } else if (isValidEmail(email, resourceBundle, locale, parameters)) {
-        sendOnboardingEmail(email, request);
-        parameters.put(SUCCESS_MESSAGE_PARAM, ONBOARDING_EMAIL_SENT_MESSAGE);
+        if (!isExistsEmail(email)) {
+          sendOnboardingEmail(email, request);
+          returnSubmissionSuccess(ONBOARDING_EMAIL_SENT_MESSAGE, response);
+          return true;
+        } else {
+          //do not expose that the email is already used
+          //so return success message without sending email
+          returnSubmissionSuccess(ONBOARDING_EMAIL_SENT_MESSAGE, response);
+          return true;
+        }
+      } else {
+        returnSubmissionError((String)parameters.get(ERROR_MESSAGE_PARAM), response);
+        return true;
       }
-      parameters.put(EMAIL_PARAM, email);
+
     }
 
-    return dispatch(controllerContext, parameters);
-  }
-
-  protected boolean dispatch(ControllerContext controllerContext, Map<String, Object> parameters) throws Exception {
-    HttpServletRequest request = controllerContext.getRequest();
-    HttpServletResponse response = controllerContext.getResponse();
-
-    // Invalidate the Captcha
-    request.getSession().removeAttribute(NAME);
-
-    List<String> additionalJSModules = getExtendedJSModules();
-    List<String> additionalCSSModules = Collections.singletonList("portal/login");
-
-    super.prepareDispatch(controllerContext,
-                          "PORTLET/social/Register",
-                          additionalJSModules,
-                          additionalCSSModules,
-                          params -> extendApplicationParameters(controllerContext, params, parameters));
-
-    servletContext.getRequestDispatcher(registerJspPath).include(request, response);
-    return true;
+    return false;
   }
 
   protected void extendApplicationParameters(ControllerContext controllerContext,
@@ -238,22 +231,6 @@ public class RegisterHandler extends JspBasedWebHandler {
     }
   }
 
-  private List<String> getExtendedJSModules() {
-    List<String> additionalJSModules = new ArrayList<>();
-    JSONObject jsConfig = javascriptConfigService.getJSConfig();
-    if (jsConfig.has(JS_PATHS_PARAM)) {
-      JSONObject jsConfigPaths = jsConfig.getJSONObject(JS_PATHS_PARAM);
-      Iterator<String> keys = jsConfigPaths.keys();
-      while (keys.hasNext()) {
-        String module = keys.next();
-        if (module.contains(REGISTER_EXTENSION_JS_MODULES)) {
-          additionalJSModules.add(module);
-        }
-      }
-    }
-    return additionalJSModules;
-  }
-
   private void sendOnboardingEmail(String email, HttpServletRequest request) throws Exception {
     StringBuilder url = getUrl(request);
     Locale locale = request.getLocale();
@@ -267,31 +244,31 @@ public class RegisterHandler extends JspBasedWebHandler {
     String errorMessage = EMAIL_VALIDATOR.validate(locale, email);
     if (StringUtils.isNotBlank(errorMessage)) {
       parameters.put(ERROR_MESSAGE_PARAM, errorMessage);
-    } else {
-      try {
-        // Check if mail address is already used
-        Query query = new Query();
-        query.setEmail(email);
-        ListAccess<User> users = organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY);
-        if (users != null && users.getSize() > 0) {
-          // Must not lack the information anonymously that the user exists
-          // Thus, send it as succeeded operation
-          parameters.put(SUCCESS_MESSAGE_PARAM, ONBOARDING_EMAIL_SENT_MESSAGE);
-        } else {
-          User user = organizationService.getUserHandler().findUserByName(email);
-          if (user != null) {
-            // Must not lack the information anonymously that the user exists
-            // Thus, send it as succeeded operation
-            parameters.put(SUCCESS_MESSAGE_PARAM, ONBOARDING_EMAIL_SENT_MESSAGE);
-          }
-        }
-      } catch (RuntimeException e) {
-        LOG.debug("Error retrieving users list with email {}. Thus, we will consider the email as already used", email, e);
-        parameters.put(ERROR_MESSAGE_PARAM, resourceBundle.getString("external.registration.fail.create.user"));
-      }
     }
-    return !parameters.containsKey(ERROR_MESSAGE_PARAM) && !parameters.containsKey(SUCCESS_MESSAGE_PARAM);
+    return !parameters.containsKey(ERROR_MESSAGE_PARAM);
   }
+
+  private boolean isExistsEmail(String email) throws Exception {
+    try {
+      // Check if mail address is already used
+      Query query = new Query();
+      query.setEmail(email);
+      ListAccess<User> users = organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY);
+      if (users != null && users.getSize() > 0) {
+        return true;
+      } else {
+        User user = organizationService.getUserHandler().findUserByName(email);
+        if (user != null) {
+          return true;
+        }
+      }
+    } catch (RuntimeException e) {
+      LOG.debug("Error retrieving users list with email {}. Thus, we will consider the email as already used", email, e);
+      return true;
+    }
+    return false;
+  }
+
 
   private boolean isValidCaptch(HttpSession session, String captchaValue) {
     Captcha captcha = (Captcha) session.getAttribute(NAME);
@@ -343,5 +320,24 @@ public class RegisterHandler extends JspBasedWebHandler {
       url.append("/" + PortalContainer.getCurrentPortalContainerName());
     }
     return url;
+  }
+
+  private static void returnSubmissionError(String message, HttpServletResponse response) throws
+                                                                                                        IOException {
+    response.setStatus(400);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                         .put(ERROR_MESSAGE_PARAM, message)
+                                         .toString()
+                                         .getBytes());
+  }
+
+  private static void returnSubmissionSuccess(String message, HttpServletResponse response) throws IOException {
+    response.setStatus(200);
+    response.setContentType("application/json");
+    response.getOutputStream().write(new JSONObject()
+                                         .put(SUCCESS_MESSAGE_PARAM, message)
+                                         .toString()
+                                         .getBytes());
   }
 }
