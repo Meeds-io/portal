@@ -29,7 +29,7 @@
 
   <groupId>io.meeds.portal</groupId>
   <artifactId>portal.parent</artifactId>
-  <version>7.1.x-meed-SNAPSHOT</version>
+  <version>7.1.0-meed-20250929</version>
   <packaging>pom</packaging>
 
   <name>Meeds - Portal</name>
@@ -47,7 +47,7 @@
     <connection>scm:git:git://github.com/meeds-io/portal.git</connection>
     <developerConnection>scm:git:git@github.com:meeds-io/portal.git</developerConnection>
     <url>https://github.com/meeds-io/portal</url>
-    <tag>HEAD</tag>
+    <tag>7.1.0-meed-20250929</tag>
   </scm>
 
   <modules>
