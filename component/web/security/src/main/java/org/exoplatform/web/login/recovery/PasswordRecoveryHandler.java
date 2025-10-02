@@ -89,8 +89,6 @@ public class PasswordRecoveryHandler extends JspBasedWebHandler {
   public static final UserFieldValidator PASSWORD_VALIDATOR         =
                                                             new UserFieldValidator(PASSWORD_PARAM, false, false, 8, 255);
 
-  public static final String             FORGOT_PASSWORD_JSP_PATH   = "/WEB-INF/jsp/forgotpassword/forgot_password.jsp"; // NOSONAR
-
   private ServletContext                 servletContext;
 
   private PasswordRecoveryService        passwordRecoveryService;
