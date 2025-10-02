@@ -100,8 +100,6 @@ public class OnboardingHandler extends JspBasedWebHandler {
 
   public static final int                CAPTCHA_HEIGHT             = 50;
 
-  public static final String             ONBOARDING_JSP_PATH        = "/WEB-INF/jsp/onboarding/reset_password.jsp";      // NOSONAR
-
   private ServletContext                 servletContext;
 
   private PasswordRecoveryService        passwordRecoveryService;
@@ -226,10 +224,6 @@ public class OnboardingHandler extends JspBasedWebHandler {
   @Override
   protected boolean getRequiresLifeCycle() {
     return true;
-  }
-
-  protected void extendApplicationParameters(JSONObject applicationParameters, Map<String, Object> additionalParameters) {
-    additionalParameters.forEach(applicationParameters::put);
   }
 
   private User findUser(String usernameOrEmail) throws Exception {
