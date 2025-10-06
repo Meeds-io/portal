@@ -56,8 +56,6 @@ import org.exoplatform.services.resources.ResourceBundleService;
 import org.exoplatform.web.WebAppController;
 import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.Router;
-import org.exoplatform.web.login.onboarding.OnboardingHandler;
-import org.exoplatform.web.register.ExternalRegisterHandler;
 import org.exoplatform.web.security.Token;
 import org.exoplatform.web.security.security.CookieTokenService;
 import org.exoplatform.web.security.security.RemindPasswordTokenService;
@@ -74,6 +72,8 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   private static final String                  EXTERNAL_REGISTRATION_LINK_PARAM = "${EXTERNAL_REGISTRATION_LINK}";
 
+  private static final String                  EXTERNAL_REGISTRATION_NAME       = "external-registration";
+
   private static final String                  SPACE_DISPLAY_NAME_PARAM         = "${SPACE_DISPLAY_NAME}";
 
   private static final String                  SENDER_DISPLAY_NAME_PARAM        = "${SENDER_DISPLAY_NAME}";
@@ -85,6 +85,12 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   private static final String                  COMPANY_NAME_PARAM               = "${COMPANY_NAME}";
 
   public static final String                   AUTHENTICATION_ATTEMPTS          = "authenticationAttempts";
+
+  public static final QualifiedName            TOKEN                            = QualifiedName.create("gtn", "token");
+
+  public static final QualifiedName            LANG                             = QualifiedName.create("gtn", "lang");
+
+  public static final String                   NAME                             = "forgot-password";
 
   protected static Log                         log                              =
                                                    ExoLogger.getLogger(PasswordRecoveryServiceImpl.class);
@@ -216,7 +222,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     String tokenId = remindPasswordTokenService.createToken(user.getUserName(), ONBOARD_TOKEN);
     StringBuilder redirectUrl = new StringBuilder();
     redirectUrl.append(url);
-    redirectUrl.append("/" + OnboardingHandler.NAME);
+    redirectUrl.append("/on-boarding");
     redirectUrl.append("?lang=" + I18N.toTagIdentifier(locale));
     redirectUrl.append("&token=" + tokenId);
     String emailBody = buildOnboardingEmailBody(user, bundle, redirectUrl.toString());
@@ -283,7 +289,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
     StringBuilder redirectUrl = new StringBuilder();
     redirectUrl.append(url);
-    redirectUrl.append("/" + ExternalRegisterHandler.NAME);
+    redirectUrl.append("/" + EXTERNAL_REGISTRATION_NAME);
     redirectUrl.append("?lang=" + I18N.toTagIdentifier(locale));
     redirectUrl.append("&token=" + token);
 
@@ -346,8 +352,8 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
       StringBuilder redirectUrl = new StringBuilder();
       redirectUrl.append(url);
-      redirectUrl.append("/").append(ExternalRegisterHandler.NAME);
-      redirectUrl.append("?action=" + ExternalRegisterHandler.VALIDATE_EXTERNAL_EMAIL_ACTION);
+      redirectUrl.append("/").append(EXTERNAL_REGISTRATION_NAME);
+      redirectUrl.append("?action=validateEmail");
       redirectUrl.append("&token=" + tokenId);
 
       String emailBody = buildExternalVerificationAccountEmailBody(firstName + " " + lastName,
@@ -389,7 +395,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
       StringBuilder redirectUrl = new StringBuilder();
       redirectUrl.append(url);
-      redirectUrl.append(ExternalRegisterHandler.LOGIN);
+      redirectUrl.append("/login");
 
       String emailBody = buildExternalConfirmationAccountEmailBody(user.getDisplayName(),
                                                                    user.getUserName(),
@@ -480,9 +486,9 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
     Router router = webController.getRouter();
     Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, PasswordRecoveryHandler.NAME);
-    params.put(PasswordRecoveryHandler.TOKEN, tokenId);
-    params.put(PasswordRecoveryHandler.LANG, I18N.toTagIdentifier(locale));
+    params.put(WebAppController.HANDLER_PARAM, NAME);
+    params.put(TOKEN, tokenId);
+    params.put(LANG, I18N.toTagIdentifier(locale));
 
     StringBuilder url = new StringBuilder();
     url.append(req.getScheme()).append("://").append(req.getServerName());
@@ -590,12 +596,12 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   public String getOnboardingURL(String tokenId, String lang) {
     Router router = webController.getRouter();
     Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, OnboardingHandler.NAME);
+    params.put(WebAppController.HANDLER_PARAM, "on-boarding");
     if (tokenId != null) {
-      params.put(OnboardingHandler.TOKEN, tokenId);
+      params.put(TOKEN, tokenId);
     }
     if (lang != null) {
-      params.put(OnboardingHandler.LANG, lang);
+      params.put(LANG, lang);
     }
     return router.render(params);
   }
@@ -604,12 +610,12 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   public String getExternalRegistrationURL(String tokenId, String lang) {
     Router router = webController.getRouter();
     Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, ExternalRegisterHandler.NAME);
+    params.put(WebAppController.HANDLER_PARAM, EXTERNAL_REGISTRATION_NAME);
     if (tokenId != null) {
-      params.put(ExternalRegisterHandler.TOKEN, tokenId);
+      params.put(TOKEN, tokenId);
     }
     if (lang != null) {
-      params.put(ExternalRegisterHandler.LANG, lang);
+      params.put(LANG, lang);
     }
     return router.render(params);
   }
@@ -618,12 +624,12 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   public String getPasswordRecoverURL(String tokenId, String lang) {
     Router router = webController.getRouter();
     Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, PasswordRecoveryHandler.NAME);
+    params.put(WebAppController.HANDLER_PARAM, NAME);
     if (tokenId != null) {
-      params.put(PasswordRecoveryHandler.TOKEN, tokenId);
+      params.put(TOKEN, tokenId);
     }
     if (lang != null) {
-      params.put(PasswordRecoveryHandler.LANG, lang);
+      params.put(LANG, lang);
     }
     return router.render(params);
   }
