@@ -30,6 +30,7 @@ import org.exoplatform.portal.config.StaleModelException;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
@@ -83,6 +84,8 @@ public class PortalRequestHandler extends WebRequestHandler {
 
   protected UserPortalConfigService               portalConfigService;
 
+  protected LayoutService                         layoutService;
+
   protected String                                globalPortal;
 
   protected String                                metaPortal;
@@ -110,6 +113,7 @@ public class PortalRequestHandler extends WebRequestHandler {
     application.onInit();
     controller.addApplication(application);
     portalConfigService = ExoContainerContext.getService(UserPortalConfigService.class);
+    layoutService = ExoContainerContext.getService(LayoutService.class);
     metaPortal = portalConfigService.getMetaPortal();
     globalPortal = portalConfigService.getGlobalPortal();
   }
@@ -147,6 +151,12 @@ public class PortalRequestHandler extends WebRequestHandler {
     if (requestSiteName == null) {
       res.sendRedirect(req.getContextPath());
       return true;
+    } else if ((StringUtils.isBlank(requestSiteType) ||
+                StringUtils.equals(requestSiteType, PortalConfig.PORTAL_TYPE))
+                && layoutService.getPortalConfig(requestSiteType, requestSiteName) == null) {
+      requestPath = "%s/%s".formatted(requestSiteName, requestPath);
+      requestSiteName = portalConfigService.getGlobalPortal();
+      requestSiteType = PortalConfig.PORTAL_TYPE;
     }
 
     return processRequest(controllerContext,
@@ -182,9 +192,6 @@ public class PortalRequestHandler extends WebRequestHandler {
           sendToNotFoundPage(context, metaPortal);
           return true;
         }
-      } else if (persistentPortalConfig != null
-                 && StringUtils.equals(persistentPortalConfig.getName(), globalPortal)) {
-        return false;
       } else {
         processRequest(context, app);
         if (context.getUiPage() == null

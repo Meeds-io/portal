@@ -107,32 +107,6 @@
       </init-params>
     </component-plugin>
     <component-plugin>
-      <name>RegisterHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.web.register.RegisterHandler</type>
-      <init-params>
-        <value-param>
-          <name>register.jsp.path</name>
-          <value>${exo.register.jsp.path:/WEB-INF/jsp/register/register.jsp}</value>
-        </value-param>
-      </init-params>
-    </component-plugin>
-    <component-plugin>
-      <name>PasswordRecoveryHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.web.login.recovery.PasswordRecoveryHandler</type>
-    </component-plugin>
-    <component-plugin>
-      <name>OnboardingHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.web.login.onboarding.OnboardingHandler</type>
-    </component-plugin>
-    <component-plugin>
-      <name>ExternalRegistrationHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.web.register.ExternalRegisterHandler</type>
-    </component-plugin>
-    <component-plugin>
       <name>UploadHandler</name>
       <set-method>register</set-method>
       <type>org.exoplatform.web.handler.UploadHandler</type>
@@ -162,11 +136,6 @@
       <name>PortalRequestHandler</name>
       <set-method>register</set-method>
       <type>org.exoplatform.portal.application.PortalRequestHandler</type>
-    </component-plugin>
-    <component-plugin>
-      <name>PageRequestHandler</name>
-      <set-method>register</set-method>
-      <type>org.exoplatform.portal.application.PageRequestHandler</type>
     </component-plugin>
     <component-plugin>
       <name>PortalDraftRequestHandler</name>

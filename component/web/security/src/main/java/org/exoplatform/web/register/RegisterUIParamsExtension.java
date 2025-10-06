@@ -37,7 +37,7 @@ public class RegisterUIParamsExtension implements UIParamsExtension {
 
   public static final String        ONBOARDING_REGISTER_ENABLED = "onboardingRegisterEnabled";
 
-  private static final List<String> EXTENSION_NAMES             = Arrays.asList(RegisterHandler.REGISTER_EXTENSION_NAME,
+  private static final List<String> EXTENSION_NAMES             = Arrays.asList(LoginHandler.REGISTER_EXTENSION_NAME,
                                                                                 LoginHandler.LOGIN_EXTENSION_NAME);
 
   private SecuritySettingService    securitySettingService;
@@ -55,7 +55,7 @@ public class RegisterUIParamsExtension implements UIParamsExtension {
   public Map<String, Object> extendParameters(ControllerContext controllerContext, String extensionName) {
     if (isRegisterEnabled()) {
       Map<String, Object> params = new HashMap<>();
-      params.put(RegisterHandler.REGISTER_ENABLED, true);
+      params.put("registerEnabled", true);
       params.put(ONBOARDING_REGISTER_ENABLED, true);
       return params;
     }
