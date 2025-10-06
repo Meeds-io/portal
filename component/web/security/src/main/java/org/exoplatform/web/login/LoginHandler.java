@@ -61,7 +61,6 @@ import org.exoplatform.web.WebAppController;
 import org.exoplatform.web.application.JspBasedWebHandler;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 import org.exoplatform.web.login.recovery.PasswordRecoveryService;
-import org.exoplatform.web.register.RegisterHandler;
 import org.exoplatform.web.security.AuthenticationRegistry;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
@@ -74,6 +73,8 @@ import io.meeds.spring.web.localization.HttpRequestLocaleWrapper;
 public class LoginHandler extends JspBasedWebHandler {
 
   public static final String      LOGIN_EXTENSION_NAME       = "LoginExtension";
+
+  public static final String      REGISTER_EXTENSION_NAME   = "RegisterExtension";
 
   private static final Log        LOG                        = ExoLogger.getLogger(LoginHandler.class);
 
@@ -219,12 +220,12 @@ public class LoginHandler extends JspBasedWebHandler {
           LOG.debug("User {} authentication failed.", username, e);
           status = LoginStatus.FAILED;
           String referer = request.getHeader("Referer");
-          if (referer!=null && !referer.contains("/portal/login?")) {
+          if (referer != null && !referer.contains("/portal/login?")) {
             // If the request comes from a different page, we redirect to the login page
             // with the error message
             try {
               String redirectUrl = referer.contains("?") ? "&" : "?";
-              redirectUrl = referer+redirectUrl+"error=" + status.getErrorCode();
+              redirectUrl = "%s%serror=%s".formatted(referer, redirectUrl, status.getErrorCode());
               response.sendRedirect(response.encodeRedirectURL(redirectUrl));
               return true;
             } catch (Exception ex) {
@@ -453,7 +454,7 @@ public class LoginHandler extends JspBasedWebHandler {
       }
       // Force disabling Register Form when the platform access is restricted
       if (securitySettingService.getRegistrationType() == UserRegistrationType.RESTRICTED) {
-        params.put(RegisterHandler.REGISTER_ENABLED, false);
+        params.put("registerEnabled", false);
       }
     } catch (Exception e) {
       LOG.warn("Error while computing Login UI parameters", e);
