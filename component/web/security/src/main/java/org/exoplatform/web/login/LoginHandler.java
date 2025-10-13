@@ -49,6 +49,7 @@ import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.portal.branding.BrandingService;
 import org.exoplatform.portal.resource.SkinService;
+import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
@@ -74,7 +75,9 @@ public class LoginHandler extends JspBasedWebHandler {
 
   public static final String      LOGIN_EXTENSION_NAME       = "LoginExtension";
 
-  public static final String      REGISTER_EXTENSION_NAME   = "RegisterExtension";
+  public static final String      REGISTER_EXTENSION_NAME    = "RegisterExtension";
+
+  public static final String      USER_AUTHENTICATION_EVENT  = "authentication.user.status";
 
   private static final Log        LOG                        = ExoLogger.getLogger(LoginHandler.class);
 
@@ -100,6 +103,8 @@ public class LoginHandler extends JspBasedWebHandler {
 
   private PasswordRecoveryService passwordRecoveryService;
 
+  private ListenerService         listenerService;
+
   private SSOHelper               ssoHelper;
 
   private ServletContext          servletContext;
@@ -114,6 +119,7 @@ public class LoginHandler extends JspBasedWebHandler {
                       BrandingService brandingService,
                       SecuritySettingService securitySettingService,
                       JavascriptConfigService javascriptConfigService,
+                      ListenerService listenerService,
                       SkinService skinService,
                       SSOHelper ssoHelper,
                       InitParams params) {
@@ -123,6 +129,7 @@ public class LoginHandler extends JspBasedWebHandler {
     this.securitySettingService = securitySettingService;
     this.authenticationRegistry = authenticationRegistry;
     this.passwordRecoveryService = passwordRecoveryService;
+    this.listenerService = listenerService;
     this.ssoHelper = ssoHelper;
     if (params != null) {
       if (params.containsKey(LOGIN_JSP_PATH_PARAM)) {
@@ -246,6 +253,8 @@ public class LoginHandler extends JspBasedWebHandler {
       status = LoginStatus.AUTHENTICATED;
     }
 
+    listenerService.broadcast(USER_AUTHENTICATION_EVENT, username, status);
+
     String initialURI = getInitalUri(request);
 
     // Redirect to initialURI
@@ -299,8 +308,8 @@ public class LoginHandler extends JspBasedWebHandler {
   private String getUserNameByEmail(String identifier,
                                     ControllerContext context,
                                     StringBuilder loginPath) throws Exception {
-    //in login context, we do not allow search by email with wildcard
-    identifier=identifier.replace("*","");
+    // in login context, we do not allow search by email with wildcard
+    identifier = identifier.replace("*", "");
     UserHandler userHandler = organizationService.getUserHandler();
     if (userHandler != null) {
       Query emailQuery = new Query();
