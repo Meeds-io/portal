@@ -484,19 +484,13 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
     String tokenId = remindPasswordTokenService.createToken(user.getUserName(), FORGOT_PASSWORD_TOKEN);
 
-    Router router = webController.getRouter();
-    Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, NAME);
-    params.put(TOKEN, tokenId);
-    params.put(LANG, I18N.toTagIdentifier(locale));
-
     StringBuilder url = new StringBuilder();
     url.append(req.getScheme()).append("://").append(req.getServerName());
     if (req.getServerPort() != 80 && req.getServerPort() != 443) {
       url.append(':').append(req.getServerPort());
     }
     url.append(container.getPortalContext().getContextPath());
-    url.append(router.render(params));
+    url.append(getPasswordRecoverURL(tokenId, I18N.toTagIdentifier(locale)));
 
     String emailBody = buildRecoverEmailBody(user, bundle, url.toString());
     String emailSubject = getEmailSubject(user, bundle);
@@ -594,44 +588,41 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   @Override
   public String getOnboardingURL(String tokenId, String lang) {
-    Router router = webController.getRouter();
-    Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, "on-boarding");
+    String passwordRecoveryPath = "/portal/on-boarding";
     if (tokenId != null) {
-      params.put(TOKEN, tokenId);
+      passwordRecoveryPath = "%s%stoken=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", tokenId);
     }
     if (lang != null) {
-      params.put(LANG, lang);
+      passwordRecoveryPath = "%s%slang=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", lang);
+
     }
-    return router.render(params);
+    return passwordRecoveryPath;
   }
 
   @Override
   public String getExternalRegistrationURL(String tokenId, String lang) {
-    Router router = webController.getRouter();
-    Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, EXTERNAL_REGISTRATION_NAME);
+    String passwordRecoveryPath = "/portal/external-registration";
     if (tokenId != null) {
-      params.put(TOKEN, tokenId);
+      passwordRecoveryPath = "%s%stoken=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", tokenId);
     }
     if (lang != null) {
-      params.put(LANG, lang);
+      passwordRecoveryPath = "%s%slang=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", lang);
+
     }
-    return router.render(params);
+    return passwordRecoveryPath;
   }
 
   @Override
   public String getPasswordRecoverURL(String tokenId, String lang) {
-    Router router = webController.getRouter();
-    Map<QualifiedName, String> params = new HashMap<>();
-    params.put(WebAppController.HANDLER_PARAM, NAME);
+    String passwordRecoveryPath = "/portal/forgot-password";
     if (tokenId != null) {
-      params.put(TOKEN, tokenId);
+      passwordRecoveryPath = "%s%stoken=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", tokenId);
     }
     if (lang != null) {
-      params.put(LANG, lang);
+      passwordRecoveryPath = "%s%slang=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", lang);
+
     }
-    return router.render(params);
+    return passwordRecoveryPath;
   }
 
   @Override
