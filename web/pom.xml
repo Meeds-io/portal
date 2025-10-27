@@ -24,7 +24,7 @@
   <parent>
     <groupId>io.meeds.portal</groupId>
     <artifactId>portal.parent</artifactId>
-    <version>7.1.x-exo-SNAPSHOT</version>
+    <version>7.1.0-exo-20251027</version>
   </parent>
 
   <artifactId>portal.web</artifactId>
