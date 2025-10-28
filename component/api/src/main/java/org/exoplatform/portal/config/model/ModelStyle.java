@@ -110,28 +110,28 @@ public class ModelStyle implements Serializable {
   public String getCssClass(String existingCssClass, boolean sectionStyle, int diff) { // NOSONAR
     StringBuilder cssClass = new StringBuilder();
     if (!sectionStyle) {
-      if (marginTop != null && marginTop >= 0 && !StringUtils.contains(existingCssClass, "mt-")) {
+      if (marginTop != null && !StringUtils.contains(existingCssClass, "mt-")) {
         cssClass.append(" mt-");
         if (marginTop < diff) {
           cssClass.append("n");
         }
         cssClass.append(Math.abs((marginTop - diff) / 4));
       }
-      if (marginBottom != null && marginBottom >= 0 && !StringUtils.contains(existingCssClass, "mb-")) {
+      if (marginBottom != null && !StringUtils.contains(existingCssClass, "mb-")) {
         cssClass.append(" mb-");
         if (marginBottom < diff) {
           cssClass.append("n");
         }
         cssClass.append(Math.abs((marginBottom - diff) / 4));
       }
-      if (marginRight != null && marginRight >= 0 && !StringUtils.contains(existingCssClass, "me-")) {
+      if (marginRight != null && !StringUtils.contains(existingCssClass, "me-")) {
         cssClass.append(" me-");
         if (marginRight < diff) {
           cssClass.append("n");
         }
         cssClass.append(Math.abs((marginRight - diff) / 4));
       }
-      if (marginLeft != null && marginLeft >= 0 && !StringUtils.contains(existingCssClass, "ms-")) {
+      if (marginLeft != null && !StringUtils.contains(existingCssClass, "ms-")) {
         cssClass.append(" ms-");
         if (marginLeft < diff) {
           cssClass.append("n");
