@@ -37,7 +37,7 @@ import org.apache.commons.fileupload2.core.DiskFileItem;
 import org.apache.commons.fileupload2.core.DiskFileItemFactory;
 import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.fileupload2.core.ProgressListener;
-import org.apache.commons.fileupload2.jakarta.JakartaServletDiskFileUpload;
+import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletDiskFileUpload;
 
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.PortalContainerInfo;
