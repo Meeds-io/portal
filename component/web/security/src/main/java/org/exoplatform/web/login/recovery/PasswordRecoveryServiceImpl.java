@@ -614,7 +614,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   @Override
   public String getPasswordRecoverURL(String tokenId, String lang) {
-    String passwordRecoveryPath = "/portal/forgot-password";
+    String passwordRecoveryPath = "/forgot-password";
     if (tokenId != null) {
       passwordRecoveryPath = "%s%stoken=%s".formatted(passwordRecoveryPath, passwordRecoveryPath.contains("?") ? "&" : "?", tokenId);
     }
