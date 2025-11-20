@@ -491,4 +491,11 @@
     </addColumn>
   </changeSet>
 
+  <changeSet author="portal" id="1.0.0-mip-a3-01">
+    <modifyDataType tableName="PORTAL_NAVIGATION_NODES" columnName="ICON" newDataType="NVARCHAR(1024)" />
+    <modifySql dbms="mysql">
+      <replace replace="NVARCHAR(1024)" with="VARCHAR(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" />
+    </modifySql>
+  </changeSet>
+
 </databaseChangeLog>
