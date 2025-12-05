@@ -599,10 +599,12 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                               .collect(Collectors.toSet());
 
       Identity userIdentity = userACL.getUserIdentity(userName);
-      List<MembershipEntry> memberships = userIdentity.getMemberships().stream().toList();
+      List<MembershipEntry> memberships = userIdentity.getMemberships()
+                                                      .stream()
+                                                      .filter(m -> groupIds.contains(m.getGroup()))
+                                                      .toList();
       totalSize = memberships.size();
       memberships = memberships.stream()
-                                .filter(m -> groupIds.contains(m.getGroup()))
                                 .skip(offset)
                                 .limit(limit)
                                 .toList();
