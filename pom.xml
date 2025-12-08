@@ -37,8 +37,8 @@
   <name>GateIn - Portal</name>
 
   <properties>
-    <org.exoplatform.gatein.sso.version>6.5.x-exo-SNAPSHOT</org.exoplatform.gatein.sso.version>
-    <org.exoplatform.gatein.pc.version>6.5.x-exo-SNAPSHOT</org.exoplatform.gatein.pc.version>
+    <org.exoplatform.gatein.sso.version>6.5.7-exo</org.exoplatform.gatein.sso.version>
+    <org.exoplatform.gatein.pc.version>6.5.7-exo</org.exoplatform.gatein.pc.version>
     
     <!-- Sonar properties -->
     <sonar.organization>meeds-io</sonar.organization>
