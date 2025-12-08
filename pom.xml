@@ -31,7 +31,7 @@
 
   <groupId>org.exoplatform.gatein.portal</groupId>
   <artifactId>exo.portal.parent</artifactId>
-  <version>6.5.x-exo-SNAPSHOT</version>
+  <version>6.5.7-exo</version>
   <packaging>pom</packaging>
 
   <name>GateIn - Portal</name>
@@ -48,7 +48,7 @@
     <connection>scm:git:git://github.com/meeds-io/gatein-portal.git</connection>
     <developerConnection>scm:git:git@github.com:meeds-io/gatein-portal.git</developerConnection>
     <url>https://github.com/meeds-io/gatein-portal</url>
-    <tag>HEAD</tag>
+    <tag>6.5.7-exo</tag>
   </scm>
 
   <modules>
