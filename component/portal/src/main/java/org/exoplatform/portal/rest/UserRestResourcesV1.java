@@ -602,10 +602,12 @@ public class UserRestResourcesV1 implements ResourceContainer {
       List<MembershipEntry> memberships = userIdentity.getMemberships()
                                                       .stream()
                                                       .filter(m -> groupIds.contains(m.getGroup()))
-                                                      .skip(offset)
-                                                      .limit(limit)
                                                       .toList();
       totalSize = memberships.size();
+      memberships = memberships.stream()
+                                .skip(offset)
+                                .limit(limit)
+                                .toList();
       memberships.forEach(m -> {
         try {
           Group group = organizationService.getGroupHandler().findGroupById(m.getGroup());
