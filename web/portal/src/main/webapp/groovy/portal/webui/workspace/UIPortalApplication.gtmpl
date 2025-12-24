@@ -66,7 +66,7 @@
   String metaPortalName = rcontext.getMetaPortal();
   
   def title = rcontext.getTitle() + " - ";
-  if (!metaPortalName.equals(siteName)) {
+  if (!metaPortalName.equals(siteName) && !siteName.equals('global') ) {
     title = title + rcontext.getSiteLabel() + " - ";
   }
   title = title + companyName;
