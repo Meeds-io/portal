@@ -176,6 +176,7 @@
      eXo.env.portal.productName = "<%=productName%>";
      eXo.env.portal.productLink = "<%=productLink%>";
      eXo.env.portal.siteId = '<%=siteId%>';
+     eXo.env.portal.siteLabel = '<%=rcontext.getSiteLabel() == null ? "" : rcontext.getSiteLabel()%>';
      eXo.env.server.context = "<%=docBase%>";
      eXo.env.server.portalBaseURL = "<%=uicomponent.getBaseURL()%>";
      eXo.env.server.portalURLTemplate = "<%=uicomponent.getPortalURLTemplate()%>";
