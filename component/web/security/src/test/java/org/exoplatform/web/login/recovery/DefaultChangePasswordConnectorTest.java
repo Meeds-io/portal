@@ -22,6 +22,7 @@ import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 import org.exoplatform.services.organization.idm.UserImpl;
@@ -60,7 +61,7 @@ public class DefaultChangePasswordConnectorTest {
     userTest.setOriginatingStore(OrganizationService.INTERNAL_STORE);
     
     UserDAOImpl userHandler = Mockito.mock(UserDAOImpl.class);
-    Mockito.when(userHandler.findUserByName(userTest.getUserName())).thenReturn(userTest);
+    Mockito.when(userHandler.findUserByName(userTest.getUserName(), UserStatus.ANY)).thenReturn(userTest);
     Mockito.when(organizationService.getUserHandler()).thenReturn(userHandler);
     InitParams initParams = new InitParams();
 
@@ -93,7 +94,7 @@ public class DefaultChangePasswordConnectorTest {
     userTest.setOriginatingStore(OrganizationService.EXTERNAL_STORE);
     
     UserDAOImpl userHandler = Mockito.mock(UserDAOImpl.class);
-    Mockito.when(userHandler.findUserByName(userTest.getUserName())).thenReturn(userTest);
+    Mockito.when(userHandler.findUserByName(userTest.getUserName(), UserStatus.ANY)).thenReturn(userTest);
     Mockito.when(organizationService.getUserHandler()).thenReturn(userHandler);
 
     InitParams initParams = new InitParams();
