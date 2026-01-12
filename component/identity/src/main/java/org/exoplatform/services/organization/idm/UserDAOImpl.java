@@ -164,10 +164,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       Tools.logMethodIn(log, LogLevel.TRACE, "saveUser", new Object[] { "user", user, "broadcast", broadcast });
     }
 
-    if (user != null && !user.isEnabled()) {
-      throw new DisabledUserException(user.getUserName());
-    }
-
     IdentitySession session = service_.getIdentitySession();
     if (broadcast) {
       preSave(user, false);
