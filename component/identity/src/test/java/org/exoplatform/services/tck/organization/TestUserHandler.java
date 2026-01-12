@@ -698,11 +698,11 @@ public class TestUserHandler extends AbstractOrganizationServiceTest
          try
          {
             uHandler.saveUser(u, true);
-            fail("A DisabledUserException was expected");
+            // no issue expected
          }
          catch (DisabledUserException e)
          {
-            // expected issue
+            fail("A DisabledUserException was not expected");
          }
 
          // Enable the user
@@ -725,8 +725,8 @@ public class TestUserHandler extends AbstractOrganizationServiceTest
       // Check the listener's counters
       assertEquals(1, listener.preSaveNew);
       assertEquals(1, listener.postSaveNew);
-      assertEquals(unsupportedOperation ? 2 : 3, listener.preSave);
-      assertEquals(unsupportedOperation ? 2 : 3, listener.postSave);
+      assertEquals(unsupportedOperation ? 3 : 4, listener.preSave);
+      assertEquals(unsupportedOperation ? 3 : 4, listener.postSave);
       assertEquals(unsupportedOperation ? 0 : 2, listener.preSetEnabled);
       assertEquals(unsupportedOperation ? 0 : 2, listener.postSetEnabled);
       assertEquals(1, listener.preDelete);
@@ -766,11 +766,12 @@ public class TestUserHandler extends AbstractOrganizationServiceTest
          try
          {
             uHandler.saveUser(u, true);
-            fail("A DisabledUserException was expected");
+            // no issue expected, as we allow to save disabled user
          }
          catch (DisabledUserException e)
          {
-            // expected issue
+            fail("A DisabledUserException is not expected");
+
          }
 
          try
@@ -818,8 +819,8 @@ public class TestUserHandler extends AbstractOrganizationServiceTest
       // Check the listener's counters
       assertEquals(1, listener.preSaveNew);
       assertEquals(1, listener.postSaveNew);
-      assertEquals(unsupportedOperation ? 1 : 2, listener.preSave);
-      assertEquals(unsupportedOperation ? 1 : 2, listener.postSave);
+      assertEquals(unsupportedOperation ? 2 : 3, listener.preSave);
+      assertEquals(unsupportedOperation ? 2 : 3, listener.postSave);
       assertEquals(unsupportedOperation ? 0 : 2, listener.preSetEnabled);
       assertEquals(unsupportedOperation ? 0 : 2, listener.postSetEnabled);
       assertEquals(1, listener.preDelete);
