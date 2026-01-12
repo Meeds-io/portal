@@ -23,6 +23,7 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.web.security.security.CookieTokenService;
 
 public class DefaultChangePasswordConnector extends ChangePasswordConnector {
@@ -53,7 +54,7 @@ public class DefaultChangePasswordConnector extends ChangePasswordConnector {
   
   @Override
   public void changePassword(final String username, final String password) throws Exception {
-    User user = organizationService.getUserHandler().findUserByName(username);
+    User user = organizationService.getUserHandler().findUserByName(username, UserStatus.ANY);
     
     if (user.isInternalStore()) {
       changeInternalPassword(user, password);
