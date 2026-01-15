@@ -734,14 +734,15 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   }
 
   public void testGetDefaultSitePath() {
-    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", null));
+    assertNull( userPortalConfigService.getDefaultSitePath("classic", null));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "NotExisting"));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "john"));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "james"));
   }
 
   public void testGetSiteNodeOrGlobalNode() {
-    UserNode userNode = userPortalConfigService.getDefaultSiteNode("classic", null);
+    UserNode userNode = userPortalConfigService.getDefaultSiteNode("classic", "mary");
+    assertNotNull(userNode);
     assertEquals("home", userNode.getURI());
 
     Page homePage = layoutService.getPage(userNode.getPageRef());
@@ -750,7 +751,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
       homePage.setAccessPermissions(new String[] {"*:/platform/administrators"});
       layoutService.save(new PageContext(homePage.getPageKey(), Utils.toPageState(homePage)));
 
-      userNode = userPortalConfigService.getDefaultSiteNode("classic", null);
+      userNode = userPortalConfigService.getDefaultSiteNode("classic", "mary");
       assertEquals("home/subnode", userNode.getURI());
     } finally {
       homePage.setAccessPermissions(accessPermissions);
@@ -762,16 +763,16 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     UserNode userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", null);
     assertEquals("home", userNode.getURI());
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "Notfound", null);
-    assertEquals("home", userNode.getURI());
+    assertNull(userNode); // No node is returned for anonymous users if the requested one is not found or inaccessible
 
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", null);
-    assertEquals("home", userNode.getURI());
+    assertNull(userNode);
 
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", "NotExisting");
     assertEquals("home", userNode.getURI());
 
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", "NotExisting");
-    assertEquals("home", userNode.getURI());
+    assertNull(userNode);
 
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "home", "john");
     assertEquals("home", userNode.getURI());
@@ -801,7 +802,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     assertEquals("webexplorer", userNode.getURI());
 
     userNode = userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "classic", "webexplorer", null);
-    assertEquals("home", userNode.getURI());
+    assertNull(userNode);
 
     assertNull(userPortalConfigService.getSiteNodeOrGlobalNode(SiteType.PORTAL.getName(), "NotFound", "home/subnode233", "mary"));
   }
