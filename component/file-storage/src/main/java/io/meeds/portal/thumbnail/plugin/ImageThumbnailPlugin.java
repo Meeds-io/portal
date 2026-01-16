@@ -44,4 +44,7 @@ public abstract class ImageThumbnailPlugin extends BaseComponentPlugin {
    */
   public abstract FileContent getImage(String fileId, String username) throws ObjectNotFoundException;
 
+  public boolean hasAccessPermission(String fileId, String username) {
+    return true;
+  }
 }
