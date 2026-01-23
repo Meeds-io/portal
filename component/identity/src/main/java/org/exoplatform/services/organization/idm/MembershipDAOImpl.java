@@ -18,6 +18,8 @@
  */
 package org.exoplatform.services.organization.idm;
 
+import lombok.SneakyThrows;
+import org.apache.commons.collections.CollectionUtils;
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.commons.utils.ListAccessImpl;
 import org.exoplatform.commons.utils.ListenerStack;
@@ -28,9 +30,13 @@ import org.picketlink.idm.api.Role;
 import org.picketlink.idm.api.RoleType;
 import org.picketlink.idm.common.exception.FeatureNotSupportedException;
 import org.picketlink.idm.common.exception.IdentityException;
+import org.picketlink.idm.impl.api.model.GroupKey;
+import org.picketlink.idm.impl.api.model.SimpleGroup;
+import org.picketlink.idm.impl.api.model.SimpleRole;
 
 import javax.naming.InvalidNameException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHandler {
 
@@ -505,14 +511,26 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     }
 
     public Collection findMembershipsByUser(String userName) throws Exception {
+        return findMembershipsByUser(userName, false);
+    }
+    public Collection findMembershipsByUser(String userName, boolean isIncludeInherited) throws Exception {
         if (log.isTraceEnabled()) {
             Tools.logMethodIn(log, LogLevel.TRACE, "findMembershipsByUser", new Object[] { "userName", userName });
         }
 
-        Collection<Role> roles = new HashSet();
-
+        Collection<Role> roles = new HashSet<>();
+        Set<Role> inheritedRoles = new HashSet<>();
         try {
             roles = getIdentitySession().getRoleManager().findRoles(userName, null);
+            if (isIncludeInherited) {
+                Set<Role> allRoles = new HashSet<>();
+                for (Role role : roles) {
+                    allRoles.addAll(getInheritedRoles(role));
+                }
+                inheritedRoles = new HashSet<>(allRoles);
+                inheritedRoles.removeAll(roles);
+                roles.addAll(allRoles);
+            }
         } catch (Exception e) {
             // TODO:
             handleException("Identity operation error: ", e);
@@ -533,7 +551,9 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                 } else {
                     m.setMembershipType(role.getRoleType().getName());
                 }
-
+                if (inheritedRoles.contains(role)) {
+                    m.setInherited(true);
+                }
                 memberships.add(m);
             }
         }
@@ -832,5 +852,34 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
 
     public String getGtnGroupName(String plidmGroupName) {
         return orgService.getConfiguration().getGtnGroupName(plidmGroupName);
+    }
+
+    @SneakyThrows
+    private Set<Role> getInheritedRoles(Role role) {
+      String groupId = ((GroupDAOImpl) orgService.getGroupHandler()).getGroupId(role.getGroup(), null);
+      Group group = orgService.getGroupHandler().findGroupById(groupId);
+      Set<String> inheritedGroupIds = group.getInheritedGroups();
+      if (CollectionUtils.isEmpty(inheritedGroupIds)) {
+        return Set.of(role);
+      } else {
+        Set<Role> groupRoles = new HashSet<>();
+        groupRoles.add(role);
+        inheritedGroupIds.stream().map(id -> {
+          try {
+            return getIdentitySession().getPersistenceManager()
+                                       .createGroupKey(getPLIDMGroupName(getGroupNameFromId(id)), getGroupTypeFromId(id));
+          } catch (Exception e) {
+            return null;
+          }
+        })
+                         .filter(Objects::nonNull)
+                         .map(GroupKey::new)
+                         .map(SimpleGroup::new)
+                         .map(plIdmGroup -> new SimpleRole(role.getRoleType(), role.getUser(), plIdmGroup))
+                         .map(this::getInheritedRoles)
+                         .flatMap(Set::stream)
+                         .forEach(groupRoles::add);
+        return groupRoles;
+      }
     }
 }

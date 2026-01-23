@@ -322,4 +322,12 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
       return false;
     }
   }
+
+  public void clearGroupCache(Group group) throws Exception {
+    String groupId = getGroupId(group);
+    // Delete related cache entries
+    groupCache.select(new ClearGroupCacheByGroupIdSelector(groupId, group.getParentId(), useCacheList));
+    membershipCache.select(new ClearMembershipCacheByGroupIdSelector(groupId));
+  }
+
 }
