@@ -70,7 +70,7 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
           case MEMBERSHIP_BY_ID:
             return findMembershipByUserGroupAndType(key.getUserName(), key.getGroupId(), key.getType());
           case MEMBERSHIPS_FOR_USER:
-            return findMembershipsByUser(key.getUserName());
+            return findMembershipsByUser(key.getUserName(), key.isIncludesInherited());
           default:
             throw new IllegalArgumentException("context value " + context + " is not recognized");
           }
@@ -105,13 +105,13 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   }
 
   @Override
-  public Collection<Membership> findMembershipsByUser(String userName) throws Exception {
+  public Collection<Membership> findMembershipsByUser(String userName, boolean isIncludeInherited) throws Exception {
     if (useCacheList && (disableCacheInThread.get() == null || !disableCacheInThread.get())) {
-      MembershipCacheKey cacheKey = new MembershipCacheKey(userName, null, null);
+      MembershipCacheKey cacheKey = new MembershipCacheKey(userName, null, null, isIncludeInherited) ;
       return (Collection<Membership>) futureMembershipCache.get(MembershipCacheOperationType.MEMBERSHIPS_FOR_USER, cacheKey);
     } else {
       try {
-        return super.findMembershipsByUser(userName);
+        return super.findMembershipsByUser(userName, isIncludeInherited);
       } finally {
         clearMembershipCache(userName);
       }

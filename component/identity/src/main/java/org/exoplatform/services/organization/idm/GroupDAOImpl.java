@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.picketlink.idm.api.Attribute;
 import org.picketlink.idm.api.IdentitySearchCriteria;
 import org.picketlink.idm.api.Role;
@@ -43,6 +45,10 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     public static final String GROUP_LABEL = "label";
 
     public static final String GROUP_DESCRIPTION = "description";
+
+    public static final String NESTED_GROUPS     = "nestedGroups";
+
+    public static final String INHERITED_GROUPS  = "inheritedGroups";
 
     private List<GroupEventListener> listeners_;
 
@@ -814,6 +820,21 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         } else {
             exoGroup.setLabel(gtnGroupName);
         }
+        if (attrs.containsKey(NESTED_GROUPS) && attrs.get(NESTED_GROUPS).getValue() != null) {
+            Set<String> nestedGroups = attrs.get(NESTED_GROUPS).getValues()
+                    .stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.toSet());
+            exoGroup.setNestedGroups(nestedGroups);
+        }
+        if (attrs.containsKey(INHERITED_GROUPS) && attrs.get(INHERITED_GROUPS).getValue() != null) {
+            Set<String> inheritedGroups = attrs.get(INHERITED_GROUPS).getValues()
+                    .stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.toSet());
+            exoGroup.setInheritedGroups(inheritedGroups);
+        }
+
 
         // Resolve full ID
         String id = getGroupId(jbidGroup, null);
@@ -1070,6 +1091,127 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
     public String getGtnGroupName(String plidmGroupName) {
         return orgService.getConfiguration().getGtnGroupName(plidmGroupName);
+    }
+
+    public void linkGroups(String parentGroupId, String memberGroupId) throws Exception {
+      try {
+        if (parentGroupId == null || memberGroupId == null) {
+          throw new IllegalArgumentException("parentGroup and memberGroup id must not be null");
+        }
+        if (parentGroupId.equals(memberGroupId)) {
+          throw new IllegalStateException("Cannot link a group to itself");
+        }
+
+        Group parentGroup = findGroupById(parentGroupId);
+        if (parentGroup == null) {
+          throw new ObjectNotFoundException("Parent group not found: " + parentGroupId);
+        }
+
+        Group memberGroup = findGroupById(memberGroupId);
+        if (memberGroup == null) {
+          throw new ObjectNotFoundException("Member group not found: " + memberGroupId);
+        }
+        if (isNestedIn(parentGroupId, memberGroupId)) {
+          throw new IllegalStateException("Cannot link: the group " + parentGroupId + " is a member of the"
+              + memberGroupId);
+        }
+        Set<String> nestedGroups = parentGroup.getNestedGroups();
+        if (nestedGroups == null) {
+          nestedGroups = new HashSet<>();
+        } else {
+          nestedGroups = new HashSet<>(nestedGroups);
+        }
+        Set<String> inheritedGroups = memberGroup.getInheritedGroups();
+        if (inheritedGroups == null) {
+          inheritedGroups = new HashSet<>();
+        } else {
+          inheritedGroups = new HashSet<>(inheritedGroups);
+        }
+        if (nestedGroups.contains(memberGroupId) && inheritedGroups.contains(parentGroupId)) {
+          // already linked
+          return;
+        }
+        nestedGroups.add(memberGroupId);
+        inheritedGroups.add(parentGroupId);
+        Attribute nestedGroupsAttr = new SimpleAttribute(NESTED_GROUPS, nestedGroups.toArray(String[]::new));
+        getIdentitySession().getAttributesManager().updateAttributes(orgService.getJBIDMGroup(parentGroupId), new Attribute[] { nestedGroupsAttr });
+        orgService.clearGroupCache(parentGroup);
+        Attribute inheritedGroupsAttr = new SimpleAttribute(INHERITED_GROUPS, inheritedGroups.toArray(String[]::new));
+        getIdentitySession().getAttributesManager().updateAttributes(orgService.getJBIDMGroup(memberGroupId), new Attribute[] { inheritedGroupsAttr });
+        orgService.clearGroupCache(memberGroup);
+        broadcastLinkGroups(parentGroup, memberGroup);
+
+      } finally {
+        orgService.flush();
+      }
+    }
+
+    public void unlinkGroups(String parentGroupId, String memberGroupId) throws Exception {
+      try {
+        Group parentGroup = findGroupById(parentGroupId);
+        Group memberGroup = findGroupById(memberGroupId);
+        Set<String> nestedGroups = parentGroup.getNestedGroups();
+        Set<String> inheritedGroups = memberGroup.getInheritedGroups();
+        if (CollectionUtils.isEmpty(nestedGroups) && CollectionUtils.isEmpty(inheritedGroups)
+            || !nestedGroups.contains(memberGroupId) && !inheritedGroups.contains(parentGroupId)) {
+          // nothing to unlink
+          return;
+        }
+        Set<String> updatedNestedGroups = new HashSet<>(nestedGroups);
+        updatedNestedGroups.remove(memberGroupId);
+        Set<String> updatedInheritedGroups = new HashSet<>(inheritedGroups);
+        updatedInheritedGroups.remove(parentGroupId);
+
+        if (updatedNestedGroups.isEmpty()) {
+          getIdentitySession().getAttributesManager().removeAttributes(orgService.getJBIDMGroup(parentGroupId), new String[] { NESTED_GROUPS });
+        } else {
+          // else update attribute
+          Attribute nestedGroupsAttr = new SimpleAttribute(NESTED_GROUPS, updatedNestedGroups.toArray(String[]::new));
+          getIdentitySession().getAttributesManager().updateAttributes(orgService.getJBIDMGroup(parentGroupId), new Attribute[] { nestedGroupsAttr });
+        }
+        orgService.clearGroupCache(parentGroup);
+
+        if (updatedInheritedGroups.isEmpty()) {
+          getIdentitySession().getAttributesManager().removeAttributes(orgService.getJBIDMGroup(memberGroupId), new String[] { INHERITED_GROUPS });
+        } else {
+          // else update attribute
+          Attribute inheritedGroupsAttr = new SimpleAttribute(INHERITED_GROUPS, updatedInheritedGroups.toArray(String[]::new));
+          getIdentitySession().getAttributesManager().updateAttributes(orgService.getJBIDMGroup(memberGroupId), new Attribute[] { inheritedGroupsAttr });
+        }
+        orgService.clearGroupCache(memberGroup);
+        broadcastUnLinkGroups(parentGroup, memberGroup);
+
+      } finally {
+        orgService.flush();
+      }
+    }
+
+    private boolean isNestedIn(String parentGroupId, String memberGroupId) throws Exception {
+        Group group = findGroupById(memberGroupId);
+        if (group == null || group.getNestedGroups() == null || group.getNestedGroups().isEmpty()) {
+            return false;
+        }
+        if (group.getNestedGroups().contains(parentGroupId)) {
+            return true;
+        }
+        for (String childId : group.getNestedGroups()) {
+            if (isNestedIn(parentGroupId,childId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private void broadcastLinkGroups(Group group, Group memberGroup) throws Exception {
+      for (GroupEventListener listener : listeners_) {
+        listener.linkGroups(group, memberGroup);
+      }
+    }
+
+    private void broadcastUnLinkGroups(Group group, Group memberGroup) throws Exception {
+      for (GroupEventListener listener : listeners_) {
+        listener.unlinkGroups(group, memberGroup);
+      }
     }
 
 }
