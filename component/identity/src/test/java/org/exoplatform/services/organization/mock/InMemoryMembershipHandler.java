@@ -148,6 +148,11 @@ public class InMemoryMembershipHandler implements MembershipHandler {
   }
 
   @Override
+  public List<Membership> findMembershipsByUser(String userName, boolean includeInherited) {
+    return userMemberships.computeIfAbsent(userName, key -> new ArrayList<>());
+  }
+
+  @Override
   public ListAccess<Membership> findAllMembershipsByUser(User user) {
     return new InMemoryListAccess<>(findMembershipsByUser(user.getUserName()), new Membership[0]);
   }
