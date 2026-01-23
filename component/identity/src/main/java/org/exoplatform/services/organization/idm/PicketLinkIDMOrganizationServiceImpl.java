@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.services.organization.Group;
 import org.gatein.portal.idm.impl.repository.ExoFallbackIdentityStoreRepository;
 import org.gatein.portal.idm.impl.repository.ExoLegacyFallbackIdentityStoreRepository;
 import org.picketlink.idm.api.Transaction;
@@ -295,6 +296,14 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
 
   public void setConfiguration(Config configuration) {
     this.configuration = configuration;
+  }
+
+  public void clearGroupCache(Group group) throws Exception{
+    if (organizationCacheHandler != null && (this.configuration == null || this.configuration.isUseCache())) {
+      if (groupDAO_ != null && groupDAO_ instanceof CacheableGroupHandlerImpl) {
+        ((CacheableGroupHandlerImpl) groupDAO_).clearGroupCache(group);
+      }
+    }
   }
 
   private void initConfiguration(InitParams params) {
