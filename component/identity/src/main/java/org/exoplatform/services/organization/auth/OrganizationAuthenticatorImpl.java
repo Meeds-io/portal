@@ -114,7 +114,7 @@ public class OrganizationAuthenticatorImpl implements Authenticator
       begin(orgService);
       try
       {
-         memberships = orgService.getMembershipHandler().findMembershipsByUser(userId);
+         memberships = orgService.getMembershipHandler().findMembershipsByUser(userId, true);
       }
       finally
       {
