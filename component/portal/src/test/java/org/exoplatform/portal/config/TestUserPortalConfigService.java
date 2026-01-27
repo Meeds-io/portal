@@ -734,7 +734,7 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
   }
 
   public void testGetDefaultSitePath() {
-    assertNull( userPortalConfigService.getDefaultSitePath("classic", null));
+    assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", null));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "NotExisting"));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "john"));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "james"));
