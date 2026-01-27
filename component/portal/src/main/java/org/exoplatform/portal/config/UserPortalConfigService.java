@@ -418,7 +418,7 @@ public class UserPortalConfigService implements Startable {
       do {
         if (isAccessiblePageNoDraft(targetUserNode, username)) {
           return targetUserNode;
-        } else if (StringUtils.isNotBlank(username) && CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
+        } else if (CollectionUtils.isNotEmpty(targetUserNode.getChildren())) {
           UserNode childUserNode = getNodeOrFirstChildWithPage(targetUserNode.getChildren(), username);
           if (isAccessiblePageNoDraft(childUserNode, username)) {
             return childUserNode;
