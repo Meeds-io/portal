@@ -110,7 +110,7 @@
           <configuration>
             <forkMode>always</forkMode>
             <includes>
-              <include>org/exoplatform/services/Test*.java</include>
+              <include>io/meeds/portal/identity/TestGroupAsMembership.java</include>
               <include>org/exoplatform/services/tck/organization/Test*.java</include>
               <include>org/exoplatform/services/organization/Test*.java</include>
               <include>org/exoplatform/services/organization/externalstore/Test*.java</include>

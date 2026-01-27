@@ -141,7 +141,7 @@ public class CacheableMembershipTypeHandlerImpl extends MembershipTypeDAOImpl {
   }
 
   public void enableCache() {
-    disableCacheInThread.set(null);
+    disableCacheInThread.remove();
   }
 
   public static final class ClearMembershipCacheByMembershipTypeSelector
