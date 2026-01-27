@@ -19,6 +19,8 @@
 package org.exoplatform.services.organization.idm.cache;
 
 import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
@@ -70,7 +72,7 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
           case MEMBERSHIP_BY_ID:
             return findMembershipByUserGroupAndType(key.getUserName(), key.getGroupId(), key.getType());
           case MEMBERSHIPS_FOR_USER:
-            return findMembershipsByUser(key.getUserName(), key.isIncludesInherited());
+            return findMembershipsByUser(key.getUserName());
           default:
             throw new IllegalArgumentException("context value " + context + " is not recognized");
           }
@@ -105,13 +107,13 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   }
 
   @Override
-  public Collection<Membership> findMembershipsByUser(String userName, boolean isIncludeInherited) throws Exception {
+  public Collection<Membership> findMembershipsByUser(String userName) throws Exception {
     if (useCacheList && (disableCacheInThread.get() == null || !disableCacheInThread.get())) {
-      MembershipCacheKey cacheKey = new MembershipCacheKey(userName, null, null, isIncludeInherited) ;
+      MembershipCacheKey cacheKey = new MembershipCacheKey(userName, null, null);
       return (Collection<Membership>) futureMembershipCache.get(MembershipCacheOperationType.MEMBERSHIPS_FOR_USER, cacheKey);
     } else {
       try {
-        return super.findMembershipsByUser(userName, isIncludeInherited);
+        return super.findMembershipsByUser(userName);
       } finally {
         clearMembershipCache(userName);
       }

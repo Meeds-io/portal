@@ -180,7 +180,7 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
   }
 
   public void enableCache() {
-    disableCacheInThread.set(null);
+    disableCacheInThread.remove();
   }
 
 }
