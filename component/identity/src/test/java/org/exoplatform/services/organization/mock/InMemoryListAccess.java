@@ -19,6 +19,7 @@
 package org.exoplatform.services.organization.mock;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -36,11 +37,9 @@ public class InMemoryListAccess<T> implements ListAccess<T> {
 
   private T[]      defaultResult;
 
-  @SuppressWarnings("unchecked")
   public InMemoryListAccess(List<T> values, T[] defaultResult) {
     this.defaultResult = defaultResult;
-    List<T> retrievedValues = values == null ? Collections.emptyList()
-                                             : values.stream().filter(Objects::nonNull).toList();
+    List<T> retrievedValues = values == null ? Collections.emptyList() : values.stream().filter(Objects::nonNull).toList();
     if (CollectionUtils.isNotEmpty(retrievedValues)) {
       T firstElement = retrievedValues.get(0);
       if (firstElement instanceof Cloneable) {
@@ -48,7 +47,6 @@ public class InMemoryListAccess<T> implements ListAccess<T> {
       } else {
         this.values = new ArrayList<>(retrievedValues);
       }
-      this.modelClass = (Class<T>) firstElement.getClass();
     } else {
       this.values = Collections.emptyList();
     }
@@ -56,14 +54,41 @@ public class InMemoryListAccess<T> implements ListAccess<T> {
 
   @SuppressWarnings("unchecked")
   public T[] load(int index, int length) {
-    if (modelClass == null || index >= values.size()) {
+    Class<T> tClass = getModelClass();
+    if (tClass == null || index >= values.size()) {
       return defaultResult;
     }
     if (index + length > values.size()) {
       length = values.size() - index;
     }
     return values.subList(index, index + length)
-                 .toArray((T[]) java.lang.reflect.Array.newInstance(modelClass, values.size()));
+                 .toArray((T[]) java.lang.reflect.Array.newInstance(tClass, values.size()));
+  }
+
+  @SuppressWarnings("unchecked")
+  private Class<T> getModelClass() {
+    if (modelClass == null && CollectionUtils.isNotEmpty(values)) {
+      List<Class<?>> classes = new ArrayList<>();
+      for (T t : values) {
+        if (t == null) {
+          continue; // NOSONAR
+        } else {
+          List<Class<?>> tClasses = new ArrayList<>(Arrays.asList(t.getClass().getInterfaces()));
+          tClasses.add(t.getClass());
+          tClasses.add(t.getClass().getSuperclass());
+          if (classes.isEmpty()) {
+            classes.addAll(tClasses);
+          } else {
+            classes.retainAll(tClasses);
+          }
+        }
+      }
+      classes.remove(Object.class);
+      if (!classes.isEmpty()) {
+        modelClass = (Class<T>) classes.getLast();
+      }
+    }
+    return modelClass;
   }
 
   public int getSize() {

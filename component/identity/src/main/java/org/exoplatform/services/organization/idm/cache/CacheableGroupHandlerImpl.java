@@ -32,6 +32,7 @@ import org.exoplatform.services.cache.ObjectCacheInfo;
 import org.exoplatform.services.organization.ExtendedCloneable;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.Membership;
+import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.cache.MembershipCacheKey;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.GroupDAOImpl;
@@ -229,6 +230,28 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     }
   }
 
+  @Override
+  public void linkGroups(NestedMembership nestedMembership) throws Exception {
+    disableCacheInThread.set(true);
+    try {
+      super.linkGroups(nestedMembership);
+      clearNestedMembershipCache(nestedMembership);
+    } finally {
+      disableCacheInThread.set(false);
+    }
+  }
+
+  @Override
+  public void unlinkGroups(NestedMembership nestedMembership) throws Exception {
+    disableCacheInThread.set(true);
+    try {
+      super.unlinkGroups(nestedMembership);
+      clearNestedMembershipCache(nestedMembership);
+    } finally {
+      disableCacheInThread.set(false);
+    }
+  }
+
   public void clearCache() {
     groupCache.clearCache();
   }
@@ -238,7 +261,7 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
   }
 
   public void enableCache() {
-    disableCacheInThread.set(null);
+    disableCacheInThread.remove();
   }
 
   private static final String computeChildrenKey(Group parent) {
@@ -328,6 +351,13 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     // Delete related cache entries
     groupCache.select(new ClearGroupCacheByGroupIdSelector(groupId, group.getParentId(), useCacheList));
     membershipCache.select(new ClearMembershipCacheByGroupIdSelector(groupId));
+  }
+
+  private void clearNestedMembershipCache(NestedMembership nestedMembership) {
+    groupCache.remove(nestedMembership.getGroupId());
+    groupCache.remove(computeChildrenKey(nestedMembership.getGroupId()));
+    groupCache.remove(nestedMembership.getNestedGroupId());
+    groupCache.remove(computeChildrenKey(nestedMembership.getNestedGroupId()));
   }
 
 }
