@@ -164,7 +164,7 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
   }
 
   public void enableCache() {
-    disableCacheInThread.set(null);
+    disableCacheInThread.remove();
   }
 
   public enum UserProfileCacheOperationType {
