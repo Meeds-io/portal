@@ -18,7 +18,9 @@
  */
 package org.exoplatform.services.organization.idm;
 
+import static org.exoplatform.services.organization.idm.EntityMapperUtils.AUTOMATIC_DISABLE;
 import static org.exoplatform.services.organization.idm.EntityMapperUtils.ORIGINATING_STORE;
+import static org.exoplatform.services.organization.idm.EntityMapperUtils.USER_CREATION_SOURCE;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -56,39 +58,40 @@ import io.meeds.services.organization.plugin.UserDecoratorPlugin;
 
 public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
-  private static final String     LISTENER_EXECUTION_ERR_MSG = "Error executing %s on listener %s for user %s";
+  private static final String     LISTENER_EXECUTION_ERR_MSG  = "Error executing %s on listener %s for user %s";
 
-  public static final String      USER_PASSWORD        = EntityMapperUtils.USER_PASSWORD;
+  public static final String      USER_PASSWORD               = EntityMapperUtils.USER_PASSWORD;
 
-  public static final String      USER_PASSWORD_SALT   = "passwordSalt";
+  public static final String      USER_PASSWORD_SALT          = "passwordSalt";
 
-  public static final String      USER_FIRST_NAME      = EntityMapperUtils.USER_FIRST_NAME;
+  public static final String      USER_FIRST_NAME             = EntityMapperUtils.USER_FIRST_NAME;
 
-  public static final String      USER_LAST_NAME       = EntityMapperUtils.USER_LAST_NAME;
+  public static final String      USER_LAST_NAME              = EntityMapperUtils.USER_LAST_NAME;
 
-  public static final String      USER_DISPLAY_NAME    = EntityMapperUtils.USER_DISPLAY_NAME;
+  public static final String      USER_DISPLAY_NAME           = EntityMapperUtils.USER_DISPLAY_NAME;
 
-  public static final String      USER_EMAIL           = EntityMapperUtils.USER_EMAIL;
+  public static final String      USER_EMAIL                  = EntityMapperUtils.USER_EMAIL;
 
-  public static final String      USER_CREATED_DATE    = EntityMapperUtils.USER_CREATED_DATE;
+  public static final String      USER_CREATED_DATE           = EntityMapperUtils.USER_CREATED_DATE;
 
-  public static final String      USER_LAST_LOGIN_TIME = EntityMapperUtils.USER_LAST_LOGIN_TIME;
+  public static final String      USER_LAST_LOGIN_TIME        = EntityMapperUtils.USER_LAST_LOGIN_TIME;
 
-  public static final String      USER_ORGANIZATION_ID = EntityMapperUtils.USER_ORGANIZATION_ID;
+  public static final String      USER_ORGANIZATION_ID        = EntityMapperUtils.USER_ORGANIZATION_ID;
 
-  public static final String      USER_ENABLED          = EntityMapperUtils.USER_ENABLED;
+  public static final String      USER_ENABLED                = EntityMapperUtils.USER_ENABLED;
 
-  public static final String      USER_PASSWORD_SALT128 = "passwordSalt128";
-
+  public static final String      USER_PASSWORD_SALT128       = "passwordSalt128";
 
   public static final Set<String> USER_NON_PROFILE_KEYS;
 
-  public static final DateFormat  dateFormat           = DateFormat.getInstance();
+  public static final DateFormat  dateFormat                  = DateFormat.getInstance();
+
+  private static final String     USER_AUTOMATIC_DEACTIVATION = "automaticDeactivation";
 
   private List<UserDecoratorPlugin> decoratorPlugins           = new ArrayList<>();
 
   static {
-    Set<String> keys = new HashSet<String>();
+    Set<String> keys = new HashSet<>();
     keys.add(USER_PASSWORD);
     keys.add(USER_PASSWORD_SALT);
     keys.add(USER_FIRST_NAME);
@@ -101,11 +104,13 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     keys.add(USER_ENABLED);
     keys.add(ORIGINATING_STORE);
     keys.add(USER_PASSWORD_SALT128);
+    keys.add(AUTOMATIC_DISABLE);
+    keys.add(USER_CREATION_SOURCE);
 
     USER_NON_PROFILE_KEYS = Collections.unmodifiableSet(keys);
   }
 
-  private List<UserEventListener> listeners_ = new ArrayList<UserEventListener>(3);
+  private List<UserEventListener> listeners_ = new ArrayList<>(3);
 
   public UserDAOImpl(PicketLinkIDMOrganizationServiceImpl orgService, PicketLinkIDMService idmService) {
     super(orgService, idmService);
@@ -156,6 +161,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       orgService.flush();
     }
 
+    Date date = new Date();
+    user.setLastLoginTime(date);
+    user.setCreatedDate(date);
     try {
       persistUserInfo(user, plIDMUser, session, true);
     } catch (Exception e) {
@@ -179,6 +187,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
   }
 
+  @SuppressWarnings("deprecation")
   public void saveUser(User user, boolean broadcast) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log, LogLevel.TRACE, "saveUser", new Object[] { "user", user, "broadcast", broadcast });
@@ -188,6 +197,14 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     if (broadcast) {
       preSave(user, false);
     }
+
+    User existingUser = findUserByName(user.getUserName(), UserStatus.ANY);
+    if (existingUser == null) {
+      throw new IllegalStateException("User with name '%s' doesn't exist".formatted(user.getUserName()));
+    }
+
+    user.setCreatedDate(existingUser.getCreatedDate());
+    user.setCreationSource(existingUser.getCreationSource());
 
     org.picketlink.idm.api.User plIDMUser = session.getPersistenceManager().findUser(user.getUserName());
     persistUserInfo(user, plIDMUser, session, false);
@@ -199,10 +216,14 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
   @Override
   public User setEnabled(String userName, boolean enabled, boolean broadcast) throws Exception {
+    return setEnabled(userName, enabled, false, broadcast);
+  }
+
+  public User setEnabled(String userName, boolean enabled, boolean automaticDeactivation, boolean broadcast) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log,
                         LogLevel.TRACE,
-                        "setEnabled",
+             "setEnabled",
                         new Object[] { "userName", userName, "enabled", enabled, "broadcast", broadcast });
     }
 
@@ -237,6 +258,25 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
         am.updateAttributes(userName, attrs);
       } catch (Exception e) {
         handleException("Cannot update enabled status for user: " + userName + "; ", e);
+      } finally {
+        orgService.flush();
+      }
+    }
+
+    if (automaticDeactivation) {
+      Attribute[] attrs = new Attribute[]{new SimpleAttribute(USER_AUTOMATIC_DEACTIVATION, String.valueOf(automaticDeactivation))};
+      try {
+        am.updateAttributes(userName, attrs);
+      } catch (Exception e) {
+        handleException("Cannot update automaticDeactivation for user: " + userName + "; ", e);
+      } finally {
+        orgService.flush();
+      }
+    } else {
+      try {
+        am.removeAttributes(userName, new String[]{USER_AUTOMATIC_DEACTIVATION});
+      } catch (Exception e) {
+        handleException("Cannot update automaticDeactivation for user: " + userName + "; ", e);
       } finally {
         orgService.flush();
       }
@@ -450,6 +490,34 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   }
 
   @Override
+  public int disableInactiveUsers(int inactiveDays) {
+    Query query = new Query();
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_YEAR, -inactiveDays);
+    Date inactiveDate = cal.getTime();
+    query.setToLoginDate(inactiveDate);
+    try {
+      ListAccess<User> users = findUsersByQuery(query, UserStatus.ENABLED);
+      int pageSize = 100;
+      int offset = 0;
+      int size = users.getSize();
+      while (offset < size) {
+        int limit = Math.min(pageSize, size - offset);
+        User[] page = users.load(offset, limit);
+        for (User u : page) {
+          String userName = u.getUserName();
+          setEnabled(userName, false, true, true);
+        }
+        offset += limit;
+      }
+      return size;
+    } catch (Exception e) {
+      log.error("Error while processing inactive users", e);
+      return 0;
+    }
+  }
+
+  @Override
   public ListAccess<User> findUsersByQuery(Query q, UserStatus userStatus) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log, LogLevel.TRACE, "findUsersByQuery", new Object[] { q, userStatus });
@@ -506,6 +574,13 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     }
 
     // TODO: from/to login date
+    if (q.getFromLoginDate() != null) {
+      qb.attributeValuesFilter(USER_LAST_LOGIN_TIME, new String[] { "" + q.getFromLoginDate().getTime() });
+    }
+
+    if (q.getToLoginDate() != null) {
+      qb.attributeValuesFilter(USER_LAST_LOGIN_TIME, new String[] { "" + q.getToLoginDate().getTime() });
+    }
 
     if (q.getLastName() != null) {
       qb.attributeValuesFilter(USER_LAST_NAME, new String[] { q.getLastName() });
@@ -760,6 +835,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     if (user.getCreatedDate() != null) {
       attributes.add(new SimpleAttribute(USER_CREATED_DATE, "" + user.getCreatedDate().getTime()));
     }
+    if (user.getCreationSource() != null) {
+      attributes.add(new SimpleAttribute(USER_CREATION_SOURCE, user.getCreationSource()));
+    }
     if (user.getLastLoginTime() != null) {
       attributes.add(new SimpleAttribute(USER_LAST_LOGIN_TIME, "" + user.getLastLoginTime().getTime()));
     }
@@ -774,6 +852,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     }
     if(!user.isEnabled()) {
       attributes.add(new SimpleAttribute(USER_ENABLED, Boolean.toString(user.isEnabled())));
+      attributes.add(new SimpleAttribute(AUTOMATIC_DISABLE, Boolean.toString(user.isAutomaticDeactivation())));
     }
 
     // TODO: GTNPORTAL-2358 Change once displayName will be available as part of
