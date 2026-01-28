@@ -22,6 +22,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.*;
 
+import org.apache.commons.lang3.StringUtils;
 import org.picketlink.idm.api.Attribute;
 
 import org.exoplatform.services.log.ExoLogger;
@@ -43,6 +44,10 @@ public class EntityMapperUtils {
   public static final String     USER_EMAIL           = "email";
 
   public static final String     USER_CREATED_DATE    = "createdDate";
+
+  public static final String     USER_CREATION_SOURCE = "creationSource";
+
+  public static final String     AUTOMATIC_DISABLE    = "automaticDeactivation";
 
   public static final String     USER_LAST_LOGIN_TIME = "lastLoginTime";
 
@@ -139,6 +144,11 @@ public class EntityMapperUtils {
       changed |= checkIfChanged && !Objects.equals(organizationId, user.getOrganizationId());
       user.setOrganizationId(organizationId);
     }
+    if (attrs.containsKey(USER_CREATION_SOURCE)) {
+      String creationSource = attrs.get(USER_CREATION_SOURCE).getValue().toString();
+      changed |= checkIfChanged && !Objects.equals(creationSource, user.getCreationSource());
+      user.setCreationSource(creationSource);
+    }
     if (attrs.containsKey(USER_ENABLED)) {
       // used when populating User from AD ; it returns numbers : 512 = enbaled, 514 = disabled
       String status = attrs.get(USER_ENABLED).getValue().toString();
@@ -158,6 +168,13 @@ public class EntityMapperUtils {
 
       if(!Objects.equals(enabled, user.isEnabled())) {
         ((UserImpl) user).setEnabled(enabled);
+      }
+
+      if (attrs.containsKey(AUTOMATIC_DISABLE)) {
+        String automaticDisabledString = attrs.get(AUTOMATIC_DISABLE).getValue().toString();
+        boolean automaticDeactivation = StringUtils.equals(automaticDisabledString, "true");
+        changed |= checkIfChanged && !Objects.equals(automaticDeactivation, user.isAutomaticDeactivation());
+        user.setAutomaticDeactivation(automaticDeactivation);
       }
     }
     if (user instanceof UserImpl && attrs.containsKey(ORIGINATING_STORE)) {
