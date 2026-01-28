@@ -111,6 +111,7 @@
             <forkMode>always</forkMode>
             <includes>
               <include>io/meeds/portal/identity/TestGroupAsMembership.java</include>
+              <include>io/meeds/portal/identity/TestUserAutomaticDeactivation.java</include>
               <include>io/meeds/portal/identity/InheritedMembershipListenerTest.java</include>
               <include>org/exoplatform/services/tck/organization/Test*.java</include>
               <include>org/exoplatform/services/organization/Test*.java</include>
