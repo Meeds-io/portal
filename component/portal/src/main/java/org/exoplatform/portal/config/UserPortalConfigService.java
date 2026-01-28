@@ -730,6 +730,10 @@ public class UserPortalConfigService implements Startable {
       }
       currentDepth++;
     }
+    if (currentDepth > validSiteDepth && currentDepth > validGlobalDepth) {
+      // Page not found in the current site and in the Global site
+      return null;
+    }
     if (globalUserNode != null) {
       if (validSiteDepth >= validGlobalDepth) {
         UserNode result = getNodeOrFirstChildWithPage(siteUserNode, username);
@@ -774,7 +778,7 @@ public class UserPortalConfigService implements Startable {
                     .map(node -> {
                       if (isAccessiblePage(node, username)) {
                         return node;
-                      } else if (CollectionUtils.isNotEmpty(node.getChildren())) {
+                      } else if (StringUtils.isNotBlank(username) && CollectionUtils.isNotEmpty(node.getChildren())) {
                         return getNodeOrFirstChildWithPage(node.getChildren(), username);
                       }
                       return null;
