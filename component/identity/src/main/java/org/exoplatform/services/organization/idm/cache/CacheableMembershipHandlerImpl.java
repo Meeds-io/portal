@@ -19,8 +19,6 @@
 package org.exoplatform.services.organization.idm.cache;
 
 import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;

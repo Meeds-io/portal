@@ -334,5 +334,10 @@
       <set-method>addListenerPlugin</set-method>
       <type>io.meeds.services.organization.listener.IdentityRegistryMembershipListener</type>
     </component-plugin>
+    <component-plugin>
+      <name>InheritedMembershipUpdateListener</name>
+      <set-method>addListenerPlugin</set-method>
+      <type>io.meeds.services.organization.listener.IdentityRegistryInheritedMembershipListener</type>
+    </component-plugin>
   </external-component-plugins>
 </configuration>
