@@ -298,14 +298,6 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
     this.configuration = configuration;
   }
 
-  public void clearGroupCache(Group group) throws Exception{
-    if (organizationCacheHandler != null && (this.configuration == null || this.configuration.isUseCache())) {
-      if (groupDAO_ != null && groupDAO_ instanceof CacheableGroupHandlerImpl) {
-        ((CacheableGroupHandlerImpl) groupDAO_).clearGroupCache(group);
-      }
-    }
-  }
-
   private void initConfiguration(InitParams params) {
     /* Default settings - DB Only */
     this.configuration.setCountPaginatedUsers(true);
