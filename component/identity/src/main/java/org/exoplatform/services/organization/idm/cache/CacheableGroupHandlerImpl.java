@@ -346,13 +346,6 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     }
   }
 
-  public void clearGroupCache(Group group) throws Exception {
-    String groupId = getGroupId(group);
-    // Delete related cache entries
-    groupCache.select(new ClearGroupCacheByGroupIdSelector(groupId, group.getParentId(), useCacheList));
-    membershipCache.select(new ClearMembershipCacheByGroupIdSelector(groupId));
-  }
-
   private void clearNestedMembershipCache(NestedMembership nestedMembership) {
     groupCache.remove(nestedMembership.getGroupId());
     groupCache.remove(computeChildrenKey(nestedMembership.getGroupId()));
