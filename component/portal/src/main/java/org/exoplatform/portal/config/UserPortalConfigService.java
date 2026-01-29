@@ -730,7 +730,7 @@ public class UserPortalConfigService implements Startable {
       }
       currentDepth++;
     }
-    if (currentDepth > validSiteDepth && currentDepth > validGlobalDepth) {
+    if (validSiteDepth == 0 && validGlobalDepth == 0) {
       // Page not found in the current site and in the Global site
       return null;
     }
