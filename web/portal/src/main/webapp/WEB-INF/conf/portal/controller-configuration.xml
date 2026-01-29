@@ -118,6 +118,11 @@
       </init-params>
     </component-plugin>
     <component-plugin>
+      <name>LogoutHandler</name>
+      <set-method>register</set-method>
+      <type>org.exoplatform.web.logout.LogoutHandler</type>
+    </component-plugin>
+    <component-plugin>
       <name>DownloadHandler</name>
       <set-method>register</set-method>
       <type>org.exoplatform.web.handler.DownloadHandler</type>
