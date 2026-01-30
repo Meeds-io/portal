@@ -41,27 +41,30 @@ import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.MembershipTypeHandler;
 import org.exoplatform.services.organization.NestedMembership;
 
+import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
+
 import lombok.SneakyThrows;
 
 public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
-  public static final String       GROUP_LABEL       = "label";
+  public static final String         GROUP_LABEL       = "label";
 
-  public static final String       GROUP_DESCRIPTION = "description";
+  public static final String         GROUP_DESCRIPTION = "description";
 
-  public static final String       NESTED_GROUPS     = "nestedGroups";
+  public static final String         NESTED_GROUPS     = "nestedGroups";
 
-  public static final String       ENCLOSING_GROUPS  = "enclosingGroups";
+  public static final String         ENCLOSING_GROUPS  = "enclosingGroups";
 
-  private List<GroupEventListener> listeners_;
+  private List<GroupEventListener>   listeners_        = new ArrayList<>();
 
-  private static final String      CYCLIC_ID         = "org.gatein.portal.identity.LOOPED_GROUP_ID";
+  private List<GroupDecoratorPlugin> decoratorPlugins  = new ArrayList<>();
 
-  org.picketlink.idm.api.Group     rootGroup         = null;
+  private static final String        CYCLIC_ID         = "org.gatein.portal.identity.LOOPED_GROUP_ID";
+
+  org.picketlink.idm.api.Group       rootGroup         = null;
 
   public GroupDAOImpl(PicketLinkIDMOrganizationServiceImpl orgService, PicketLinkIDMService service) {
     super(orgService, service);
-    listeners_ = new ArrayList<GroupEventListener>();
   }
 
   public void addGroupEventListener(GroupEventListener listener) {
@@ -884,7 +887,11 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       Tools.logMethodOut(log, LogLevel.TRACE, "convertGroup", group);
     }
 
-    return group;
+    Group result = group;
+    for (GroupDecoratorPlugin decoratorPlugin : decoratorPlugins) {
+      result = decoratorPlugin.decorate(result);
+    }
+    return result;
   }
 
   /**
@@ -1235,6 +1242,10 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     } finally {
       orgService.flush();
     }
+  }
+
+  public void addDecoratorPlugin(GroupDecoratorPlugin decoratorPlugin) {
+    decoratorPlugins.add(decoratorPlugin);
   }
 
   @SneakyThrows

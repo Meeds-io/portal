@@ -29,6 +29,9 @@ import java.util.Set;
 
 import javax.naming.InvalidNameException;
 
+import org.picketlink.idm.api.Attribute;
+import org.picketlink.idm.impl.api.SimpleAttribute;
+
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
@@ -37,18 +40,19 @@ import org.exoplatform.services.organization.UserProfileEventListener;
 import org.exoplatform.services.organization.UserProfileHandler;
 import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.impl.UserProfileImpl;
-import org.picketlink.idm.api.Attribute;
-import org.picketlink.idm.impl.api.SimpleAttribute;
+
+import io.meeds.services.organization.plugin.UserProfileDecoratorPlugin;
 
 public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHandler {
 
-    private static final UserProfile       NOT_FOUND = new UserProfileImpl();
+  private static final UserProfile         NOT_FOUND        = new UserProfileImpl();
 
-    private List<UserProfileEventListener> listeners;
+  private List<UserProfileEventListener>   listeners        = new ArrayList<>();
+
+  private List<UserProfileDecoratorPlugin> decoratorPlugins = new ArrayList<>();
 
     public UserProfileDAOImpl(PicketLinkIDMOrganizationServiceImpl orgService, PicketLinkIDMService service) {
         super(orgService, service);
-        listeners = new ArrayList<>();
     }
 
     public void addUserProfileEventListener(UserProfileEventListener listener) {
@@ -176,6 +180,10 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         return profiles;
     }
 
+    public void addDecoratorPlugin(UserProfileDecoratorPlugin decoratorPlugin) {
+      decoratorPlugins.add(decoratorPlugin);
+    }
+
     private void preSave(UserProfile profile, boolean isNew) throws Exception {
         for (UserProfileEventListener listener : listeners) {
             listener.preSave(profile, isNew);
@@ -252,7 +260,9 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         }
 
         UserProfile profile = new UserProfileImpl(userName, filteredAttrs);
-
+        for (UserProfileDecoratorPlugin decoratorPlugin : decoratorPlugins) {
+          profile = decoratorPlugin.decorate(profile);
+        }
         return profile;
 
     }
