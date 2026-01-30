@@ -21,20 +21,38 @@ package org.exoplatform.services.organization.idm;
 import static org.exoplatform.services.organization.idm.EntityMapperUtils.ORIGINATING_STORE;
 
 import java.text.DateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import org.exoplatform.services.log.LogLevel;
-import org.picketlink.idm.api.*;
+import org.picketlink.idm.api.Attribute;
+import org.picketlink.idm.api.AttributesManager;
+import org.picketlink.idm.api.IdentitySession;
 import org.picketlink.idm.api.query.UserQueryBuilder;
 import org.picketlink.idm.impl.api.SimpleAttribute;
 import org.picketlink.idm.impl.api.model.SimpleUser;
 
 import org.exoplatform.commons.utils.LazyPageList;
 import org.exoplatform.commons.utils.ListAccess;
-import org.exoplatform.container.*;
-import org.exoplatform.services.organization.*;
+import org.exoplatform.container.ExoContainer;
+import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.RootContainer;
+import org.exoplatform.services.log.LogLevel;
+import org.exoplatform.services.organization.DisabledUserException;
+import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.Query;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserEventListener;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.externalstore.IDMExternalStoreService;
+
+import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
+import io.meeds.services.organization.plugin.UserDecoratorPlugin;
 
 public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
@@ -66,6 +84,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   public static final Set<String> USER_NON_PROFILE_KEYS;
 
   public static final DateFormat  dateFormat           = DateFormat.getInstance();
+
+  private List<UserDecoratorPlugin> decoratorPlugins           = new ArrayList<>();
 
   static {
     Set<String> keys = new HashSet<String>();
@@ -554,7 +574,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     if (plUser != null) {
       user = new UserImpl(plUser.getId());
-      populateUser(user, session);
+      user = populateUser(user, session);
 
       if (disableUserActived() && !userStatus.matches(user.isEnabled())) {
         user = null;
@@ -826,7 +846,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     }
 
     User user = new UserImpl(u.getId());
-    populateUser(user, session);
+    user = populateUser(user, session);
 
     if (disableUserActived()) {
       return userStatus.matches(user.isEnabled()) ? user : null;
@@ -835,7 +855,11 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     }
   }
 
-  public void populateUser(User user, IdentitySession session) throws Exception {
+  public void addDecoratorPlugin(UserDecoratorPlugin decoratorPlugin) {
+    decoratorPlugins.add(decoratorPlugin);
+  }
+
+  public User populateUser(User user, IdentitySession session) throws Exception {
     AttributesManager am = session.getAttributesManager();
 
     Map<String, Attribute> attrs = null;
@@ -848,12 +872,16 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     }
     if (attrs == null) {
-      return;
+      return user;
     } else {
       EntityMapperUtils.populateUser(user, attrs);
       if (attrs.containsKey(USER_PASSWORD)) {
         user.setPassword(attrs.get(USER_PASSWORD).getValue().toString());
       }
+      for (UserDecoratorPlugin decoratorPlugin : decoratorPlugins) {
+        user = decoratorPlugin.decorate(user);
+      }
+      return user;
     }
   }
 
