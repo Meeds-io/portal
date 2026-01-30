@@ -116,7 +116,7 @@ public class IDMUserListAccess implements ListAccess<User>, Serializable {
             User gtnUser = null;
             if (loadUserAttributes) {
               gtnUser = new UserImpl(user.getId());
-              ((UserDAOImpl) getOrganizationService().getUserHandler()).populateUser(gtnUser, getIDMService().getIdentitySession());
+              gtnUser = ((UserDAOImpl) getOrganizationService().getUserHandler()).populateUser(gtnUser, getIDMService().getIdentitySession());
             } else {
               gtnUser = getOrganizationService().getUserHandler().createUserInstance(user.getId());
             }
