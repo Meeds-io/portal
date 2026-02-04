@@ -58,6 +58,7 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     user.setEmail("test@test.com");
     user.setCreationSource(CREATION_SOURCE);
     userDao.createUser(user, true);
+    restartTransaction();
   }
 
   @Override
