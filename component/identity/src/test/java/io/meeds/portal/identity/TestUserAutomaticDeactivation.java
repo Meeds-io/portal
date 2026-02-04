@@ -48,9 +48,9 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
 
   @Override
   protected void setUp() throws Exception {
-    super.setUp();
     organizationService = getContainer().getComponentInstanceOfType(OrganizationService.class);
     userDao = (UserDAOImpl) organizationService.getUserHandler();
+    begin();
     userName = UUID.randomUUID().toString();
     User user = userDao.createUserInstance(userName);
     user.setFirstName("First Name");
@@ -64,7 +64,7 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   @Override
   protected void tearDown() throws Exception {
     userDao.removeUser(userName, true);
-    super.tearDown();
+    end();
   }
 
   public void testShouldNotDisableUsersWhenNotInactive() {
@@ -82,8 +82,12 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
                                              .atZone(ZoneId.systemDefault())
                                              .toInstant()));
     userDao.saveUser(user, true);
+    restartTransaction();
 
     assertEquals(1, userDao.disableInactiveUsers(5));
+    restartTransaction();
+
+    user = userDao.findUserByName(userName, UserStatus.ANY);
     assertFalse(user.isEnabled());
     assertTrue(user.isAutomaticDeactivation());
 
