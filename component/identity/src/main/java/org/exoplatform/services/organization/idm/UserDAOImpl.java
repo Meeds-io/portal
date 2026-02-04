@@ -26,14 +26,13 @@ import java.text.DateFormat;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.hibernate.Session;
-import org.hibernate.Transaction;
-import org.hibernate.query.NativeQuery;
 import org.picketlink.idm.api.Attribute;
 import org.picketlink.idm.api.AttributesManager;
 import org.picketlink.idm.api.IdentitySession;
@@ -49,7 +48,6 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.RootContainer;
 import org.exoplatform.services.log.LogLevel;
 import org.exoplatform.services.organization.DisabledUserException;
-import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.Query;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserEventListener;
@@ -57,8 +55,8 @@ import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.externalstore.IDMExternalStoreService;
 
-import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
 import io.meeds.services.organization.plugin.UserDecoratorPlugin;
+
 import jakarta.persistence.Tuple;
 
 public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
@@ -94,24 +92,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   private static final String     USER_AUTOMATIC_DEACTIVATION = "automaticDeactivation";
 
   private List<UserDecoratorPlugin> decoratorPlugins           = new ArrayList<>();
-  private static final String     AUTOMATIC_DEACTIVATION_USER_SELECTION_QUERY = """
-     SELECT identity.NAME, lastLoginTimeValue.ATTR_VALUE FROM JBID_IO identity
-     INNER JOIN JBID_IO_ATTR lastLoginTimeAttribute
-       ON lastLoginTimeAttribute.IDENTITY_OBJECT_ID = identity.ID AND lastLoginTimeAttribute.NAME = 'lastLoginTime'
-     INNER JOIN JBID_IO_ATTR_TEXT_VALUES lastLoginTimeValue
-       ON lastLoginTimeAttribute.ATTRIBUTE_ID = lastLoginTimeValue.TEXT_ATTR_VALUE_ID
-     WHERE NOT EXISTS(
-       SELECT identity_tmp.NAME FROM JBID_IO identity_tmp
-       INNER JOIN JBID_IO_ATTR enabledAttribute
-         ON enabledAttribute.IDENTITY_OBJECT_ID = identity_tmp.ID
-         AND enabledAttribute.NAME = 'enabled'
-       INNER JOIN JBID_IO_ATTR_TEXT_VALUES enabledValue
-         ON enabledAttribute.ATTRIBUTE_ID = enabledValue.TEXT_ATTR_VALUE_ID
-         AND enabledValue.ATTR_VALUE = 'false'
-       WHERE identity_tmp.ID = identity.ID
-     )
-     ORDER BY lastLoginTimeValue.ATTR_VALUE DESC
-    """;
 
   static {
     Set<String> keys = new HashSet<>();
@@ -521,7 +501,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       int limit = 100;
       List<Tuple> result;
       do {
-        NativeQuery<Tuple> sqlQuery = session.createNativeQuery(AUTOMATIC_DEACTIVATION_USER_SELECTION_QUERY, Tuple.class);
+        org.hibernate.query.Query<Tuple> sqlQuery = session.createNamedQuery("HibernateIdentityObject.findEnabledIdentitiesSortByLastLoginTime", Tuple.class);
         sqlQuery.setFirstResult(offset);
         sqlQuery.setMaxResults(limit);
         result = sqlQuery.getResultList();
@@ -530,9 +510,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
           .map(t -> t.get(0, String.class))
           .toList();
         int inactiveUsersSize = inactiveUsers.size();
-        if (inactiveUsersSize == 0) {
-          break;
-        }
         for (String userName : inactiveUsers) {
           setEnabled(userName, false, true, true);
         }
@@ -606,16 +583,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     if (q.getFirstName() != null) {
       qb.attributeValuesFilter(USER_FIRST_NAME, new String[] { q.getFirstName() });
     }
-
-    // TODO: from/to login date
-    if (q.getFromLoginDate() != null) {
-      qb.attributeValuesFilter(USER_LAST_LOGIN_TIME, new String[] { "" + q.getFromLoginDate().getTime() });
-    }
-
-    if (q.getToLoginDate() != null) {
-      qb.attributeValuesFilter(USER_LAST_LOGIN_TIME, new String[] { "" + q.getToLoginDate().getTime() });
-    }
-
     if (q.getLastName() != null) {
       qb.attributeValuesFilter(USER_LAST_NAME, new String[] { q.getLastName() });
     }
