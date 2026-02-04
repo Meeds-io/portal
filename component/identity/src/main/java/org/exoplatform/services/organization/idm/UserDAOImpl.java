@@ -23,6 +23,7 @@ import static org.exoplatform.services.organization.idm.EntityMapperUtils.ORIGIN
 import static org.exoplatform.services.organization.idm.EntityMapperUtils.USER_CREATION_SOURCE;
 
 import java.text.DateFormat;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -30,6 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.query.NativeQuery;
 import org.picketlink.idm.api.Attribute;
 import org.picketlink.idm.api.AttributesManager;
 import org.picketlink.idm.api.IdentitySession;
@@ -55,6 +59,7 @@ import org.exoplatform.services.organization.externalstore.IDMExternalStoreServi
 
 import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
 import io.meeds.services.organization.plugin.UserDecoratorPlugin;
+import jakarta.persistence.Tuple;
 
 public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
@@ -89,6 +94,24 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   private static final String     USER_AUTOMATIC_DEACTIVATION = "automaticDeactivation";
 
   private List<UserDecoratorPlugin> decoratorPlugins           = new ArrayList<>();
+  private static final String     AUTOMATIC_DEACTIVATION_USER_SELECTION_QUERY = """
+     SELECT identity.NAME, lastLoginTimeValue.ATTR_VALUE FROM JBID_IO identity
+     INNER JOIN JBID_IO_ATTR lastLoginTimeAttribute
+       ON lastLoginTimeAttribute.IDENTITY_OBJECT_ID = identity.ID AND lastLoginTimeAttribute.NAME = 'lastLoginTime'
+     INNER JOIN JBID_IO_ATTR_TEXT_VALUES lastLoginTimeValue
+       ON lastLoginTimeAttribute.ATTRIBUTE_ID = lastLoginTimeValue.TEXT_ATTR_VALUE_ID
+     WHERE NOT EXISTS(
+       SELECT identity_tmp.NAME FROM JBID_IO identity_tmp
+       INNER JOIN JBID_IO_ATTR enabledAttribute
+         ON enabledAttribute.IDENTITY_OBJECT_ID = identity_tmp.ID
+         AND enabledAttribute.NAME = 'enabled'
+       INNER JOIN JBID_IO_ATTR_TEXT_VALUES enabledValue
+         ON enabledAttribute.ATTRIBUTE_ID = enabledValue.TEXT_ATTR_VALUE_ID
+         AND enabledValue.ATTR_VALUE = 'false'
+       WHERE identity_tmp.ID = identity.ID
+     )
+     ORDER BY lastLoginTimeValue.ATTR_VALUE DESC
+    """;
 
   static {
     Set<String> keys = new HashSet<>();
@@ -222,9 +245,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   public User setEnabled(String userName, boolean enabled, boolean automaticDeactivation, boolean broadcast) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log,
-                        LogLevel.TRACE,
-             "setEnabled",
-                        new Object[] { "userName", userName, "enabled", enabled, "broadcast", broadcast });
+        LogLevel.TRACE,
+        "setEnabled",
+        new Object[] { "userName", userName, "enabled", enabled, "broadcast", broadcast });
     }
 
     IdentitySession session = service_.getIdentitySession();
@@ -372,11 +395,11 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       qb = addEnabledUserFilter(qb);
     }
     return new LazyPageList<User>(new IDMUserListAccess(qb,
-                                                        pageSize,
-                                                        true,
-                                                        countPaginatedUsers(),
-                                                        enabledOnly ? UserStatus.ENABLED : UserStatus.DISABLED),
-                                  pageSize);
+      pageSize,
+      true,
+      countPaginatedUsers(),
+      enabledOnly ? UserStatus.ENABLED : UserStatus.DISABLED),
+      pageSize);
   }
 
   public ListAccess<User> findAllUsers() throws Exception {
@@ -392,18 +415,18 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     UserQueryBuilder qb = service_.getIdentitySession().createUserQueryBuilder();
     if (disableUserActived()) {
       switch (userStatus) {
-      case DISABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addDisabledUserFilter(qb);
-        }
-        break;
-      case ANY:
-        break;
-      case ENABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addEnabledUserFilter(qb);
-        }
-        break;
+        case DISABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addDisabledUserFilter(qb);
+          }
+          break;
+        case ANY:
+          break;
+        case ENABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addEnabledUserFilter(qb);
+          }
+          break;
       }
     }
     return new IDMUserListAccess(qb, 20, !countPaginatedUsers(), countPaginatedUsers(), userStatus);
@@ -491,26 +514,37 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
   @Override
   public int disableInactiveUsers(int inactiveDays) {
-    Query query = new Query();
-    Calendar cal = Calendar.getInstance();
-    cal.add(Calendar.DAY_OF_YEAR, -inactiveDays);
-    Date inactiveDate = cal.getTime();
-    query.setToLoginDate(inactiveDate);
-    try {
-      ListAccess<User> users = findUsersByQuery(query, UserStatus.ENABLED);
-      int pageSize = 100;
+    long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
+    try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
+      int disabledCount = 0;
       int offset = 0;
-      int size = users.getSize();
-      while (offset < size) {
-        int limit = Math.min(pageSize, size - offset);
-        User[] page = users.load(offset, limit);
-        for (User u : page) {
-          String userName = u.getUserName();
+      int limit = 100;
+      List<Tuple> result;
+      do {
+        NativeQuery<Tuple> sqlQuery = session.createNativeQuery(AUTOMATIC_DEACTIVATION_USER_SELECTION_QUERY, Tuple.class);
+        sqlQuery.setFirstResult(offset);
+        sqlQuery.setMaxResults(limit);
+        result = sqlQuery.getResultList();
+        List<String> inactiveUsers = result.stream()
+          .filter(t -> Long.parseLong(t.get(1, String.class)) < sinceTime)
+          .map(t -> t.get(0, String.class))
+          .toList();
+        int inactiveUsersSize = inactiveUsers.size();
+        if (inactiveUsersSize == 0) {
+          break;
+        }
+        for (String userName : inactiveUsers) {
           setEnabled(userName, false, true, true);
         }
+        disabledCount += inactiveUsersSize;
         offset += limit;
-      }
-      return size;
+        if (inactiveUsersSize != result.size()) {
+          // The users who already logged in lately is already reached since the
+          // Results are sorted by lastLoginTime DESC
+          break;
+        }
+      } while (!result.isEmpty());
+      return disabledCount;
     } catch (Exception e) {
       log.error("Error while processing inactive users", e);
       return 0;
@@ -588,18 +622,18 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     if (disableUserActived()) {
       switch (userStatus) {
-      case DISABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addDisabledUserFilter(qb);
-        }
-        break;
-      case ANY:
-        break;
-      case ENABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addEnabledUserFilter(qb);
-        }
-        break;
+        case DISABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addDisabledUserFilter(qb);
+          }
+          break;
+        case ANY:
+          break;
+        case ENABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addEnabledUserFilter(qb);
+          }
+          break;
       }
     }
 
@@ -628,9 +662,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   public User findUserByUniqueAttribute(String attributeName, String attributeValue, UserStatus userStatus) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log,
-                        LogLevel.TRACE,
-                        "findUserByUniqueAttribute",
-                        new Object[] { "findUserByUniqueAttribute", attributeName, attributeValue, userStatus });
+        LogLevel.TRACE,
+        "findUserByUniqueAttribute",
+        new Object[] { "findUserByUniqueAttribute", attributeName, attributeValue, userStatus });
     }
 
     IdentitySession session = service_.getIdentitySession();
@@ -641,7 +675,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       plUser = session.getAttributesManager().findUserByUniqueAttribute(attributeName, attributeValue);
     } catch (Exception e) {
       handleException("Cannot find user by unique attribute: attrName=" + attributeName + ", attrValue=" + attributeValue + "; ",
-                      e);
+        e);
 
     }
 
@@ -763,18 +797,18 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     if (disableUserActived()) {
       switch (userStatus) {
-      case DISABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addDisabledUserFilter(qb);
-        }
-        break;
-      case ANY:
-        break;
-      case ENABLED:
-        if (filterDisabledUsersInQueries()) {
-          qb = addEnabledUserFilter(qb);
-        }
-        break;
+        case DISABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addDisabledUserFilter(qb);
+          }
+          break;
+        case ANY:
+          break;
+        case ENABLED:
+          if (filterDisabledUsersInQueries()) {
+            qb = addEnabledUserFilter(qb);
+          }
+          break;
       }
     }
 
@@ -1024,10 +1058,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // throw the error if the operation shouldn't continue
       throw new IllegalStateException(String.format(LISTENER_EXECUTION_ERR_MSG,
-                                                    "preSave",
-                                                    listener.getClass().getName(),
-                                                    user.getUserName()),
-                                      e);
+        "preSave",
+        listener.getClass().getName(),
+        user.getUserName()),
+        e);
     }
   }
 
@@ -1037,10 +1071,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // Just log the error to not stop event propagation
       log.warn(String.format(LISTENER_EXECUTION_ERR_MSG,
-                             "postSave",
-                             listener.getClass().getName(),
-                             user.getUserName()),
-               e);
+          "postSave",
+          listener.getClass().getName(),
+          user.getUserName()),
+        e);
     }
   }
 
@@ -1050,10 +1084,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // throw the error if the operation shouldn't continue
       throw new IllegalStateException(String.format(LISTENER_EXECUTION_ERR_MSG,
-                                                    "preDelete",
-                                                    listener.getClass().getName(),
-                                                    user.getUserName()),
-                                      e);
+        "preDelete",
+        listener.getClass().getName(),
+        user.getUserName()),
+        e);
     }
   }
 
@@ -1063,10 +1097,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // Just log the error to not stop event propagation
       log.warn(String.format(LISTENER_EXECUTION_ERR_MSG,
-                             "postDelete",
-                             listener.getClass().getName(),
-                             user.getUserName()),
-               e);
+          "postDelete",
+          listener.getClass().getName(),
+          user.getUserName()),
+        e);
     }
   }
 
@@ -1076,10 +1110,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // throw the error if the operation shouldn't continue
       throw new IllegalStateException(String.format(LISTENER_EXECUTION_ERR_MSG,
-                                                    "preSetEnabled",
-                                                    listener.getClass().getName(),
-                                                    user.getUserName()),
-                                      e);
+        "preSetEnabled",
+        listener.getClass().getName(),
+        user.getUserName()),
+        e);
     }
   }
 
@@ -1089,10 +1123,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       // Just log the error to not stop event propagation
       log.warn(String.format(LISTENER_EXECUTION_ERR_MSG,
-                             "postSetEnabled",
-                             listener.getClass().getName(),
-                             user.getUserName()),
-               e);
+          "postSetEnabled",
+          listener.getClass().getName(),
+          user.getUserName()),
+        e);
     }
   }
 
