@@ -18,6 +18,7 @@
  */
 package io.meeds.services.organization.plugin;
 
+import org.exoplatform.services.organization.OrganizationDecoratorPlugin;
 import org.exoplatform.services.organization.UserProfile;
 
 @FunctionalInterface
