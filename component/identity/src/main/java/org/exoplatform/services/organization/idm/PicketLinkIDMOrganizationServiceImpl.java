@@ -23,7 +23,6 @@ import java.util.List;
 
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.services.organization.Group;
 import org.gatein.portal.idm.impl.repository.ExoFallbackIdentityStoreRepository;
 import org.gatein.portal.idm.impl.repository.ExoLegacyFallbackIdentityStoreRepository;
 import org.picketlink.idm.api.Transaction;
@@ -47,7 +46,6 @@ import org.exoplatform.services.organization.idm.cache.CacheableUserHandlerImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserProfileHandlerImpl;
 
 import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
-import io.meeds.services.organization.plugin.OrganizationDecoratorPlugin;
 
 /**
  * OrganizationService implementation using PicketLink
@@ -302,9 +300,13 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
     this.configuration = configuration;
   }
 
-  public void addDecoratorPlugin(OrganizationDecoratorPlugin<?> plugin) throws Exception {
+  @Override
+  public void addDecoratorPlugin(ComponentPlugin plugin) {
     switch (plugin) {
-    case GroupDecoratorPlugin groupDecoratorPlugin -> ((GroupDAOImpl) groupDAO_).addDecoratorPlugin(groupDecoratorPlugin);
+    case GroupDecoratorPlugin groupDecoratorPlugin -> {
+      ((GroupDAOImpl) groupDAO_).addDecoratorPlugin(groupDecoratorPlugin);
+      organizationCacheHandler.getGroupCache().clearCache();
+    }
     default -> throw new IllegalArgumentException("Unexpected plugin class: %s".formatted(plugin));
     };
   }

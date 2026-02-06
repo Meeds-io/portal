@@ -19,6 +19,7 @@
 package io.meeds.services.organization.plugin;
 
 import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.OrganizationDecoratorPlugin;
 
 @FunctionalInterface
 public interface GroupDecoratorPlugin extends OrganizationDecoratorPlugin<Group> {
