@@ -346,7 +346,13 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     }
   }
 
-  public void clearNestedMembershipCache(NestedMembership nestedMembership) {
+  @Override
+  public void clearGroupCache(String groupId) {
+    groupCache.remove(groupId);
+    groupCache.remove(computeChildrenKey(groupId));
+  }
+
+  private void clearNestedMembershipCache(NestedMembership nestedMembership) {
     groupCache.remove(nestedMembership.getGroupId());
     groupCache.remove(computeChildrenKey(nestedMembership.getGroupId()));
     groupCache.remove(nestedMembership.getNestedGroupId());
