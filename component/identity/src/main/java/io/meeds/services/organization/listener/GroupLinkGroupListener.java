@@ -18,29 +18,40 @@
  */
 package io.meeds.services.organization.listener;
 
+import jakarta.annotation.PostConstruct;
 import org.apache.commons.collections.CollectionUtils;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.GroupEventListener;
 import org.exoplatform.services.organization.NestedMembership;
+import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.ConversationRegistry;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class IdentityRegistryInheritedMembershipListener extends GroupEventListener {
+@Component
+public class GroupLinkGroupListener extends GroupEventListener {
 
-  protected static final Log LOG = ExoLogger.getLogger(IdentityRegistryInheritedMembershipListener.class);
+  protected static final Log   LOG = ExoLogger.getLogger(GroupLinkGroupListener.class);
 
-  private final IdentityRegistry    identityRegistry;
+  @Autowired
+  private IdentityRegistry     identityRegistry;
 
-  private final ConversationRegistry conversationRegistry;
+  @Autowired
+  private ConversationRegistry conversationRegistry;
 
-  public IdentityRegistryInheritedMembershipListener(IdentityRegistry identityRegistry, ConversationRegistry conversationRegistry) {
-    this.identityRegistry = identityRegistry;
-    this.conversationRegistry = conversationRegistry;
+  @Autowired
+  private OrganizationService  organizationService;
+
+  @PostConstruct
+  public void setup() {
+    this.organizationService.getGroupHandler().addGroupEventListener(this);
   }
 
   @Override
@@ -58,7 +69,6 @@ public class IdentityRegistryInheritedMembershipListener extends GroupEventListe
     try {
       identities = identityRegistry.getIdentities()
                                    .stream()
-                                   .map(identity -> (Identity) identity)
                                    .filter(identity -> hasMatchingMembership(identity, nestedMembership))
                                    .toList();
     } catch (Exception exception) {
@@ -77,9 +87,10 @@ public class IdentityRegistryInheritedMembershipListener extends GroupEventListe
     if (identity.getMemberships() == null) {
       return false;
     }
-    return identity.getMemberships().stream()
-            .anyMatch(m -> m.getGroup().equals(nestedMembership.getNestedGroupId())
-                    && (nestedMembership.isIncludeAllMembershipTypes()
-                    || m.getMembershipType().equals(nestedMembership.getNestedMembershipType())));
+    return identity.getMemberships()
+                   .stream()
+                   .anyMatch(m -> m.getGroup().equals(nestedMembership.getNestedGroupId())
+                                  && (nestedMembership.isIncludeAllMembershipTypes()
+                                      || m.getMembershipType().equals(nestedMembership.getNestedMembershipType())));
   }
 }
