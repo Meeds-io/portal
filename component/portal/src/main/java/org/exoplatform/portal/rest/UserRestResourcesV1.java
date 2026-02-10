@@ -98,6 +98,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
 
+  public static final String             CREATION_SOURCE_UI             = "ui";
+
   public static final UserFieldValidator USERNAME_VALIDATOR             = new UserFieldValidator("userName", true, false);
 
   public static final UserFieldValidator EMAIL_VALIDATOR                = new UserFieldValidator("email", false, false);
@@ -274,6 +276,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
     user.setFirstName(firstName);
     user.setLastName(lastName);
     user.setPassword(password);
+    user.setCreationSource(CREATION_SOURCE_UI);
     try {
        organizationService.getUserHandler().createUser(user, true);
     } catch (ObjectAlreadyExistsException objectAlreadyExistsException) {

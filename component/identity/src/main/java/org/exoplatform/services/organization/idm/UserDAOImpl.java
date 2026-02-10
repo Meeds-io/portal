@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.Session;
 import org.picketlink.idm.api.Attribute;
 import org.picketlink.idm.api.AttributesManager;
@@ -493,7 +495,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   }
 
   @Override
-  public int disableInactiveUsers(int inactiveDays) {
+  public int disableInactiveUsers(String groupId, int inactiveDays) {
     long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
     try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
       int disabledCount = 0;
@@ -501,19 +503,26 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       int limit = 100;
       List<Tuple> result;
       do {
-        org.hibernate.query.Query<Tuple> sqlQuery = session.createNamedQuery("HibernateIdentityObject.findEnabledIdentitiesSortByLastLoginTime", Tuple.class);
-        sqlQuery.setFirstResult(offset);
-        sqlQuery.setMaxResults(limit);
-        result = sqlQuery.getResultList();
+        result = session.createNamedQuery("HibernateIdentityObject.findEnabledIdentitiesSortByLastLoginTime",
+                                          Tuple.class)
+                        .setFirstResult(offset)
+                        .setMaxResults(limit)
+                        .getResultList();
         List<String> inactiveUsers = result.stream()
-          .filter(t -> Long.parseLong(t.get(1, String.class)) < sinceTime)
-          .map(t -> t.get(0, String.class))
-          .toList();
+                                           .filter(t -> Long.parseLong(t.get(1, String.class)) < sinceTime)
+                                           .map(t -> t.get(0, String.class))
+                                           .toList();
         int inactiveUsersSize = inactiveUsers.size();
         for (String userName : inactiveUsers) {
-          setEnabled(userName, false, true, true);
+          if (CollectionUtils.isEmpty(orgService.getMembershipHandler()
+                                                .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
+              && (StringUtils.isBlank(groupId)
+                  || CollectionUtils.isNotEmpty(orgService.getMembershipHandler()
+                                                          .findMembershipsByUserAndGroup(userName, groupId)))) {
+            setEnabled(userName, false, true, true);
+            disabledCount += 1;
+          }
         }
-        disabledCount += inactiveUsersSize;
         offset += limit;
         if (inactiveUsersSize != result.size()) {
           // The users who already logged in lately is already reached since the
