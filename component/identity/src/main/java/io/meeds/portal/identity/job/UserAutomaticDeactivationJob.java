@@ -15,19 +15,17 @@
  */
 package io.meeds.portal.identity.job;
 
-import io.meeds.common.ContainerTransactional;
-
-import lombok.extern.slf4j.Slf4j;
-
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
-import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.UserHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+
+import org.exoplatform.services.organization.OrganizationService;
+
+import io.meeds.common.ContainerTransactional;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Scheduled job responsible for automatically deactivating inactive users.
@@ -61,13 +59,16 @@ public class UserAutomaticDeactivationJob {
   @Value("${social.user.inactive.period.days:180}")
   private int                 inactiveDays;
 
+  @Value("${social.user.inactive.groupId:}")
+  private String              groupId;
+
   @Scheduled(cron = "${social.UserAutomaticDeactivationJob.expression:0 15 23 ? * *}")
   @ContainerTransactional
   public void deactivateUsersInactive() {
     log.info("Starting automatic user deactivation job (inactiveDays={})", inactiveDays);
     try {
       int deactivatedCount = organizationService.getUserHandler()
-                                                .disableInactiveUsers(inactiveDays);
+                                                .disableInactiveUsers(groupId, inactiveDays);
       if (deactivatedCount != 0) {
         log.info("Automatic user deactivation job finished. {} users disabled",
                  deactivatedCount);
