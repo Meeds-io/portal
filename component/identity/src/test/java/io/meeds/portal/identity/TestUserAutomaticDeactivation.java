@@ -68,7 +68,7 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   }
 
   public void testShouldNotDisableUsersWhenNotInactive() {
-    assertEquals(0, userDao.disableInactiveUsers(5));
+    assertEquals(0, userDao.disableInactiveUsers(null, 5));
   }
 
   @SuppressWarnings("deprecation")
@@ -84,14 +84,14 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     userDao.saveUser(user, true);
     restartTransaction();
 
-    assertEquals(1, userDao.disableInactiveUsers(5));
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
 
     user = userDao.findUserByName(userName, UserStatus.ANY);
     assertFalse(user.isEnabled());
     assertTrue(user.isAutomaticDeactivation());
 
-    assertEquals(0, userDao.disableInactiveUsers(5));
+    assertEquals(0, userDao.disableInactiveUsers(null, 5));
   }
 
 }
