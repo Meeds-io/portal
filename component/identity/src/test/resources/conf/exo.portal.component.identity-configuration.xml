@@ -306,11 +306,6 @@
         <set-method>addListenerPlugin</set-method>
         <type>org.exoplatform.services.organization.impl.MembershipUpdateListener</type>
       </component-plugin>
-      <component-plugin>
-        <name>MembershipUpdateListener</name>
-        <set-method>addListenerPlugin</set-method>
-        <type>io.meeds.services.organization.listener.IdentityRegistryMembershipListener</type>
-      </component-plugin>
     </component-plugins>
   </component>
 
