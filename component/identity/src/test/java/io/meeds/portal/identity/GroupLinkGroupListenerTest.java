@@ -18,15 +18,16 @@
  */
 package io.meeds.portal.identity;
 
-import io.meeds.services.organization.listener.IdentityRegistryInheritedMembershipListener;
+import io.meeds.services.organization.listener.GroupLinkGroupListener;
 import org.exoplatform.services.organization.NestedMembership;
+import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.ConversationRegistry;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityRegistry;
 import org.exoplatform.services.security.MembershipEntry;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import java.util.List;
@@ -36,22 +37,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class InheritedMembershipListenerTest {
+public class GroupLinkGroupListenerTest {
 
   @Mock
-  private IdentityRegistry                            identityRegistry;
+  private IdentityRegistry       identityRegistry;
 
   @Mock
-  private ConversationRegistry                        conversationRegistry;
+  private ConversationRegistry   conversationRegistry;
 
-  private IdentityRegistryInheritedMembershipListener listener;
+  @Mock
+  private OrganizationService    organizationService;
 
-  @Before
-  public void setup() throws Exception {
-    this.listener = new IdentityRegistryInheritedMembershipListener(identityRegistry, conversationRegistry);
-  }
+  @InjectMocks
+  private GroupLinkGroupListener listener;
 
   @Test
+  @SuppressWarnings("deprecation")
   public void shouldUnregisterIdentityWhenMembershipMatches() throws Exception {
     // Given
     String userId = "root";
