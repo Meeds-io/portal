@@ -18,27 +18,23 @@
  */
 package io.meeds.services.organization.listener;
 
-import jakarta.annotation.PostConstruct;
-import org.apache.commons.collections.CollectionUtils;
-import org.exoplatform.services.log.ExoLogger;
-import org.exoplatform.services.log.Log;
+import java.util.concurrent.CompletableFuture;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import org.exoplatform.services.organization.GroupEventListener;
 import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.ConversationRegistry;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityRegistry;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import jakarta.annotation.PostConstruct;
+import lombok.SneakyThrows;
 
 @Component
 public class GroupLinkGroupListener extends GroupEventListener {
-
-  protected static final Log   LOG = ExoLogger.getLogger(GroupLinkGroupListener.class);
 
   @Autowired
   private IdentityRegistry     identityRegistry;
@@ -64,23 +60,13 @@ public class GroupLinkGroupListener extends GroupEventListener {
     CompletableFuture.runAsync(() -> refreshIdentitiesMemberships(nestedMembership));
   }
 
+  @SneakyThrows
   private void refreshIdentitiesMemberships(NestedMembership nestedMembership) {
-    List<Identity> identities = new ArrayList<>();
-    try {
-      identities = identityRegistry.getIdentities()
-                                   .stream()
-                                   .filter(identity -> hasMatchingMembership(identity, nestedMembership))
-                                   .toList();
-    } catch (Exception exception) {
-      LOG.error("Error while fetching cached identities", exception);
-      return;
-    }
-    if (CollectionUtils.isNotEmpty(identities)) {
-      for (Identity identity : identities) {
-        identityRegistry.unregister(identity.getUserId());
-        conversationRegistry.unregisterByUserId(identity.getUserId());
-      }
-    }
+    identityRegistry.getIdentities()
+                    .stream()
+                    .filter(identity -> hasMatchingMembership(identity, nestedMembership))
+                    .map(Identity::getUserId)
+                    .forEach(this::clearIdentityCache);
   }
 
   private boolean hasMatchingMembership(Identity identity, NestedMembership nestedMembership) {
@@ -93,4 +79,10 @@ public class GroupLinkGroupListener extends GroupEventListener {
                                   && (nestedMembership.isIncludeAllMembershipTypes()
                                       || m.getMembershipType().equals(nestedMembership.getNestedMembershipType())));
   }
+
+  private void clearIdentityCache(String userId) {
+    identityRegistry.unregister(userId);
+    conversationRegistry.unregisterByUserId(userId);
+  }
+
 }
