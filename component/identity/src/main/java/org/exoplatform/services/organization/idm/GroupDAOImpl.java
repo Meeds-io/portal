@@ -503,27 +503,9 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     }
 
     if (user == null) {
-      // julien : integration bug
-      // need to look at that later
-      //
-      // Caused by: java.lang.IllegalArgumentException: User name cannot be null
-      // at
-      // org.picketlink.idm.impl.api.session.managers.AbstractManager.checkNotNullArgument(AbstractManager.java:267)
-      // at
-      // org.picketlink.idm.impl.api.session.managers.RelationshipManagerImpl.findRelatedGroups(RelationshipManagerImpl.java:753)
-      // at
-      // org.exoplatform.services.organization.idm.GroupDAOImpl.findGroupsOfUser(GroupDAOImpl.java:225)
-      // at
-      // org.exoplatform.organization.webui.component.GroupManagement.isMemberOfGroup(GroupManagement.java:72)
-      // at
-      // org.exoplatform.organization.webui.component.GroupManagement.isAdministrator(GroupManagement.java:125)
-      // at
-      // org.exoplatform.organization.webui.component.UIGroupExplorer.<init>(UIGroupExplorer.java:57)
-
       if (log.isTraceEnabled()) {
         Tools.logMethodOut(log, LogLevel.TRACE, "findGroupsOfUser", Collections.emptyList());
       }
-
       return Collections.emptyList();
     }
 
@@ -819,12 +801,10 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       Tools.logMethodIn(log, LogLevel.TRACE, "convertGroup", new Object[] { "jbidGroup", jbidGroup });
     }
 
-    Map<String, Attribute> attrs = new HashMap<String, Attribute>();
-
+    Map<String, Attribute> attrs = new HashMap<>();
     try {
       attrs = getIdentitySession().getAttributesManager().getAttributes(jbidGroup);
     } catch (Exception e) {
-      // TODO:
       handleException("Identity operation error: ", e);
     }
 
@@ -864,15 +844,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       group.setParentId(id.substring(0, id.lastIndexOf("/")));
     }
 
-    if (attrs.containsKey(NESTED_GROUPS) && attrs.get(NESTED_GROUPS).getValue() != null) {
-      Set<NestedMembership> nestedMemberships = attrs.get(NESTED_GROUPS)
-                                                     .getValues()
-                                                     .stream()
-                                                     .map(String::valueOf)
-                                                     .map(m -> NestedMembership.parseNestedMembership(m, id))
-                                                     .collect(Collectors.toSet());
-      group.setNestedMemberships(nestedMemberships);
-    }
     if (attrs.containsKey(ENCLOSING_GROUPS) && attrs.get(ENCLOSING_GROUPS).getValue() != null) {
       Set<NestedMembership> enclosingMemberships = attrs.get(ENCLOSING_GROUPS)
                                                         .getValues()
@@ -892,6 +863,29 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       result = decoratorPlugin.decorate(result);
     }
     return result;
+  }
+
+  @Override
+  public Set<NestedMembership> getNestedMemberships(String groupId) {
+    try {
+      org.picketlink.idm.api.Group jbidGroup = orgService.getJBIDMGroup(groupId);
+      if (jbidGroup != null) {
+        Map<String, Attribute> attrs = getIdentitySession().getAttributesManager().getAttributes(jbidGroup);
+        if (attrs != null
+            && attrs.containsKey(NESTED_GROUPS)
+            && attrs.get(NESTED_GROUPS).getValue() != null) {
+          return attrs.get(NESTED_GROUPS)
+                      .getValues()
+                      .stream()
+                      .map(String::valueOf)
+                      .map(m -> NestedMembership.parseNestedMembership(m, groupId))
+                      .collect(Collectors.toSet());
+        }
+      }
+    } catch (Exception e) {
+      handleException("Identity operation error: ", e);
+    }
+    return Collections.emptySet();
   }
 
   /**
@@ -1171,12 +1165,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         throw new IllegalStateException("A circular dependency has been detected between groups '%s' and '%s'".formatted(enclosingGroupId,
                                                                                                                          nestedGroupId));
       }
-      Set<NestedMembership> nestedMemberships = parentGroup.getNestedMemberships();
-      if (nestedMemberships == null) {
-        nestedMemberships = new HashSet<>();
-      } else {
-        nestedMemberships = new HashSet<>(nestedMemberships);
-      }
+      Set<NestedMembership> existingNestedMemberships = getNestedMemberships(enclosingGroupId);
+      Set<NestedMembership> nestedMemberships = new HashSet<>(existingNestedMemberships);
       Set<NestedMembership> enclosingMemberships = nestedGroup.getEnclosingMemberships();
       if (enclosingMemberships == null) {
         enclosingMemberships = new HashSet<>();
@@ -1218,9 +1208,9 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       boolean updated = false;
       Group parentGroup = findGroupById(nestedMembership.getGroupId());
       if (parentGroup != null) {
-        Set<NestedMembership> nestedMemberships = parentGroup.getNestedMemberships();
-        if (nestedMemberships != null && nestedMemberships.contains(nestedMembership)) {
-          nestedMemberships = new HashSet<>(nestedMemberships);
+        Set<NestedMembership> existingNestedMemberships = getNestedMemberships(nestedMembership.getGroupId());
+        Set<NestedMembership> nestedMemberships = new HashSet<>(existingNestedMemberships);
+        if (nestedMemberships.contains(nestedMembership)) {
           nestedMemberships.remove(nestedMembership);
           updateEnclosingMembershipAttributes(nestedMembership.getGroupId(), nestedMemberships);
           updated = true;
@@ -1250,9 +1240,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
   @SneakyThrows
   private boolean isNestedIn(String parentGroupId, String memberGroupId) {
-    Group group = findGroupById(memberGroupId);
-    Set<NestedMembership> nestedMemberships = group == null ? null : group.getNestedMemberships();
-    if (group == null || CollectionUtils.isEmpty(nestedMemberships)) {
+    Set<NestedMembership> nestedMemberships = getNestedMemberships(memberGroupId);
+    if (CollectionUtils.isEmpty(nestedMemberships)) {
       return false;
     } else {
       return nestedMemberships.stream()
