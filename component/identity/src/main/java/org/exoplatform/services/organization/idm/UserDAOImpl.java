@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.meeds.core.organization.util.UserModificationSource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.Session;
@@ -497,6 +498,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   @Override
   public int disableInactiveUsers(String groupId, int inactiveDays) {
     long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
+    UserModificationSource.setSource(USER_AUTOMATIC_DEACTIVATION);
     try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
       int disabledCount = 0;
       int offset = 0;
@@ -534,6 +536,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } catch (Exception e) {
       log.error("Error while processing inactive users", e);
       return 0;
+    } finally {
+      UserModificationSource.clear();
     }
   }
 
