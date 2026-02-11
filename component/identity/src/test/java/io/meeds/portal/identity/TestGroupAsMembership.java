@@ -23,6 +23,8 @@ import static org.junit.Assert.assertThrows;
 import java.util.Collection;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
+
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
@@ -82,7 +84,7 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                                         .build());
 
     // Then
-    Set<NestedMembership> updatedNestedMemberships = groupDao.findGroupById(parentGroup.getId()).getNestedMemberships();
+    Set<NestedMembership> updatedNestedMemberships = groupDao.getNestedMemberships(parentGroup.getId());
     assertNotNull(updatedNestedMemberships);
     assertTrue(updatedNestedMemberships.stream().anyMatch(m -> m.getNestedGroupId().equals(nestedGroup.getId())));
     assertTrue(updatedNestedMemberships.stream()
@@ -98,7 +100,7 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                                           .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())
                                                          && m.isIncludeAllMembershipTypes()
                                                          && m.isInheritMembershipType()));
-    assertNull(groupDao.findGroupById(nestedGroup.getId()).getNestedMemberships());
+    assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(nestedGroup.getId())));
 
     memberships = membershipDao.findMembershipsByUser("root", true);
     assertTrue(memberships.stream()
