@@ -45,6 +45,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.SequenceGenerator;
@@ -70,6 +71,21 @@ import lombok.Data;
     name = "HibernateIdentityObject.countIdentityObjectsByType",
     query = "SELECT count(o.id) FROM HibernateIdentityObject o" + " WHERE o.realm.name = :realmName" +
         " AND o.identityType.name = :typeName")
+@NamedNativeQuery(name = "HibernateIdentityObject.findEnabledIdentitiesSortByLastLoginTime", query = """
+    SELECT identity.NAME, lastLoginTimeValue.ATTR_VALUE FROM jbid_io identity
+    INNER JOIN jbid_io_attr lastLoginTimeAttribute
+      ON lastLoginTimeAttribute.IDENTITY_OBJECT_ID = identity.ID AND lastLoginTimeAttribute.NAME = 'lastLoginTime'
+    INNER JOIN jbid_io_attr_text_values lastLoginTimeValue
+      ON lastLoginTimeAttribute.ATTRIBUTE_ID = lastLoginTimeValue.TEXT_ATTR_VALUE_ID
+    WHERE NOT EXISTS(
+      SELECT enabledAttribute.IDENTITY_OBJECT_ID FROM jbid_io_attr enabledAttribute
+      INNER JOIN jbid_io_attr_text_values enabledValue
+        ON enabledAttribute.ATTRIBUTE_ID = enabledValue.TEXT_ATTR_VALUE_ID
+        AND enabledValue.ATTR_VALUE = 'false'
+      WHERE enabledAttribute.IDENTITY_OBJECT_ID = identity.ID AND enabledAttribute.NAME = 'enabled'
+    )
+    ORDER BY lastLoginTimeValue.ATTR_VALUE DESC
+    """)
 @Data
 public class HibernateIdentityObject implements IdentityObject {
 
