@@ -32,6 +32,7 @@ import org.picketlink.idm.spi.configuration.metadata.IdentityStoreMappingMetaDat
 import org.picocontainer.Startable;
 
 import org.exoplatform.container.ExoContainer;
+import org.exoplatform.container.component.ComponentPlugin;
 import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.container.xml.InitParams;
@@ -43,6 +44,10 @@ import org.exoplatform.services.organization.idm.cache.CacheableMembershipHandle
 import org.exoplatform.services.organization.idm.cache.CacheableMembershipTypeHandlerImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserHandlerImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserProfileHandlerImpl;
+
+import io.meeds.services.organization.plugin.GroupDecoratorPlugin;
+import io.meeds.services.organization.plugin.UserDecoratorPlugin;
+import io.meeds.services.organization.plugin.UserProfileDecoratorPlugin;
 
 /**
  * OrganizationService implementation using PicketLink
@@ -295,6 +300,25 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
 
   public void setConfiguration(Config configuration) {
     this.configuration = configuration;
+  }
+
+  @Override
+  public void addDecoratorPlugin(ComponentPlugin plugin) {
+    switch (plugin) {
+    case GroupDecoratorPlugin groupDecoratorPlugin -> {
+      ((GroupDAOImpl) groupDAO_).addDecoratorPlugin(groupDecoratorPlugin);
+      organizationCacheHandler.getGroupCache().clearCache();
+    }
+    case UserDecoratorPlugin userDecoratorPlugin -> {
+      ((UserDAOImpl) userDAO_).addDecoratorPlugin(userDecoratorPlugin);
+      organizationCacheHandler.getUserCache().clearCache();
+    }
+    case UserProfileDecoratorPlugin userProfileDecoratorPlugin -> {
+      ((UserProfileDAOImpl) userDAO_).addDecoratorPlugin(userProfileDecoratorPlugin);
+      organizationCacheHandler.getUserProfileCache().clearCache();
+    }
+    default -> throw new IllegalArgumentException("Unexpected plugin class: %s".formatted(plugin));
+    }
   }
 
   private void initConfiguration(InitParams params) {
