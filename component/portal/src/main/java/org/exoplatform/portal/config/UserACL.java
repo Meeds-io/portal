@@ -36,6 +36,8 @@ import org.exoplatform.container.xml.ValuesParam;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.page.PageContext;
+import org.exoplatform.services.cache.CacheService;
+import org.exoplatform.services.cache.future.FutureExoCache;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.Authenticator;
@@ -53,6 +55,8 @@ import lombok.SneakyThrows;
 public class UserACL {
 
   public static final String                 EVERYONE               = "Everyone";
+
+  private static final String                CACHE_NAME             = "portal.IdentityRegistry";
 
   @Getter
   private String                             superUser;
@@ -86,9 +90,13 @@ public class UserACL {
 
   private Authenticator                      authenticator;
 
+  private CacheService                       cacheService;
+
   private IdentityRegistry                   identityRegistry;
 
-  public UserACL(InitParams params) {
+  private FutureExoCache<String, Identity, Object> futureIdentitiesCache;
+
+  public UserACL(InitParams params) { // NOSONAR
     ValuesParam mandatoryGroupsParam = params.getValuesParam("mandatory.groups");
     if (mandatoryGroupsParam != null) {
       mandatoryGroups = mandatoryGroupsParam.getValues();
@@ -141,6 +149,13 @@ public class UserACL {
       allGroups = md.getPortalCreateGroups();
     }
     portalCreatorGroups = defragmentPermission(allGroups);
+    futureIdentitiesCache = new FutureExoCache<>((c, k) -> {
+      Identity identity = getAuthenticator().createIdentity(k);
+      if (identity != null) {
+        getIdentityRegistry().register(identity);
+      }
+      return identity;
+    }, getCacheService().getCacheInstance(CACHE_NAME));
   }
 
   public void addGroupVisibilityPlugin(GroupVisibilityPlugin plugin) {
@@ -164,13 +179,9 @@ public class UserACL {
   public Identity getUserIdentity(String username) {
     if (StringUtils.isBlank(username) || IdentityConstants.ANONIM.equals(username)) {
       return null;
+    } else {
+      return futureIdentitiesCache.get(null, username);
     }
-    Identity identity = getIdentityRegistry().getIdentity(username);
-    if (identity == null) {
-      identity = getAuthenticator().createIdentity(username);
-      identityRegistry.register(identity);
-    }
-    return identity;
   }
 
   /**
@@ -492,6 +503,13 @@ public class UserACL {
       authenticator = ExoContainerContext.getService(Authenticator.class);
     }
     return authenticator;
+  }
+
+  public CacheService getCacheService() {
+    if (cacheService == null) {
+      cacheService = ExoContainerContext.getService(CacheService.class);
+    }
+    return cacheService;
   }
 
   public IdentityRegistry getIdentityRegistry() {
