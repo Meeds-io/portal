@@ -18,19 +18,19 @@
  */
 package org.exoplatform.web.logout;
 
-import jakarta.servlet.ServletConfig;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.StringUtils;
+import org.gatein.wci.ServletContainerFactory;
+
 import org.exoplatform.web.ControllerContext;
-import org.exoplatform.web.WebAppController;
 import org.exoplatform.web.WebRequestHandler;
 import org.exoplatform.web.login.LoginUtils;
 import org.exoplatform.web.login.LogoutControl;
-import org.exoplatform.web.security.PortalToken;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
-import org.gatein.wci.ServletContainerFactory;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class LogoutHandler extends WebRequestHandler {
 
@@ -45,51 +45,48 @@ public class LogoutHandler extends WebRequestHandler {
   }
 
   @Override
-  public void onInit(WebAppController controller, ServletConfig servletConfig) {
-
-  }
-
-  @Override
   public boolean execute(ControllerContext context) throws Exception { // NOSONAR
     HttpServletRequest request = context.getRequest();
     HttpServletResponse response = context.getResponse();
 
-    // Delete the token from store
-    String token = getTokenCookie(request);
-    if (token != null) {
-      AbstractTokenService<PortalToken, String> tokenService = AbstractTokenService.getInstance(CookieTokenService.class);
-      tokenService.deleteToken(token);
+    deleteRememberMeCookie(request, response);
+
+    if (StringUtils.isNotBlank(request.getRemoteUser())) {
+      logout(request, response);
     }
 
-    LogoutControl.wantLogout();
-
-    ServletContainerFactory.getServletContainer().logout(request, response);
-
-
-
-    Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-    cookie.setPath(request.getContextPath());
-    cookie.setMaxAge(0);
-    response.addCookie(cookie);
-
     response.sendRedirect("/");
-
-
-
     return true;
   }
 
-private String getTokenCookie(HttpServletRequest req) {
-  Cookie[] cookies = req.getCookies();
-  if (cookies != null) {
-    for (Cookie cookie : cookies) {
-      if (LoginUtils.COOKIE_NAME.equals(cookie.getName())) {
-        return cookie.getValue();
-      }
+  private void logout(HttpServletRequest request, HttpServletResponse response) {
+    LogoutControl.wantLogout();
+    ServletContainerFactory.getServletContainer().logout(request, response);
+  }
+
+  private void deleteRememberMeCookie(HttpServletRequest request, HttpServletResponse response) {
+    String token = getTokenCookie(request);
+    if (token != null) {
+      AbstractTokenService.getInstance(CookieTokenService.class)
+                          .deleteToken(token);
+
+      Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
+      cookie.setPath(request.getContextPath());
+      cookie.setMaxAge(0);
+      response.addCookie(cookie);
     }
   }
-  return null;
-}
 
+  private String getTokenCookie(HttpServletRequest req) {
+    Cookie[] cookies = req.getCookies();
+    if (cookies != null) {
+      for (Cookie cookie : cookies) {
+        if (LoginUtils.COOKIE_NAME.equals(cookie.getName())) {
+          return cookie.getValue();
+        }
+      }
+    }
+    return null;
+  }
 
 }
