@@ -27,6 +27,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -283,24 +285,42 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
                                           StringBuilder url,
                                           boolean spaceInvitation) throws Exception {
 
+    return sendExternalRegisterEmail(sender, email, locale, space, url, spaceInvitation, null);
+  }
+
+  @Override
+  public String sendExternalRegisterEmail(String sender,
+                                          String email,
+                                          Locale locale,
+                                          String space,
+                                          StringBuilder url,
+                                          boolean spaceInvitation,
+                                          String initialUri) throws Exception {
+
     ResourceBundle bundle = bundleService.getResourceBundle(bundleService.getSharedResourceBundleNames(), locale);
 
     String token = createToken(email);
 
     StringBuilder redirectUrl = new StringBuilder();
     redirectUrl.append(url);
-    redirectUrl.append("/" + EXTERNAL_REGISTRATION_NAME);
-    redirectUrl.append("?lang=" + I18N.toTagIdentifier(locale));
-    redirectUrl.append("&token=" + token);
+    redirectUrl.append("/").append(EXTERNAL_REGISTRATION_NAME);
+    redirectUrl.append("?lang=").append(I18N.toTagIdentifier(locale));
+    redirectUrl.append("&token=").append(token);
+
+    if (initialUri != null && !initialUri.isBlank() && initialUri.startsWith("/")) {
+      redirectUrl.append("&initialURI=")
+                 .append(URLEncoder.encode(initialUri, StandardCharsets.UTF_8));
+    }
 
     String emailBody;
     String emailSubject;
+
     if (spaceInvitation) {
       UserHandler uHandler = orgService.getUserHandler();
       String senderFullName = uHandler.findUserByName(sender).getDisplayName();
       emailBody = buildExternalEmailBody(senderFullName, space, redirectUrl.toString(), bundle);
       emailSubject = bundle.getString("external.email.subject") + " " + (space != null ? space : "")
-          + " " + bundle.getString("external.email.on") + " " + brandingService.getCompanyName() ;
+          + " " + bundle.getString("external.email.on") + " " + brandingService.getCompanyName();
     } else {
       emailBody = buildOnboardingEmailBody(null, bundle, redirectUrl.toString());
       emailSubject = bundle.getString("onboarding.email.header") + " " + brandingService.getCompanyName();
@@ -318,7 +338,9 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     message.setSubject(emailSubject);
     message.setBody(emailBody);
     message.setMimeType("text/html");
+
     mailService.sendMessage(message);
+
     return token;
   }
 
