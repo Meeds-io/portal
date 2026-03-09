@@ -101,4 +101,13 @@ public interface PasswordRecoveryService {
    */
   boolean sendAccountVerificationEmail(String data, String username, String firstName, String lastName, String email, Locale locale, StringBuilder url);
 
+  default String sendExternalRegisterEmail(String sender,
+                                           String email,
+                                           Locale locale,
+                                           String space,
+                                           StringBuilder url,
+                                           boolean spaceInvitation,
+                                           String initialUri) throws Exception {
+    throw new UnsupportedOperationException();
+  }
 }
