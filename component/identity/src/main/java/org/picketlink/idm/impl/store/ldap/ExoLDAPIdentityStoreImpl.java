@@ -653,10 +653,9 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
               identityObjectAttribute.addValue(value);
             }
           }
-        } else{
+        } else {
           // mapped attribute exists in configuration but not set for user in LDAP
           identityObjectAttribute.addValue(null);
-          log.info("Mapped attribute '" + attrName + "' exists in configuration but is not set for user: " + dn);
         }
         attrsMap.put(name, identityObjectAttribute);
       }
