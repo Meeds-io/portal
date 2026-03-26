@@ -6,6 +6,9 @@
   jsManager
     .require("SHARED/topbarLoading", "topbarLoading")
     .addScripts("topbarLoading.init()");
+  jsManager
+    .require("SHARED/commonVueComponents")
+    .addScripts("Vue.prototype.\$utils.includeExtensions('BaseExtension')");
   uicomponent.renderChildren();
   uicomponent.includePortletScripts();
 %></div><%
