@@ -628,20 +628,17 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
       Name jndiName = new CompositeName().add(dn);
       Attributes attrs = ldapContext.getAttributes(jndiName);
 
-      for (Iterator<String> iterator = mappedNames.iterator(); iterator.hasNext();)
-      {
-        String name = iterator.next();
+      for (String name : mappedNames) {
         String attrName = getTypeConfiguration(ctx, identity.getIdentityType()).getAttributeMapping(name);
         Attribute attr = attrs.get(attrName);
 
+        IdentityObjectAttribute identityObjectAttribute;
+        if (attrsMap.containsKey(name)) {
+          identityObjectAttribute = attrsMap.get(name);
+        } else {
+          identityObjectAttribute = new SimpleAttribute(name);
+        }
         if (attr != null) {
-          IdentityObjectAttribute identityObjectAttribute;
-          if(attrsMap.containsKey(name)) {
-            identityObjectAttribute = attrsMap.get(name);
-          } else {
-            identityObjectAttribute = new SimpleAttribute(name);
-          }
-          
           NamingEnumeration<?> values = attr.getAll();
 
           while (values.hasMoreElements()) {
@@ -650,16 +647,17 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
             // check if the value is the DN of another identity type
             IdentityObject identityObject = findIdentityObject(ctx, value);
             // If it is an identity object, let's add its ID
-            if(identityObject != null) {
+            if (identityObject != null) {
               identityObjectAttribute.addValue(identityObject.getName());
             } else { // Otherwise, we add the String value as is
               identityObjectAttribute.addValue(value);
             }
           }
-          attrsMap.put(name, identityObjectAttribute);
         } else {
-          log.fine("No such attribute ('" + attrName + "') in entry: " + dn);
+          // mapped attribute exists in configuration but not set for user in LDAP
+          identityObjectAttribute.addValue(null);
         }
+        attrsMap.put(name, identityObjectAttribute);
       }
     }
     catch (NamingException e)
