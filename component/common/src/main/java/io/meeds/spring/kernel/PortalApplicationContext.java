@@ -22,11 +22,9 @@ import static io.meeds.spring.kernel.KernelContainerLifecyclePlugin.addSpringCon
 
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext;
 
@@ -64,12 +62,12 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
     if (async) {
       addSpringContext(servletContext.getServletContextName(),
                        this,
-                       (BeanDefinitionRegistry) beanFactory,
+                       beanFactory,
                        () -> finishSpringContextStartupAsync(beanFactory));
     } else {
       addSpringContext(servletContext.getServletContextName(),
                        this,
-                       (BeanDefinitionRegistry) beanFactory,
+                       beanFactory,
                        () -> finishSpringContextStartup(beanFactory));
     }
   }
@@ -110,9 +108,8 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
                servletContext.getServletContextName(),
                System.currentTimeMillis() - start);
     } catch (Exception e) {
-      throw new IllegalStateException(String.format("Error While finishing Beans Initialization in context '%s' with Bean names [%s] (May be related to issue Meeds-io/meeds#2469)",
-                                                    servletContext.getServletContextName(),
-                                                    StringUtils.join(beanFactory.getBeanDefinitionNames(), " , ")),
+      throw new IllegalStateException(String.format("Error While finishing Beans Initialization in context '%s'",
+                                                    servletContext.getServletContextName()),
                                       e);
     }
   }
