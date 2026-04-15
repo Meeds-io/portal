@@ -71,6 +71,7 @@ public class PortalAuthenticationManager implements AuthenticationProvider {
     try {
       Identity identity = getCurrentIdentity(request);
       if (isAnonymousUser(identity)
+          && authentication != null
           && authentication.getPrincipal() instanceof String username) {
         identity = getCurrentIdentity(request, username);
       }
