@@ -246,6 +246,11 @@ public class InMemoryGroupHandler implements GroupHandler {
                                      .toList();
   }
 
+  @Override
+  public void clearGroupCache(String groupId) {
+    // Nothing to do
+  }
+
   private void preSave(Group group, boolean isNew) {
     for (GroupEventListener listener : groupListeners) {
       try {
