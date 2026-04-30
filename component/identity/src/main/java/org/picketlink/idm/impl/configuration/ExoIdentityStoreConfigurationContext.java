@@ -101,7 +101,7 @@ public class ExoIdentityStoreConfigurationContext implements IdentityStoreConfig
     // Add custom attributes
     String customNamesPropertyName = LDAP_USERS_ATTRIBUTES_NAMES_PROP;
     String attributesPropertyPrefix = LDAP_USERS_ATTRIBUTES_PROPS_PREFIX;
-    if("GROUP".equals(supportedIdentityType.getName())) {
+    if("GROUP".equals(supportedIdentityType.getName()) || "LDAP_MAPPED_GROUP".equals(supportedIdentityType.getName())) {
       customNamesPropertyName = LDAP_GROUPS_ATTRIBUTES_NAMES_PROP;
       attributesPropertyPrefix = LDAP_GROUPS_ATTRIBUTES_PROPS_PREFIX;
     }
