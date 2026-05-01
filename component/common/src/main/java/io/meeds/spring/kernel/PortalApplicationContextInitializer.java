@@ -44,6 +44,7 @@ public abstract class PortalApplicationContextInitializer extends SpringBootServ
     // Used to disable LogBack initialization in WebApp context after having
     // initialized it already in Meeds Server globally
     System.setProperty("org.springframework.boot.logging.LoggingSystem", "none");
+    System.setProperty("spring.quartz.auto-startup", "false");
 
     this.servletContext = servletContext;
     this.servletContext.setInitParameter("spring.profiles.active", StringUtils.join(ExoContainer.getProfiles(), ","));

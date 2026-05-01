@@ -21,6 +21,8 @@ package io.meeds.spring.kernel;
 import org.quartz.Scheduler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 import org.exoplatform.services.scheduler.impl.QuartzSheduler;
 
@@ -32,6 +34,33 @@ import org.exoplatform.services.scheduler.impl.QuartzSheduler;
 public class QuartzConfiguration {
 
   @Bean
+  @Primary
+  public SchedulerFactoryBean quartzSchedulerFactoryBean(QuartzSheduler quartzSheduler) {
+    return new SchedulerFactoryBean() {
+      @Override
+      public Scheduler getScheduler() {
+        return quartzSheduler.getQuartzSheduler();
+      }
+
+      @Override
+      public void afterPropertiesSet() {
+        // no new Quartz scheduler creation
+      }
+
+      @Override
+      public void start() {
+        // Kernel owns startup
+      }
+
+      @Override
+      public void destroy() {
+        // Kernel owns shutdown
+      }
+    };
+  }
+
+  @Bean
+  @Primary
   public Scheduler scheduler(QuartzSheduler quartzSheduler) {
     return quartzSheduler.getQuartzSheduler();
   }
