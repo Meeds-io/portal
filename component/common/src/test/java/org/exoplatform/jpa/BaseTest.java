@@ -22,14 +22,14 @@ import org.exoplatform.commons.testing.BaseTestCase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-/**
- * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
- */
-public abstract class BaseTest extends BaseTestCase {
+public abstract class BaseTest extends BaseTestCase { // NOSONAR
+
+  @Override
   public void setUp() {
     begin();
   }
 
+  @Override
   protected void tearDown() {
     end();
   }
@@ -37,7 +37,7 @@ public abstract class BaseTest extends BaseTestCase {
   @BeforeClass
   @Override
   protected void beforeRunBare() {
-    if(System.getProperty("gatein.test.output.path") == null) {
+    if (System.getProperty("gatein.test.output.path") == null) {
       System.setProperty("gatein.test.output.path", System.getProperty("java.io.tmpdir"));
     }
     super.beforeRunBare();
@@ -49,7 +49,9 @@ public abstract class BaseTest extends BaseTestCase {
     super.afterRunBare();
   }
 
+  @Override
   public <T> T getService(Class<T> clazz) {
-    return (T) getContainer().getComponentInstanceOfType(clazz);
+    return getContainer().getComponentInstanceOfType(clazz);
   }
+
 }

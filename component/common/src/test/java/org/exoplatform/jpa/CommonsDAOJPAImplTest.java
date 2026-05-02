@@ -18,6 +18,16 @@
  */
 package org.exoplatform.jpa;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
+
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
@@ -28,15 +38,8 @@ import org.exoplatform.settings.jpa.SettingsDAO;
 import io.meeds.kernel.test.KernelExtension;
 import io.meeds.spring.AvailableIntegration;
 import io.meeds.spring.kernel.KernelCacheConfiguration;
-
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import io.meeds.spring.kernel.KernelElasticsearchConfiguration;
+import io.meeds.spring.kernel.KernelQuartzConfiguration;
 
 @ExtendWith({ SpringExtension.class, KernelExtension.class })
 @SpringBootApplication(scanBasePackages = {
@@ -46,7 +49,12 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
   AvailableIntegration.LIQUIBASE_MODULE,
 })
 @EnableJpaRepositories(basePackages = CommonsDAOJPAImplTest.MODULE_NAME)
-@ContextConfiguration(classes = { KernelCacheConfiguration.class })
+@EnableElasticsearchRepositories(basePackages = CommonsDAOJPAImplTest.MODULE_NAME)
+@ContextConfiguration(classes = {
+  KernelElasticsearchConfiguration.class,
+  KernelCacheConfiguration.class,
+  KernelQuartzConfiguration.class,
+})
 @TestPropertySource(properties = {
   "spring.liquibase.change-log=" + CommonsDAOJPAImplTest.CHANGELOG_PATH,
 })
@@ -61,11 +69,11 @@ public class CommonsDAOJPAImplTest extends BaseTest { // NOSONAR
 
   protected static final String CHANGELOG_PATH = "classpath:db/changelog/test-rdbms.db.changelog.xml";
 
-  protected SettingContextDAO settingContextDAO;
+  protected SettingContextDAO   settingContextDAO;
 
-  protected SettingScopeDAO   settingScopeDAO;
+  protected SettingScopeDAO     settingScopeDAO;
 
-  protected SettingsDAO       settingsDAO;
+  protected SettingsDAO         settingsDAO;
 
   @Override
   public void setUp() {

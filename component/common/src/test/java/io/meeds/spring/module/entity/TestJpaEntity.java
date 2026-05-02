@@ -36,7 +36,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TestEntity implements Serializable {
+public class TestJpaEntity implements Serializable {
 
   private static final long serialVersionUID = -1657319966260461019L;
 

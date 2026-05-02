@@ -18,23 +18,24 @@
  */
 package io.meeds.spring.module.storage;
 
-import static io.meeds.spring.module.mapper.EntityMapper.*;
+import static io.meeds.spring.module.mapper.EntityMapper.fromEntity;
+import static io.meeds.spring.module.mapper.EntityMapper.toEntity;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import io.meeds.spring.module.dao.TestDao;
-import io.meeds.spring.module.entity.TestEntity;
+import io.meeds.spring.module.dao.TestJpaDao;
+import io.meeds.spring.module.entity.TestJpaEntity;
 import io.meeds.spring.module.model.TestModel;
 
 @Component
 public class TestStorage {
 
   @Autowired
-  private TestDao dao;
+  private TestJpaDao dao;
 
   public TestModel save(TestModel model) {
-    TestEntity entity = toEntity(model);
+    TestJpaEntity entity = toEntity(model);
     entity = dao.save(entity);
     return fromEntity(entity);
   }

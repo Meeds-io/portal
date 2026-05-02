@@ -26,4 +26,8 @@
       <type>org.exoplatform.jpa.mock.MockEntityManagerService</type>
   </component>
 
+  <component>
+    <type>org.exoplatform.services.scheduler.impl.QuartzSheduler</type>
+  </component>
+
 </configuration>

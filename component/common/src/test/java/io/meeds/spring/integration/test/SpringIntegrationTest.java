@@ -25,8 +25,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.jpa.CommonsDAOJPAImplTest;
 
-import io.meeds.spring.module.dao.TestDao;
-import io.meeds.spring.module.entity.TestEntity;
+import io.meeds.spring.module.dao.TestJpaDao;
+import io.meeds.spring.module.entity.TestJpaEntity;
 import io.meeds.spring.module.model.TestModel;
 import io.meeds.spring.module.service.TestExcludedService;
 import io.meeds.spring.module.service.TestService;
@@ -35,15 +35,11 @@ import io.meeds.spring.module.storage.TestStorage;
 @SpringJUnitConfig(CommonsDAOJPAImplTest.class)
 public class SpringIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
 
-  static final String         MODULE_NAME    = "io.meeds.spring.module";
-
-  static final String         CHANGELOG_PATH = "classpath:db/changelog/test-rdbms.db.changelog.xml";
-
   @Autowired
   private SettingService      settingService;
 
   @Autowired
-  private TestDao             testDao;
+  private TestJpaDao          testJpaDao;
 
   @Autowired
   private TestStorage         testStorage;
@@ -57,7 +53,7 @@ public class SpringIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
   @Test
   public void beansInjected() {
     assertNotNull("Kernel Component not found in Spring context", settingService);
-    assertNotNull("Spring @Repository Bean not found", testDao);
+    assertNotNull("Spring @Repository Bean not found", testJpaDao);
     assertNotNull("Spring @Component Bean not found", testStorage);
     assertNotNull("Spring @Service Bean not found", testService);
     assertNotNull("Spring @Service + @Exclude Bean not found", testExcludedService);
@@ -65,7 +61,7 @@ public class SpringIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
 
   @Test
   public void daoBeanReady() {
-    TestEntity testEntity = testDao.save(new TestEntity(null, "test"));
+    TestJpaEntity testEntity = testJpaDao.save(new TestJpaEntity(null, "test"));
     assertNotNull(testEntity);
     assertTrue(testEntity.getId() > 0);
     assertEquals("test", testEntity.getText());
@@ -81,7 +77,7 @@ public class SpringIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
 
   @Test
   public void daoNotRegisteredInKernel() {
-    TestDao daoComponent = getContainer().getComponentInstanceOfType(TestDao.class);
+    TestJpaDao daoComponent = getContainer().getComponentInstanceOfType(TestJpaDao.class);
     assertNull("DAO Layer shouldn't be accessible globally outside the curent module", daoComponent);
   }
 

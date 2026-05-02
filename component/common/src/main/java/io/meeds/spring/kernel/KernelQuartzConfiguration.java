@@ -31,7 +31,7 @@ import org.exoplatform.services.scheduler.impl.QuartzSheduler;
  * Quartz Scheduler instance
  */
 @Configuration
-public class QuartzConfiguration {
+public class KernelQuartzConfiguration {
 
   @Bean
   @Primary
