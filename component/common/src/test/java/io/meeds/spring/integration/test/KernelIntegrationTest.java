@@ -23,17 +23,13 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import org.exoplatform.jpa.CommonsDAOJPAImplTest;
 
-import io.meeds.spring.module.dao.TestDao;
+import io.meeds.spring.module.dao.TestJpaDao;
 import io.meeds.spring.module.service.TestExcludedService;
 import io.meeds.spring.module.service.TestService;
 import io.meeds.spring.module.storage.TestStorage;
 
 @SpringJUnitConfig(CommonsDAOJPAImplTest.class)
 public class KernelIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
-
-  static final String MODULE_NAME    = "io.meeds.spring.module";
-
-  static final String CHANGELOG_PATH = "classpath:db/changelog/test-rdbms.db.changelog.xml";
 
   @Test
   public void beansInjected() {
@@ -44,7 +40,7 @@ public class KernelIntegrationTest extends CommonsDAOJPAImplTest { // NOSONAR
     assertNull("Spring Bean @Repository (Storage) layer shouldn't be defined as Kernel component",
                getContainer().getComponentInstanceOfType(TestStorage.class));
     assertNull("Spring Bean Dao layer shouldn't be defined as Kernel component",
-               getContainer().getComponentInstanceOfType(TestDao.class));
+               getContainer().getComponentInstanceOfType(TestJpaDao.class));
   }
 
 }

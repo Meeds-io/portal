@@ -36,7 +36,7 @@ public class KernelCacheConfiguration {
 
   @Bean
   public CacheManager cacheManager(CacheService cacheService, Environment environment) {
-    return new CacheManagerImpl(cacheService, environment);
+    return new KernelCacheManagerAdapter(cacheService, environment);
   }
 
 }

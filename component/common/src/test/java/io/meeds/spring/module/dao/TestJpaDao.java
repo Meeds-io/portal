@@ -21,8 +21,8 @@ package io.meeds.spring.module.dao;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import io.meeds.spring.module.entity.TestEntity;
+import io.meeds.spring.module.entity.TestJpaEntity;
 
 @Repository
-public interface TestDao extends JpaRepository<TestEntity, Long> {
+public interface TestJpaDao extends JpaRepository<TestJpaEntity, Long> {
 }
