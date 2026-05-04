@@ -18,7 +18,7 @@
  */
 package io.meeds.spring.module.mapper;
 
-import io.meeds.spring.module.entity.TestEntity;
+import io.meeds.spring.module.entity.TestJpaEntity;
 import io.meeds.spring.module.model.TestModel;
 
 public class EntityMapper {
@@ -26,14 +26,14 @@ public class EntityMapper {
   private EntityMapper() {
   }
 
-  public static TestEntity toEntity(TestModel model) {
+  public static TestJpaEntity toEntity(TestModel model) {
     if (model == null) {
       return null;
     }
-    return new TestEntity(model.getId(), model.getText());
+    return new TestJpaEntity(model.getId(), model.getText());
   }
 
-  public static TestModel fromEntity(TestEntity entity) {
+  public static TestModel fromEntity(TestJpaEntity entity) {
     if (entity == null) {
       return null;
     }

@@ -74,7 +74,7 @@ public class AvailableIntegration {
    * @deprecated use WEB_MODULE instead to integrate all web integrations
    */
   @Deprecated(forRemoval = true)
-  public static final String   WEB_SECURITY_MODULE    = "io.meeds.spring.web.security";
+  public static final String   WEB_SECURITY_MODULE    = "io.meeds.spring.web.security";    // NOSONAR
 
   /**
    * Used to start and end a transaction at each Spring REST/Controller call,
@@ -83,28 +83,28 @@ public class AvailableIntegration {
    * @deprecated use WEB_MODULE instead
    */
   @Deprecated(forRemoval = true)
-  public static final String   WEB_TRANSACTION_MODULE = "io.meeds.spring.web.transaction";
+  public static final String   WEB_TRANSACTION_MODULE = "io.meeds.spring.web.transaction"; // NOSONAR
 
   /**
    * Shortcut to list all available Meeds Portal and Kernel integration modules
    * with Spring
    */
-  public static final String[] ALL_MODULES            = {                                 // NOSONAR
-                                                          KERNEL_MODULE,
-                                                          JPA_MODULE,
-                                                          LIQUIBASE_MODULE,
-                                                          WEB_MODULE
+  public static final String[] ALL_MODULES            = {                                  // NOSONAR
+    KERNEL_MODULE,
+    JPA_MODULE,
+    LIQUIBASE_MODULE,
+    WEB_MODULE
   };
 
   /**
    * Shortcut to list all available Meeds Portal and Kernel integration modules
    * with Spring in Test scope
    */
-  public static final String[] ALL_TEST_MODULES       = {                                 // NOSONAR
-                                                          KERNEL_TEST_MODULE,
-                                                          JPA_MODULE,
-                                                          LIQUIBASE_MODULE,
-                                                          WEB_MODULE
+  public static final String[] ALL_TEST_MODULES       = {                                  // NOSONAR
+    KERNEL_TEST_MODULE,
+    JPA_MODULE,
+    LIQUIBASE_MODULE,
+    WEB_MODULE
   };
 
 }

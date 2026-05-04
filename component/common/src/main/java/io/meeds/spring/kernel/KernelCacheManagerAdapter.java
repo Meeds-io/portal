@@ -35,7 +35,7 @@ import org.exoplatform.services.cache.ExoCache;
 
 import lombok.Setter;
 
-public class CacheManagerImpl implements CacheManager {
+public class KernelCacheManagerAdapter implements CacheManager {
 
   @Setter
   private CacheService       cacheService;
@@ -45,7 +45,7 @@ public class CacheManagerImpl implements CacheManager {
 
   private Map<String, Cache> cacheInstances = new ConcurrentHashMap<>();
 
-  public CacheManagerImpl(CacheService cacheService, Environment environment) {
+  public KernelCacheManagerAdapter(CacheService cacheService, Environment environment) {
     this.cacheService = cacheService;
     this.environment = environment;
   }
@@ -56,7 +56,7 @@ public class CacheManagerImpl implements CacheManager {
   }
 
   @Override
-  public Cache getCache(String name) {
+  public Cache getCache(String name) { // NOSONAR
     return cacheInstances.computeIfAbsent(name, k -> {
       boolean isNew = cacheService.getAllCacheInstances()
                                   .stream()
