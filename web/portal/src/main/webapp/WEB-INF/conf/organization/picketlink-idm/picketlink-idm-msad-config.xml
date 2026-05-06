@@ -236,6 +236,14 @@
                 <value>false</value>
               </option>
               <option>
+                <name>childMembershipAttributeName</name>
+                <value>${exo.ldap.users.childMembershipAttributeName:}</value>
+              </option>
+              <option>
+                <name>childMembershipAttributeDN</name>
+                <value>${exo.ldap.users.childMembershipAttributeDN:}</value>
+              </option>
+              <option>
                 <name>createEntryAttributeValues</name>
                 <value>objectClass=top</value>
                 <value>objectClass=inetOrgPerson</value>
