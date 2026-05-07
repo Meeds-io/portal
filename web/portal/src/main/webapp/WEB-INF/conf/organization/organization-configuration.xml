@@ -43,6 +43,11 @@
           <description>Update users if they already exists</description>
           <value>false</value>
         </value-param>
+        <value-param>
+          <name>updateGroups</name>
+          <description>Update groups if they already exists</description>
+          <value>true</value>
+        </value-param>
         <object-param>
           <name>configuration</name>
           <description>description</description>
@@ -201,7 +206,7 @@
                       <string>the organization group</string>
                     </field>
                     <field name="label">
-                      <string>Organization</string>
+                      <string>Custom Groups</string>
                     </field>
                   </object>
                 </value>
