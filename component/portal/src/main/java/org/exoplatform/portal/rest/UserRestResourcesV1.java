@@ -42,6 +42,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
@@ -551,6 +552,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
   )
   public Response getUserMemberships(
                                      @Parameter(description = "User name identifier", required = true) @PathParam("id") String userName,
+                                     @Parameter(description = "Group id to filter only its members, ex: /platform")
+                                     @QueryParam("groupId")
+                                     List<String> groupIds,
                                      @Parameter(description = "Offset", required = false) @Schema(defaultValue = "0")
                                      @QueryParam("offset") int offset,
                                      @Parameter(description = "Limit", required = false) @Schema(defaultValue = "20")
@@ -560,7 +564,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                      boolean returnSize) throws Exception {
 
     boolean isAdmin = isMemberOfAdminGroup();
-    if (!isAdmin && !isMemberOfDelegatedGroup(userName)) {
+    if (!isAdmin) {
       throw new WebApplicationException(Response.Status.UNAUTHORIZED);
     }
     offset = offset > 0 ? offset : 0;
@@ -573,7 +577,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
     List<MembershipRestEntity> membershipEntities = new ArrayList<>();
     int totalSize = 0;
-    if (isAdmin) {
+    if (CollectionUtils.isEmpty(groupIds)) {
       ListAccess<Membership> membershipsByUser = organizationService.getMembershipHandler().findAllMembershipsByUser(user);
       totalSize = membershipsByUser.getSize();
       Membership[] memberships;
@@ -592,15 +596,6 @@ public class UserRestResourcesV1 implements ResourceContainer {
         }
       }
     } else {
-      Set<String> groupIds = ConversationState.getCurrent()
-                                              .getIdentity()
-                                              .getMemberships()
-                                              .stream()
-                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType())
-                                                           || StringUtils.equals("*", m.getMembershipType()))
-                                              .map(MembershipEntry::getGroup)
-                                              .collect(Collectors.toSet());
-
       Identity userIdentity = userACL.getUserIdentity(userName);
       List<MembershipEntry> memberships = userIdentity.getMemberships()
                                                       .stream()
