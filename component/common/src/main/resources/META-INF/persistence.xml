@@ -34,7 +34,6 @@
       <property name="hibernate.current_session_context_class" value="thread"/>
       <property name="hibernate.cache.use_second_level_cache" value="false"/>
       <property name="hibernate.cache.use_query_cache" value="false"/>
-      <property name="hibernate.identifier_generator_strategy_provider" value="io.meeds.common.persistence.HibernateCustomIdentifierGeneratorStrategyProvider"/>
     </properties>
   </persistence-unit>
 </persistence>

@@ -18,9 +18,14 @@
  */
 package io.meeds.spring.web.localization;
 
+import java.util.EnumSet;
+import java.util.List;
+
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration("httpRequestLocaleFilterConfiguration")
 public class HttpRequestLocaleFilterConfiguration {
@@ -29,7 +34,8 @@ public class HttpRequestLocaleFilterConfiguration {
   public FilterRegistrationBean<HttpRequestLocaleFilter> httpRequestLocaleFilter() {
     FilterRegistrationBean<HttpRequestLocaleFilter> registrationBean = new FilterRegistrationBean<>();
     registrationBean.setFilter(new HttpRequestLocaleFilter());
-    registrationBean.addUrlPatterns("/rest/*");
+    registrationBean.setUrlPatterns(List.of("/rest/*"));
+    registrationBean.setDispatcherTypes(EnumSet.allOf(DispatcherType.class));
     registrationBean.setOrder(4);
     return registrationBean;
   }

@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.picocontainer.Startable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,7 +197,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
       Map<String, BeanDefinition> beansMap = springBeansByContext.get(senderServletContextName);
       springBeanRegistries.entrySet()
                           .stream()
-                          .filter(e -> !StringUtils.equals(senderServletContextName, e.getKey()))
+                          .filter(e -> !Strings.CS.equals(senderServletContextName, e.getKey()))
                           .collect(Collectors.toMap(Entry::getKey, Entry::getValue))
                           .forEach((receiverServletContextName,
                                     receiverBeanRegistry) -> addSpringBeansToEachOtherContexts(portalContainer,
@@ -401,10 +402,10 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
 
   private static boolean isServiceBean(Class<?> beanClass) {
     return beanClass.isAnnotationPresent(Service.class)
-           && !StringUtils.contains(beanClass.getName(), "org.springframework")
-           && !StringUtils.startsWith(beanClass.getName(), "java")
-           && !StringUtils.startsWith(beanClass.getName(), "jdk")
-           && !StringUtils.contains(beanClass.getName(), "$");
+           && !Strings.CS.contains(beanClass.getName(), "org.springframework")
+           && !Strings.CS.startsWith(beanClass.getName(), "java")
+           && !Strings.CS.startsWith(beanClass.getName(), "jdk")
+           && !Strings.CS.contains(beanClass.getName(), "$");
   }
 
   private static boolean isComponentClassValid(Class<?> componentClass) {
@@ -413,8 +414,8 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
            && !componentClass.equals(Startable.class)
            && !componentClass.equals(StartableApplication.class)
            && !componentClass.equals(ResourceContainer.class)
-           && !StringUtils.startsWith(componentClass.getName(), "jakarta")
-           && !StringUtils.equals(componentClass.getName(), "org.exoplatform.commons.cluster.StartableClusterAware");
+           && !Strings.CS.startsWith(componentClass.getName(), "jakarta")
+           && !Strings.CS.equals(componentClass.getName(), "org.exoplatform.commons.cluster.StartableClusterAware");
   }
 
   private static Object getBeanInstance(ApplicationContext applicationContext,

@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.support.AbstractValueAdaptingCache;
@@ -61,7 +62,7 @@ public class KernelCacheManagerAdapter implements CacheManager {
       boolean isNew = cacheService.getAllCacheInstances()
                                   .stream()
                                   .map(ExoCache::getName)
-                                  .noneMatch(n -> StringUtils.equals(n, name));
+                                  .noneMatch(n -> Strings.CS.equals(n, name));
       ExoCache<Serializable, Object> cacheInstance = cacheService.getCacheInstance(name);
       if (isNew) {
         String ttl = environment.getProperty("meeds.cache." + name + ".ttl", "");

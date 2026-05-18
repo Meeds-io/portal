@@ -18,84 +18,242 @@
  */
 package org.exoplatform.commons.persistence.impl;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
-import org.hibernate.boot.archive.internal.StandardArchiveDescriptorFactory;
-import org.hibernate.boot.archive.scan.spi.AbstractScannerImpl;
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.boot.archive.scan.spi.ClassDescriptor;
+import org.hibernate.boot.archive.scan.spi.MappingFileDescriptor;
+import org.hibernate.boot.archive.scan.spi.PackageDescriptor;
 import org.hibernate.boot.archive.scan.spi.ScanEnvironment;
 import org.hibernate.boot.archive.scan.spi.ScanOptions;
 import org.hibernate.boot.archive.scan.spi.ScanParameters;
 import org.hibernate.boot.archive.scan.spi.ScanResult;
-import org.hibernate.boot.archive.spi.ArchiveDescriptorFactory;
+import org.hibernate.boot.archive.scan.spi.Scanner;
+import org.hibernate.boot.archive.spi.InputStreamAccess;
 
 import org.exoplatform.commons.api.persistence.ExoEntityProcessor;
 
+import jakarta.persistence.Converter;
+
 /**
- * A specific hibernate scanner to allow injecting JPA Entities into
- * EntityManagerFactory
+ * Hibernate 7 scanner for Meeds JPA entities. This scanner does not delegate to
+ * Hibernate's old default scanner. It returns Hibernate ScanResult descriptors
+ * directly from Meeds entity indexes.
  */
-public class JPADatasourceEntityScanner extends AbstractScannerImpl {
-
-  public JPADatasourceEntityScanner() {
-    this(StandardArchiveDescriptorFactory.INSTANCE);
-  }
-
-  public JPADatasourceEntityScanner(ArchiveDescriptorFactory value) {
-    super(value);
-  }
+public class JPADatasourceEntityScanner implements Scanner {
 
   @Override
+  @SuppressWarnings("removal")
   public ScanResult scan(ScanEnvironment environment, ScanOptions options, ScanParameters params) {
-    ScanEnvironment environmentWrapper = new ScanEnvironment() {
-      @Override
-      public URL getRootUrl() {
-        return environment.getRootUrl();
-      }
+    ClassLoader classLoader = getClassLoader();
 
-      @SuppressWarnings("removal")
-      @Override
-      public List<URL> getNonRootUrls() {
-        List<URL> nonRootUrls = new ArrayList<>();
-        String rootPath = environment.getRootUrl().getPath();
-        addPaths(nonRootUrls, rootPath, ExoEntityProcessor.DEPRECATED_ENTITIES_IDX_PATH);
-        addPaths(nonRootUrls, rootPath, ExoEntityProcessor.ENTITIES_IDX_PATH);
-        return nonRootUrls;
-      }
+    Set<ClassDescriptor> classes = new LinkedHashSet<>();
 
-      @Override
-      public List<String> getExplicitlyListedMappingFiles() {
-        return environment.getExplicitlyListedMappingFiles();
-      }
+    addIndexedClasses(classes, classLoader, ExoEntityProcessor.DEPRECATED_ENTITIES_IDX_PATH);
+    addIndexedClasses(classes, classLoader, ExoEntityProcessor.ENTITIES_IDX_PATH);
+    addExplicitClasses(classes, classLoader, environment.getExplicitlyListedClassNames());
 
-      @Override
-      public List<String> getExplicitlyListedClassNames() {
-        return environment.getExplicitlyListedClassNames();
-      }
-    };
-    return super.scan(environmentWrapper, options, params);
+    Set<MappingFileDescriptor> mappingFiles = new LinkedHashSet<>();
+    addExplicitMappingFiles(mappingFiles, classLoader, environment.getExplicitlyListedMappingFiles());
+
+    return new ExoScanResult(classes, mappingFiles);
   }
 
-  private void addPaths(List<URL> nonRootUrls, String rootPath, String entitiesIdxPath) {
+  private void addIndexedClasses(Set<ClassDescriptor> classes, ClassLoader classLoader, String indexPath) {
     try {
-      Enumeration<URL> entityFiles = getClass().getClassLoader().getResources(entitiesIdxPath);
-      while (entityFiles.hasMoreElements()) {
-        URL url = entityFiles.nextElement();
-        url = new URL(url.toExternalForm()
-                         .replace("!/" + entitiesIdxPath, "")
-                         .replace("jar:", "")
-                         .replace(entitiesIdxPath, ""));
-        if (url.getPath().startsWith(rootPath)) {
-          continue;
+      Enumeration<URL> resources = classLoader.getResources(indexPath);
+
+      while (resources.hasMoreElements()) {
+        URL resource = resources.nextElement();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.openStream(), StandardCharsets.UTF_8))) {
+          reader.lines()
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .filter(line -> !line.startsWith("#"))
+                .forEach(className -> classes.add(new ExoClassDescriptor(classLoader, className)));
         }
-        nonRootUrls.add(url);
       }
     } catch (IOException e) {
-      throw new IllegalStateException("Can't access class path loader resources", e);
+      throw new IllegalStateException("Can't access JPA entity index resource: " + indexPath, e);
     }
   }
 
+  private void addExplicitClasses(Set<ClassDescriptor> classes, ClassLoader classLoader, List<String> classNames) {
+    if (classNames == null) {
+      return;
+    }
+
+    for (String className : classNames) {
+      if (className != null && !className.isBlank()) {
+        classes.add(new ExoClassDescriptor(classLoader, className.trim()));
+      }
+    }
+  }
+
+  private void addExplicitMappingFiles(Set<MappingFileDescriptor> mappingFiles,
+                                       ClassLoader classLoader,
+                                       List<String> mappingFileNames) {
+    if (mappingFileNames == null) {
+      return;
+    }
+
+    for (String mappingFileName : mappingFileNames) {
+      if (mappingFileName != null && !mappingFileName.isBlank()) {
+        mappingFiles.add(new ExoMappingFileDescriptor(classLoader, mappingFileName.trim()));
+      }
+    }
+  }
+
+  private ClassLoader getClassLoader() {
+    ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+    return contextClassLoader == null ? JPADatasourceEntityScanner.class.getClassLoader() : contextClassLoader;
+  }
+
+  private static final class ExoScanResult implements ScanResult {
+
+    private final Set<ClassDescriptor>       classes;
+
+    private final Set<MappingFileDescriptor> mappingFiles;
+
+    private ExoScanResult(Set<ClassDescriptor> classes, Set<MappingFileDescriptor> mappingFiles) {
+      this.classes = Collections.unmodifiableSet(classes);
+      this.mappingFiles = Collections.unmodifiableSet(mappingFiles);
+    }
+
+    @Override
+    public Set<PackageDescriptor> getLocatedPackages() {
+      return Collections.emptySet();
+    }
+
+    @Override
+    public Set<ClassDescriptor> getLocatedClasses() {
+      return classes;
+    }
+
+    @Override
+    public Set<MappingFileDescriptor> getLocatedMappingFiles() {
+      return mappingFiles;
+    }
+  }
+
+  private static final class ExoClassDescriptor implements ClassDescriptor {
+
+    private final ClassLoader classLoader;
+
+    private final String      className;
+
+    private ExoClassDescriptor(ClassLoader classLoader, String className) {
+      this.classLoader = classLoader;
+      this.className = className;
+    }
+
+    @Override
+    public String getName() {
+      return className;
+    }
+
+    @Override
+    public Categorization getCategorization() {
+      if (isConverterClass()) {
+        return Categorization.CONVERTER;
+      }
+      return Categorization.MODEL;
+    }
+
+    @Override
+    public InputStreamAccess getStreamAccess() {
+      String resourceName = className.replace('.', '/') + ".class";
+      return new ClasspathInputStreamAccess(classLoader, resourceName);
+    }
+
+    private boolean isConverterClass() {
+      try {
+        Class<?> clazz = Class.forName(className, false, classLoader);
+        return clazz.isAnnotationPresent(Converter.class);
+      } catch (ClassNotFoundException e) {
+        throw new IllegalStateException("Indexed JPA class not found: " + className, e);
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof ExoClassDescriptor that && className.equals(that.className);
+    }
+
+    @Override
+    public int hashCode() {
+      return className.hashCode();
+    }
+  }
+
+  private static final class ExoMappingFileDescriptor implements MappingFileDescriptor {
+
+    private final ClassLoader classLoader;
+
+    private final String      mappingFileName;
+
+    private ExoMappingFileDescriptor(ClassLoader classLoader, String mappingFileName) {
+      this.classLoader = classLoader;
+      this.mappingFileName = mappingFileName;
+    }
+
+    @Override
+    public String getName() {
+      return mappingFileName;
+    }
+
+    @Override
+    public InputStreamAccess getStreamAccess() {
+      return new ClasspathInputStreamAccess(classLoader, mappingFileName);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof ExoMappingFileDescriptor that && mappingFileName.equals(that.mappingFileName);
+    }
+
+    @Override
+    public int hashCode() {
+      return mappingFileName.hashCode();
+    }
+  }
+
+  private static final class ClasspathInputStreamAccess implements InputStreamAccess {
+
+    private final ClassLoader classLoader;
+
+    private final String      resourceName;
+
+    private ClasspathInputStreamAccess(ClassLoader classLoader, String resourceName) {
+      this.classLoader = classLoader;
+      this.resourceName = resourceName;
+    }
+
+    @Override
+    public String getStreamName() {
+      return resourceName;
+    }
+
+    @Override
+    public InputStream accessInputStream() {
+      InputStream stream = classLoader.getResourceAsStream(resourceName);
+
+      if (stream == null) {
+        throw new IllegalStateException("Classpath resource not found: " + resourceName);
+      }
+
+      return stream;
+    }
+  }
 }

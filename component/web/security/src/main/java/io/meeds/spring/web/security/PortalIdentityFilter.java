@@ -74,7 +74,7 @@ public class PortalIdentityFilter extends AbstractFilter {
     }
   }
 
-  private ConversationState getCurrentState(ExoContainer container,
+  private ConversationState getCurrentState(ExoContainer container, // NOSONAR
                                             HttpServletRequest httpRequest) {
     String userId = httpRequest.getRemoteUser();
     if (StringUtils.isBlank(userId)) {

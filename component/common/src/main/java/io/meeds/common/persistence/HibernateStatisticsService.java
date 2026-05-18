@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.hibernate.Session;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.stat.QueryStatistics;
@@ -171,7 +172,7 @@ public class HibernateStatisticsService implements Startable, ComponentRequestLi
       return;
     }
     List<String> performances = Arrays.stream(queries)
-                                      .filter(q -> !StringUtils.containsAny(q, ignoredQueryMatchArray))
+                                      .filter(q -> !Strings.CS.containsAny(q, ignoredQueryMatchArray))
                                       .map(q -> {
                                         QueryStatistics stats = statistics.getQueryStatistics(q);
                                         if (stats.getExecutionCount() == 0) {

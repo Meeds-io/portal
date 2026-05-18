@@ -18,9 +18,14 @@
  */
 package io.meeds.spring.web.transaction;
 
+import java.util.EnumSet;
+import java.util.List;
+
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration("webTransactionFilterConfiguration")
 public class WebTransactionFilterConfiguration {
@@ -29,7 +34,8 @@ public class WebTransactionFilterConfiguration {
   public FilterRegistrationBean<PortalTransactionFilter> transactionFilter() {
     FilterRegistrationBean<PortalTransactionFilter> registrationBean = new FilterRegistrationBean<>();
     registrationBean.setFilter(new PortalTransactionFilter());
-    registrationBean.addUrlPatterns("/rest/*");
+    registrationBean.setUrlPatterns(List.of("/rest/*"));
+    registrationBean.setDispatcherTypes(EnumSet.allOf(DispatcherType.class));
     registrationBean.setOrder(1);
     return registrationBean;
   }

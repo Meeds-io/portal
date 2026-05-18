@@ -202,17 +202,18 @@ public class LiquibaseDataInitializer implements Startable, DataInitializer {
    * @param datasource
    * @param changelogsPath
    */
+  @SuppressWarnings("resource")
   protected void applyChangeLog(DataSource datasource, String changelogsPath) {
     Database database = null;
-    try {
+    try { // NOSONAR
       database = DatabaseFactory.getInstance()
-              .findCorrectDatabaseImplementation(new JdbcConnection(datasource.getConnection()));
-      Liquibase liquibase = new Liquibase(changelogsPath, new ClassLoaderResourceAccessor(), database);
+                                .findCorrectDatabaseImplementation(new JdbcConnection(datasource.getConnection()));
+      Liquibase liquibase = new Liquibase(changelogsPath, new ClassLoaderResourceAccessor(), database);// NOSONAR
       liquibase.update(liquibaseContexts);
     } catch (SQLException e) {
-      LOG.error("Error while getting a JDBC connection from datasource " + datasourceName + " - Cause : " + e.getMessage(), e);
+      LOG.error("Error while getting a JDBC connection from datasource {} - Cause : {}", datasourceName, e.getMessage(), e);
     } catch (LiquibaseException e) {
-      LOG.error("Error while applying liquibase changelogs " + changelogsPath + " - Cause : " + e.getMessage(), e);
+      LOG.error("Error while applying liquibase changelogs {} - Cause : {}", changelogsPath, e.getMessage(), e);
     } finally {
       if (database != null) {
         try {
