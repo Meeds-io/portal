@@ -20,7 +20,14 @@ package org.exoplatform.portal.jdbc.entity;
 
 import java.io.Serializable;
 
-import jakarta.persistence.*;
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQueries;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
 
 @Entity(name = "GateInPermission")
 @Table(name = "PORTAL_PERMISSIONS")
@@ -32,8 +39,7 @@ public class PermissionEntity implements Serializable {
   private static final long serialVersionUID = 1173817577220348267L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_PORTAL_PERMISSIONS_ID", sequenceName = "SEQ_PORTAL_PERMISSIONS_ID", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_PORTAL_PERMISSIONS_ID")
+  @PortableSequence(name = "SEQ_PORTAL_PERMISSIONS_ID")
   @Column(name = "PERMISSION_ID")
   private Long              id;
 

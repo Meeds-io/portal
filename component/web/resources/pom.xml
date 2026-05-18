@@ -31,6 +31,7 @@
   <description>Web resource serving services such as Javascript, skins and stylesheets</description>
 
   <properties>
+    <org.graalvm.js.version>22.0.0</org.graalvm.js.version>
     <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
     <maven.build.timestamp.format>yyyyMMddHHmmss</maven.build.timestamp.format>
     <exo.test.coverage.ratio>0.65</exo.test.coverage.ratio>
@@ -76,11 +77,13 @@
     <dependency>
       <groupId>org.graalvm.js</groupId>
       <artifactId>js</artifactId>
+      <version>${org.graalvm.js.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.graalvm.js</groupId>
       <artifactId>js-scriptengine</artifactId>
+      <version>${org.graalvm.js.version}</version>
       <scope>test</scope>
     </dependency>
 

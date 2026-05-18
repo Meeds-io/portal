@@ -1,1 +1,1 @@
-io.meeds.spring.integration.test.TestEntity
+io.meeds.spring.module.entity.TestJpaEntity

@@ -18,20 +18,18 @@
  */
 package org.picketlink.idm.impl.model.hibernate;
 
+import io.meeds.common.persistence.PortableSequence;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 @Entity(name = "HibernateIdentityObjectAttributeBinaryValue")
 @Table(name = "jbid_attr_bin_value")
 public class HibernateIdentityObjectAttributeBinaryValue {
   @Id
-  @GeneratedValue(strategy = GenerationType.AUTO, generator="JBID_ATTR_BIN_VALUE_ID_SEQ")
-  @SequenceGenerator(name = "JBID_ATTR_BIN_VALUE_ID_SEQ", sequenceName = "JBID_ATTR_BIN_VALUE_ID_SEQ", allocationSize = 1)
+  @PortableSequence(name = "JBID_ATTR_BIN_VALUE_ID_SEQ")
   @Column(name = "BIN_VALUE_ID")
   private Long   id;
 

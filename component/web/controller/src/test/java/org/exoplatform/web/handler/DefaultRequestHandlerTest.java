@@ -19,7 +19,6 @@
 package org.exoplatform.web.handler;
 
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.*;

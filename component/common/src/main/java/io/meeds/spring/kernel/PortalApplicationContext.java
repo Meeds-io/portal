@@ -26,9 +26,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext;
+import org.springframework.boot.web.server.servlet.context.AnnotationConfigServletWebServerApplicationContext;
 
 import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.monitor.jvm.ServerStartupWaiter;
 
 import jakarta.servlet.ServletContext;
 
@@ -78,6 +79,9 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
   }
 
   private void finishSpringContextStartupAsync(ConfigurableListableBeanFactory beanFactory) {
+    // A dedicated Thread rather than the common ForkJoinPool: the wait lasts
+    // until the full server startup and would retain a shared pool worker for
+    // the whole remaining startup time
     CompletableFuture.runAsync(() -> {
       Thread currentThread = Thread.currentThread();
       ClassLoader originalClassLoader = currentThread.getContextClassLoader();
@@ -86,7 +90,11 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
         do {
           Thread.sleep(3000);
         } while (!PortalContainer.getInstance().isStarted());
-        Thread.sleep(3000);
+        // Holds the Spring context startup until the full server startup, HTTP
+        // connector included (see ServerStartupWaiter for the contract, its
+        // degraded paths and the exo.server.startup.wait.* properties)
+        ServerStartupWaiter.awaitServerStartup(PortalContainer.getInstance(),
+                                               "Spring context '" + servletContext.getServletContextName() + "' startup");
         finishSpringContextStartup(beanFactory);
       } catch (InterruptedException e) {
         currentThread.interrupt();
@@ -95,6 +103,10 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
       } finally {
         currentThread.setContextClassLoader(originalClassLoader);
       }
+    }, runnable -> {
+      Thread thread = new Thread(runnable, "async-spring-context-startup-" + servletContext.getServletContextName());
+      thread.setDaemon(true);
+      thread.start();
     });
   }
 

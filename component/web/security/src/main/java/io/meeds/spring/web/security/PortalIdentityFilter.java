@@ -65,16 +65,21 @@ public class PortalIdentityFilter extends AbstractFilter {
     ExoContainer container = getContainer();
 
     ExoContainerContext.setCurrentContainer(container);
+    ConversationState currentState = ConversationState.getCurrent();
     try {
-      ConversationState.setCurrent(getCurrentState(container, httpRequest));
+      if (currentState == null) {
+        ConversationState.setCurrent(getCurrentState(container, httpRequest));
+      }
       chain.doFilter(request, response);
     } finally {
-      ConversationState.setCurrent(null);
+      if (currentState == null) {
+        ConversationState.setCurrent(null);
+      }
       ExoContainerContext.setCurrentContainer(null);
     }
   }
 
-  private ConversationState getCurrentState(ExoContainer container,
+  private ConversationState getCurrentState(ExoContainer container, // NOSONAR
                                             HttpServletRequest httpRequest) {
     String userId = httpRequest.getRemoteUser();
     if (StringUtils.isBlank(userId)) {

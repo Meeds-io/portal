@@ -40,7 +40,6 @@
         <property name="hibernate.cache.use_second_level_cache" value="false"/>
         <property name="hibernate.cache.use_query_cache" value="false"/>
         <property name="hibernate.listeners.envers.autoRegister" value="false"/>
-        <property name="hibernate.identifier_generator_strategy_provider" value="io.meeds.common.persistence.HibernateCustomIdentifierGeneratorStrategyProvider" />
       </properties-param>
     </init-params>
   </component>

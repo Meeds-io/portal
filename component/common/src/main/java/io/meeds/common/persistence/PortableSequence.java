@@ -1,7 +1,7 @@
 /**
  * This file is part of the Meeds project (https://meeds.io/).
  *
- * Copyright (C) 2020 - 2025 Meeds Association contact@meeds.io
+ * Copyright (C) 2020 - 2026 Meeds Association contact@meeds.io
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,19 +16,25 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package org.exoplatform.commons.api.persistence;
+package io.meeds.common.persistence;
 
-import java.lang.annotation.ElementType;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Describe a class as a JPA entity managed by eXo Platform
- *
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-@Deprecated(since = "1.6.0")
-public @interface ExoEntity {
+import org.hibernate.annotations.IdGeneratorType;
+
+@IdGeneratorType(PortableSequenceGenerator.class)
+@Target({ FIELD, METHOD })
+@Retention(RUNTIME)
+public @interface PortableSequence {
+
+  String name();
+
+  int startWith() default 1;
+
+  int incrementBy() default 1;
 }

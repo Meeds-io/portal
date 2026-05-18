@@ -49,7 +49,6 @@ import java.io.InputStream;
 import java.util.Date;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
