@@ -22,16 +22,15 @@ import java.io.Serializable;
 
 import org.json.simple.JSONObject;
 
+import io.meeds.common.persistence.PortableSequence;
+
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.NamedQuery;
-import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 @Entity(name = "GateInWindow")
@@ -45,8 +44,7 @@ public class WindowEntity extends ComponentEntity implements Serializable {
   private static final long serialVersionUID = 6633792468705838255L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_WINDOW_ID_GENERATOR", sequenceName = "SEQ_WINDOW_ID_GENERATOR", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_WINDOW_ID_GENERATOR")
+  @PortableSequence(name = "SEQ_WINDOW_ID_GENERATOR")
   @Column(name = "ID")
   protected Long            id;
 

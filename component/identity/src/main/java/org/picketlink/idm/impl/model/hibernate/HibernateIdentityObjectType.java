@@ -18,9 +18,15 @@
  */
 package org.picketlink.idm.impl.model.hibernate;
 
-import jakarta.persistence.*;
-
 import org.picketlink.idm.spi.model.IdentityObjectType;
+
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
 
 @Entity(name = "HibernateIdentityObjectType")
 @Table(name = "jbid_io_type")
@@ -32,8 +38,7 @@ import org.picketlink.idm.spi.model.IdentityObjectType;
 public class HibernateIdentityObjectType implements IdentityObjectType {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.AUTO, generator="JBID_IO_TYPE_ID_SEQ")
-  @SequenceGenerator(name = "JBID_IO_TYPE_ID_SEQ", sequenceName = "JBID_IO_TYPE_ID_SEQ", allocationSize = 1)
+  @PortableSequence(name = "JBID_IO_TYPE_ID_SEQ")
   @Column(name = "ID")
   private Long               id;
 

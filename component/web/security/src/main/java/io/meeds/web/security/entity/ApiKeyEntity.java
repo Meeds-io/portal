@@ -23,10 +23,8 @@ import java.util.Date;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.SequenceGenerator;
+import io.meeds.common.persistence.PortableSequence;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
@@ -44,8 +42,7 @@ public class ApiKeyEntity implements Serializable {
   private static final long serialVersionUID = -84331457457586854L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_API_KEYS_ID_GENERATOR", sequenceName = "SEQ_API_KEYS_ID_GENERATOR", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_API_KEYS_ID_GENERATOR")
+  @PortableSequence(name = "SEQ_API_KEYS_ID_GENERATOR")
   @Column(name = "ID")
   private Long              id;
 

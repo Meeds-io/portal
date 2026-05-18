@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Vector;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 
 import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.services.log.ExoLogger;
@@ -38,15 +39,15 @@ public class ServerResponseTime {
   public static final boolean                 DEVELOPPING           = PropertyManager.isDevelopping();
 
   public static final boolean                 SERVER_TIMING_ENABLED = DEVELOPPING
-                                                                      || StringUtils.equals(System.getProperty("meeds.server.timing.api.enabled",
-                                                                                                               "false"),
-                                                                                            "true");
+                                                                      || Strings.CS.equals(System.getProperty("meeds.server.timing.api.enabled",
+                                                                                                              "false"),
+                                                                                           "true");
 
   private static final Log                    LOG                   = ExoLogger.getLogger("ServerTimingAPI");
 
   private static final String                 OVERALL_KEY           = "overall";
 
-  private List<String>                        serverTimeNames       = new Vector<>();                                                            // NOSONAR
+  private List<String>                        serverTimeNames       = new Vector<>();                                                           // NOSONAR
 
   private Map<String, ServerResponseTimeItem> serverTimes           = new LinkedHashMap<>();
 

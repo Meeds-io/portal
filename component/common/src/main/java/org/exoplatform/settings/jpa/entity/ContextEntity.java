@@ -23,13 +23,11 @@ import java.util.Set;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.NamedQueries;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.SequenceGenerator;
+import io.meeds.common.persistence.PortableSequence;
 import jakarta.persistence.Table;
 
 /**
@@ -91,8 +89,7 @@ import jakarta.persistence.Table;
 public class ContextEntity {
   @Id
   @Column(name = "CONTEXT_ID")
-  @SequenceGenerator(name="SEQ_STG_CONTEXT_COMMON_ID", sequenceName="SEQ_STG_CONTEXT_COMMON_ID", allocationSize = 1)
-  @GeneratedValue(strategy=GenerationType.AUTO, generator="SEQ_STG_CONTEXT_COMMON_ID")
+  @PortableSequence(name = "SEQ_STG_CONTEXT_COMMON_ID")
   private Long id;
 
   @Column(name = "NAME")

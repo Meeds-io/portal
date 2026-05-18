@@ -22,10 +22,8 @@ import java.io.Serializable;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.SequenceGenerator;
+import io.meeds.common.persistence.PortableSequence;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -41,11 +39,7 @@ public class TestJpaEntity implements Serializable {
   private static final long serialVersionUID = -1657319966260461019L;
 
   @Id
-  @SequenceGenerator(name = "TEST_ID_SEQ",
-      sequenceName = "TEST_ID_SEQ",
-      allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO,
-      generator = "TEST_ID_SEQ")
+  @PortableSequence(name = "TEST_ID_SEQ")
   @Column(name = "TEST_ID")
   private Long              id;
 

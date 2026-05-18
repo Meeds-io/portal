@@ -21,12 +21,19 @@ package org.exoplatform.portal.jdbc.entity;
 import java.util.LinkedList;
 import java.util.List;
 
-import jakarta.persistence.*;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import org.exoplatform.portal.mop.SiteType;
+
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity(name = "GateInSite")
 @Table(name = "PORTAL_SITES")
@@ -71,8 +78,7 @@ public class SiteEntity extends ComponentEntity {
   private static final long     serialVersionUID = 3036823700771832314L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_SITE_ID_GENERATOR", sequenceName = "SEQ_SITE_ID_GENERATOR", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_SITE_ID_GENERATOR")
+  @PortableSequence(name = "SEQ_SITE_ID_GENERATOR")
   @Column(name = "ID")
   protected Long                id;
 

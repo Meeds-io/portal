@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +38,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer.AuthorizationManagerRequestMatcherRegistry;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
-import org.springframework.security.config.annotation.web.configurers.JeeConfigurer;
+import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.WebAttributes;
@@ -70,11 +70,10 @@ public class WebSecurityConfiguration implements ServletContextAware {
   @Bean
   public static GrantedAuthorityDefaults grantedAuthorityDefaults() {
     // Reset prefix to be empty. By default it adds "ROLE_" prefix
-    return new GrantedAuthorityDefaults();
+    return new GrantedAuthorityDefaults("");
   }
 
   @Bean
-  @SuppressWarnings("removal")
   public SecurityFilterChain filterChain(HttpSecurity http,
                                          PortalAuthenticationManager authenticationProvider,
                                          @Qualifier("restRequestMatcher")
@@ -84,10 +83,9 @@ public class WebSecurityConfiguration implements ServletContextAware {
                                          @Qualifier("accessDeniedHandler")
                                          AccessDeniedHandler accessDeniedHandler,
                                          @Qualifier("requestAuthorizationManager")
-                                         AuthorizationManager<RequestAuthorizationContext> requestAuthorizationManager) throws Exception {
+                                         AuthorizationManager<RequestAuthorizationContext> requestAuthorizationManager) {
     return this.customizeHttpSecurity(http)
                .authenticationProvider(authenticationProvider)
-               .jee(JeeConfigurer::and) // NOSONAR no method replacement
                .csrf(CsrfConfigurer::disable)
                .headers(HeadersConfigurer::disable)
                .authorizeHttpRequests(customizer -> {
@@ -110,12 +108,12 @@ public class WebSecurityConfiguration implements ServletContextAware {
 
   @Bean("restRequestMatcher")
   public RequestMatcher restRequestMatcher() {
-    return request -> StringUtils.startsWith(request.getRequestURI(), servletContext.getContextPath() + "/rest/");
+    return request -> Strings.CS.startsWith(request.getRequestURI(), servletContext.getContextPath() + "/rest/");
   }
 
   @Bean("staticResourcesRequestMatcher")
   public RequestMatcher staticResourcesRequestMatcher() {
-    return request -> !StringUtils.startsWith(request.getRequestURI(), servletContext.getContextPath() + "/rest/");
+    return request -> !Strings.CS.startsWith(request.getRequestURI(), servletContext.getContextPath() + "/rest/");
   }
 
   @Bean("accessDeniedHandler")
@@ -136,7 +134,7 @@ public class WebSecurityConfiguration implements ServletContextAware {
 
   @Bean("requestAuthorizationManager")
   public AuthorizationManager<RequestAuthorizationContext> requestAuthorizationManager() {
-    return (Supplier<Authentication> authentication, RequestAuthorizationContext object) -> {
+    return (Supplier<? extends Authentication> authentication, RequestAuthorizationContext object) -> {
       Authentication userAuthentication = authentication.get();
       // Permit anonymous and authentication users to access
       // the REST endpoints and rely on jee & secured permission

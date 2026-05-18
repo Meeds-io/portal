@@ -21,15 +21,24 @@ package org.picketlink.idm.impl.model.hibernate;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.persistence.*;
-
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
-import org.hibernate.annotations.LazyCollection;
-import org.hibernate.annotations.LazyCollectionOption;
-import org.hibernate.annotations.LazyToOne;
-import org.hibernate.annotations.LazyToOneOption;
 import org.picketlink.idm.spi.model.IdentityObjectCredential;
+
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
 
 @Entity(name = "HibernateIdentityObjectCredential")
 @Table(name = "jbid_io_creden")
@@ -42,9 +51,8 @@ import org.picketlink.idm.spi.model.IdentityObjectCredential;
 public class HibernateIdentityObjectCredential implements IdentityObjectCredential {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.AUTO, generator="JBID_IO_CREDEN_ID_SEQ")
   @Column(name = "ID")
-  @SequenceGenerator(name = "JBID_IO_CREDEN_ID_SEQ", sequenceName = "JBID_IO_CREDEN_ID_SEQ", allocationSize = 1)
+  @PortableSequence(name = "JBID_IO_CREDEN_ID_SEQ")
   private Long                                         id;
 
   @ManyToOne(fetch = FetchType.EAGER)
@@ -55,7 +63,6 @@ public class HibernateIdentityObjectCredential implements IdentityObjectCredenti
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "IDENTITY_OBJECT_ID", nullable = false)
   @Fetch(FetchMode.SELECT)
-  @LazyToOne(LazyToOneOption.PROXY)
   private HibernateIdentityObject                      identityObject;
 
   @Column(name = "TEXT")
@@ -64,15 +71,13 @@ public class HibernateIdentityObjectCredential implements IdentityObjectCredenti
   @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
   @Fetch(FetchMode.SELECT)
   @JoinColumn(name = "BIN_VALUE_ID")
-  @LazyToOne(LazyToOneOption.PROXY)
   private HibernateIdentityObjectCredentialBinaryValue binaryValue;
 
-  @ElementCollection
+  @ElementCollection(fetch = FetchType.LAZY)
   @MapKeyColumn(name = "PROP_NAME")
   @Column(name = "PROP_VALUE")
   @CollectionTable(name = "jbid_io_creden_props", joinColumns = { @JoinColumn(name = "PROP_ID", referencedColumnName = "ID") })
   @Fetch(FetchMode.SUBSELECT)
-  @LazyCollection(LazyCollectionOption.EXTRA)
   private Map<String, String>                          properties = new HashMap<String, String>();
 
   public HibernateIdentityObjectCredential() {

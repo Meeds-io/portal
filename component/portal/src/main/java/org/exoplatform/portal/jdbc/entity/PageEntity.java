@@ -22,31 +22,29 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedQuery;
-import jakarta.persistence.SequenceGenerator;
-import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
-import lombok.Getter;
-import lombok.Setter;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import org.exoplatform.portal.mop.PageType;
 import org.exoplatform.portal.mop.SiteType;
 
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import lombok.Getter;
+import lombok.Setter;
+
 @Entity(name = "GateInPage")
-@SequenceGenerator(name = "SEQ_GTN_ID_GENERATOR", sequenceName = "SEQ_GTN_PAGE_ID", allocationSize = 1)
 @Table(name = "PORTAL_PAGES")
 @NamedQuery(name = "PageEntity.deleteByOwner", query = "DELETE GateInPage p WHERE p.owner.id = :ownerId")
 @NamedQuery(name = "PageEntity.findByKey", query = "SELECT p FROM GateInPage p WHERE p.name = :name AND p.owner.siteType = :ownerType AND p.owner.name = :ownerId")
@@ -55,8 +53,7 @@ public class PageEntity extends ComponentEntity implements Serializable {
   private static final long     serialVersionUID = -6195451978995765259L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_PAGE_ID_GENERATOR", sequenceName = "SEQ_PAGE_ID_GENERATOR", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_PAGE_ID_GENERATOR")
+  @PortableSequence(name = "SEQ_PAGE_ID_GENERATOR")
   @Column(name = "ID")
   protected Long                id;
 

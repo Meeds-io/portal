@@ -26,6 +26,8 @@
     </encoder>
   </appender>
   <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="ERROR" />
+  <logger name="org.hibernate.orm.jdbc.warn" level="ERROR" />
+  <logger name="org.hibernate.orm.deprecation" level="ERROR" />
   <logger name="liquibase.executor.jvm.JdbcExecutor" level="ERROR" />
   <logger name="liquibase.database.core.HsqlDatabase" level="ERROR" />
   <logger name="liquibase.database.core.MySQLDatabase" level="ERROR" />
