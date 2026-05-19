@@ -729,7 +729,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                                   boolean returnSize) throws Exception {
 
     offset = Math.max(offset, DEFAULT_OFFSET);
-    limit = Math.max(limit, DEFAULT_LIMIT);
+    limit = limit > 0 ? limit : DEFAULT_LIMIT;
     if (StringUtils.isBlank(groupId)) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
@@ -778,5 +778,4 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     parentGroupEntity.addChild(groupRestEntity);
     buildTree(rootGroups, groupsById, parentGroupEntity);
   }
-
 }
