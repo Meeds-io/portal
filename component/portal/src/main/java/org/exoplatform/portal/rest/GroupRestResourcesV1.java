@@ -38,6 +38,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.utils.ListAccess;
@@ -248,6 +249,12 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     }
 
     organizationService.getGroupHandler().addChild(parent, group, true);
+    if (parent != null && CollectionUtils.isNotEmpty(group.getEnclosingMemberships())) {
+      for (NestedMembership enclosingMembership : group.getEnclosingMemberships()) {
+        enclosingMembership.setNestedGroupId(groupId);
+        organizationService.getGroupHandler().linkGroups(enclosingMembership);
+      }
+    }
     return Response.noContent().build();
   }
 
@@ -692,6 +699,64 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     return Response.ok(result).build();
   }
 
+  @GET
+  @Path("nested")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("administrators")
+  @Operation(
+      summary = "Get nested groups",
+      description = "Returns paginated nested groups of a parent group",
+      method = "GET")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Request fulfilled successfully"),
+      @ApiResponse(responseCode = "404", description = "Parent group not found"),
+      @ApiResponse(responseCode = "500", description = "Internal server error")
+  })
+  public Response getNestedGroups(@Context UriInfo uriInfo,
+                                  @Parameter(description = "Parent group id", required = true)
+                                  @QueryParam("groupId")
+                                  String groupId,
+                                  @Parameter(description = "Pagination offset")
+                                  @DefaultValue("0")
+                                  @QueryParam("offset")
+                                  int offset,
+                                  @Parameter(description = "Pagination limit")
+                                  @DefaultValue("20")
+                                  @QueryParam("limit")
+                                  int limit,
+                                  @Parameter(description = "Return total size")
+                                  @QueryParam("returnSize")
+                                  boolean returnSize) throws Exception {
+
+    offset = Math.max(offset, DEFAULT_OFFSET);
+    limit = limit > 0 ? limit : DEFAULT_LIMIT;
+    if (StringUtils.isBlank(groupId)) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    Group parentGroup = organizationService.getGroupHandler().findGroupById(groupId);
+    if (parentGroup == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    List<Group> groups = organizationService.getGroupHandler()
+                                            .getNestedMemberships(groupId)
+                                            .stream()
+                                            .map(NestedMembership::getNestedGroupId)
+                                            .sorted(String.CASE_INSENSITIVE_ORDER)
+                                            .map(id -> {
+                                              try {
+                                                return organizationService.getGroupHandler().findGroupById(id);
+                                              } catch (Exception e) {
+                                                return null;
+                                              }
+                                            })
+                                            .filter(Objects::nonNull)
+                                            .toList();
+    int totalSize = groups.size();
+    List<GroupRestEntity> groupRestEntities = groups.stream().skip(offset).limit(limit).map(GroupRestEntity::new).toList();
+    CollectionEntity<GroupRestEntity> result = new CollectionEntity<>(groupRestEntities, offset, limit, returnSize ? totalSize : 0);
+    return Response.ok(result).build();
+  }
+
   private void buildTree(List<GroupRestEntity> rootGroups,
                          Map<String, GroupRestEntity> groupsById,
                          GroupRestEntity groupRestEntity) throws Exception {
@@ -713,5 +778,4 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     parentGroupEntity.addChild(groupRestEntity);
     buildTree(rootGroups, groupsById, parentGroupEntity);
   }
-
 }
