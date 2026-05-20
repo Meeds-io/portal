@@ -22,6 +22,7 @@
   import org.exoplatform.services.resources.LocaleConfigService;
   import org.exoplatform.portal.mop.user.UserNode;
   import org.exoplatform.portal.mop.SiteKey;
+  import org.exoplatform.portal.config.UserPortalConfigService;
 
   def rcontext = _ctx.getRequestContext() ;
   def session = rcontext.getRequest().getSession();
@@ -105,6 +106,19 @@
   LocaleConfigService localeConfigService = uicomponent.getApplicationComponent(LocaleConfigService.class);
   def defaultLocaleTag = localeConfigService.getDefaultLocaleConfig().getLocale().toLanguageTag();
 
+  UserPortalConfigService portalConfigService = uicomponent.getApplicationComponent(UserPortalConfigService.class);
+  String defaultPath;
+  if (StringUtils.equals(rcontext.getPortalOwner(), "public")) {
+    defaultPath = "/portal/public";
+  } else {
+    defaultPath = portalConfigService.getUserHomePage(userName);
+    if (defaultPath == null) {
+      defaultPath = portalConfigService.getDefaultPath(userName);
+    }
+  }
+  if (defaultPath == null) {
+    defaultPath = "/portal/" + rcontext.getPortalOwner();
+  }
 %>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="$language" lang="$language" dir="$dir">
   <head id="head">
@@ -175,6 +189,7 @@
      eXo.env.portal.csrfToken = "<%=CSRFTokenUtil.getToken(rcontext.getRequest())%>";
      eXo.env.portal.productName = "<%=productName%>";
      eXo.env.portal.productLink = "<%=productLink%>";
+     eXo.env.portal.defaultPath = "<%=defaultPath%>";
      eXo.env.portal.siteId = '<%=siteId%>';
      eXo.env.portal.siteLabel = '<%=rcontext.getSiteLabel() == null ? "" : rcontext.getSiteLabel().replaceAll("'", "\\\\'")%>';
      eXo.env.server.context = "<%=docBase%>";
