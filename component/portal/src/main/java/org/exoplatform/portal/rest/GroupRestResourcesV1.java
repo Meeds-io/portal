@@ -752,8 +752,8 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                                             .filter(Objects::nonNull)
                                             .toList();
     int totalSize = groups.size();
-    List<Group> paginatedGroups = groups.stream().skip(offset).limit(limit).toList();
-    CollectionEntity<Group> result = new CollectionEntity<>(paginatedGroups, offset, limit, returnSize ? totalSize : 0);
+    List<GroupRestEntity> groupRestEntities = groups.stream().skip(offset).limit(limit).map(GroupRestEntity::new).toList();
+    CollectionEntity<GroupRestEntity> result = new CollectionEntity<>(groupRestEntities, offset, limit, returnSize ? totalSize : 0);
     return Response.ok(result).build();
   }
 
