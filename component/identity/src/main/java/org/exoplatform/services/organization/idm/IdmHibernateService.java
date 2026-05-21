@@ -163,14 +163,14 @@ public class IdmHibernateService implements ComponentRequestLifecycle {
 
   public Object create(Object obj) throws Exception {
     Session session = openSession();
-    session.save(obj);
+    session.persist(obj);
     session.flush();
     return obj;
   }
 
   public Object update(Object obj) throws Exception {
     Session session = openSession();
-    session.update(obj);
+    session.persist(obj);
     session.flush();
     return obj;
   }
@@ -184,7 +184,7 @@ public class IdmHibernateService implements ComponentRequestLifecycle {
 
   public Object remove(Object obj) throws Exception {
     Session session = openSession();
-    session.delete(obj);
+    session.remove(obj);
     session.flush();
     return obj;
   }
@@ -193,7 +193,7 @@ public class IdmHibernateService implements ComponentRequestLifecycle {
   public Object remove(Class clazz, Serializable id) throws Exception {
     Session session = openSession();
     Object obj = session.get(clazz, id);
-    session.delete(obj);
+    session.remove(obj);
     session.flush();
     return obj;
   }
@@ -201,7 +201,7 @@ public class IdmHibernateService implements ComponentRequestLifecycle {
   @SuppressWarnings("rawtypes")
   public Object remove(Session session, Class clazz, Serializable id) throws Exception {
     Object obj = session.get(clazz, id);
-    session.delete(obj);
+    session.remove(obj);
     return obj;
   }
 

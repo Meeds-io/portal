@@ -58,7 +58,7 @@ public class EmptyResponse implements HttpServletResponse {
   public void sendError(int i) throws IOException {
   }
 
-  public void sendRedirect(String s) throws IOException {
+  public void sendRedirect(String location, int sc, boolean clearBuffer) throws IOException {
   }
 
   public void setDateHeader(String s, long l) {
