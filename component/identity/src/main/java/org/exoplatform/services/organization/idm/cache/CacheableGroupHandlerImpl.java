@@ -20,8 +20,11 @@ package org.exoplatform.services.organization.idm.cache;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
@@ -105,6 +108,9 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
         }
       }
       super.addChild(parent, child, broadcast);
+      if (CollectionUtils.isNotEmpty(child.getEnclosingMemberships())) {
+        clearNestedMembershipsCache(child.getEnclosingMemberships());
+      }
     } finally {
       disableCacheInThread.set(false);
     }
@@ -172,11 +178,11 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     disableCacheInThread.set(true);
     try {
       String groupId = getGroupId(group);
-
       // Delete related cache entries
       groupCache.select(new ClearGroupCacheByGroupIdSelector(groupId, group.getParentId(), useCacheList));
       membershipCache.select(new ClearMembershipCacheByGroupIdSelector(groupId));
-
+      clearNestedMembershipsCache(group.getEnclosingMemberships());
+      clearNestedMembershipsCache(getNestedMemberships(group.getId()));
       gr = super.removeGroup(group, broadcast);
     } finally {
       disableCacheInThread.set(false);
@@ -211,6 +217,24 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
         groupCache.remove(computeChildrenKey(group.getParentId()));
       }
       super.saveGroup(group, broadcast);
+    } finally {
+      disableCacheInThread.set(false);
+    }
+  }
+
+  @Override
+  public void updateGroup(Group group, boolean broadcast) throws Exception {
+    disableCacheInThread.set(true);
+    Group existingGroup = findGroupById(group.getId());
+    try {
+      groupCache.remove(getGroupId(group));
+      if (group.getParentId() == null) {
+        groupCache.remove(computeChildrenKey((String) null));
+      } else {
+        groupCache.remove(computeChildrenKey(group.getParentId()));
+      }
+      super.updateGroup(group, broadcast);
+      clearAffectedNestedMembershipsCache(existingGroup, group);
     } finally {
       disableCacheInThread.set(false);
     }
@@ -357,6 +381,27 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     groupCache.remove(computeChildrenKey(nestedMembership.getGroupId()));
     groupCache.remove(nestedMembership.getNestedGroupId());
     groupCache.remove(computeChildrenKey(nestedMembership.getNestedGroupId()));
+  }
+
+  private void clearNestedMembershipsCache(Set<NestedMembership> nestedMemberships) {
+    if (CollectionUtils.isNotEmpty(nestedMemberships)) {
+      nestedMemberships.forEach(this::clearNestedMembershipCache);
+    }
+  }
+
+  private void clearAffectedNestedMembershipsCache(Group existingGroup, Group updatedGroup) {
+    Set<NestedMembership> oldMemberships = super.toSet(existingGroup.getEnclosingMemberships());
+    Set<NestedMembership> newMemberships = super.toSet(updatedGroup.getEnclosingMemberships());
+
+    Set<NestedMembership> toRemove = new HashSet<>(oldMemberships);
+    toRemove.removeAll(newMemberships);
+
+    Set<NestedMembership> toAdd = new HashSet<>(newMemberships);
+    toAdd.removeAll(oldMemberships);
+
+    // Clear cache for both added and removed enclosing memberships
+    clearNestedMembershipsCache(toRemove);
+    clearNestedMembershipsCache(toAdd);
   }
 
 }
