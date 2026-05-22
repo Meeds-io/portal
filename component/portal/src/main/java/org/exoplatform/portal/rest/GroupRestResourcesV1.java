@@ -249,12 +249,6 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     }
 
     organizationService.getGroupHandler().addChild(parent, group, true);
-    if (parent != null && CollectionUtils.isNotEmpty(group.getEnclosingMemberships())) {
-      for (NestedMembership enclosingMembership : group.getEnclosingMemberships()) {
-        enclosingMembership.setNestedGroupId(groupId);
-        organizationService.getGroupHandler().linkGroups(enclosingMembership);
-      }
-    }
     return Response.noContent().build();
   }
 
@@ -283,7 +277,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                      .entity("ID:NOT_FOUND")
                      .build();
     }
-    organizationService.getGroupHandler().saveGroup(group, true);
+    organizationService.getGroupHandler().updateGroup(group, true);
     return Response.noContent().build();
   }
 
