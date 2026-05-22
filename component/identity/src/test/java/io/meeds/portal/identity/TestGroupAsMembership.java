@@ -21,6 +21,8 @@ package io.meeds.portal.identity;
 import static org.junit.Assert.assertThrows;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -47,6 +49,9 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
   private static final String GROUP_2 = "/organization/management/executive-board";
 
   private static final String GROUP_1 = "/organization/management/human-resources";
+
+  private static final String GROUP_4 = "/organization/management";
+
 
   private OrganizationService organizationService;                                 // NOSONAR
 
@@ -413,6 +418,68 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                            .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
     assertFalse(memberships.stream()
                            .anyMatch(m -> m.getGroupId().equals(parentOfParentGroup.getId())));
+  }
+
+  public void testUpdateGroupAsMembership() throws Exception {
+    Group parentGroup = groupDao.findGroupById(GROUP_4);
+    Group nestedGroup = groupDao.findGroupById(GROUP_2);
+
+    // Given
+    Collection<Membership> memberships = membershipDao.findMembershipsByUser("root", true);
+    assertTrue(memberships.stream()
+                          .anyMatch(m -> m.getGroupId().equals(nestedGroup.getId())));
+    assertFalse(memberships.stream()
+                           .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
+    // When
+    String membershipType = "member";
+    NestedMembership nestedMembership = NestedMembership.builder()
+                                                      .groupId(parentGroup.getId())
+                                                      .membershipType(membershipType)
+                                                      .nestedGroupId(nestedGroup.getId())
+                                                      .nestedMembershipType(membershipType)
+                                                      .build();
+    nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singletonList(nestedMembership)));
+    groupDao.updateGroup(nestedGroup, true);
+
+    // Then
+    Set<NestedMembership> updatedNestedMemberships = groupDao.getNestedMemberships(parentGroup.getId());
+    assertNotNull(updatedNestedMemberships);
+    assertTrue(updatedNestedMemberships.stream().anyMatch(m -> m.getNestedGroupId().equals(nestedGroup.getId())));
+    assertTrue(updatedNestedMemberships.stream()
+                                       .anyMatch(m -> m.getNestedGroupId().equals(nestedGroup.getId())
+                                           && m.getNestedMembershipType().equals(membershipType)));
+    assertNull(groupDao.findGroupById(parentGroup.getId()).getEnclosingMemberships());
+
+    Set<NestedMembership> updatedEnclosingMemberships = groupDao.findGroupById(nestedGroup.getId()).getEnclosingMemberships();
+    assertNotNull(updatedEnclosingMemberships);
+    assertTrue(updatedEnclosingMemberships.stream().anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
+    assertTrue(updatedEnclosingMemberships.stream()
+                                          .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())
+                                             && m.getMembershipType().equals(membershipType)));
+    assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(nestedGroup.getId())));
+
+    memberships = membershipDao.findMembershipsByUser("root", true);
+    assertTrue(memberships.stream()
+                          .anyMatch(m -> m.getGroupId().equals(nestedGroup.getId())));
+    assertTrue(memberships.stream()
+                          .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
+
+    //when
+    nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.emptyList()));
+    groupDao.updateGroup(nestedGroup, true);
+
+    //
+    updatedNestedMemberships = groupDao.getNestedMemberships(parentGroup.getId());
+    assertTrue(CollectionUtils.isEmpty(updatedNestedMemberships));
+
+    updatedEnclosingMemberships = groupDao.findGroupById(nestedGroup.getId()).getEnclosingMemberships();
+    assertTrue(CollectionUtils.isEmpty(updatedEnclosingMemberships));
+
+    memberships = membershipDao.findMembershipsByUser("root", true);
+    assertTrue(memberships.stream()
+                          .anyMatch(m -> m.getGroupId().equals(nestedGroup.getId())));
+    assertFalse(memberships.stream()
+                          .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
   }
 
 }
