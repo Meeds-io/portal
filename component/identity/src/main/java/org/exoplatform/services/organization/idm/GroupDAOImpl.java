@@ -176,6 +176,14 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     if (broadcast) {
       postSave(child, true);
     }
+    
+    if (CollectionUtils.isNotEmpty(child.getEnclosingMemberships())) {
+      Set<NestedMembership> enclosingMemberships = child.getEnclosingMemberships();
+      for (NestedMembership enclosingMembership : enclosingMemberships) {
+        enclosingMembership.setNestedGroupId(child.getId());
+      }
+      updateNestedMemberships(enclosingMemberships, null);
+    }
 
   }
 
@@ -270,10 +278,27 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     }
   }
 
+  @Override
+  public void updateGroup(Group group, boolean broadcast) throws Exception {
+    if (group == null || group.getId() == null) {
+      throw new IllegalArgumentException("Group and group ID cannot be null");
+    }
+    Group existingGroup = findGroupById(group.getId());
+    if (existingGroup == null) {
+      throw new Exception(String.format("Group with id %s does not exist", group.getId()));
+    }
+    saveGroup(group, broadcast);
+    // Handle enclosing membership changes
+    updateEnclosingMemberships(existingGroup, group);
+  }
+
   public Group removeGroup(Group group, boolean broadcast) throws Exception {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log, LogLevel.TRACE, "removeGroup", new Object[] { "group", group, "broadcast", broadcast });
     }
+    // unlink groups before removing
+    updateNestedMemberships(null, group.getEnclosingMemberships());
+    updateNestedMemberships(null, getNestedMemberships(group.getId()));
 
     org.picketlink.idm.api.Group jbidGroup = null;
 
@@ -1238,6 +1263,13 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     decoratorPlugins.add(decoratorPlugin);
   }
 
+  protected Set<NestedMembership> toSet(Collection<NestedMembership> collection) {
+    if (CollectionUtils.isEmpty(collection)) {
+      return Collections.emptySet();
+    }
+    return new HashSet<>(collection);
+  }
+
   @SneakyThrows
   private boolean isNestedIn(String parentGroupId, String memberGroupId) {
     Set<NestedMembership> nestedMemberships = getNestedMemberships(memberGroupId);
@@ -1297,6 +1329,44 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   private void broadcastUnLinkGroups(NestedMembership nestedMembership) throws Exception {
     for (GroupEventListener listener : listeners_) {
       listener.unlinkGroups(nestedMembership);
+    }
+  }
+
+  /**
+   * Updates enclosing (inherited) memberships by calculating the difference between
+   * current and new state.
+   */
+  private void updateEnclosingMemberships(Group existingGroup, Group updatedGroup) {
+    Set<NestedMembership> oldMemberships = toSet(existingGroup.getEnclosingMemberships());
+    Set<NestedMembership> newMemberships = toSet(updatedGroup.getEnclosingMemberships());
+
+    Set<NestedMembership> toRemove = new HashSet<>(oldMemberships);
+    toRemove.removeAll(newMemberships);
+
+    Set<NestedMembership> toAdd = new HashSet<>(newMemberships);
+    toAdd.removeAll(oldMemberships);
+
+    updateNestedMemberships(toAdd, toRemove);
+  }
+
+  private void updateNestedMemberships(Set<NestedMembership> toAdd, Set<NestedMembership> toRemove) {
+    if (CollectionUtils.isNotEmpty(toAdd)) {
+      toAdd.forEach(nestedMembership -> {
+        try {
+          linkGroups(nestedMembership);
+        } catch (Exception e) {
+          handleException(String.format("Cannot link group %s as nested to %s", nestedMembership.getNestedGroupId(), nestedMembership.getGroupId()), e);
+        }
+      });
+    }
+    if (CollectionUtils.isNotEmpty(toRemove)) {
+      toRemove.forEach(nestedMembership -> {
+        try {
+          unlinkGroups(nestedMembership);
+        } catch (Exception e) {
+          handleException(String.format("Cannot unlink group %s as nested from %s", nestedMembership.getNestedGroupId(), nestedMembership.getGroupId()), e);
+        }
+      });
     }
   }
 
