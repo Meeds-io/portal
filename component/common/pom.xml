@@ -21,7 +21,7 @@
   <parent>
     <groupId>io.meeds.portal</groupId>
     <artifactId>portal.component</artifactId>
-    <version>7.2.x-SNAPSHOT</version>
+    <version>7.2.0-M23</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>portal.component.common</artifactId>
