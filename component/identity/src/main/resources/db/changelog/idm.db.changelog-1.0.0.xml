@@ -450,4 +450,7 @@
     </sql>
   </changeSet>
 
+  <changeSet author="idm" id="1.0.0-22" dbms="mysql">
+    <modifyDataType tableName="jbid_io_attr_text_values" columnName="ATTR_VALUE" newDataType="CLOB" />
+  </changeSet>
 </databaseChangeLog>
