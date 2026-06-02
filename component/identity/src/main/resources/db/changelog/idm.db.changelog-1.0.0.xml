@@ -450,7 +450,11 @@
     </sql>
   </changeSet>
 
-  <changeSet author="idm" id="1.0.0-22" dbms="mysql">
-    <modifyDataType tableName="jbid_io_attr_text_values" columnName="ATTR_VALUE" newDataType="CLOB" />
+  <changeSet author="idm" id="1.0.0-meed-10447-01">
+    <modifyDataType tableName="jbid_io_attr_text_values" columnName="ATTR_VALUE" newDataType="VARCHAR(2048)" />
+    <modifySql dbms="mysql">
+      <replace replace="VARCHAR(2048)" with="VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" />
+    </modifySql>
   </changeSet>
+
 </databaseChangeLog>
