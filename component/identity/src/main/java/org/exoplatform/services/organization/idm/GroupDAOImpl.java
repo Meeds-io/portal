@@ -996,6 +996,9 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   }
 
   private org.picketlink.idm.api.Group persistGroup(Group exoGroup) throws Exception {
+    for (GroupDecoratorPlugin decoratorPlugin : decoratorPlugins) {
+      exoGroup = decoratorPlugin.undecorate(exoGroup);
+    }
 
     org.picketlink.idm.api.Group jbidGroup = null;
 
