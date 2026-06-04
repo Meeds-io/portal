@@ -222,7 +222,7 @@ public class PicketLinkIDMExternalStoreService implements IDMExternalStoreServic
 
         if (isUpdateInformationOnLogin()) {
           try {
-            getExternalStoreImportService().importEntityToInternalStore(IDMEntityType.USER_MEMBERSHIPS, username, true, false);
+            getExternalStoreImportService().importEntityToInternalStore(IDMEntityType.USER_MEMBERSHIPS, username, true, getExternalStoreImportService().isUpdateDeletedUserMemberships());
           } catch (Exception e) {
             LOG.error("Error while importing user memberships '" + username + "' from external store", e);
           }
