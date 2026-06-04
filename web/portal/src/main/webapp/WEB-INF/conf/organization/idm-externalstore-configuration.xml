@@ -66,6 +66,16 @@
 				<description>If TRUE delete users if they are not present in external store, otherwise disable them (Default : delete users)</description>
 				<value>${exo.idm.externalStore.entries.missing.delete:true}</value>
 			</value-param>
+			<value-param>
+				<name>exo.idm.externalStore.user.memberships.update.delete</name>
+				<description>If TRUE : removed memberships in external user object will be removed in exo</description>
+				<value>${exo.idm.externalStore.user.memberships.update.delete:true}</value>
+			</value-param>
+			<value-param>
+				<name>exo.idm.externalStore.group.memberships.update.delete</name>
+				<description>If TRUE : removed memberships in external group object will be removed in exo</description>
+				<value>${exo.idm.externalStore.group.memberships.update.delete:true}</value>
+			</value-param>
 		</init-params>
 	</component>
 
