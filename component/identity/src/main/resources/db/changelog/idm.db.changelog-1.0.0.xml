@@ -457,4 +457,22 @@
     </modifySql>
   </changeSet>
 
+  <changeSet author="idm" id="1.0.0-exo-87644-01" dbms="mysql">
+    <sql>
+      ALTER TABLE jbid_realm MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+    </sql>
+  </changeSet>
+
+  <changeSet author="idm" id="1.0.0-exo-87644-02" dbms="mysql">
+    <sql>
+      ALTER TABLE jbid_io_type MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+    </sql>
+  </changeSet>
+
+  <changeSet author="idm" id="1.0.0-exo-87644-03" dbms="mysql">
+    <sql>
+      ALTER TABLE jbid_io MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+    </sql>
+  </changeSet>
+
 </databaseChangeLog>
