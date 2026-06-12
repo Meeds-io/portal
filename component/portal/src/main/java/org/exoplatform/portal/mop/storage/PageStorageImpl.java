@@ -57,8 +57,6 @@ public class PageStorageImpl implements PageStorage {
 
   private static final Log    LOG                  = ExoLogger.getLogger(PageStorageImpl.class);
 
-  private static final String NO_NULL_KEY_ACCEPTED = "No null key accepted";
-
   protected ListenerService   listenerService;
 
   protected LayoutStorage     layoutStorage;
@@ -80,19 +78,19 @@ public class PageStorageImpl implements PageStorage {
   @Override
   public Page getPage(String pageKey) {
     PageKey key = PageKey.parse(pageKey);
-    return getPage(key);
+    return key == null ? null : getPage(key);
   }
 
   @Override
   public Page getPage(long id) {
     PageKey key = getPageKey(id);
-    return getPage(key);
+    return key == null ? null : getPage(key);
   }
 
   @Override
   public Page getPage(PageKey key) {
     if (key == null) {
-      throw new IllegalArgumentException(NO_NULL_KEY_ACCEPTED);
+      return null;
     }
     PageData pageData = getPage(key.toPomPageKey());
     if (pageData == null) {
@@ -105,7 +103,7 @@ public class PageStorageImpl implements PageStorage {
   @Override
   public PageContext loadPage(PageKey key) {
     if (key == null) {
-      throw new IllegalArgumentException(NO_NULL_KEY_ACCEPTED);
+      return null;
     }
 
     PageData pageData = getPage(key.toPomPageKey());
