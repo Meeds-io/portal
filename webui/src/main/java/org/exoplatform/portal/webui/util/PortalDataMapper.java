@@ -122,7 +122,6 @@ public class PortalDataMapper {
   }
 
   public static void toUIPage(UIPage uiPage, Page model) {
-    toUIContainer(uiPage, model);
     uiPage.setSiteKey(new SiteKey(model.getOwnerType(), model.getOwnerId()));
     uiPage.setIcon(model.getIcon());
     uiPage.setAccessPermissions(model.getAccessPermissions());
@@ -135,6 +134,7 @@ public class PortalDataMapper {
     uiPage.setHideSharedLayout(model.isHideSharedLayout());
     uiPage.setShowSharedLayout(model.isShowSharedLayout());
 
+    toUIContainer(uiPage, model);
     List<UIPortlet> portlets = new ArrayList<>();
     uiPage.findComponentOfType(portlets, UIPortlet.class);
   }
