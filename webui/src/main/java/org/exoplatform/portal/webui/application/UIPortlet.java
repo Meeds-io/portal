@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,6 +44,7 @@ import org.gatein.common.net.media.MediaType;
 import org.gatein.common.util.MultiValuedPropertyMap;
 import org.gatein.common.util.ParameterValidation;
 import org.gatein.pc.api.Mode;
+import org.gatein.pc.api.NoSuchPortletException;
 import org.gatein.pc.api.PortletContext;
 import org.gatein.pc.api.PortletInvoker;
 import org.gatein.pc.api.PortletInvokerException;
@@ -72,6 +74,7 @@ import org.gatein.pc.portlet.impl.spi.AbstractWindowContext;
 import org.w3c.dom.Element;
 
 import org.exoplatform.Constants;
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.commons.utils.Text;
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.application.PortalRequestContext;
@@ -79,6 +82,7 @@ import org.exoplatform.portal.application.UserProfileLifecycle;
 import org.exoplatform.portal.application.state.ContextualPropertyManager;
 import org.exoplatform.portal.config.NoSuchDataException;
 import org.exoplatform.portal.module.ModuleRegistry;
+import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.pc.ExoPortletState;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
@@ -572,12 +576,35 @@ public class UIPortlet extends UIApplication {
         if (moduleRegistry.isPortletActive(applicationId)) {
           try {
             this.producedOfferedPortlet = portletInvoker.getPortlet(producerOfferedPortletContext);
+          } catch (NoSuchPortletException e) {
+            this.producedOfferedPortlet = null;
+            SiteKey siteKey = null;
+            String requestURI = null;
+            PortalRequestContext portalRequestContext = PortalRequestContext.getCurrentInstance();
+            if (portalRequestContext != null) {
+              siteKey = portalRequestContext.getSiteKey();
+              if (portalRequestContext.getPage() != null) {
+                requestURI = portalRequestContext.getRequestURI();
+              }
+            }
+            if (PropertyManager.isDevelopping() || LOG.isDebugEnabled()) {
+              LOG.warn("Portlet '{}' wasn't found in page '{}' of site '{}'. Continue rendering the page",
+                       applicationId,
+                       StringUtils.defaultIfBlank(requestURI, "/"),
+                       Objects.toString(siteKey, ""),
+                       e);
+            } else {
+              LOG.warn("Portlet '{}' wasn't found in page '{}' of site '{}'. Continue rendering the page",
+                       applicationId,
+                       StringUtils.defaultIfBlank(requestURI, "/"),
+                       Objects.toString(siteKey, ""));
+            }
           } catch (Exception e) {
             // Whenever couldn't invoke the portlet object, set the request
             // portlet to null for the error tobe
             // properly handled and displayed when the portlet is rendered
             this.producedOfferedPortlet = null;
-            LOG.error(e.getMessage(), e);
+            LOG.warn("Error while retrieving Producer of Portlet {}. Continue rendering the page", applicationId, e);
           }
         }
 
