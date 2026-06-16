@@ -457,21 +457,21 @@
     </modifySql>
   </changeSet>
 
-  <changeSet author="idm" id="1.0.0-exo-87644-01" dbms="mysql">
+  <changeSet author="idm" id="1.0.0-exo-87644-04" dbms="mysql">
     <sql>
-      ALTER TABLE jbid_realm MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+      ALTER TABLE jbid_realm MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;
     </sql>
   </changeSet>
 
-  <changeSet author="idm" id="1.0.0-exo-87644-02" dbms="mysql">
+  <changeSet author="idm" id="1.0.0-exo-87644-05" dbms="mysql">
     <sql>
-      ALTER TABLE jbid_io_type MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+      ALTER TABLE jbid_io_type MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;
     </sql>
   </changeSet>
 
-  <changeSet author="idm" id="1.0.0-exo-87644-03" dbms="mysql">
+  <changeSet author="idm" id="1.0.0-exo-87644-06" dbms="mysql">
     <sql>
-      ALTER TABLE jbid_io MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+      ALTER TABLE jbid_io MODIFY COLUMN NAME VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;
     </sql>
   </changeSet>
 
