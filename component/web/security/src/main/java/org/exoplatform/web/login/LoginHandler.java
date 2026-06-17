@@ -19,8 +19,6 @@
 package org.exoplatform.web.login;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -63,6 +61,7 @@ import org.exoplatform.web.application.JspBasedWebHandler;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 import org.exoplatform.web.security.AuthenticationRegistry;
+import org.exoplatform.web.security.RedirectUrlValidator;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
 import org.exoplatform.web.security.sso.SSOHelper;
@@ -353,28 +352,19 @@ public class LoginHandler extends JspBasedWebHandler {
   }
 
   private String getInitalUri(HttpServletRequest request) {
-    // Obtain initial URI
+    // Obtain and validate initial URI
     String initialURI = request.getParameter("initialURI");
+    String sanitizedInitialURI = RedirectUrlValidator.sanitizeInitialURI(request, initialURI);
 
-    // Otherwise compute one
-    if (initialURI == null || initialURI.length() == 0) {
-      initialURI = request.getContextPath();
-      LOG.debug("No initial URI found, will use default " + initialURI + " instead ");
+    if (StringUtils.isBlank(initialURI)) {
+      LOG.debug("No initial URI found, will use default " + sanitizedInitialURI + " instead ");
+    } else if (StringUtils.equals(initialURI, sanitizedInitialURI)) {
+      LOG.debug("Found initial URI " + sanitizedInitialURI);
     } else {
-      LOG.debug("Found initial URI " + initialURI);
+      LOG.warn("Unsafe initial URI in login link. Redirecting to the portal context path instead.");
     }
 
-    try {
-      URI uri = new URI(initialURI);
-      if ((uri.getHost() != null) && !(uri.getHost().equals(request.getServerName()))) {
-        LOG.warn("Cannot redirect to an URI outside of the current host when using a login redirect. Redirecting to the portal context path instead.");
-        initialURI = request.getContextPath();
-      }
-    } catch (URISyntaxException e) {
-      LOG.warn("Initial URI in login link is malformed. Redirecting to the portal context path instead.");
-      initialURI = request.getContextPath();
-    }
-    return initialURI;
+    return sanitizedInitialURI;
   }
 
   /**
