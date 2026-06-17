@@ -18,8 +18,11 @@
  */
 package org.exoplatform.upload;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
@@ -144,6 +147,29 @@ public class TestUploadService extends AbstractKernelTest {
             assertEquals("Upload id " + notAllowedUploadId
                     + " is not valid, it cannot be null or contain '.' , '/' or '\\'", e.getMessage());
         }
+    }
+
+    @Test
+    public void testShouldRejectUnsafeSvgUpload() throws Exception {
+        SvgUploadValidator validator = new SvgUploadValidator();
+        String unsafeSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"><rect width=\"10\" height=\"10\"/></svg>";
+
+        try (InputStream inputStream = new ByteArrayInputStream(unsafeSvg.getBytes(StandardCharsets.UTF_8))) {
+            validator.validate("infected.svg", "image/svg+xml", inputStream);
+            fail("Unsafe SVG upload must be rejected");
+        } catch (FileUploadException e) {
+            assertEquals(SvgUploadValidator.INFECTED_SVG_MESSAGE, e.getMessage());
+        }
+    }
+
+    @Test
+    public void testSvgValidatorShouldNotSupportNonSvgFiles() {
+        SvgUploadValidator validator = new SvgUploadValidator();
+
+        assertFalse(validator.supports("document.xml", "application/xml"));
+        assertFalse(validator.supports("page.html", "text/html"));
+        assertFalse(validator.supports("presentation.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"));
+        assertFalse(validator.supports("spreadsheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }
 
     private void assertFileCreation(String fileName) {

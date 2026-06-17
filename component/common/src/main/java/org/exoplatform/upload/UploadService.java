@@ -19,6 +19,7 @@
 package org.exoplatform.upload;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +40,7 @@ import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.fileupload2.core.ProgressListener;
 import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletDiskFileUpload;
 
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.PortalContainerInfo;
 import org.exoplatform.services.log.ExoLogger;
@@ -64,6 +66,8 @@ public class UploadService {
   private static final Pattern        UPLOAD_ID_PATTERN      = Pattern.compile("[^(\\./\\\\)]*");
 
   private List<MimeTypeUploadPlugin>  plugins;
+
+  private List<UploadFileValidator>   uploadFileValidators;
 
   private Map<String, UploadResource> uploadResources        = new LinkedHashMap<>();
 
@@ -138,15 +142,10 @@ public class UploadService {
     DiskFileItem fileItem = getFileItem(request, upResource);
     upResource.setFileName(fileItem.getName());
     upResource.setMimeType(fileItem.getContentType());
+    applyMimeTypeUploadPlugins(upResource, fileItem.getName());
     if (upResource.getStatus() == UploadResource.UPLOADED_STATUS) {
       writeFile(upResource, fileItem);
-    }
-    if (plugins != null) {
-      for (MimeTypeUploadPlugin plugin : plugins) {
-        String mimeType = plugin.getMimeType(fileItem.getName());
-        if (mimeType != null)
-          upResource.setMimeType(mimeType);
-      }
+      validateUploadedFile(upResource);
     }
   }
 
@@ -184,6 +183,7 @@ public class UploadService {
 
     upResource.setFileName(fileName);
     upResource.setMimeType(headers.get(RequestStreamReader.CONTENT_TYPE));
+    applyMimeTypeUploadPlugins(upResource, fileName);
     upResource.setStoreLocation(uploadLocation_ + "/" + uploadId + "." + fileName);
     upResource.setEstimatedSize(contentLength);
     File fileStore = new File(upResource.getStoreLocation());
@@ -192,16 +192,54 @@ public class UploadService {
     } else {
       throw new IllegalStateException("Wasn't able to create a file with uploadId " + uploadId);
     }
-    FileOutputStream output = new FileOutputStream(fileStore);
-    reader.readBodyData(inputStream, contentType, output);
+    try (FileOutputStream output = new FileOutputStream(fileStore)) {
+      reader.readBodyData(inputStream, contentType, output);
+    }
 
     if (upResource.getStatus() == UploadResource.UPLOADING_STATUS) {
+      validateUploadedFile(upResource);
       upResource.setStatus(UploadResource.UPLOADED_STATUS);
       return;
     }
 
     uploadResources.remove(uploadId);
     fileStore.delete();
+  }
+
+  private void applyMimeTypeUploadPlugins(UploadResource upResource, String fileName) {
+    if (plugins == null) {
+      return;
+    }
+    for (MimeTypeUploadPlugin plugin : plugins) {
+      String mimeType = plugin.getMimeType(fileName);
+      if (mimeType != null)
+        upResource.setMimeType(mimeType);
+    }
+  }
+
+  private void validateUploadedFile(UploadResource upResource) throws FileUploadException {
+    if (getUploadFileValidators().isEmpty()
+        || upResource == null
+        || upResource.getStoreLocation() == null) {
+      return;
+    }
+
+    for (UploadFileValidator uploadFileValidator : getUploadFileValidators()) {
+      if (!uploadFileValidator.supports(upResource.getFileName(), upResource.getMimeType())) {
+        continue;
+      }
+      try (InputStream inputStream = new FileInputStream(upResource.getStoreLocation())) {
+        uploadFileValidator.validate(upResource.getFileName(), upResource.getMimeType(), inputStream);
+      } catch (FileUploadException e) {
+        upResource.setStatus(UploadResource.FAILED_STATUS);
+        removeUploadResource(upResource.getUploadId());
+        throw e;
+      } catch (IOException e) {
+        upResource.setStatus(UploadResource.FAILED_STATUS);
+        removeUploadResource(upResource.getUploadId());
+        throw new FileUploadException("Unable to read uploaded file for validation", e);
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -401,6 +439,19 @@ public class UploadService {
         fileItem.getPath().toFile().deleteOnExit();
       }
     }
+  }
+
+  private List<UploadFileValidator> getUploadFileValidators() {
+    if (uploadFileValidators == null) {
+      List<UploadFileValidator> services = ExoContainerContext.getCurrentContainer()
+                                                              .getComponentInstancesOfType(UploadFileValidator.class);
+      if (services == null) {
+        uploadFileValidators = new ArrayList<>();
+      } else {
+        uploadFileValidators = new ArrayList<>(services);
+      }
+    }
+    return uploadFileValidators;
   }
 
   public static class UploadLimit {
