@@ -49,6 +49,10 @@
   </component>
 
   <component>
+    <type>org.exoplatform.upload.SvgUploadValidator</type>
+  </component>
+
+  <component>
     <type>org.exoplatform.download.DownloadService</type>
     <init-params>
       <value-param>
