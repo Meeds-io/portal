@@ -21,6 +21,7 @@ package org.exoplatform.web.handler;
 import java.io.Writer;
 import java.net.URLEncoder;
 
+import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.common.text.EntityEncoder;
 
@@ -118,7 +119,19 @@ public class UploadHandler extends WebRequestHandler {
             value.append("\n  }\n}");
             writer.append(value);
         } else if (uploadActionService == UploadServiceAction.UPLOAD) {
+          try {
             service.createUploadResource(req);
+          } catch (FileUploadException e) {
+            if (!res.isCommitted()) {
+              res.resetBuffer();
+              res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+              res.setContentType("text/plain");
+              res.setCharacterEncoding("UTF-8");
+
+              String message = StringUtils.defaultIfBlank(e.getMessage(), "Upload failed");
+              res.getWriter().write(message);
+            }
+          }
         } else if (uploadActionService == UploadServiceAction.DELETE) {
             service.removeUploadResource(uploadIds[0]);
         } else if (uploadActionService == UploadServiceAction.ABORT) {
