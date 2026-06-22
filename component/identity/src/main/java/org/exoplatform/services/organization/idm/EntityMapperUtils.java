@@ -139,7 +139,7 @@ public class EntityMapperUtils {
       changed |= checkIfChanged && !Objects.equals(organizationId, user.getOrganizationId());
       user.setOrganizationId(organizationId);
     }
-    if (attrs.containsKey(USER_ORGANIZATION_ID) && attrs.get(USER_ORGANIZATION_ID) != null && attrs.get(USER_ORGANIZATION_ID).getValue() != null) {
+    if (attrs.containsKey(USER_ENABLED) && attrs.get(USER_ENABLED) != null && attrs.get(USER_ENABLED).getValue() != null) {
       // used when populating User from AD ; it returns numbers : 512 = enbaled, 514 = disabled
       String status = attrs.get(USER_ENABLED).getValue().toString();
 
