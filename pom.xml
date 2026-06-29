@@ -29,7 +29,7 @@
 
   <groupId>io.meeds.portal</groupId>
   <artifactId>portal.parent</artifactId>
-  <version>7.3.x-SNAPSHOT</version>
+  <version>7.3.x-whitepaper-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Meeds - Portal</name>
