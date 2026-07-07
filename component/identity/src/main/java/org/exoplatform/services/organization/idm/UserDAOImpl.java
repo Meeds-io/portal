@@ -795,6 +795,27 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     return new IDMUserListAccess(qb, 20, false, countPaginatedUsers(), userStatus);
   }
 
+  @Override
+  public List<String> findUserNamesByGroupId(String groupId) {
+    if (log.isTraceEnabled()) {
+      Tools.logMethodIn(log, LogLevel.TRACE, "findUserNamesByGroupId", new Object[] { groupId});
+    }
+    Config configuration = orgService.getConfiguration();
+    String groupName = configuration.getPLIDMGroupName(groupId.substring(groupId.lastIndexOf('/') + 1));
+    String parentId = groupId.lastIndexOf('/') > -1 ? groupId.substring(0, groupId.lastIndexOf('/')) : "";
+    String groupType = configuration.getGroupType(parentId);
+    String realmName = ((PicketLinkIDMServiceImpl) service_).getRealmName();
+
+    try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().getSessionFactory().openSession()) {
+      return session.createNamedQuery("HibernateIdentityObjectRelationship.findUserNamesByGroup", String.class)
+                    .setParameter("groupName", groupName)
+                    .setParameter("groupType", groupType)
+                    .setParameter("realmName", realmName)
+                    .setParameter("userType", "USER")
+                    .getResultList();
+    }
+  }
+
 
   //
   private void preSave(User user, boolean isNew) {

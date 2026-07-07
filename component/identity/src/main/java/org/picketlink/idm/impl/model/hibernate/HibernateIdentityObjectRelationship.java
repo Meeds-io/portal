@@ -80,6 +80,15 @@ import jakarta.persistence.Table;
     query = "DELETE FROM HibernateIdentityObjectRelationship "
         + " WHERE name.id = :nameId"
 )
+@NamedQuery(
+    name = "HibernateIdentityObjectRelationship.findUserNamesByGroup",
+    query = "SELECT DISTINCT member.name FROM HibernateIdentityObjectRelationship r,"
+        + " HibernateIdentityObject grp, HibernateIdentityObject member"
+        + " WHERE grp.name = :groupName AND grp.identityType.name = :groupType AND grp.realm.name = :realmName"
+        + " AND member.identityType.name = :userType AND member.realm.name = :realmName"
+        + " AND ( (r.fromIdentityObject = grp AND r.toIdentityObject = member)"
+        + "    OR (r.fromIdentityObject = member AND r.toIdentityObject = grp) )"
+)
 public class HibernateIdentityObjectRelationship implements IdentityObjectRelationship {
 
   @Id

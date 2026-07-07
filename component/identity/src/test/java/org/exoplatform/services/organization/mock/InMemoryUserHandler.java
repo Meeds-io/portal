@@ -20,6 +20,7 @@ package org.exoplatform.services.organization.mock;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -243,6 +244,11 @@ public class InMemoryUserHandler implements UserHandler {
 
   public InMemoryListAccess<User> findUsersByGroupId(String groupId) {
     return findUsersByGroupId(groupId, UserStatus.ENABLED);
+  }
+
+  @Override
+  public List<String> findUserNamesByGroupId(String groupId) {
+    return Arrays.stream(new String[] {"john", "test"}).toList();
   }
 
   @Override
