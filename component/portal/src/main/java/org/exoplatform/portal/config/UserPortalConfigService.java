@@ -174,21 +174,9 @@ public class UserPortalConfigService implements Startable {
       return false;
     }
     List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(type, name);
-    boolean firstConfig = true;
     for(NewPortalConfig config : configs) {
       config = config.clone();
-      // A site's pages/navigation are contributed by several configs (one
-      // per module), imported one at a time below. OVERWRITE's orphan
-      // destruction acts on the whole site on every single pass, so
-      // applying it on every config would let each module's pass wipe out
-      // what the previous modules' passes just restored, leaving only the
-      // last-processed module's content. Orphans must be destroyed once,
-      // so only the first pass keeps the requested OVERWRITE; later passes
-      // fall back to MERGE (same as OVERWRITE minus destroyOrphan) to
-      // additively restore their own module's content without re-wiping.
-      ImportMode passImportMode = (!firstConfig && importMode == ImportMode.OVERWRITE) ? ImportMode.MERGE : importMode;
-      firstConfig = false;
-      config.setImportMode(passImportMode.name());
+      config.setImportMode(importMode.name());
       config.setOverrideMode(true);
       HashSet<String> ownerName = new HashSet<>();
       ownerName.add(name);
