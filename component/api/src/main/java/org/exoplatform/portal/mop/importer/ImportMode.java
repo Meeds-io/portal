@@ -42,7 +42,15 @@ public enum ImportMode {
     /**
      * Overwrite data whatsoever.
      */
-    OVERWRITE(new ImportConfig(true, true, true));
+    OVERWRITE(new ImportConfig(true, true, true)),
+
+    /**
+     * Import data when it does not exist, update data when it exists, same as MERGE for a node
+     * that isn't inside any default page (independent custom content at the site's navigation
+     * root is always preserved), but destroys an orphan nested inside a default page (e.g. a page
+     * added, pasted or left behind inside an existing default section).
+     */
+    RESTORE_DEFAULTS(new ImportConfig(false, true, true, true));
 
     /** . */
     public final ImportConfig config;
