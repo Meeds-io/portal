@@ -208,6 +208,52 @@ public class UserPortalConfigService implements Startable {
     return true;
   }
 
+  /**
+   * Restores a single page's layout from its packaged default configuration, leaving every other
+   * page and the site's navigation tree untouched.
+   *
+   * @param pageKey the key of the page to restore
+   * @param importMode the import mode to apply
+   * @return {@code true} if the page's site has a packaged default defining this page and it was
+   *         restored, {@code false} if this page isn't part of any default/product configuration
+   */
+  public boolean restorePage(PageKey pageKey, ImportMode importMode) {
+    SiteKey siteKey = pageKey.getSite();
+    if (!canRestore(siteKey.getTypeName(), siteKey.getName())) {
+      return false;
+    }
+    List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(siteKey.getTypeName(), siteKey.getName());
+    for (NewPortalConfig config : configs) {
+      if (newPortalConfigListener.restorePage(config, siteKey.getName(), pageKey.getName(), importMode)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks whether the given page is a default/product page, i.e. its layout is defined by the
+   * product's packaged configuration and can therefore be restored to its default. No import is
+   * performed.
+   *
+   * @param pageKey the key of the page to check
+   * @return {@code true} if the page's site has a packaged default defining this page,
+   *         {@code false} if this page isn't part of any default/product configuration
+   */
+  public boolean isDefaultPage(PageKey pageKey) {
+    SiteKey siteKey = pageKey.getSite();
+    if (!canRestore(siteKey.getTypeName(), siteKey.getName())) {
+      return false;
+    }
+    List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(siteKey.getTypeName(), siteKey.getName());
+    for (NewPortalConfig config : configs) {
+      if (newPortalConfigListener.hasDefaultPage(config, siteKey.getName(), pageKey.getName())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public LayoutService getDataStorage() {
     return layoutService;
   }

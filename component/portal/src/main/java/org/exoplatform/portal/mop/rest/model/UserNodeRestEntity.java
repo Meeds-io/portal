@@ -36,6 +36,8 @@ public class UserNodeRestEntity {
 
   private boolean                  canEditPage;
 
+  private boolean                  canRestoreLayout;
+
   private String[]                 pageAccessPermissions;
 
   private String                   pageEditPermission;
