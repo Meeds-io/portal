@@ -20,7 +20,9 @@ package io.meeds.portal.identity;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import org.exoplatform.component.test.AbstractKernelTest;
@@ -92,6 +94,68 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertTrue(user.isAutomaticDeactivation());
 
     assertEquals(0, userDao.disableInactiveUsers(null, 5));
+  }
+
+  /**
+   * Reproduces the case where inactive users are not disabled when they fall
+   * beyond the first page of results. Users are paginated 100 at a time and
+   * sorted by last login time so that inactive accounts (the oldest logins) are
+   * processed first; if the ordering is reversed, an installation with enough
+   * recently-active users hides the inactive ones on later pages and they are
+   * never disabled.
+   */
+  @SuppressWarnings("deprecation")
+  public void testShouldDisableInactiveUsersBeyondFirstPage() throws Exception {
+    List<String> createdUserNames = new ArrayList<>();
+    List<String> activeUserNames = new ArrayList<>();
+    Date recentLogin = new Date();
+    Date oldLogin = Date.from(LocalDate.now()
+                                       .minusDays(6)
+                                       .atStartOfDay()
+                                       .atZone(ZoneId.systemDefault())
+                                       .toInstant());
+    try {
+      // Create more active users than the pagination page size (100) so that an
+      // inactive user is pushed onto a later page.
+      for (int i = 0; i < 100; i++) {
+        String activeUserName = UUID.randomUUID().toString();
+        User activeUser = userDao.createUserInstance(activeUserName);
+        activeUser.setFirstName("Active");
+        activeUser.setLastName("User " + i);
+        activeUser.setEmail(activeUserName + "@test.com");
+        activeUser.setCreationSource(CREATION_SOURCE);
+        activeUser.setLastLoginTime(recentLogin);
+        userDao.createUser(activeUser, true);
+        activeUserNames.add(activeUserName);
+        createdUserNames.add(activeUserName);
+      }
+
+      String inactiveUserName = UUID.randomUUID().toString();
+      User inactiveUser = userDao.createUserInstance(inactiveUserName);
+      inactiveUser.setFirstName("Inactive");
+      inactiveUser.setLastName("User");
+      inactiveUser.setEmail(inactiveUserName + "@test.com");
+      inactiveUser.setCreationSource(CREATION_SOURCE);
+      inactiveUser.setLastLoginTime(oldLogin);
+      userDao.createUser(inactiveUser, true);
+      createdUserNames.add(inactiveUserName);
+      restartTransaction();
+
+      assertEquals(1, userDao.disableInactiveUsers(null, 5));
+      restartTransaction();
+
+      inactiveUser = userDao.findUserByName(inactiveUserName, UserStatus.ANY);
+      assertFalse("Inactive user should have been disabled", inactiveUser.isEnabled());
+      assertTrue(inactiveUser.isAutomaticDeactivation());
+
+      User activeUser = userDao.findUserByName(activeUserNames.get(0), UserStatus.ANY);
+      assertTrue("Active user should remain enabled", activeUser.isEnabled());
+    } finally {
+      for (String createdUserName : createdUserNames) {
+        userDao.removeUser(createdUserName, true);
+      }
+      restartTransaction();
+    }
   }
 
 }

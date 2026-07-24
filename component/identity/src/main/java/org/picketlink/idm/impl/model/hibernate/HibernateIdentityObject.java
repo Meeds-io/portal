@@ -84,7 +84,7 @@ import lombok.Data;
         AND enabledValue.ATTR_VALUE = 'false'
       WHERE enabledAttribute.IDENTITY_OBJECT_ID = identity.ID AND enabledAttribute.NAME = 'enabled'
     )
-    ORDER BY lastLoginTimeValue.ATTR_VALUE DESC
+    ORDER BY lastLoginTimeValue.ATTR_VALUE ASC
     """)
 @Data
 public class HibernateIdentityObject implements IdentityObject {

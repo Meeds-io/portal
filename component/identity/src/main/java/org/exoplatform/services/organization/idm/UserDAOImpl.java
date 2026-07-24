@@ -527,8 +527,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
         }
         offset += limit;
         if (inactiveUsersSize != result.size()) {
-          // The users who already logged in lately is already reached since the
-          // Results are sorted by lastLoginTime DESC
+          // Results are sorted by lastLoginTime ASC, so inactive users (the
+          // oldest logins) come first. Once a page contains at least one active
+          // user, all the remaining users have logged in more recently and are
+          // therefore active as well, so we can stop paginating.
           break;
         }
       } while (!result.isEmpty());
