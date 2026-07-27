@@ -108,7 +108,6 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   public void testShouldDisableInactiveUsersBeyondFirstPage() throws Exception {
     List<String> createdUserNames = new ArrayList<>();
     List<String> activeUserNames = new ArrayList<>();
-    Date recentLogin = new Date();
     Date oldLogin = Date.from(LocalDate.now()
                                        .minusDays(6)
                                        .atStartOfDay()
@@ -116,7 +115,9 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
                                        .toInstant());
     try {
       // Create more active users than the pagination page size (100) so that an
-      // inactive user is pushed onto a later page.
+      // inactive user is pushed onto a later page. Newly created users get
+      // lastLoginTime = now automatically (NewUserEventListener), so they all
+      // count as active.
       for (int i = 0; i < 100; i++) {
         String activeUserName = UUID.randomUUID().toString();
         User activeUser = userDao.createUserInstance(activeUserName);
@@ -124,7 +125,6 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
         activeUser.setLastName("User " + i);
         activeUser.setEmail(activeUserName + "@test.com");
         activeUser.setCreationSource(CREATION_SOURCE);
-        activeUser.setLastLoginTime(recentLogin);
         userDao.createUser(activeUser, true);
         activeUserNames.add(activeUserName);
         createdUserNames.add(activeUserName);
@@ -136,9 +136,15 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
       inactiveUser.setLastName("User");
       inactiveUser.setEmail(inactiveUserName + "@test.com");
       inactiveUser.setCreationSource(CREATION_SOURCE);
-      inactiveUser.setLastLoginTime(oldLogin);
       userDao.createUser(inactiveUser, true);
       createdUserNames.add(inactiveUserName);
+      restartTransaction();
+
+      // Backdate the login time AFTER creation: NewUserEventListener only resets
+      // lastLoginTime for new users, so saveUser (not "new") keeps our value.
+      inactiveUser = userDao.findUserByName(inactiveUserName, UserStatus.ANY);
+      inactiveUser.setLastLoginTime(oldLogin);
+      userDao.saveUser(inactiveUser, true);
       restartTransaction();
 
       assertEquals(1, userDao.disableInactiveUsers(null, 5));
