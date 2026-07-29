@@ -21,6 +21,7 @@ package org.exoplatform.portal.rest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -96,6 +97,12 @@ public class UserRestResourcesV1 implements ResourceContainer {
   private static final String            ADMINISTRATOR_GROUP            = "/platform/administrators";
 
   private static final String            DELEGATED_GROUP                = "/platform/delegated";
+
+  /** Must match social's GroupAclPlugin.OBJECT_TYPE */
+  private static final String            GROUP_OBJECT_TYPE = "group";
+
+  /** Must match social's GroupAclPlugin.LIST_MEMBERS_PERMISSION_TYPE */
+  private static final String            GROUP_LIST_MEMBERS_PERMISSION_TYPE = "listMembers";
 
   public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
 
@@ -552,9 +559,13 @@ public class UserRestResourcesV1 implements ResourceContainer {
   )
   public Response getUserMemberships(
                                      @Parameter(description = "User name identifier", required = true) @PathParam("id") String userName,
-                                     @Parameter(description = "Group id to filter only its members, ex: /platform")
+                                     @Parameter(description = "Group id to filter only its memberships, ex: /platform")
                                      @QueryParam("groupId")
-                                     List<String> groupIds,
+                                     String groupId,
+                                     @Parameter(description = "When filtering by groupId, whether to also include memberships on groups nested, at any level, inside the given group")
+                                     @Schema(defaultValue = "false")
+                                     @QueryParam("includeNestedGroups")
+                                     boolean includeNestedGroups,
                                      @Parameter(description = "Offset", required = false) @Schema(defaultValue = "0")
                                      @QueryParam("offset") int offset,
                                      @Parameter(description = "Limit", required = false) @Schema(defaultValue = "20")
@@ -564,7 +575,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                      boolean returnSize) throws Exception {
 
     boolean isAdmin = isMemberOfAdminGroup();
-    if (!isAdmin) {
+    if (!isAdmin && !canManageGroupMemberships(groupId)) {
       throw new WebApplicationException(Response.Status.UNAUTHORIZED);
     }
     offset = offset > 0 ? offset : 0;
@@ -577,7 +588,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
     List<MembershipRestEntity> membershipEntities = new ArrayList<>();
     int totalSize = 0;
-    if (CollectionUtils.isEmpty(groupIds)) {
+    if (StringUtils.isBlank(groupId)) {
       ListAccess<Membership> membershipsByUser = organizationService.getMembershipHandler().findAllMembershipsByUser(user);
       totalSize = membershipsByUser.getSize();
       Membership[] memberships;
@@ -596,10 +607,11 @@ public class UserRestResourcesV1 implements ResourceContainer {
         }
       }
     } else {
-      Identity userIdentity = userACL.getUserIdentity(userName);
-      List<MembershipEntry> memberships = userIdentity.getMemberships()
+      List<Membership> memberships = organizationService.getMembershipHandler().findMembershipsByUser(userName)
                                                       .stream()
-                                                      .filter(m -> groupIds.contains(m.getGroup()))
+                                                      .filter(m -> StringUtils.equals(groupId, m.getGroupId())
+                                                                   || (includeNestedGroups
+                                                                       && isNestedInGroup(m.getGroupId(), groupId)))
                                                       .toList();
       totalSize = memberships.size();
       memberships = memberships.stream()
@@ -608,10 +620,10 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                 .toList();
       memberships.forEach(m -> {
         try {
-          Group group = organizationService.getGroupHandler().findGroupById(m.getGroup());
+          Group group = organizationService.getGroupHandler().findGroupById(m.getGroupId());
           membershipEntities.add(new MembershipRestEntity(m.getMembershipType(), group, user));
         } catch (Exception e) {
-          LOG.warn("Error retrieving group {}", m.getGroup(), e);
+          LOG.warn("Error retrieving group {}", m.getGroupId(), e);
         }
       });
     }
@@ -701,6 +713,47 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public boolean isMemberOfAdminGroup() {
     return ConversationState.getCurrent().getIdentity().isMemberOf(ADMINISTRATOR_GROUP);
+  }
+
+  private boolean isNestedInGroup(String groupId, String targetGroupId) {
+    return isNestedInGroup(groupId, targetGroupId, new HashSet<>());
+  }
+
+  private boolean isNestedInGroup(String groupId, String targetGroupId, Set<String> visitedGroupIds) {
+    if (!visitedGroupIds.add(groupId)) { // Cycle guard
+      return false;
+    }
+    try {
+      Group group = organizationService.getGroupHandler().findGroupById(groupId);
+      return group != null
+             && CollectionUtils.isNotEmpty(group.getEnclosingMemberships())
+             && group.getEnclosingMemberships()
+                     .stream()
+                     .anyMatch(enclosingMembership -> StringUtils.equals(targetGroupId, enclosingMembership.getGroupId())
+                                                      || isNestedInGroup(enclosingMembership.getGroupId(),
+                                                                         targetGroupId,
+                                                                         visitedGroupIds));
+    } catch (Exception e) {
+      LOG.warn("Error retrieving enclosing groups of group {}", groupId, e);
+      return false;
+    }
+  }
+
+  /**
+   * Check if the authenticated user can manage the memberships of the given
+   * group, checked through the 'group' ACL plugin contributed at runtime by
+   * the social addon
+   *
+   * @param groupId group id to check
+   * @return true if the authenticated user can manage the group memberships
+   */
+  private boolean canManageGroupMemberships(String groupId) {
+    return StringUtils.isNotBlank(groupId)
+           && userACL.hasAclPlugin(GROUP_OBJECT_TYPE)
+           && userACL.hasPermission(GROUP_OBJECT_TYPE,
+                                    groupId,
+                                    GROUP_LIST_MEMBERS_PERMISSION_TYPE,
+                                    ConversationState.getCurrent().getIdentity());
   }
 
   public boolean isMemberOfDelegatedGroup(String userName) {
