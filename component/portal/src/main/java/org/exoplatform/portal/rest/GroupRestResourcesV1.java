@@ -62,6 +62,12 @@ public class GroupRestResourcesV1 implements ResourceContainer {
 
   public static final int     DEFAULT_OFFSET = 0;
 
+  /** Must match social's GroupAclPlugin.OBJECT_TYPE */
+  private static final String GROUP_OBJECT_TYPE = "group";
+
+  /** Must match social's GroupAclPlugin.MANAGE_MEMBERSHIPS_PERMISSION_TYPE */
+  private static final String GROUP_MANAGE_MEMBERSHIPS_PERMISSION_TYPE = "manageMemberships";
+
   private GroupSearchService  groupSearchService;
 
   private OrganizationService organizationService;
@@ -383,7 +389,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
 
   @POST
   @Path("memberships")
-  @RolesAllowed("administrators")
+  @RolesAllowed("users")
   @Consumes(MediaType.APPLICATION_JSON)
   @Operation(
       summary = "Creates a new membership",
@@ -404,6 +410,9 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     }
     if (StringUtils.isBlank(membership.getGroupId())) {
       return Response.status(Response.Status.BAD_REQUEST).entity("GROUP_ID:MANDATORY").build();
+    }
+    if (!canManageGroupMemberships(membership.getGroupId())) {
+      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
     }
     if (StringUtils.isBlank(membership.getUserName())) {
       return Response.status(Response.Status.BAD_REQUEST).entity("USER:MANDATORY").build();
@@ -578,7 +587,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
 
   @DELETE
   @Path("memberships")
-  @RolesAllowed("administrators")
+  @RolesAllowed("users")
   @Operation(
       summary = "Deletes an existing membership",
       description = "Deletes an existing membership",
@@ -599,6 +608,11 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     if (StringUtils.isBlank(membershipId)) {
       return Response.status(Response.Status.BAD_REQUEST).entity("MEMBERSHIP:MANDATORY").build();
     }
+    String[] membershipIdParts = membershipId.split(":", 3);
+    String membershipGroupId = membershipIdParts.length == 3 ? membershipIdParts[2] : null;
+    if (!canManageGroupMemberships(membershipGroupId)) {
+      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+    }
     if (organizationService.getMembershipHandler().findMembership(membershipId) == null) {
       return Response.status(Response.Status.NOT_FOUND)
                      .entity("NAME:NOT_FOUND")
@@ -606,6 +620,26 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     }
     organizationService.getMembershipHandler().removeMembership(membershipId, true);
     return Response.noContent().build();
+  }
+
+  /**
+   * Check if the authenticated user can manage the memberships of the given
+   * group: whether an administrator, or a manager of the group designated as
+   * an Organizational Unit, checked through the 'organizationalUnit' ACL
+   * plugin contributed at runtime by the social addon
+   *
+   * @param groupId group id to check
+   * @return true if the authenticated user can manage the group memberships
+   */
+  private boolean canManageGroupMemberships(String groupId) {
+    Identity identity = ConversationState.getCurrent().getIdentity();
+    return userACL.isAdministrator(identity)
+           || (StringUtils.isNotBlank(groupId)
+               && userACL.hasAclPlugin(GROUP_OBJECT_TYPE)
+               && userACL.hasPermission(GROUP_OBJECT_TYPE,
+                                        groupId,
+                                        GROUP_MANAGE_MEMBERSHIPS_PERMISSION_TYPE,
+                                        identity));
   }
 
   @GET

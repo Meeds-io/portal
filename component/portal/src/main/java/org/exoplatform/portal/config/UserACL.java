@@ -490,6 +490,10 @@ public class UserACL {
     this.aclPlugins.put(aclPlugin.getObjectType(), aclPlugin);
   }
 
+  public boolean hasAclPlugin(String objectType) {
+    return this.aclPlugins.containsKey(objectType);
+  }
+
   public AclPlugin getAclPlugin(String objectType) {
     AclPlugin aclPlugin = this.aclPlugins.get(objectType);
     if (aclPlugin == null) {
