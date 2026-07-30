@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.DELETE;
@@ -65,7 +64,6 @@ import org.exoplatform.services.rest.http.PATCH;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
-import org.exoplatform.services.security.MembershipEntry;
 import org.exoplatform.web.login.recovery.ChangePasswordConnector;
 import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 
@@ -95,8 +93,6 @@ public class UserRestResourcesV1 implements ResourceContainer {
   private static final Log               LOG                               = ExoLogger.getLogger(UserRestResourcesV1.class);
 
   private static final String            ADMINISTRATOR_GROUP            = "/platform/administrators";
-
-  private static final String            DELEGATED_GROUP                = "/platform/delegated";
 
   /** Must match social's GroupAclPlugin.OBJECT_TYPE */
   private static final String            GROUP_OBJECT_TYPE = "group";
@@ -314,8 +310,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
   public Response updateUser(@Context HttpServletRequest request,
                              @RequestBody(description = "User Object") UserRestEntity userEntity) throws Exception {
     Identity identity = ConversationState.getCurrent().getIdentity();
-    if (!userACL.isUserInGroup(identity, DELEGATED_GROUP)
-        && !userACL.isAdministrator(ConversationState.getCurrent().getIdentity())) {
+    if (!userACL.isAdministrator(identity)) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     if (userEntity == null) {
@@ -649,26 +644,6 @@ public class UserRestResourcesV1 implements ResourceContainer {
   }
 
   @GET
-  @Path("isDelegatedAdministrator")
-  @Produces(MediaType.APPLICATION_JSON)
-  @RolesAllowed("users")
-  @Operation(
-          summary = "Check if current user is a delegated administrator",
-          description = "Check if current user is a delegated administrator",
-          method = "GET")
-  @ApiResponses(
-          value = {
-                  @ApiResponse(responseCode = "200", description = "Request fulfilled"),
-                  @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
-          }
-  )
-  public Response isDelegatedAdministrator() {
-    boolean isDelegatedAdministrator = userACL.isUserInGroup(ConversationState.getCurrent().getIdentity(), DELEGATED_GROUP)
-                                       && !userACL.isAdministrator(ConversationState.getCurrent().getIdentity());
-    return Response.ok().entity("{\"result\":\"" + isDelegatedAdministrator + "\"}").build();
-  }
-
-  @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("isSynchronizedUserAllowedToChangePassword")
   @RolesAllowed("users")
@@ -754,22 +729,6 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                     groupId,
                                     GROUP_LIST_MEMBERS_PERMISSION_TYPE,
                                     ConversationState.getCurrent().getIdentity());
-  }
-
-  public boolean isMemberOfDelegatedGroup(String userName) {
-    if (!ConversationState.getCurrent().getIdentity().isMemberOf(DELEGATED_GROUP)) {
-      return false;
-    } else {
-      Set<String> groupIds = ConversationState.getCurrent()
-                                              .getIdentity()
-                                              .getMemberships()
-                                              .stream()
-                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType()) || StringUtils.equals("*", m.getMembershipType()))
-                                              .map(MembershipEntry::getGroup)
-                                              .collect(Collectors.toSet());
-      Identity userIdentity = userACL.getUserIdentity(userName);
-      return groupIds.stream().anyMatch(userIdentity::isMemberOf);
-    }
   }
 
 }
