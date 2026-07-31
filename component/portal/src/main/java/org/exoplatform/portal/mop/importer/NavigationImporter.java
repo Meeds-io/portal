@@ -83,6 +83,7 @@ public class NavigationImporter {
                 break;
             case MERGE:
             case OVERWRITE:
+            case RESTORE_DEFAULTS:
                 dst = new NavigationContext(key, new NavigationState(src.getPriority()));
                 service.saveNavigation(dst);
                 break;

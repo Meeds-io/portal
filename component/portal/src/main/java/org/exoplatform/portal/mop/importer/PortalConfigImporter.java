@@ -59,6 +59,7 @@ public class PortalConfigImporter {
                 break;
             case MERGE:
             case OVERWRITE:
+            case RESTORE_DEFAULTS:
                 dst = src;
                 break;
             default:

@@ -29,10 +29,18 @@ public class ImportConfig {
     /** . */
     final boolean createMissing;
 
+    /** . */
+    final boolean destroyNestedOrphan;
+
     public ImportConfig(boolean destroyOrphan, boolean updatedSame, boolean createMissing) {
+        this(destroyOrphan, updatedSame, createMissing, false);
+    }
+
+    public ImportConfig(boolean destroyOrphan, boolean updatedSame, boolean createMissing, boolean destroyNestedOrphan) {
         this.destroyOrphan = destroyOrphan;
         this.updatedSame = updatedSame;
         this.createMissing = createMissing;
+        this.destroyNestedOrphan = destroyNestedOrphan;
     }
 
     /**
@@ -50,5 +58,16 @@ public class ImportConfig {
 
     public boolean getCreateMissing() {
         return createMissing;
+    }
+
+    /**
+     * Returns true when an orphan node nested inside a default page should be
+     * destroyed, even when {@link #destroyOrphan} leaves an orphan that isn't
+     * inside any default page alone.
+     *
+     * @return the destroy nested orphan value
+     */
+    public boolean getDestroyNestedOrphan() {
+        return destroyNestedOrphan;
     }
 }

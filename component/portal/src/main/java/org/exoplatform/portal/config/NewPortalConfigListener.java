@@ -443,6 +443,62 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     }
   }
 
+  /**
+   * Restores a single page's layout from its packaged default configuration,
+   * leaving every other page and the navigation tree untouched.
+   *
+   * @param config the packaged config fragment to look up the default page in
+   * @param owner the site owner name
+   * @param pageName the name of the page to restore
+   * @param importMode the import mode to apply to the matched page
+   * @return {@code true} if this fragment defines a default page named {@code pageName} and it
+   *         was restored, {@code false} if this fragment doesn't define that page
+   */
+  public boolean restorePage(NewPortalConfig config, String owner, String pageName, ImportMode importMode) {
+    Page defaultPage = getDefaultPage(config, owner, pageName);
+    if (defaultPage == null) {
+      return false;
+    }
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      PageImporter importer = new PageImporter(importMode,
+                                               new SiteKey(config.getOwnerType(), owner),
+                                               Collections.singletonList(defaultPage),
+                                               layoutService);
+      importer.perform();
+      return true;
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
+  /**
+   * Checks whether the given packaged config fragment defines a default page named
+   * {@code pageName}, without performing any import. This mirrors the lookup done by
+   * {@link #restorePage(NewPortalConfig, String, String, ImportMode)} but leaves the page untouched.
+   *
+   * @param config the packaged config fragment to look up the default page in
+   * @param owner the site owner name
+   * @param pageName the name of the page to look up
+   * @return {@code true} if this fragment defines a default page named {@code pageName}
+   */
+  public boolean hasDefaultPage(NewPortalConfig config, String owner, String pageName) {
+    return getDefaultPage(config, owner, pageName) != null;
+  }
+
+  private Page getDefaultPage(NewPortalConfig config, String owner, String pageName) {
+    UnmarshalledObject<PageSet> pageSet = getConfig(config, owner, "pages", PageSet.class);
+    if (pageSet == null) {
+      return null;
+    }
+    return pageSet.getObject()
+                  .getPages()
+                  .stream()
+                  .filter(page -> StringUtils.equals(page.getName(), pageName))
+                  .findFirst()
+                  .orElse(null);
+  }
+
   public void createPageNavigation(NewPortalConfig config, String owner) {
     UnmarshalledObject<PageNavigation> obj = getConfig(config, owner, "navigation", PageNavigation.class);
     if (obj == null) {

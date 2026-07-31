@@ -46,6 +46,14 @@ import org.exoplatform.portal.tree.diff.ListDiff;
 
 public class NavigationFragmentImporter {
 
+    /**
+     * Depths at (and below) which an orphan is considered to be at a top-level
+     * section rather than inside a default page: 0 is this fragment's own
+     * attachment point, 1 is its direct children (e.g. the "home" wrapper's own
+     * children -- the top-level admin sections themselves).
+     */
+    private static final int TOP_LEVEL_MAX_DEPTH = 1;
+
     private static final ListAdapter<PageNodeContainer, String> PAGE_NODE_CONTAINER_ADAPTER = new ListAdapter<PageNodeContainer, String>() {
         public int size(PageNodeContainer list) {
             List<PageNode> nodes = list.getNodes();
@@ -146,8 +154,17 @@ public class NavigationFragmentImporter {
             // Collect labels
             Map<NodeContext<?>, Map<Locale, org.exoplatform.portal.mop.State>> labelMap = new HashMap<NodeContext<?>, Map<Locale, org.exoplatform.portal.mop.State>>();
 
-            // Perform save
-            perform(src, from, labelMap);
+            // Depth 0 is this fragment's own attachment point (e.g. the site
+            // navigation root); depth 1 is its direct default children (e.g. the
+            // "home" wrapper's own children -- the top-level admin sections
+            // themselves). A node found at either of these two levels is a
+            // top-level section, not something inside a default page, so under
+            // RESTORE_DEFAULTS it must be preserved even if it's an orphan (e.g. a
+            // brand-new custom section added as a sibling of an existing one).
+            // From depth 2 on, we're nested inside a default page (e.g. inside an
+            // existing section), so an orphan there is a candidate for removal
+            // (e.g. a page added or left behind inside that section).
+            perform(src, from, labelMap, 0);
 
             // Save the node
             navigationService.saveNode(root, null);
@@ -168,7 +185,8 @@ public class NavigationFragmentImporter {
     private void perform(PageNodeContainer src,
                          NodeContext<?> dst,
                          Map<NodeContext<?>,
-                         Map<Locale, org.exoplatform.portal.mop.State>> labelMap) {
+                         Map<Locale, org.exoplatform.portal.mop.State>> labelMap,
+                         int depth) {
         navigationService.rebaseNode(dst, Scope.CHILDREN, null);
 
         //
@@ -212,8 +230,8 @@ public class NavigationFragmentImporter {
             //
             switch (change.type) {
                 case SAME:
-                    // Perform recursively
-                    perform(srcChild, dstChild, labelMap);
+                    // Perform recursively, one level deeper
+                    perform(srcChild, dstChild, labelMap, depth + 1);
 
                     //
                     if (config.updatedSame) {
@@ -235,7 +253,9 @@ public class NavigationFragmentImporter {
                         }
                         previousChild = dstChild;
                     } else {
-                        if (config.destroyOrphan) {
+                        boolean topLevelSection = depth <= TOP_LEVEL_MAX_DEPTH;
+                        boolean destroy = topLevelSection ? config.destroyOrphan : (config.destroyOrphan || config.destroyNestedOrphan);
+                        if (destroy) {
                             dstChild.removeNode();
                         } else {
                             previousChild = dstChild;
