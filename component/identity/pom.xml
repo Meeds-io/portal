@@ -117,6 +117,8 @@
               <include>org/exoplatform/services/organization/Test*.java</include>
               <include>org/exoplatform/services/organization/externalstore/Test*.java</include>
               <include>org/exoplatform/services/organization/externalstore/jpa/Test*.java</include>
+              <include>org/exoplatform/services/organization/idm/ldap/*Test.java</include>
+              <include>org/picketlink/idm/impl/store/ldap/*Test.java</include>
             </includes>
             <excludes>
               <exclude>**/Test*LDAP*.java</exclude>
