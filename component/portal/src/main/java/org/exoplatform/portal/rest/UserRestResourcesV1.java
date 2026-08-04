@@ -626,6 +626,53 @@ public class UserRestResourcesV1 implements ResourceContainer {
   }
 
   @GET
+  @Path("{id}/nestedGroups/count")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("administrators")
+  @Operation(
+      summary = "Counts how many nested groups of a parent group a user is member of",
+      description = "Counts how many groups nested inside the given parent group the given user is member of."
+          + " A group is considered nested when it is reachable from the parent group at any depth,"
+          + " either as a child group or through an explicit group link (nested membership)."
+          + " Distinct groups are counted, not memberships: a user holding two membership types"
+          + " (ex: member and manager) on the same nested group counts once."
+          + " The parent group itself is excluded, as are inherited memberships"
+          + " computed by nested-group propagation. Response body: {\"nestedCount\": <n>}",
+      method = "GET")
+  @ApiResponses(
+      value = {
+          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+          @ApiResponse(responseCode = "400", description = "Invalid query input"),
+          @ApiResponse(responseCode = "404", description = "User not found"),
+          @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
+      }
+  )
+  public Response countUserNestedGroups(
+                                        @Parameter(description = "User name identifier", required = true) @PathParam("id") String userName,
+                                        @Parameter(description = "Parent group id under which the nested groups the user is member of are counted, ex: /platform", required = true)
+                                        @QueryParam("parentGroupId")
+                                        String parentGroupId) throws Exception {
+    if (StringUtils.isBlank(parentGroupId)) {
+      return Response.status(Response.Status.BAD_REQUEST).entity("PARENT_GROUP_ID_MANDATORY").build();
+    }
+    User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    if (user == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    Collection<Membership> memberships = organizationService.getMembershipHandler().findMembershipsByUser(userName);
+    long nestedCount = 0;
+    if (memberships != null) {
+      nestedCount = memberships.stream()
+                               .map(Membership::getGroupId)
+                               .distinct()
+                               .filter(membershipGroupId -> !StringUtils.equals(parentGroupId, membershipGroupId))
+                               .filter(membershipGroupId -> isNestedInGroup(membershipGroupId, parentGroupId))
+                               .count();
+    }
+    return Response.ok("{\"nestedCount\":" + nestedCount + "}").build();
+  }
+
+  @GET
   @Path("isSuperUser")
   @Produces(MediaType.APPLICATION_JSON)
   @RolesAllowed("users")

@@ -49,6 +49,8 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
 
   private static final String USER_2 = "testuser2";
 
+  private OrganizationService organizationService;
+
   private UserHandler         userHandler;
 
   private ChangePasswordConnector changePasswordConnector;
@@ -71,7 +73,7 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     getContainer().unregisterComponent(PasswordRecoveryService.class);
     getContainer().registerComponentInstance(PasswordRecoveryService.class, passwordRecoveryService);
 
-    OrganizationService organizationService = mock(OrganizationService.class);
+    organizationService = mock(OrganizationService.class);
     userHandler = mock(UserHandler.class);
     userACL = mock(UserACL.class);
 
@@ -552,6 +554,112 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     assertNotNull(response);
     assertEquals(400, response.getStatus());
     assertEquals("DeleteSuperUser", response.getEntity());
+  }
+
+  public void testCountUserNestedGroupsMandatoryParentGroupId() throws Exception {
+    startAdminSession(USER_1);
+
+    ContainerResponse resp = launcher.service("GET",
+                                              "/v1/users/" + USER_1 + "/nestedGroups/count",
+                                              "",
+                                              null,
+                                              null,
+                                              null);
+
+    assertEquals(400, resp.getStatus());
+  }
+
+  public void testCountUserNestedGroupsRestrictedToAdministrators() throws Exception {
+    // @RolesAllowed is enforced by the server security stack, not by this test
+    // harness: assert the endpoint contract on the annotation itself
+    javax.annotation.security.RolesAllowed rolesAllowed = UserRestResourcesV1.class
+                                                                             .getMethod("countUserNestedGroups",
+                                                                                        String.class,
+                                                                                        String.class)
+                                                                             .getAnnotation(javax.annotation.security.RolesAllowed.class);
+    assertNotNull(rolesAllowed);
+    assertEquals(1, rolesAllowed.value().length);
+    assertEquals("administrators", rolesAllowed.value()[0]);
+  }
+
+  public void testCountUserNestedGroupsUserNotFound() throws Exception {
+    startAdminSession(USER_1);
+
+    ContainerResponse resp = launcher.service("GET",
+                                              "/v1/users/" + USER_2 + "/nestedGroups/count?parentGroupId=/company",
+                                              "",
+                                              null,
+                                              null,
+                                              null);
+
+    assertEquals(404, resp.getStatus());
+  }
+
+  public void testCountUserNestedGroups() throws Exception {
+    // Given a group tree where /company/sales is a path child of /company,
+    // /marketing/design is linked into /company as a nested group and
+    // /platform/users is unrelated to /company
+    MembershipHandler membershipHandler = mock(MembershipHandler.class);
+    GroupHandler groupHandler = mock(GroupHandler.class);
+    when(organizationService.getMembershipHandler()).thenReturn(membershipHandler);
+    when(organizationService.getGroupHandler()).thenReturn(groupHandler);
+
+    mockGroup(groupHandler, "/company/sales", "/company");
+    mockGroup(groupHandler, "/company/sales/emea", "/company/sales");
+    mockGroup(groupHandler, "/marketing/design", "/marketing", "/company");
+    mockGroup(groupHandler, "/marketing");
+    mockGroup(groupHandler, "/platform/users", "/platform");
+    mockGroup(groupHandler, "/platform");
+
+    java.util.List<Membership> memberships = java.util.List.of(mockMembership("/company"),
+                                                               mockMembership("/company/sales"),
+                                                               mockMembership("/company/sales"),
+                                                               mockMembership("/company/sales/emea"),
+                                                               mockMembership("/marketing/design"),
+                                                               mockMembership("/platform/users"));
+    when(membershipHandler.findMembershipsByUser(USER_1)).thenReturn(memberships);
+    startAdminSession(USER_1);
+
+    // When
+    ContainerResponse resp = launcher.service("GET",
+                                              "/v1/users/" + USER_1 + "/nestedGroups/count?parentGroupId=/company",
+                                              "",
+                                              null,
+                                              null,
+                                              null);
+
+    // Then: 3 distinct nested groups (/company/sales counted once despite its 2
+    // memberships, /company/sales/emea two levels deep, /marketing/design through
+    // the link); the direct membership on /company itself is not counted
+    assertEquals(200, resp.getStatus());
+    JSONObject counts = new JSONObject(String.valueOf(resp.getEntity()));
+    assertEquals(3, counts.getInt("nestedCount"));
+  }
+
+  private void startAdminSession(String username) {
+    Identity identity = new Identity(username,
+                                     java.util.List.of(new org.exoplatform.services.security.MembershipEntry("/platform/administrators")),
+                                     java.util.List.of("users", "administrators"));
+    ConversationState.setCurrent(new ConversationState(identity));
+  }
+
+  private Group mockGroup(GroupHandler groupHandler, String groupId, String... enclosingGroupIds) throws Exception {
+    Group group = mock(Group.class);
+    java.util.Set<NestedMembership> enclosingMemberships = new java.util.HashSet<>();
+    for (String enclosingGroupId : enclosingGroupIds) {
+      NestedMembership enclosingMembership = mock(NestedMembership.class);
+      when(enclosingMembership.getGroupId()).thenReturn(enclosingGroupId);
+      enclosingMemberships.add(enclosingMembership);
+    }
+    when(group.getEnclosingMemberships()).thenReturn(enclosingMemberships);
+    when(groupHandler.findGroupById(groupId)).thenReturn(group);
+    return group;
+  }
+
+  private Membership mockMembership(String groupId) {
+    Membership membership = mock(Membership.class);
+    when(membership.getGroupId()).thenReturn(groupId);
+    return membership;
   }
 
   private MockHttpServletRequest getChangePasswordRequest(String path, String currentPassword, String newPassword) {
