@@ -82,6 +82,70 @@ public class MappedAttributes {
 
   public static final Key<String>  TEXT_SUBTITLE_FONT_STYLE   = Key.create("text-subtitle-font-style", ValueType.STRING);
 
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_COLOR = Key.create("text-title-background-color", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_IMAGE = Key.create("text-title-background-image", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_EFFECT = Key.create("text-title-background-effect", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_POSITION = Key.create("text-title-background-position", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_SIZE = Key.create("text-title-background-size", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_REPEAT = Key.create("text-title-background-repeat", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_PADDING = Key.create("text-title-background-padding", ValueType.STRING);
+
+  public static final Key<String>  TEXT_TITLE_BACKGROUND_RADIUS = Key.create("text-title-background-radius", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_COLOR = Key.create("text-header-background-color", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_IMAGE = Key.create("text-header-background-image", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_EFFECT = Key.create("text-header-background-effect", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_POSITION = Key.create("text-header-background-position", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_SIZE = Key.create("text-header-background-size", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_REPEAT = Key.create("text-header-background-repeat", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_PADDING = Key.create("text-header-background-padding", ValueType.STRING);
+
+  public static final Key<String>  TEXT_HEADER_BACKGROUND_RADIUS = Key.create("text-header-background-radius", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_COLOR      = Key.create("text-background-color", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_IMAGE      = Key.create("text-background-image", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_EFFECT     = Key.create("text-background-effect", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_POSITION   = Key.create("text-background-position", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_SIZE       = Key.create("text-background-size", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_REPEAT     = Key.create("text-background-repeat", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_PADDING    = Key.create("text-background-padding", ValueType.STRING);
+
+  public static final Key<String>  TEXT_BACKGROUND_RADIUS     = Key.create("text-background-radius", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_COLOR = Key.create("text-subtitle-background-color", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_IMAGE = Key.create("text-subtitle-background-image", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_EFFECT = Key.create("text-subtitle-background-effect", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_POSITION = Key.create("text-subtitle-background-position", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_SIZE = Key.create("text-subtitle-background-size", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_REPEAT = Key.create("text-subtitle-background-repeat", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_PADDING = Key.create("text-subtitle-background-padding", ValueType.STRING);
+
+  public static final Key<String>  TEXT_SUBTITLE_BACKGROUND_RADIUS = Key.create("text-subtitle-background-radius", ValueType.STRING);
+
   public static final Key<String>  BACKGROUND_COLOR           = Key.create("background-color", ValueType.STRING);
 
   public static final Key<String>  BACKGROUND_IMAGE           = Key.create("background-image", ValueType.STRING);
