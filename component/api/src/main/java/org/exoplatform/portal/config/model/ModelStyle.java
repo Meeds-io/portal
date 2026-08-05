@@ -99,6 +99,70 @@ public class ModelStyle implements Serializable {
 
   private String            textSubtitleFontStyle;
 
+  private String            textTitleBackgroundColor;
+
+  private String            textTitleBackgroundImage;
+
+  private String            textTitleBackgroundEffect;
+
+  private String            textTitleBackgroundPosition;
+
+  private String            textTitleBackgroundSize;
+
+  private String            textTitleBackgroundRepeat;
+
+  private String            textTitleBackgroundPadding;
+
+  private String            textTitleBackgroundRadius;
+
+  private String            textHeaderBackgroundColor;
+
+  private String            textHeaderBackgroundImage;
+
+  private String            textHeaderBackgroundEffect;
+
+  private String            textHeaderBackgroundPosition;
+
+  private String            textHeaderBackgroundSize;
+
+  private String            textHeaderBackgroundRepeat;
+
+  private String            textHeaderBackgroundPadding;
+
+  private String            textHeaderBackgroundRadius;
+
+  private String            textBackgroundColor;
+
+  private String            textBackgroundImage;
+
+  private String            textBackgroundEffect;
+
+  private String            textBackgroundPosition;
+
+  private String            textBackgroundSize;
+
+  private String            textBackgroundRepeat;
+
+  private String            textBackgroundPadding;
+
+  private String            textBackgroundRadius;
+
+  private String            textSubtitleBackgroundColor;
+
+  private String            textSubtitleBackgroundImage;
+
+  private String            textSubtitleBackgroundEffect;
+
+  private String            textSubtitleBackgroundPosition;
+
+  private String            textSubtitleBackgroundSize;
+
+  private String            textSubtitleBackgroundRepeat;
+
+  private String            textSubtitleBackgroundPadding;
+
+  private String            textSubtitleBackgroundRadius;
+
   public String getCssClass() { // NOSONAR
     return getCssClass(null);
   }
