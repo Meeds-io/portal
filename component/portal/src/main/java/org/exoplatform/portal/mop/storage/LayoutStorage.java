@@ -893,6 +893,102 @@ public class LayoutStorage {
     if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName())) {
       cssStyle.setTextSubtitleFontStyle((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName()));
     }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName())) {
+      cssStyle.setTextTitleBackgroundColor((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_IMAGE.getName())) {
+      cssStyle.setTextTitleBackgroundImage((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_IMAGE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_EFFECT.getName())) {
+      cssStyle.setTextTitleBackgroundEffect((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_EFFECT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_POSITION.getName())) {
+      cssStyle.setTextTitleBackgroundPosition((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_POSITION.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_SIZE.getName())) {
+      cssStyle.setTextTitleBackgroundSize((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_SIZE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_REPEAT.getName())) {
+      cssStyle.setTextTitleBackgroundRepeat((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_REPEAT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_PADDING.getName())) {
+      cssStyle.setTextTitleBackgroundPadding((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_PADDING.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_RADIUS.getName())) {
+      cssStyle.setTextTitleBackgroundRadius((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_RADIUS.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_COLOR.getName())) {
+      cssStyle.setTextHeaderBackgroundColor((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_COLOR.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_IMAGE.getName())) {
+      cssStyle.setTextHeaderBackgroundImage((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_IMAGE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_EFFECT.getName())) {
+      cssStyle.setTextHeaderBackgroundEffect((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_EFFECT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_POSITION.getName())) {
+      cssStyle.setTextHeaderBackgroundPosition((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_POSITION.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_SIZE.getName())) {
+      cssStyle.setTextHeaderBackgroundSize((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_SIZE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_REPEAT.getName())) {
+      cssStyle.setTextHeaderBackgroundRepeat((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_REPEAT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_PADDING.getName())) {
+      cssStyle.setTextHeaderBackgroundPadding((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_PADDING.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_HEADER_BACKGROUND_RADIUS.getName())) {
+      cssStyle.setTextHeaderBackgroundRadius((String) attrs.get(MappedAttributes.TEXT_HEADER_BACKGROUND_RADIUS.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_COLOR.getName())) {
+      cssStyle.setTextBackgroundColor((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_COLOR.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_IMAGE.getName())) {
+      cssStyle.setTextBackgroundImage((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_IMAGE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_EFFECT.getName())) {
+      cssStyle.setTextBackgroundEffect((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_EFFECT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_POSITION.getName())) {
+      cssStyle.setTextBackgroundPosition((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_POSITION.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_SIZE.getName())) {
+      cssStyle.setTextBackgroundSize((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_SIZE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_REPEAT.getName())) {
+      cssStyle.setTextBackgroundRepeat((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_REPEAT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_PADDING.getName())) {
+      cssStyle.setTextBackgroundPadding((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_PADDING.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_BACKGROUND_RADIUS.getName())) {
+      cssStyle.setTextBackgroundRadius((String) attrs.get(MappedAttributes.TEXT_BACKGROUND_RADIUS.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_COLOR.getName())) {
+      cssStyle.setTextSubtitleBackgroundColor((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_COLOR.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_IMAGE.getName())) {
+      cssStyle.setTextSubtitleBackgroundImage((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_IMAGE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_EFFECT.getName())) {
+      cssStyle.setTextSubtitleBackgroundEffect((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_EFFECT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_POSITION.getName())) {
+      cssStyle.setTextSubtitleBackgroundPosition((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_POSITION.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_SIZE.getName())) {
+      cssStyle.setTextSubtitleBackgroundSize((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_SIZE.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_REPEAT.getName())) {
+      cssStyle.setTextSubtitleBackgroundRepeat((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_REPEAT.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_PADDING.getName())) {
+      cssStyle.setTextSubtitleBackgroundPadding((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_PADDING.getName()));
+    }
+    if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_RADIUS.getName())) {
+      cssStyle.setTextSubtitleBackgroundRadius((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_RADIUS.getName()));
+    }
     return cssStyle;
   }
 
@@ -1019,6 +1115,102 @@ public class LayoutStorage {
     }
     if (StringUtils.isNotBlank(cssStyle.getTextSubtitleFontStyle())) {
       properties.put(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName(), cssStyle.getTextSubtitleFontStyle());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundColor())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName(), cssStyle.getTextTitleBackgroundColor());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundImage())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_IMAGE.getName(), cssStyle.getTextTitleBackgroundImage());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundEffect())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_EFFECT.getName(), cssStyle.getTextTitleBackgroundEffect());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundPosition())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_POSITION.getName(), cssStyle.getTextTitleBackgroundPosition());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundSize())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_SIZE.getName(), cssStyle.getTextTitleBackgroundSize());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundRepeat())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_REPEAT.getName(), cssStyle.getTextTitleBackgroundRepeat());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundPadding())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_PADDING.getName(), cssStyle.getTextTitleBackgroundPadding());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundRadius())) {
+      properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_RADIUS.getName(), cssStyle.getTextTitleBackgroundRadius());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundColor())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_COLOR.getName(), cssStyle.getTextHeaderBackgroundColor());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundImage())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_IMAGE.getName(), cssStyle.getTextHeaderBackgroundImage());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundEffect())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_EFFECT.getName(), cssStyle.getTextHeaderBackgroundEffect());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundPosition())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_POSITION.getName(), cssStyle.getTextHeaderBackgroundPosition());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundSize())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_SIZE.getName(), cssStyle.getTextHeaderBackgroundSize());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundRepeat())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_REPEAT.getName(), cssStyle.getTextHeaderBackgroundRepeat());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundPadding())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_PADDING.getName(), cssStyle.getTextHeaderBackgroundPadding());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextHeaderBackgroundRadius())) {
+      properties.put(MappedAttributes.TEXT_HEADER_BACKGROUND_RADIUS.getName(), cssStyle.getTextHeaderBackgroundRadius());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundColor())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_COLOR.getName(), cssStyle.getTextBackgroundColor());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundImage())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_IMAGE.getName(), cssStyle.getTextBackgroundImage());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundEffect())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_EFFECT.getName(), cssStyle.getTextBackgroundEffect());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundPosition())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_POSITION.getName(), cssStyle.getTextBackgroundPosition());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundSize())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_SIZE.getName(), cssStyle.getTextBackgroundSize());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundRepeat())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_REPEAT.getName(), cssStyle.getTextBackgroundRepeat());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundPadding())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_PADDING.getName(), cssStyle.getTextBackgroundPadding());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextBackgroundRadius())) {
+      properties.put(MappedAttributes.TEXT_BACKGROUND_RADIUS.getName(), cssStyle.getTextBackgroundRadius());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundColor())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_COLOR.getName(), cssStyle.getTextSubtitleBackgroundColor());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundImage())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_IMAGE.getName(), cssStyle.getTextSubtitleBackgroundImage());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundEffect())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_EFFECT.getName(), cssStyle.getTextSubtitleBackgroundEffect());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundPosition())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_POSITION.getName(), cssStyle.getTextSubtitleBackgroundPosition());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundSize())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_SIZE.getName(), cssStyle.getTextSubtitleBackgroundSize());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundRepeat())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_REPEAT.getName(), cssStyle.getTextSubtitleBackgroundRepeat());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundPadding())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_PADDING.getName(), cssStyle.getTextSubtitleBackgroundPadding());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getTextSubtitleBackgroundRadius())) {
+      properties.put(MappedAttributes.TEXT_SUBTITLE_BACKGROUND_RADIUS.getName(), cssStyle.getTextSubtitleBackgroundRadius());
     }
   }
 
