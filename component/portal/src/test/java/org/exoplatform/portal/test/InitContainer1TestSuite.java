@@ -56,6 +56,7 @@ import org.exoplatform.portal.mop.storage.TestNavigationServiceWrapper;
 import org.exoplatform.portal.mop.storage.TestPageService;
 import org.exoplatform.portal.rest.MembershipTypeRestResourcesTest;
 import org.exoplatform.portal.rest.UserFieldValidatorTest;
+import org.exoplatform.portal.rest.GroupRestResourcesTest;
 import org.exoplatform.portal.rest.UserRestResourcesTest;
 import org.exoplatform.portal.tree.list.TestListTree;
 import org.exoplatform.settings.rest.SettingResourceTest;
@@ -100,6 +101,7 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     TestPageService.class,
     BrandingRestResourcesTest.class,
     NavigationRestTest.class,
+    GroupRestResourcesTest.class,
     MembershipTypeRestResourcesTest.class,
     UserFieldValidatorTest.class,
     UserRestResourcesTest.class,
