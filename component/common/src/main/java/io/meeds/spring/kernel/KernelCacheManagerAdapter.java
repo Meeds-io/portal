@@ -30,6 +30,8 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.support.AbstractValueAdaptingCache;
 import org.springframework.core.env.Environment;
 
+import org.exoplatform.commons.cache.future.FutureExoCache;
+import org.exoplatform.commons.cache.future.Loader;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 
@@ -75,6 +77,12 @@ public class KernelCacheManagerAdapter implements CacheManager {
         }
       }
 
+      // Backs Spring's @Cacheable(sync = true): FutureExoCache guarantees that
+      // concurrent misses on the same key trigger a single load, the other
+      // threads waiting on that same future instead of loading in parallel.
+      Loader<Serializable, Object, Callable<?>> loader = (valueLoader, cacheKey) -> valueLoader.call();
+      FutureExoCache<Serializable, Object, Callable<?>> futureCache = new FutureExoCache<>(loader, cacheInstance);
+
       return new AbstractValueAdaptingCache(false) {
 
         @Override
@@ -90,16 +98,11 @@ public class KernelCacheManagerAdapter implements CacheManager {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(Object key, Callable<T> valueLoader) {
-          T value = (T) cacheInstance.get((Serializable) key);
-          if (value == null) {
-            try {
-              value = valueLoader.call();
-              cacheInstance.put((Serializable) key, value);
-            } catch (Exception e) {
-              throw new ValueRetrievalException(key, valueLoader, e);
-            }
+          try {
+            return (T) futureCache.get(valueLoader, getSerializableKey(key));
+          } catch (RuntimeException e) {
+            throw new ValueRetrievalException(key, valueLoader, e);
           }
-          return value;
         }
 
         @Override
