@@ -24,7 +24,9 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.naming.Context;
@@ -140,7 +142,9 @@ public class LdapServerLocator {
 
   private final AtomicReference<List<SrvRecord>> cachedRecords = new AtomicReference<>();
 
-  private volatile boolean   attempted;
+  private final AtomicBoolean refreshInProgress = new AtomicBoolean(false);
+
+  private volatile boolean   lastAttemptFailed;
 
   private volatile long      lastAttemptAt;
 
@@ -201,6 +205,28 @@ public class LdapServerLocator {
     return srvEnabled && StringUtils.isNotBlank(srvDomain);
   }
 
+  /**
+   * @return {@code true} if every server this locator can ever return uses
+   *         the {@code ldaps} scheme: the SRV-generated scheme (when SRV
+   *         lookup is enabled) and every statically configured URL (main and
+   *         secondary). Used to decide whether it is safe to register a
+   *         TLS-only {@code java.naming.ldap.factory.socket} - that JNDI
+   *         property is not scheme-scoped, so registering it while any
+   *         configured server is plain {@code ldap://} would force a TLS
+   *         handshake on a plaintext connection and break it.
+   */
+  public boolean isAllLdaps() {
+    if (isSrvLookupEnabled() && !"ldaps".equalsIgnoreCase(scheme)) {
+      return false;
+    }
+    for (String url : staticUrls) {
+      if (!StringUtils.startsWithIgnoreCase(url, "ldaps://")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private List<String> resolveSrvUrls() {
     refreshIfNeeded();
     List<SrvRecord> records = cachedRecords.get();
@@ -214,32 +240,74 @@ public class LdapServerLocator {
     return ordered;
   }
 
-  private synchronized void refreshIfNeeded() {
+  /**
+   * Decides whether the SRV cache needs refreshing and, if so, triggers it -
+   * synchronously the very first time (there is nothing to serve yet, so
+   * callers need to wait once), and in the background for every later
+   * refresh (the current, possibly stale, list is served immediately and
+   * never blocks a connection attempt on a DNS round-trip). Only actual
+   * resolution failures are subject to {@link #FAILURE_RETRY_BACKOFF_MS};
+   * successful refreshes are only paced by {@link #refreshPeriodMs}.
+   */
+  private void refreshIfNeeded() {
     long now = currentTimeMillis();
     boolean neverResolved = cachedRecords.get() == null;
     boolean stale = !neverResolved && (now - lastSuccessAt) > refreshPeriodMs;
-    boolean backoffElapsed = !attempted || (now - lastAttemptAt) > FAILURE_RETRY_BACKOFF_MS;
+    boolean backoffElapsed = !lastAttemptFailed || (now - lastAttemptAt) > FAILURE_RETRY_BACKOFF_MS;
 
-    if ((neverResolved || stale) && backoffElapsed) {
-      attempted = true;
-      lastAttemptAt = now;
-      try {
-        List<SrvRecord> resolved = lookupSrvRecords();
-        cachedRecords.set(resolved);
-        lastSuccessAt = now;
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Resolved {} LDAP SRV record(s) for '{}.{}': {}", resolved.size(), srvService, srvDomain, resolved);
-        }
-      } catch (Exception e) {
-        int previousSize = cachedRecords.get() == null ? 0 : cachedRecords.get().size();
-        LOG.warn("Failed to resolve LDAP SRV records for '{}.{}' - keeping previous list ({} entries): {}",
-                 srvService,
-                 srvDomain,
-                 previousSize,
-                 e.getMessage());
-        cachedRecords.compareAndSet(null, Collections.emptyList());
-      }
+    if (!((neverResolved || stale) && backoffElapsed)) {
+      return;
     }
+    if (!refreshInProgress.compareAndSet(false, true)) {
+      // A refresh (synchronous or background) is already running - the caller keeps using
+      // whatever is currently cached (or the static fallback if nothing is cached yet).
+      return;
+    }
+    if (neverResolved) {
+      try {
+        doRefresh(now);
+      } finally {
+        refreshInProgress.set(false);
+      }
+    } else {
+      runAsync(() -> {
+        try {
+          doRefresh(now);
+        } finally {
+          refreshInProgress.set(false);
+        }
+      });
+    }
+  }
+
+  private void doRefresh(long now) {
+    lastAttemptAt = now;
+    try {
+      List<SrvRecord> resolved = lookupSrvRecords();
+      cachedRecords.set(resolved);
+      lastSuccessAt = now;
+      lastAttemptFailed = false;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Resolved {} LDAP SRV record(s) for '{}.{}': {}", resolved.size(), srvService, srvDomain, resolved);
+      }
+    } catch (Exception e) {
+      lastAttemptFailed = true;
+      int previousSize = cachedRecords.get() == null ? 0 : cachedRecords.get().size();
+      LOG.warn("Failed to resolve LDAP SRV records for '{}.{}' - keeping previous list ({} entries)",
+               srvService,
+               srvDomain,
+               previousSize,
+               e);
+      cachedRecords.compareAndSet(null, Collections.emptyList());
+    }
+  }
+
+  /**
+   * Runs {@code task} in the background. Package-private so tests can
+   * substitute a same-thread execution and keep assertions deterministic.
+   */
+  void runAsync(Runnable task) {
+    CompletableFuture.runAsync(task);
   }
 
   List<SrvRecord> lookupSrvRecords() throws NamingException {
@@ -309,7 +377,8 @@ public class LdapServerLocator {
       if (totalWeight <= 0) {
         pickedIndex = random.nextInt(remaining.size());
       } else {
-        int threshold = random.nextInt(totalWeight);
+        // Inclusive upper bound per RFC 2782, so a weight-0 entry retains a (small) chance.
+        int threshold = random.nextInt(totalWeight + 1);
         int cumulative = 0;
         pickedIndex = remaining.size() - 1;
         for (int i = 0; i < remaining.size(); i++) {

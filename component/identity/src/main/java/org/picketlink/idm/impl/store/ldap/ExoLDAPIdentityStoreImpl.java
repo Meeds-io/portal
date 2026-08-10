@@ -122,8 +122,12 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
    * servers, failover and load-balancing ordering)</li>
    * <li>{@code getCustomJNDIConnectionParameters()}, which gets the
    * {@link SniAwareLdapSocketFactory} registered when
-   * {@code exo.ldap.sni.enabled=true}, so that a single {@code ldaps://} host
-   * name resolving to several addresses (CNAME/round-robin DNS) fails over
+   * {@code exo.ldap.sni.enabled=true} <em>and</em> every server this store can
+   * ever connect to uses {@code ldaps://} - {@code java.naming.ldap.factory.socket}
+   * is not scheme-scoped, so registering a TLS-only factory while any
+   * configured server is plain {@code ldap://} would force a TLS handshake on
+   * a plaintext connection and break it. A single {@code ldaps://} host name
+   * resolving to several addresses (CNAME/round-robin DNS) then fails over
    * across those addresses while keeping SNI/hostname verification pinned to
    * the original host name</li>
    * </ul>
@@ -144,7 +148,8 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
       if (args == null && "getProviderURL".equals(method.getName())) {
         return serverLocator.resolveProviderURL();
       }
-      if (args == null && "getCustomJNDIConnectionParameters".equals(method.getName()) && SniAwareLdapSocketFactory.isEnabled()) {
+      if (args == null && "getCustomJNDIConnectionParameters".equals(method.getName()) && SniAwareLdapSocketFactory.isEnabled()
+          && serverLocator.isAllLdaps()) {
         return withSniSocketFactory(original.getCustomJNDIConnectionParameters());
       }
       try {

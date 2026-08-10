@@ -19,10 +19,12 @@
 package org.exoplatform.services.organization.idm.ldap;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import javax.naming.NamingException;
 
@@ -68,7 +70,7 @@ public class LdapServerLocatorTest {
   public void testSrvEnabledButDomainBlankFallsBackToStaticOnly() {
     PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
     LdapServerLocator locator = new LdapServerLocator("ldap://fallback:389");
-    assertTrue(!locator.isSrvLookupEnabled());
+    assertFalse(locator.isSrvLookupEnabled());
     assertEquals("ldap://fallback:389", locator.resolveProviderURL());
   }
 
@@ -174,5 +176,56 @@ public class LdapServerLocatorTest {
     locator.setNow(LdapServerLocator.DEFAULT_REFRESH_PERIOD_MS + 1 + LdapServerLocator.FAILURE_RETRY_BACKOFF_MS + 1);
     locator.resolveProviderURL();
     assertEquals(3, locator.getLookupCount());
+  }
+
+  @Test
+  public void testSuccessfulRefreshesAreNotClampedToTheFailureBackoff() {
+    PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
+    PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");
+    // Well below FAILURE_RETRY_BACKOFF_MS (30s): a successful refresh must follow this
+    // cadence exactly and not be silently floored to the failure backoff.
+    PropertyManager.setProperty(LdapServerLocator.SRV_REFRESH_PERIOD_PROP, "5000");
+
+    StubLdapServerLocator locator = new StubLdapServerLocator("ldap://fallback:389");
+    locator.setNow(0L);
+    locator.setRecordsToReturn(Arrays.asList(new SrvRecord(0, 100, 389, "dc1.example.com")));
+
+    locator.resolveProviderURL();
+    assertEquals(1, locator.getLookupCount());
+
+    locator.setNow(5001L);
+    locator.resolveProviderURL();
+    assertEquals(2, locator.getLookupCount());
+  }
+
+  @Test
+  public void testBackgroundRefreshServesTheStaleListImmediatelyWithoutBlocking() throws InterruptedException {
+    PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
+    PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");
+
+    StubLdapServerLocator locator = new StubLdapServerLocator("ldap://fallback:389");
+    locator.setNow(0L);
+    locator.setRecordsToReturn(Arrays.asList(new SrvRecord(0, 100, 389, "dc1.example.com")));
+    locator.resolveProviderURL();
+    assertEquals(1, locator.getLookupCount());
+
+    CountDownLatch refreshStarted = new CountDownLatch(1);
+    CountDownLatch releaseRefresh = new CountDownLatch(1);
+    locator.setNow(LdapServerLocator.DEFAULT_REFRESH_PERIOD_MS + 1);
+    locator.setRecordsToReturn(Arrays.asList(new SrvRecord(0, 100, 389, "dc2.example.com")));
+    locator.blockNextLookupOn(refreshStarted, releaseRefresh);
+    locator.runInBackgroundThread();
+
+    // The stale (dc1) list is served immediately, even while the background refresh is
+    // still blocked - this is exactly what a login request must never wait on.
+    String duringRefresh = locator.resolveProviderURL();
+    assertEquals("ldap://dc1.example.com:389 ldap://fallback:389", duringRefresh);
+
+    refreshStarted.await();
+    releaseRefresh.countDown();
+    locator.awaitBackgroundRefresh();
+
+    String afterRefresh = locator.resolveProviderURL();
+    assertEquals("ldap://dc2.example.com:389 ldap://fallback:389", afterRefresh);
   }
 }
