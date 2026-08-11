@@ -103,33 +103,45 @@ import org.exoplatform.services.log.Log;
  */
 public class LdapServerLocator {
 
-  public static final String FAILOVER_URLS_PROP       = "exo.ldap.failover.urls";
+  public static final String FAILOVER_URLS_PROP        = "exo.ldap.failover.urls";
 
-  public static final String SRV_ENABLED_PROP         = "exo.ldap.srv.enabled";
+  public static final String SRV_ENABLED_PROP          = "exo.ldap.srv.enabled";
 
-  public static final String SRV_DOMAIN_PROP          = "exo.ldap.srv.domain";
+  public static final String SRV_DOMAIN_PROP           = "exo.ldap.srv.domain";
 
-  public static final String SRV_SERVICE_PROP         = "exo.ldap.srv.service";
+  public static final String SRV_SERVICE_PROP          = "exo.ldap.srv.service";
 
-  public static final String SRV_SCHEME_PROP          = "exo.ldap.srv.scheme";
+  public static final String SRV_SCHEME_PROP           = "exo.ldap.srv.scheme";
 
-  public static final String SRV_REFRESH_PERIOD_PROP  = "exo.ldap.srv.refresh.period";
+  public static final String SRV_REFRESH_PERIOD_PROP   = "exo.ldap.srv.refresh.period";
 
-  public static final String SRV_TIMEOUT_PROP         = "exo.ldap.srv.timeout";
+  public static final String SRV_TIMEOUT_PROP          = "exo.ldap.srv.timeout";
 
-  public static final String SRV_DNS_SERVERS_PROP     = "exo.ldap.srv.dns.servers";
+  public static final String SRV_DNS_SERVERS_PROP      = "exo.ldap.srv.dns.servers";
 
-  static final String        DEFAULT_SERVICE          = "_ldap._tcp";
+  public static final long   DEFAULT_REFRESH_PERIOD_MS = 300000L;
 
-  static final String        DEFAULT_SCHEME           = "ldap";
+  public static final long   FAILURE_RETRY_BACKOFF_MS  = 30000L;
 
-  static final long          DEFAULT_REFRESH_PERIOD_MS = 300000L;
+  private static final String DEFAULT_SERVICE    = "_ldap._tcp";
 
-  static final long          DEFAULT_TIMEOUT_MS       = 5000L;
+  private static final String DEFAULT_SCHEME     = "ldap";
 
-  static final long          FAILURE_RETRY_BACKOFF_MS = 30000L;
+  private static final long   DEFAULT_TIMEOUT_MS = 5000L;
 
-  private static final Log   LOG                      = ExoLogger.getLogger(LdapServerLocator.class);
+  private static final Log    LOG                = ExoLogger.getLogger(LdapServerLocator.class);
+
+  /**
+   * A single dedicated daemon thread, shared by every {@link LdapServerLocator}
+   * instance, used to run background SRV refreshes. A blocking JNDI DNS query
+   * (up to {@code exo.ldap.srv.timeout} times its retry count) has no business
+   * parking a thread borrowed from the JVM-wide common {@link java.util.concurrent.ForkJoinPool}.
+   */
+  private static final ExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+    Thread thread = new Thread(runnable, "ldap-srv-refresh");
+    thread.setDaemon(true);
+    return thread;
+  });
 
   private final boolean      srvEnabled;
 
@@ -208,10 +220,6 @@ public class LdapServerLocator {
     return String.join(" ", urls);
   }
 
-  boolean isSrvLookupEnabled() {
-    return srvEnabled && StringUtils.isNotBlank(srvDomain);
-  }
-
   /**
    * @return {@code true} if at least one server is configured and every
    *         server this locator can ever return uses the {@code ldaps}
@@ -242,6 +250,76 @@ public class LdapServerLocator {
     // Nothing configured at all: there is no server to prove is ldaps, so do not
     // fail open and let a TLS-only socket factory register itself regardless.
     return hasKnownServer;
+  }
+
+  public boolean isSrvLookupEnabled() {
+    return srvEnabled && StringUtils.isNotBlank(srvDomain);
+  }
+
+  /**
+   * Runs {@code task} in the background. Overridable so tests can substitute
+   * a same-thread execution and keep assertions deterministic.
+   */
+  protected void runAsync(Runnable task) {
+    REFRESH_EXECUTOR.execute(task);
+  }
+
+  protected List<SrvRecord> lookupSrvRecords() throws NamingException {
+    Hashtable<String, Object> env = new Hashtable<>();
+    env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
+    if (dnsServersUrl != null) {
+      env.put(Context.PROVIDER_URL, dnsServersUrl);
+    }
+    env.put("com.sun.jndi.dns.timeout.initial", String.valueOf(timeoutMs));
+    env.put("com.sun.jndi.dns.timeout.retries", "1");
+
+    DirContext dirContext = new InitialDirContext(env);
+    try {
+      String lookupName = srvService + "." + srvDomain;
+      Attributes attrs = dirContext.getAttributes(lookupName, new String[] { "SRV" });
+      Attribute srvAttr = attrs == null ? null : attrs.get("SRV");
+      List<SrvRecord> records = new ArrayList<>();
+      if (srvAttr != null) {
+        NamingEnumeration<?> values = srvAttr.getAll();
+        while (values.hasMore()) {
+          SrvRecord srvRecord = SrvRecord.parse(String.valueOf(values.next()));
+          if (srvRecord != null) {
+            records.add(srvRecord);
+          }
+        }
+      }
+      return records;
+    } finally {
+      try {
+        dirContext.close();
+      } catch (NamingException e) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to close DNS lookup context", e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Orders SRV records per RFC 2782: ascending by priority, and within a
+   * priority tier, a weighted-random order (higher weight = more likely to be
+   * picked earlier). Re-evaluated on every call so successive connections are
+   * spread across same-priority servers.
+   */
+  protected List<SrvRecord> orderByRfc2782(List<SrvRecord> records) {
+    Map<Integer, List<SrvRecord>> byPriority = new TreeMap<>();
+    for (SrvRecord srvRecord : records) {
+      byPriority.computeIfAbsent(srvRecord.getPriority(), key -> new ArrayList<>()).add(srvRecord);
+    }
+    List<SrvRecord> ordered = new ArrayList<>(records.size());
+    for (List<SrvRecord> tier : byPriority.values()) {
+      ordered.addAll(weightedShuffle(tier));
+    }
+    return ordered;
+  }
+
+  protected long currentTimeMillis() {
+    return System.currentTimeMillis();
   }
 
   private List<String> resolveSrvUrls() {
@@ -319,80 +397,6 @@ public class LdapServerLocator {
     }
   }
 
-  /**
-   * A single dedicated daemon thread, shared by every {@link LdapServerLocator}
-   * instance, used to run background SRV refreshes. A blocking JNDI DNS query
-   * (up to {@code exo.ldap.srv.timeout} times its retry count) has no business
-   * parking a thread borrowed from the JVM-wide common {@link java.util.concurrent.ForkJoinPool}.
-   */
-  private static final ExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
-    Thread thread = new Thread(runnable, "ldap-srv-refresh");
-    thread.setDaemon(true);
-    return thread;
-  });
-
-  /**
-   * Runs {@code task} in the background. Package-private so tests can
-   * substitute a same-thread execution and keep assertions deterministic.
-   */
-  void runAsync(Runnable task) {
-    REFRESH_EXECUTOR.execute(task);
-  }
-
-  List<SrvRecord> lookupSrvRecords() throws NamingException {
-    Hashtable<String, Object> env = new Hashtable<>();
-    env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
-    if (dnsServersUrl != null) {
-      env.put(Context.PROVIDER_URL, dnsServersUrl);
-    }
-    env.put("com.sun.jndi.dns.timeout.initial", String.valueOf(timeoutMs));
-    env.put("com.sun.jndi.dns.timeout.retries", "1");
-
-    DirContext dirContext = new InitialDirContext(env);
-    try {
-      String lookupName = srvService + "." + srvDomain;
-      Attributes attrs = dirContext.getAttributes(lookupName, new String[] { "SRV" });
-      Attribute srvAttr = attrs == null ? null : attrs.get("SRV");
-      List<SrvRecord> records = new ArrayList<>();
-      if (srvAttr != null) {
-        NamingEnumeration<?> values = srvAttr.getAll();
-        while (values.hasMore()) {
-          SrvRecord srvRecord = SrvRecord.parse(String.valueOf(values.next()));
-          if (srvRecord != null) {
-            records.add(srvRecord);
-          }
-        }
-      }
-      return records;
-    } finally {
-      try {
-        dirContext.close();
-      } catch (NamingException e) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Failed to close DNS lookup context", e);
-        }
-      }
-    }
-  }
-
-  /**
-   * Orders SRV records per RFC 2782: ascending by priority, and within a
-   * priority tier, a weighted-random order (higher weight = more likely to be
-   * picked earlier). Re-evaluated on every call so successive connections are
-   * spread across same-priority servers.
-   */
-  List<SrvRecord> orderByRfc2782(List<SrvRecord> records) {
-    Map<Integer, List<SrvRecord>> byPriority = new TreeMap<>();
-    for (SrvRecord srvRecord : records) {
-      byPriority.computeIfAbsent(srvRecord.getPriority(), key -> new ArrayList<>()).add(srvRecord);
-    }
-    List<SrvRecord> ordered = new ArrayList<>(records.size());
-    for (List<SrvRecord> tier : byPriority.values()) {
-      ordered.addAll(weightedShuffle(tier));
-    }
-    return ordered;
-  }
-
   private List<SrvRecord> weightedShuffle(List<SrvRecord> tier) {
     List<SrvRecord> remaining = new ArrayList<>(tier);
     List<SrvRecord> result = new ArrayList<>(remaining.size());
@@ -463,9 +467,5 @@ public class LdapServerLocator {
       LOG.warn("Invalid value '{}' for property {} - using default {}", value, propertyName, defaultValue);
       return defaultValue;
     }
-  }
-
-  long currentTimeMillis() {
-    return System.currentTimeMillis();
   }
 }

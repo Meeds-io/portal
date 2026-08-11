@@ -79,21 +79,26 @@ import org.exoplatform.services.log.Log;
  */
 public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Comparator<SniAwareLdapSocketFactory> {
 
-  public static final String SNI_ENABLED_PROP             = "exo.ldap.sni.enabled";
+  public static final String SNI_ENABLED_PROP                      = "exo.ldap.sni.enabled";
 
-  public static final String SNI_CONNECT_TIMEOUT_PROP     = "exo.ldap.sni.connect.timeout";
+  public static final String SNI_CONNECT_TIMEOUT_PROP              = "exo.ldap.sni.connect.timeout";
 
-  public static final String SOCKET_FACTORY_JNDI_PROPERTY = "java.naming.ldap.factory.socket";
+  public static final String SOCKET_FACTORY_JNDI_PROPERTY          = "java.naming.ldap.factory.socket";
 
-  static final int           DEFAULT_CONNECT_TIMEOUT_MS   = 10000;
+  public static final String JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP = "com.sun.jndi.ldap.connect.timeout";
 
-  private static final Log   LOG                          = ExoLogger.getLogger(SniAwareLdapSocketFactory.class);
+  public static final int    DEFAULT_CONNECT_TIMEOUT_MS            = 10000;
+
+  private static final Log   LOG      = ExoLogger.getLogger(SniAwareLdapSocketFactory.class);
 
   private static final SniAwareLdapSocketFactory INSTANCE = new SniAwareLdapSocketFactory();
 
-  // Package-private (rather than private) only so tests in this package can exercise
-  // resolveCandidates()/connectPlain() directly; production code must go through getDefault().
-  SniAwareLdapSocketFactory() {
+  private static volatile String customJndiConnectTimeoutHint;
+
+  // Protected (rather than private) only so tests in this package can subclass this factory to
+  // exercise resolveCandidates()/connectPlain()/connectWithFailover() directly; production code
+  // must go through getDefault().
+  protected SniAwareLdapSocketFactory() {
   }
 
   /**
@@ -107,6 +112,41 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
 
   public static boolean isEnabled() {
     return Boolean.parseBoolean(PropertyManager.getProperty(SNI_ENABLED_PROP));
+  }
+
+  /**
+   * Called once, when the SNI socket factory gets registered, with the raw
+   * {@code com.sun.jndi.ldap.connect.timeout} value found (if any) in the
+   * store's {@code customJNDIConnectionParameters} - this is how that
+   * timeout is actually shipped/configured (a JNDI env entry copied verbatim
+   * into the LDAP context), as opposed to a JVM system property.
+   */
+  public static void hintCustomJndiConnectTimeout(String value) {
+    customJndiConnectTimeoutHint = value;
+  }
+
+  /**
+   * Resolves the connect timeout (ms) used for each candidate address, in
+   * order of precedence: the explicit {@code exo.ldap.sni.connect.timeout}
+   * property, then whatever {@code com.sun.jndi.ldap.connect.timeout} value
+   * was hinted from the store's {@code customJNDIConnectionParameters} (see
+   * {@link #hintCustomJndiConnectTimeout(String)}), then the JVM system
+   * property of the same name, then {@value #DEFAULT_CONNECT_TIMEOUT_MS}.
+   */
+  public static int connectTimeoutMs() {
+    String explicit = PropertyManager.getProperty(SNI_CONNECT_TIMEOUT_PROP);
+    if (StringUtils.isNotBlank(explicit)) {
+      return parseTimeout(explicit, SNI_CONNECT_TIMEOUT_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
+    }
+    String hint = customJndiConnectTimeoutHint;
+    if (StringUtils.isNotBlank(hint)) {
+      return parseTimeout(hint, "customJNDIConnectionParameters[" + JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP + "]", DEFAULT_CONNECT_TIMEOUT_MS);
+    }
+    String systemProperty = System.getProperty(JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
+    if (StringUtils.isNotBlank(systemProperty)) {
+      return parseTimeout(systemProperty, JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
+    }
+    return DEFAULT_CONNECT_TIMEOUT_MS;
   }
 
   /**
@@ -157,11 +197,11 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
   }
 
   /**
-   * Package-private (rather than private) so tests can drive this method
+   * Overridable (rather than private) so tests can drive this method
    * directly - including the TLS upgrade step - against a fake delegate
    * factory, instead of only re-testing a copy of its retry loop.
    */
-  Socket connectWithFailover(String host, int port) throws IOException {
+  protected Socket connectWithFailover(String host, int port) throws IOException {
     int timeoutMs = connectTimeoutMs();
     List<InetSocketAddress> candidates = resolveCandidates(host, port);
     IOException lastFailure = null;
@@ -190,10 +230,10 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
 
   /**
    * Enumerates every candidate address behind {@code host}, paired with the
-   * target port. Package-private so tests can verify the mapping without
+   * target port. Overridable so tests can verify the mapping without
    * depending on real multi-homed DNS entries.
    */
-  List<InetSocketAddress> resolveCandidates(String host, int port) throws UnknownHostException {
+  protected List<InetSocketAddress> resolveCandidates(String host, int port) throws UnknownHostException {
     InetAddress[] addresses = InetAddress.getAllByName(host);
     List<InetSocketAddress> candidates = new ArrayList<>(addresses.length);
     for (InetAddress address : addresses) {
@@ -203,11 +243,11 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
   }
 
   /**
-   * Opens a plain TCP connection to a single candidate address. Package-private
+   * Opens a plain TCP connection to a single candidate address. Overridable
    * so the failover/skip-on-failure iteration can be exercised with real
    * loopback sockets in tests, without requiring a TLS handshake.
    */
-  Socket connectPlain(InetSocketAddress candidate, int timeoutMs) throws IOException {
+  protected Socket connectPlain(InetSocketAddress candidate, int timeoutMs) throws IOException {
     Socket socket = new Socket();
     try {
       socket.connect(candidate, timeoutMs);
@@ -216,6 +256,15 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
       throw e;
     }
     return socket;
+  }
+
+  /**
+   * Overridable (rather than private/static) so tests can substitute a
+   * fake TLS delegate and exercise {@link #connectWithFailover(String, int)}
+   * without a real certificate/handshake.
+   */
+  protected SSLSocketFactory delegate() {
+    return (SSLSocketFactory) SSLSocketFactory.getDefault();
   }
 
   private static void closeQuietly(Socket socket) {
@@ -228,45 +277,6 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
     }
   }
 
-  public static final String JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP = "com.sun.jndi.ldap.connect.timeout";
-
-  private static volatile String customJndiConnectTimeoutHint;
-
-  /**
-   * Called once, when the SNI socket factory gets registered, with the raw
-   * {@code com.sun.jndi.ldap.connect.timeout} value found (if any) in the
-   * store's {@code customJNDIConnectionParameters} - this is how that
-   * timeout is actually shipped/configured (a JNDI env entry copied verbatim
-   * into the LDAP context), as opposed to a JVM system property.
-   */
-  public static void hintCustomJndiConnectTimeout(String value) {
-    customJndiConnectTimeoutHint = value;
-  }
-
-  /**
-   * Resolves the connect timeout (ms) used for each candidate address, in
-   * order of precedence: the explicit {@code exo.ldap.sni.connect.timeout}
-   * property, then whatever {@code com.sun.jndi.ldap.connect.timeout} value
-   * was hinted from the store's {@code customJNDIConnectionParameters} (see
-   * {@link #hintCustomJndiConnectTimeout(String)}), then the JVM system
-   * property of the same name, then {@value #DEFAULT_CONNECT_TIMEOUT_MS}.
-   */
-  public static int connectTimeoutMs() {
-    String explicit = PropertyManager.getProperty(SNI_CONNECT_TIMEOUT_PROP);
-    if (StringUtils.isNotBlank(explicit)) {
-      return parseTimeout(explicit, SNI_CONNECT_TIMEOUT_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
-    }
-    String hint = customJndiConnectTimeoutHint;
-    if (StringUtils.isNotBlank(hint)) {
-      return parseTimeout(hint, "customJNDIConnectionParameters[" + JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP + "]", DEFAULT_CONNECT_TIMEOUT_MS);
-    }
-    String systemProperty = System.getProperty(JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
-    if (StringUtils.isNotBlank(systemProperty)) {
-      return parseTimeout(systemProperty, JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
-    }
-    return DEFAULT_CONNECT_TIMEOUT_MS;
-  }
-
   private static int parseTimeout(String value, String propertyName, int fallback) {
     try {
       return Integer.parseInt(value.trim());
@@ -274,14 +284,5 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
       LOG.warn("Invalid value '{}' for property {} - using default {}", value, propertyName, fallback);
       return fallback;
     }
-  }
-
-  /**
-   * Package-private (rather than private/static) so tests can substitute a
-   * fake TLS delegate and exercise {@link #connectWithFailover(String, int)}
-   * without a real certificate/handshake.
-   */
-  SSLSocketFactory delegate() {
-    return (SSLSocketFactory) SSLSocketFactory.getDefault();
   }
 }

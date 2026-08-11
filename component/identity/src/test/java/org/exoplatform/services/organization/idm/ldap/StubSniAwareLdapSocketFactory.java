@@ -44,12 +44,12 @@ class StubSniAwareLdapSocketFactory extends SniAwareLdapSocketFactory {
   }
 
   @Override
-  List<InetSocketAddress> resolveCandidates(String host, int port) {
+  protected List<InetSocketAddress> resolveCandidates(String host, int port) {
     return candidates;
   }
 
   @Override
-  SSLSocketFactory delegate() {
+  protected SSLSocketFactory delegate() {
     return fakeDelegate;
   }
 }

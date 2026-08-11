@@ -97,7 +97,7 @@ class StubLdapServerLocator extends LdapServerLocator {
   }
 
   @Override
-  List<SrvRecord> lookupSrvRecords() throws NamingException {
+  protected List<SrvRecord> lookupSrvRecords() throws NamingException {
     lookupCount++;
     if (lookupStartedLatch != null) {
       lookupStartedLatch.countDown();
@@ -119,12 +119,12 @@ class StubLdapServerLocator extends LdapServerLocator {
   }
 
   @Override
-  long currentTimeMillis() {
+  protected long currentTimeMillis() {
     return now;
   }
 
   @Override
-  void runAsync(Runnable task) {
+  protected void runAsync(Runnable task) {
     if (useRealAsync) {
       lastBackgroundTask = CompletableFuture.runAsync(task);
     } else {
