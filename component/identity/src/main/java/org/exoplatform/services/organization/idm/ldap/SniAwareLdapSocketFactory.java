@@ -57,14 +57,13 @@ import org.exoplatform.services.log.Log;
  * <p>
  * Enabled by setting {@code exo.ldap.sni.enabled=true}; the connect timeout
  * (ms) used for each candidate address can be tuned with
- * {@code exo.ldap.sni.connect.timeout}. When unset, it defaults to the JVM
- * system property {@code com.sun.jndi.ldap.connect.timeout} if present (the
- * standard, documented way this timeout is normally configured), else 10000.
- * Note that this only covers the system-property form of that setting: a
- * value supplied only through the store's {@code customJNDIConnectionParameters}
- * option (i.e. as a JNDI env entry rather than a system property) is not
- * visible from this factory and must be mirrored into
- * {@code exo.ldap.sni.connect.timeout} explicitly if SNI support is enabled.
+ * {@code exo.ldap.sni.connect.timeout}. When unset, it falls back to whatever
+ * {@code com.sun.jndi.ldap.connect.timeout} value is already configured -
+ * either as a {@code customJNDIConnectionParameters} entry (the way this
+ * timeout is shipped by default) or as a JVM system property - so switching
+ * SNI on does not silently replace a timeout the admin already set, and
+ * finally defaults to 10000 if neither is present. See
+ * {@link #connectTimeoutMs()} for the exact precedence.
  * <p>
  * Registered via the standard JNDI LDAP {@code java.naming.ldap.factory.socket}
  * connection property, whose contract requires a public static
@@ -229,26 +228,41 @@ public class SniAwareLdapSocketFactory extends SSLSocketFactory implements Compa
     }
   }
 
-  static final String JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP = "com.sun.jndi.ldap.connect.timeout";
+  public static final String JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP = "com.sun.jndi.ldap.connect.timeout";
 
-  static int connectTimeoutMs() {
-    String value = PropertyManager.getProperty(SNI_CONNECT_TIMEOUT_PROP);
-    if (StringUtils.isNotBlank(value)) {
-      return parseTimeout(value, SNI_CONNECT_TIMEOUT_PROP, defaultConnectTimeoutMs());
-    }
-    return defaultConnectTimeoutMs();
+  private static volatile String customJndiConnectTimeoutHint;
+
+  /**
+   * Called once, when the SNI socket factory gets registered, with the raw
+   * {@code com.sun.jndi.ldap.connect.timeout} value found (if any) in the
+   * store's {@code customJNDIConnectionParameters} - this is how that
+   * timeout is actually shipped/configured (a JNDI env entry copied verbatim
+   * into the LDAP context), as opposed to a JVM system property.
+   */
+  public static void hintCustomJndiConnectTimeout(String value) {
+    customJndiConnectTimeoutHint = value;
   }
 
   /**
-   * Falls back to the JVM system property {@code com.sun.jndi.ldap.connect.timeout}
-   * when {@code exo.ldap.sni.connect.timeout} is unset, so switching SNI on
-   * does not silently replace a timeout the admin already configured the
-   * standard way.
+   * Resolves the connect timeout (ms) used for each candidate address, in
+   * order of precedence: the explicit {@code exo.ldap.sni.connect.timeout}
+   * property, then whatever {@code com.sun.jndi.ldap.connect.timeout} value
+   * was hinted from the store's {@code customJNDIConnectionParameters} (see
+   * {@link #hintCustomJndiConnectTimeout(String)}), then the JVM system
+   * property of the same name, then {@value #DEFAULT_CONNECT_TIMEOUT_MS}.
    */
-  private static int defaultConnectTimeoutMs() {
-    String jndiValue = System.getProperty(JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
-    if (StringUtils.isNotBlank(jndiValue)) {
-      return parseTimeout(jndiValue, JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
+  public static int connectTimeoutMs() {
+    String explicit = PropertyManager.getProperty(SNI_CONNECT_TIMEOUT_PROP);
+    if (StringUtils.isNotBlank(explicit)) {
+      return parseTimeout(explicit, SNI_CONNECT_TIMEOUT_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
+    }
+    String hint = customJndiConnectTimeoutHint;
+    if (StringUtils.isNotBlank(hint)) {
+      return parseTimeout(hint, "customJNDIConnectionParameters[" + JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP + "]", DEFAULT_CONNECT_TIMEOUT_MS);
+    }
+    String systemProperty = System.getProperty(JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
+    if (StringUtils.isNotBlank(systemProperty)) {
+      return parseTimeout(systemProperty, JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, DEFAULT_CONNECT_TIMEOUT_MS);
     }
     return DEFAULT_CONNECT_TIMEOUT_MS;
   }

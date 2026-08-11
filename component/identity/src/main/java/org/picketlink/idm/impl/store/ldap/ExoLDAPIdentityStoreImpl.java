@@ -141,6 +141,12 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
     private FailoverInvocationHandler(LDAPIdentityStoreConfiguration original) {
       this.original = original;
       this.serverLocator = new LdapServerLocator(original.getProviderURL());
+      if (SniAwareLdapSocketFactory.isEnabled() && !serverLocator.isAllLdaps()) {
+        log.warning("exo.ldap.sni.enabled is true, but not every configured LDAP server uses ldaps:// "
+            + "(or none is configured) - the SNI-safe socket factory will NOT be registered to avoid "
+            + "forcing a TLS handshake on a plaintext connection. Configure exo.ldap.url, "
+            + "exo.ldap.failover.urls and, if used, exo.ldap.srv.scheme to all use ldaps:// to enable it.");
+      }
     }
 
     @Override
@@ -161,6 +167,13 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
 
     private static Map<String, String> withSniSocketFactory(Map<String, String> originalParameters) {
       Map<String, String> merged = originalParameters == null ? new HashMap<>() : new HashMap<>(originalParameters);
+      // The default configuration ships com.sun.jndi.ldap.connect.timeout as a
+      // customJNDIConnectionParameters entry (not a system property) - pass it through so the
+      // SNI socket factory's own connect timeout does not silently replace it with its default.
+      String configuredConnectTimeout = merged.get(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
+      if (StringUtils.isNotBlank(configuredConnectTimeout)) {
+        SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout(configuredConnectTimeout);
+      }
       merged.put(SniAwareLdapSocketFactory.SOCKET_FACTORY_JNDI_PROPERTY, SniAwareLdapSocketFactory.class.getName());
       return merged;
     }

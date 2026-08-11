@@ -24,7 +24,8 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,6 +46,12 @@ import org.exoplatform.services.log.Log;
 
 /**
  * Resolves the LDAP/AD provider URL(s) used to open a JNDI {@code LdapContext}.
+ * <p>
+ * This class is only ever instantiated - and none of the properties below
+ * have any effect - when {@code org.picketlink.idm.impl.store.ldap.ExoLDAPIdentityStoreImpl#FAILOVER_ENABLED_PROP}
+ * ({@code exo.ldap.failover.enabled}) is set to {@code true}; that master
+ * flag defaults to {@code false}, leaving the original PicketLink code path
+ * untouched.
  * <p>
  * By default (feature disabled), this simply returns the statically configured
  * {@code providerURL} (i.e. the value of {@code exo.ldap.url}) untouched, so
@@ -206,25 +213,35 @@ public class LdapServerLocator {
   }
 
   /**
-   * @return {@code true} if every server this locator can ever return uses
-   *         the {@code ldaps} scheme: the SRV-generated scheme (when SRV
-   *         lookup is enabled) and every statically configured URL (main and
-   *         secondary). Used to decide whether it is safe to register a
-   *         TLS-only {@code java.naming.ldap.factory.socket} - that JNDI
-   *         property is not scheme-scoped, so registering it while any
-   *         configured server is plain {@code ldap://} would force a TLS
+   * @return {@code true} if at least one server is configured and every
+   *         server this locator can ever return uses the {@code ldaps}
+   *         scheme: the SRV-generated scheme (when SRV lookup is enabled) and
+   *         every statically configured URL (main and secondary). Returns
+   *         {@code false} when nothing is configured at all - there is no
+   *         server to prove is {@code ldaps}, so this fails closed rather
+   *         than vacuously true. Used to decide whether it is safe to
+   *         register a TLS-only {@code java.naming.ldap.factory.socket} -
+   *         that JNDI property is not scheme-scoped, so registering it while
+   *         any configured server is plain {@code ldap://} would force a TLS
    *         handshake on a plaintext connection and break it.
    */
   public boolean isAllLdaps() {
-    if (isSrvLookupEnabled() && !"ldaps".equalsIgnoreCase(scheme)) {
-      return false;
+    boolean hasKnownServer = false;
+    if (isSrvLookupEnabled()) {
+      hasKnownServer = true;
+      if (!"ldaps".equalsIgnoreCase(scheme)) {
+        return false;
+      }
     }
     for (String url : staticUrls) {
+      hasKnownServer = true;
       if (!StringUtils.startsWithIgnoreCase(url, "ldaps://")) {
         return false;
       }
     }
-    return true;
+    // Nothing configured at all: there is no server to prove is ldaps, so do not
+    // fail open and let a TLS-only socket factory register itself regardless.
+    return hasKnownServer;
   }
 
   private List<String> resolveSrvUrls() {
@@ -303,11 +320,23 @@ public class LdapServerLocator {
   }
 
   /**
+   * A single dedicated daemon thread, shared by every {@link LdapServerLocator}
+   * instance, used to run background SRV refreshes. A blocking JNDI DNS query
+   * (up to {@code exo.ldap.srv.timeout} times its retry count) has no business
+   * parking a thread borrowed from the JVM-wide common {@link java.util.concurrent.ForkJoinPool}.
+   */
+  private static final ExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+    Thread thread = new Thread(runnable, "ldap-srv-refresh");
+    thread.setDaemon(true);
+    return thread;
+  });
+
+  /**
    * Runs {@code task} in the background. Package-private so tests can
    * substitute a same-thread execution and keep assertions deterministic.
    */
   void runAsync(Runnable task) {
-    CompletableFuture.runAsync(task);
+    REFRESH_EXECUTOR.execute(task);
   }
 
   List<SrvRecord> lookupSrvRecords() throws NamingException {

@@ -55,6 +55,7 @@ public class SniAwareLdapSocketFactoryTest {
     System.clearProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP);
     System.clearProperty(SniAwareLdapSocketFactory.SNI_CONNECT_TIMEOUT_PROP);
     System.clearProperty(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
+    SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout(null);
     PropertyManager.refresh();
   }
 
@@ -96,6 +97,28 @@ public class SniAwareLdapSocketFactoryTest {
   @Test
   public void testConnectTimeoutPrefersTheExplicitSniPropertyOverTheJndiOne() {
     System.setProperty(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, "45000");
+    PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_CONNECT_TIMEOUT_PROP, "5000");
+    assertEquals(5000, SniAwareLdapSocketFactory.connectTimeoutMs());
+  }
+
+  @Test
+  public void testConnectTimeoutFallsBackToTheCustomJndiConnectionParametersHint() {
+    // This is how com.sun.jndi.ldap.connect.timeout is actually shipped by default: as a
+    // customJNDIConnectionParameters entry, not a system property.
+    SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout("30000");
+    assertEquals(30000, SniAwareLdapSocketFactory.connectTimeoutMs());
+  }
+
+  @Test
+  public void testConnectTimeoutPrefersTheCustomJndiConnectionParametersHintOverTheSystemProperty() {
+    System.setProperty(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, "45000");
+    SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout("30000");
+    assertEquals(30000, SniAwareLdapSocketFactory.connectTimeoutMs());
+  }
+
+  @Test
+  public void testConnectTimeoutPrefersTheExplicitSniPropertyOverTheCustomJndiConnectionParametersHint() {
+    SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout("30000");
     PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_CONNECT_TIMEOUT_PROP, "5000");
     assertEquals(5000, SniAwareLdapSocketFactory.connectTimeoutMs());
   }

@@ -47,6 +47,7 @@ public class ExoLDAPIdentityStoreImplTest {
     System.clearProperty(ExoLDAPIdentityStoreImpl.FAILOVER_ENABLED_PROP);
     System.clearProperty("exo.ldap.failover.urls");
     System.clearProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP);
+    SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout(null);
     PropertyManager.refresh();
   }
 
@@ -96,9 +97,10 @@ public class ExoLDAPIdentityStoreImplTest {
   }
 
   @Test
-  public void testEnabledMergesSniSocketFactoryWhenSniEnabled() {
+  public void testEnabledMergesSniSocketFactoryWhenSniEnabledAndEveryUrlIsLdaps() {
     PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP, "true");
     LDAPIdentityStoreConfiguration original = mock(LDAPIdentityStoreConfiguration.class);
+    when(original.getProviderURL()).thenReturn("ldaps://main:636");
     Map<String, String> originalParams = new HashMap<>();
     originalParams.put("com.sun.jndi.ldap.read.timeout", "60000");
     when(original.getCustomJNDIConnectionParameters()).thenReturn(originalParams);
@@ -108,5 +110,49 @@ public class ExoLDAPIdentityStoreImplTest {
 
     assertEquals("60000", merged.get("com.sun.jndi.ldap.read.timeout"));
     assertEquals(SniAwareLdapSocketFactory.class.getName(), merged.get(SniAwareLdapSocketFactory.SOCKET_FACTORY_JNDI_PROPERTY));
+  }
+
+  @Test
+  public void testEnabledHintsTheConfiguredJndiConnectTimeoutToTheSniFactory() {
+    PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP, "true");
+    LDAPIdentityStoreConfiguration original = mock(LDAPIdentityStoreConfiguration.class);
+    when(original.getProviderURL()).thenReturn("ldaps://main:636");
+    Map<String, String> originalParams = new HashMap<>();
+    // This is how the shipped configuration sets it - as a customJNDIConnectionParameters entry.
+    originalParams.put(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP, "45000");
+    when(original.getCustomJNDIConnectionParameters()).thenReturn(originalParams);
+
+    ExoLDAPIdentityStoreImpl.applyFailoverIfEnabled(original, true).getCustomJNDIConnectionParameters();
+
+    assertEquals(45000, SniAwareLdapSocketFactory.connectTimeoutMs());
+  }
+
+  @Test
+  public void testEnabledDoesNotRegisterSniSocketFactoryWhenAnyUrlIsPlainLdap() {
+    PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP, "true");
+    LDAPIdentityStoreConfiguration original = mock(LDAPIdentityStoreConfiguration.class);
+    when(original.getProviderURL()).thenReturn("ldap://main:389");
+    Map<String, String> originalParams = new HashMap<>();
+    originalParams.put("com.sun.jndi.ldap.read.timeout", "60000");
+    when(original.getCustomJNDIConnectionParameters()).thenReturn(originalParams);
+
+    LDAPIdentityStoreConfiguration result = ExoLDAPIdentityStoreImpl.applyFailoverIfEnabled(original, true);
+    Map<String, String> merged = result.getCustomJNDIConnectionParameters();
+
+    assertEquals(originalParams, merged);
+  }
+
+  @Test
+  public void testEnabledDoesNotRegisterSniSocketFactoryWhenNoUrlIsConfigured() {
+    PropertyManager.setProperty(SniAwareLdapSocketFactory.SNI_ENABLED_PROP, "true");
+    LDAPIdentityStoreConfiguration original = mock(LDAPIdentityStoreConfiguration.class);
+    // getProviderURL() left unstubbed: returns null, exactly the "nothing configured" case.
+    Map<String, String> originalParams = new HashMap<>();
+    when(original.getCustomJNDIConnectionParameters()).thenReturn(originalParams);
+
+    LDAPIdentityStoreConfiguration result = ExoLDAPIdentityStoreImpl.applyFailoverIfEnabled(original, true);
+    Map<String, String> merged = result.getCustomJNDIConnectionParameters();
+
+    assertEquals(originalParams, merged);
   }
 }

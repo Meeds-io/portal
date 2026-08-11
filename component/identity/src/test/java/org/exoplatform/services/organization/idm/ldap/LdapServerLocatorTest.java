@@ -67,6 +67,44 @@ public class LdapServerLocatorTest {
   }
 
   @Test
+  public void testIsAllLdapsTrueWhenEveryStaticUrlIsLdaps() {
+    LdapServerLocator locator = new LdapServerLocator("ldaps://main:636");
+    assertTrue(locator.isAllLdaps());
+  }
+
+  @Test
+  public void testIsAllLdapsFalseWhenAnyStaticUrlIsPlainLdap() {
+    PropertyManager.setProperty(LdapServerLocator.FAILOVER_URLS_PROP, "ldap://secondary:389");
+    LdapServerLocator locator = new LdapServerLocator("ldaps://main:636");
+    assertFalse(locator.isAllLdaps());
+  }
+
+  @Test
+  public void testIsAllLdapsFalseWhenNothingIsConfigured() {
+    // No server known at all: must fail closed, not vacuously true.
+    LdapServerLocator locator = new LdapServerLocator("");
+    assertFalse(locator.isAllLdaps());
+  }
+
+  @Test
+  public void testIsAllLdapsTrueWhenSrvSchemeIsLdapsAndNoStaticUrlConfigured() {
+    PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
+    PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");
+    PropertyManager.setProperty(LdapServerLocator.SRV_SCHEME_PROP, "ldaps");
+    LdapServerLocator locator = new LdapServerLocator("");
+    assertTrue(locator.isAllLdaps());
+  }
+
+  @Test
+  public void testIsAllLdapsFalseWhenSrvSchemeIsNotLdapsRegardlessOfStaticUrls() {
+    PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
+    PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");
+    // SRV_SCHEME_PROP left at its default ("ldap")
+    LdapServerLocator locator = new LdapServerLocator("ldaps://main:636");
+    assertFalse(locator.isAllLdaps());
+  }
+
+  @Test
   public void testSrvEnabledButDomainBlankFallsBackToStaticOnly() {
     PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
     LdapServerLocator locator = new LdapServerLocator("ldap://fallback:389");
