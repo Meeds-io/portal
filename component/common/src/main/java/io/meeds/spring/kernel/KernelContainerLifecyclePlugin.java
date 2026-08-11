@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -38,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.picocontainer.Startable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -50,6 +52,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 
 import org.exoplatform.commons.api.persistence.GenericDAO;
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.BaseContainerLifecyclePlugin;
 import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
@@ -72,11 +75,19 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
   private static final Logger                                 LOG                     =
                                                                   LoggerFactory.getLogger(KernelContainerLifecyclePlugin.class);
 
+  private static final boolean                                DEVELOPPING             = PropertyManager.isDevelopping();
+
   private static Map<String, ConfigurableListableBeanFactory> springBeanRegistries    = new ConcurrentHashMap<>();
 
   private static Map<String, ApplicationContext>              springContexts          = new ConcurrentHashMap<>();
 
   private static Map<String, Runnable>                        springContextsInitTasks = new ConcurrentHashMap<>();
+
+  private static Set<String>                                  initializedContexts     = ConcurrentHashMap.newKeySet();
+
+  private static Map<String, Thread>                          initializingContexts    = new ConcurrentHashMap<>();
+
+  private static Set<String>                                  warnedContexts          = ConcurrentHashMap.newKeySet();
 
   private static boolean                                      kernelAlreadyBooted     = false;
 
@@ -95,6 +106,39 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
     if (springContextInitTask != null) {
       springContextsInitTasks.put(servletContextName, springContextInitTask);
     }
+  }
+
+  /**
+   * Marks a Spring context as currently initializing its beans, by the calling
+   * Thread. Beans requested by that same Thread are part of the context own
+   * initialization, thus they aren't reported as requested too early.
+   *
+   * @param servletContextName Servlet context name of the Spring context
+   */
+  public static void markSpringContextAsInitializing(String servletContextName) {
+    initializingContexts.put(servletContextName, Thread.currentThread());
+  }
+
+  /**
+   * Marks a Spring context as not initializing its beans anymore, whether its
+   * initialization succeeded or not, to not retain the initializing Thread.
+   *
+   * @param servletContextName Servlet context name of the Spring context
+   */
+  public static void unmarkSpringContextAsInitializing(String servletContextName) {
+    initializingContexts.remove(servletContextName);
+  }
+
+  /**
+   * Marks a Spring context as having completely finished its startup (its beans
+   * initialization ended). Used to detect and warn about beans requested from a
+   * context before it finishes its startup, which reveals a wrong addons
+   * startup ordering.
+   *
+   * @param servletContextName Servlet context name of the Spring context
+   */
+  public static void markSpringContextAsInitialized(String servletContextName) {
+    initializedContexts.add(servletContextName);
   }
 
   @Override
@@ -173,6 +217,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
                                                                       componentKey.getName(),
                                                                       beanDefinition.getBeanClassName(),
                                                                       () -> getBeanInstance(applicationContext,
+                                                                                            servletContextName,
                                                                                             beanName,
                                                                                             portalContainer.getName()));
         if (componentAdapter != null) {
@@ -278,6 +323,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
         RootBeanDefinition receiverBeanDefinition = createProxyBeanDefinition(beanClassNameInterface,
                                                                               () -> getBeanInstance(senderApplicationContext,
                                                                                                     portalContainer,
+                                                                                                    senderServletContextName,
                                                                                                     beanName,
                                                                                                     beanClassNameInterface,
                                                                                                     receiverServletContextName));
@@ -419,6 +465,7 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
 
   private static Object getBeanInstance(ApplicationContext applicationContext,
                                         PortalContainer portalContainer,
+                                        String servletContextName,
                                         String beanName,
                                         Class<Object> beanClassName,
                                         String contextName) {
@@ -430,16 +477,53 @@ public class KernelContainerLifecyclePlugin extends BaseContainerLifecyclePlugin
                 contextName);
       return portalContainer.getComponentInstanceOfType(beanClassName);
     } else {
-      return getBeanInstance(applicationContext, beanName, contextName);
+      return getBeanInstance(applicationContext, servletContextName, beanName, contextName);
     }
   }
 
-  private static Object getBeanInstance(ApplicationContext applicationContext, String beanName, String contextName) {
+  private static Object getBeanInstance(ApplicationContext applicationContext,
+                                        String servletContextName,
+                                        String beanName,
+                                        String contextName) {
+    checkContextStartupFinished(servletContextName, beanName, contextName);
     LOG.trace("Retrieve Bean with name '{}' from Spring to Kernel using Application context '{}' in detstination to '{}'",
               beanName,
               applicationContext.getApplicationName(),
               contextName);
     return applicationContext.getBean(beanName);
+  }
+
+  /**
+   * Warns when a Bean is requested from a Spring context before this context
+   * finishes its startup. This forces the not-yet-finished context to
+   * initialize its beans earlier than planned by the addons startup order
+   * (based on {@link PortalContainerConfig} dependencies declared through the
+   * addons *PortalContainerDefinitionChange* priorities), which can lead to
+   * unpredictable startup errors. The fix is to change addons priorities so
+   * that the requested addon gets initialized before its dependent addons.
+   * Warned only once per context: this is a startup ordering diagnostic, where
+   * the first occurrence is the meaningful one, and Beans are requested from
+   * the Kernel on each single access.
+   */
+  private static void checkContextStartupFinished(String servletContextName, String beanName, String contextName) {
+    if (initializedContexts.contains(servletContextName)
+        || !springContextsInitTasks.containsKey(servletContextName)
+        // Beans requested by the Thread initializing that same context are part
+        // of its own initialization, they aren't accessed too early
+        || Thread.currentThread() == initializingContexts.get(servletContextName)
+        || !warnedContexts.add(servletContextName)) {
+      return;
+    }
+    LOG.atLevel(DEVELOPPING ? Level.WARN : Level.DEBUG)
+       .log("Spring Bean '{}' of context '{}' is requested by '{}' while context '{}' hasn't finished its startup yet." +
+           " This generally means that the addons startup order (PortalContainerDefinitionChange priorities) is wrong:" +
+           " addon of context '{}' should be initialized before its dependent addons." +
+           " Its beans will be initialized earlier than planned, which can lead to unpredictable startup errors.",
+            beanName,
+            servletContextName,
+            contextName,
+            servletContextName,
+            servletContextName);
   }
 
   private static <T> T getComponentInstance(PortalContainer portalContainer, Class<T> keyClass) {
