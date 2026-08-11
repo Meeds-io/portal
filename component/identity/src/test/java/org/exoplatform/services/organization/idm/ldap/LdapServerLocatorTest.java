@@ -160,6 +160,34 @@ public class LdapServerLocatorTest {
   }
 
   @Test
+  public void testWeightZeroEntryCanStillBePickedFirstPerRfc2782() {
+    PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
+    PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");
+
+    StubLdapServerLocator locator = new StubLdapServerLocator("");
+    locator.setNow(0L);
+    // RFC 2782: a weight-0 entry, when it leads the tier, must retain a small (here ~1/11)
+    // but non-zero chance of being picked first - not literally zero.
+    locator.setRecordsToReturn(Arrays.asList(new SrvRecord(0, 0, 389, "zero-weight.example.com"),
+                                              new SrvRecord(0, 10, 389, "ten-weight.example.com")));
+
+    int zeroWeightFirstCount = 0;
+    int iterations = 5000;
+    for (int i = 0; i < iterations; i++) {
+      String firstUrl = locator.resolveProviderURL().split(" ")[0];
+      if ("ldap://zero-weight.example.com:389".equals(firstUrl)) {
+        zeroWeightFirstCount++;
+      }
+    }
+    // Expected ~1/11 (~9%) of the time; a wide tolerance band keeps this non-flaky
+    // while still failing if the weight-0 entry can never win (the regression this covers).
+    assertTrue("Expected the weight-0 entry to be picked first a small but non-zero fraction of the "
+        + "time, got " + zeroWeightFirstCount + "/" + iterations, zeroWeightFirstCount > iterations * 0.02);
+    assertTrue("Expected the weight-0 entry to be picked first noticeably less often than the weight-10 one, got "
+        + zeroWeightFirstCount + "/" + iterations, zeroWeightFirstCount < iterations * 0.2);
+  }
+
+  @Test
   public void testResolutionIsCachedWithinRefreshPeriod() {
     PropertyManager.setProperty(LdapServerLocator.SRV_ENABLED_PROP, "true");
     PropertyManager.setProperty(LdapServerLocator.SRV_DOMAIN_PROP, "example.com");

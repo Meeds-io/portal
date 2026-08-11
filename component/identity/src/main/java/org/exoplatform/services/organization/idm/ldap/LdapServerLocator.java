@@ -406,13 +406,15 @@ public class LdapServerLocator {
       if (totalWeight <= 0) {
         pickedIndex = random.nextInt(remaining.size());
       } else {
-        // Inclusive upper bound per RFC 2782, so a weight-0 entry retains a (small) chance.
+        // RFC 2782: pick a number in [0, total] inclusive, then select the first entry whose
+        // running sum is >= that number - this (not a strict "<") is what lets a weight-0 entry
+        // retain a small chance of being picked first, when it is.
         int threshold = random.nextInt(totalWeight + 1);
         int cumulative = 0;
         pickedIndex = remaining.size() - 1;
         for (int i = 0; i < remaining.size(); i++) {
           cumulative += Math.max(remaining.get(i).getWeight(), 0);
-          if (threshold < cumulative) {
+          if (threshold <= cumulative) {
             pickedIndex = i;
             break;
           }
