@@ -48,8 +48,14 @@ class Retrieval<K, V, C> implements Callable<V> {
     }
 
     public V call() throws Exception {
+      // Retrieve the value from the cache without using the loader
+        V value = cache.get(key);
+        if (value != null) {
+            return value;
+        }
+
         // Retrieve the value from the loader
-        V value = cache.loader.retrieve(context, key);
+        value = cache.loader.retrieve(context, key);
 
         //
         if (value != null) {
