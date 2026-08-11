@@ -100,17 +100,22 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
 
   private void finishSpringContextStartup(ConfigurableListableBeanFactory beanFactory) {
     long start = System.currentTimeMillis();
-    LOG.info("Continue Spring context '{}' initialization", servletContext.getServletContextName());
+    String contextName = servletContext.getServletContextName();
+    LOG.info("Continue Spring context '{}' initialization", contextName);
+    KernelContainerLifecyclePlugin.markSpringContextAsInitializing(contextName);
     try {
       PortalApplicationContext.super.finishBeanFactoryInitialization(beanFactory);
       PortalApplicationContext.super.finishRefresh();
+      KernelContainerLifecyclePlugin.markSpringContextAsInitialized(contextName);
       LOG.info("Spring context '{}' initialized in {}ms",
-               servletContext.getServletContextName(),
+               contextName,
                System.currentTimeMillis() - start);
     } catch (Exception e) {
       throw new IllegalStateException(String.format("Error While finishing Beans Initialization in context '%s'",
-                                                    servletContext.getServletContextName()),
+                                                    contextName),
                                       e);
+    } finally {
+      KernelContainerLifecyclePlugin.unmarkSpringContextAsInitializing(contextName);
     }
   }
 
