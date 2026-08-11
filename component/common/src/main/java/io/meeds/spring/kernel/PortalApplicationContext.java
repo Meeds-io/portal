@@ -104,6 +104,7 @@ public class PortalApplicationContext extends AnnotationConfigServletWebServerAp
     try {
       PortalApplicationContext.super.finishBeanFactoryInitialization(beanFactory);
       PortalApplicationContext.super.finishRefresh();
+      KernelContainerLifecyclePlugin.markSpringContextAsInitialized(servletContext.getServletContextName());
       LOG.info("Spring context '{}' initialized in {}ms",
                servletContext.getServletContextName(),
                System.currentTimeMillis() - start);
