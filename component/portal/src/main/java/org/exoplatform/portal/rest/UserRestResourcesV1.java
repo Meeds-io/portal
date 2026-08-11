@@ -94,10 +94,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   private static final String            ADMINISTRATOR_GROUP            = "/platform/administrators";
 
-  /** Must match social's GroupAclPlugin.OBJECT_TYPE */
   private static final String            GROUP_OBJECT_TYPE = "group";
 
-  /** Must match social's GroupAclPlugin.LIST_MEMBERS_PERMISSION_TYPE */
   private static final String            GROUP_LIST_MEMBERS_PERMISSION_TYPE = "listMembers";
 
   public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
@@ -570,7 +568,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                      boolean returnSize) throws Exception {
 
     boolean isAdmin = isMemberOfAdminGroup();
-    if (!isAdmin && !canManageGroupMemberships(groupId)) {
+    if (!isAdmin && !canListGroupMemberships(groupId)) {
       throw new WebApplicationException(Response.Status.UNAUTHORIZED);
     }
     offset = offset > 0 ? offset : 0;
@@ -715,14 +713,14 @@ public class UserRestResourcesV1 implements ResourceContainer {
   }
 
   /**
-   * Check if the authenticated user can manage the memberships of the given
+   * Check if the authenticated user can list the memberships of the given
    * group, checked through the 'group' ACL plugin contributed at runtime by
    * the social addon
    *
    * @param groupId group id to check
-   * @return true if the authenticated user can manage the group memberships
+   * @return true if the authenticated user can list the group memberships
    */
-  private boolean canManageGroupMemberships(String groupId) {
+  private boolean canListGroupMemberships(String groupId) {
     return StringUtils.isNotBlank(groupId)
            && userACL.hasAclPlugin(GROUP_OBJECT_TYPE)
            && userACL.hasPermission(GROUP_OBJECT_TYPE,

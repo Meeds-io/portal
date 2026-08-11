@@ -62,10 +62,8 @@ public class GroupRestResourcesV1 implements ResourceContainer {
 
   public static final int     DEFAULT_OFFSET = 0;
 
-  /** Must match social's GroupAclPlugin.OBJECT_TYPE */
   private static final String GROUP_OBJECT_TYPE = "group";
 
-  /** Must match social's GroupAclPlugin.MANAGE_MEMBERSHIPS_PERMISSION_TYPE */
   private static final String GROUP_MANAGE_MEMBERSHIPS_PERMISSION_TYPE = "manageMemberships";
 
   private GroupSearchService  groupSearchService;
