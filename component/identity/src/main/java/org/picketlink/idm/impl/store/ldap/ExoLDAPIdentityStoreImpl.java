@@ -33,6 +33,10 @@ import org.picketlink.idm.spi.model.IdentityObjectType;
 import org.picketlink.idm.spi.search.IdentityObjectSearchCriteria;
 import org.picketlink.idm.spi.store.IdentityStoreInvocationContext;
 
+import org.exoplatform.commons.utils.PropertyManager;
+import org.exoplatform.services.organization.idm.ldap.LdapServerLocator;
+import org.exoplatform.services.organization.idm.ldap.SniAwareLdapSocketFactory;
+
 import javax.naming.CompositeName;
 import javax.naming.Name;
 import javax.naming.NamingEnumeration;
@@ -43,6 +47,10 @@ import javax.naming.ldap.Control;
 import javax.naming.ldap.LdapContext;
 import javax.naming.ldap.SortControl;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -59,6 +67,15 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
   public static final String MODIFICATION_DATE_SINCE = "modificationDateSince";
   public static final String FAILED_TO_CLOSE_LDAP_CONNECTION_MESSAGE = "Failed to close LDAP connection";
 
+  /**
+   * Master feature flag for the LDAP/AD failover, DNS SRV load-balancing and
+   * SNI-safe multi-homed LDAPS support. Defaults to {@code false}: when unset,
+   * {@link #bootstrap(IdentityStoreConfigurationContext)} never wraps the
+   * configuration, so the exact original PicketLink code execution chain is
+   * used, guaranteeing no behavior change for existing deployments.
+   */
+  public static final String FAILOVER_ENABLED_PROP = "exo.ldap.failover.enabled";
+
   private static Logger      log                     = Logger.getLogger(LDAPIdentityStoreImpl.class.getName());
 
   public ExoLDAPIdentityStoreImpl(String id) {
@@ -70,6 +87,30 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
     ExoIdentityStoreConfigurationContext exoIdentityStoreConfigurationContext = new ExoIdentityStoreConfigurationContext(configurationContext);
 
     super.bootstrap(exoIdentityStoreConfigurationContext);
+
+    this.configuration = applyFailoverIfEnabled(this.configuration, isFailoverEnabled());
+  }
+
+  private static boolean isFailoverEnabled() {
+    return Boolean.parseBoolean(PropertyManager.getProperty(FAILOVER_ENABLED_PROP));
+  }
+
+  /**
+   * When {@code enabled} is {@code false} (the default), returns
+   * {@code configuration} untouched - no {@link Proxy} is created and the
+   * previous code execution chain is preserved exactly. When {@code true},
+   * wraps it so that {@code getProviderURL()} is resolved dynamically on
+   * every LDAP connection attempt (DNS SRV discovery, failover and
+   * load-balancing ordering) instead of using the single static value read
+   * once at bootstrap time.
+   */
+  protected static LDAPIdentityStoreConfiguration applyFailoverIfEnabled(LDAPIdentityStoreConfiguration configuration, boolean enabled) {
+    if (!enabled) {
+      return configuration;
+    }
+    return (LDAPIdentityStoreConfiguration) Proxy.newProxyInstance(LDAPIdentityStoreConfiguration.class.getClassLoader(),
+                                                                     new Class<?>[] { LDAPIdentityStoreConfiguration.class },
+                                                                     new FailoverInvocationHandler(configuration));
   }
 
   /**
@@ -699,5 +740,71 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
 
     return attrsMap;
 
+  }
+
+  /**
+   * Delegates every {@link LDAPIdentityStoreConfiguration} method to the
+   * original configuration, except:
+   * <ul>
+   * <li>{@code getProviderURL()}, resolved on each call through a
+   * {@link LdapServerLocator} (DNS SRV discovery, static main/secondary
+   * servers, failover and load-balancing ordering)</li>
+   * <li>{@code getCustomJNDIConnectionParameters()}, which gets the
+   * {@link SniAwareLdapSocketFactory} registered when
+   * {@code exo.ldap.sni.enabled=true} <em>and</em> every server this store can
+   * ever connect to uses {@code ldaps://} - {@code java.naming.ldap.factory.socket}
+   * is not scheme-scoped, so registering a TLS-only factory while any
+   * configured server is plain {@code ldap://} would force a TLS handshake on
+   * a plaintext connection and break it. A single {@code ldaps://} host name
+   * resolving to several addresses (CNAME/round-robin DNS) then fails over
+   * across those addresses while keeping SNI/hostname verification pinned to
+   * the original host name</li>
+   * </ul>
+   */
+  private static final class FailoverInvocationHandler implements InvocationHandler {
+
+    private final LDAPIdentityStoreConfiguration original;
+
+    private final LdapServerLocator             serverLocator;
+
+    private FailoverInvocationHandler(LDAPIdentityStoreConfiguration original) {
+      this.original = original;
+      this.serverLocator = new LdapServerLocator(original.getProviderURL());
+      if (SniAwareLdapSocketFactory.isEnabled() && !serverLocator.isAllLdaps()) {
+        log.warning("exo.ldap.sni.enabled is true, but not every configured LDAP server uses ldaps:// "
+            + "(or none is configured) - the SNI-safe socket factory will NOT be registered to avoid "
+            + "forcing a TLS handshake on a plaintext connection. Configure exo.ldap.url, "
+            + "exo.ldap.failover.urls and, if used, exo.ldap.srv.scheme to all use ldaps:// to enable it.");
+      }
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      if (args == null && "getProviderURL".equals(method.getName())) {
+        return serverLocator.resolveProviderURL();
+      }
+      if (args == null && "getCustomJNDIConnectionParameters".equals(method.getName()) && SniAwareLdapSocketFactory.isEnabled()
+          && serverLocator.isAllLdaps()) {
+        return withSniSocketFactory(original.getCustomJNDIConnectionParameters());
+      }
+      try {
+        return method.invoke(original, args);
+      } catch (InvocationTargetException e) {
+        throw e.getCause();
+      }
+    }
+
+    private static Map<String, String> withSniSocketFactory(Map<String, String> originalParameters) {
+      Map<String, String> merged = originalParameters == null ? new HashMap<>() : new HashMap<>(originalParameters);
+      // The default configuration ships com.sun.jndi.ldap.connect.timeout as a
+      // customJNDIConnectionParameters entry (not a system property) - pass it through so the
+      // SNI socket factory's own connect timeout does not silently replace it with its default.
+      String configuredConnectTimeout = merged.get(SniAwareLdapSocketFactory.JNDI_LDAP_CONNECT_TIMEOUT_SYSTEM_PROP);
+      if (StringUtils.isNotBlank(configuredConnectTimeout)) {
+        SniAwareLdapSocketFactory.hintCustomJndiConnectTimeout(configuredConnectTimeout);
+      }
+      merged.put(SniAwareLdapSocketFactory.SOCKET_FACTORY_JNDI_PROPERTY, SniAwareLdapSocketFactory.class.getName());
+      return merged;
+    }
   }
 }
