@@ -266,6 +266,7 @@ public class LayoutServiceImpl implements LayoutService {
   @Override
   public void remove(Page page) {
     pageStorage.destroyPage(page.getPageKey());
+    broadcastEvent(PAGE_REMOVED, page);
   }
 
   @Override
