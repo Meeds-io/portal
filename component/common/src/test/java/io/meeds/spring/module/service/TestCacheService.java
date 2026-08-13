@@ -48,6 +48,16 @@ public class TestCacheService {
   @Getter
   private final CountDownLatch   loadStarted     = new CountDownLatch(1);
 
+  /** Same three, dedicated to the eviction test so the gates are independent. */
+  @Getter
+  private final AtomicInteger    evictLoadCount  = new AtomicInteger();
+
+  @Getter
+  private final CountDownLatch   evictLoadGate   = new CountDownLatch(1);
+
+  @Getter
+  private final CountDownLatch   evictLoadStarted = new CountDownLatch(1);
+
   @Cacheable(CACHE_NAME)
   public int get(int i) {
     return i;
@@ -73,6 +83,43 @@ public class TestCacheService {
   @CacheEvict(cacheNames = SYNC_CACHE_NAME)
   public void removeSlow(int i) {
     // Nothing, just cache eviction
+  }
+
+  /**
+   * Throws the domain exception a caller is expected to see. With
+   * {@code sync = true} the value flows through a future, which wraps a failed
+   * load twice — the caller must still receive this exception, not the wrapper.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getFailing(int i) {
+    throw new TestCacheException("loader failed for " + i);
+  }
+
+  /**
+   * Same as {@link #getSlow(int)} but with its own gates and counter, so the
+   * eviction test does not depend on whether another test already released the
+   * shared ones.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getSlowForEviction(int i) {
+    evictLoadCount.incrementAndGet();
+    evictLoadStarted.countDown();
+    try {
+      evictLoadGate.await(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return i;
+  }
+
+  /** Stands for a domain exception the org's REST contract maps to a status. */
+  public static class TestCacheException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    public TestCacheException(String message) {
+      super(message);
+    }
   }
 
   @CacheEvict(CACHE_NAME)

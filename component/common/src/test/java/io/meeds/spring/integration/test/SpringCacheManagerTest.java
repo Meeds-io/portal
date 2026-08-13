@@ -18,6 +18,8 @@
  */
 package io.meeds.spring.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +40,7 @@ import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 
 import io.meeds.spring.module.service.TestCacheService;
+import io.meeds.spring.module.service.TestCacheService.TestCacheException;
 
 @SpringJUnitConfig(CommonsDAOJPAImplTest.class)
 public class SpringCacheManagerTest extends CommonsDAOJPAImplTest { // NOSONAR
@@ -122,6 +125,54 @@ public class SpringCacheManagerTest extends CommonsDAOJPAImplTest { // NOSONAR
 
     testCacheService.removeSlow(key);
     assertNull(syncCache.get(key));
+  }
+
+  /**
+   * A {@code @Cacheable(sync = true)} method must surface the exception it
+   * threw, not the wrapper the future cache reports it as. Losing the type
+   * turns a domain exception the REST contract maps to a status into an
+   * {@code IllegalStateException}, i.e. a 500.
+   */
+  @Test
+  public void syncCachePropagatesTheLoaderExceptionType() {
+    TestCacheException thrown = assertThrows(TestCacheException.class, () -> testCacheService.getFailing(7));
+    assertTrue(thrown.getMessage().contains("loader failed for 7"));
+
+    // A failed load must leave nothing behind, so the next call retries
+    ExoCache<Serializable, Object> syncCache = cacheService.getCacheInstance(TestCacheService.SYNC_CACHE_NAME);
+    assertNull(syncCache.get(7));
+    assertThrows(TestCacheException.class, () -> testCacheService.getFailing(7));
+  }
+
+  /**
+   * Evicting must stop a reader from joining the load that was in flight when
+   * the value was evicted: joining it would return the pre-eviction value and
+   * let it be written back, leaving the cache stale until its TTL rather than
+   * until the eviction.
+   */
+  @Test
+  public void evictDoesNotLetALaterReaderJoinThePreEvictionLoad() throws Exception {
+    int key = 77;
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Integer> firstReader = executor.submit(() -> testCacheService.getSlowForEviction(key));
+      // A load is now in flight and blocked inside the method body
+      assertTrue(testCacheService.getEvictLoadStarted().await(10, TimeUnit.SECONDS));
+
+      testCacheService.removeSlow(key);
+
+      Future<Integer> readerAfterEviction = executor.submit(() -> testCacheService.getSlowForEviction(key));
+      testCacheService.getEvictLoadGate().countDown();
+
+      assertEquals(key, firstReader.get(10, TimeUnit.SECONDS).intValue());
+      assertEquals(key, readerAfterEviction.get(10, TimeUnit.SECONDS).intValue());
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // Two loads: the reader that arrived after the eviction ran its own rather
+    // than sharing the one the eviction invalidated
+    assertEquals(2, testCacheService.getEvictLoadCount().get());
   }
 
 }

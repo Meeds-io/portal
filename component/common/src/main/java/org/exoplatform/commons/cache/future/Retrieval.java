@@ -39,6 +39,18 @@ class Retrieval<K, V, C> implements Callable<V> {
     /** Avoid reentrancy. */
     transient Thread current;
 
+    /** Set when the entry was evicted while this load was still running. */
+    private volatile boolean invalidated;
+
+    /**
+     * Marks this load as superseded by an eviction, so that its result is still
+     * returned to the threads already waiting on it but is not written into the
+     * cache.
+     */
+    void invalidate() {
+        this.invalidated = true;
+    }
+
     public Retrieval(C context, K key, FutureCache<K, V, C> cache) {
         this.key = key;
         this.context = context;
@@ -48,7 +60,7 @@ class Retrieval<K, V, C> implements Callable<V> {
     }
 
     public V call() throws Exception {
-      // Retrieve the value from the cache without using the loader
+        // Retrieve the value from the cache without using the loader
         V value = cache.get(key);
         if (value != null) {
             return value;
@@ -59,8 +71,12 @@ class Retrieval<K, V, C> implements Callable<V> {
 
         //
         if (value != null) {
-            // Cache it, it is made available to other threads (unless someone removes it)
-            cache.putOnly(key, value);
+            // Cache it, it is made available to other threads (unless someone removes it).
+            // An eviction that happened while this load was running wins: writing the value
+            // now would put back exactly what the eviction meant to drop.
+            if (!invalidated) {
+                cache.putOnly(key, value);
+            }
 
             // Return value
             return value;
