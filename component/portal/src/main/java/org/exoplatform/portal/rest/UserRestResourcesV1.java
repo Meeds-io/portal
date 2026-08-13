@@ -21,10 +21,10 @@ package org.exoplatform.portal.rest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.DELETE;
@@ -42,6 +42,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
@@ -63,7 +64,6 @@ import org.exoplatform.services.rest.http.PATCH;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
-import org.exoplatform.services.security.MembershipEntry;
 import org.exoplatform.web.login.recovery.ChangePasswordConnector;
 import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 
@@ -94,7 +94,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   private static final String            ADMINISTRATOR_GROUP            = "/platform/administrators";
 
-  private static final String            DELEGATED_GROUP                = "/platform/delegated";
+  private static final String            GROUP_OBJECT_TYPE = "group";
+
+  private static final String            GROUP_LIST_MEMBERS_PERMISSION_TYPE = "listMembers";
 
   public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
 
@@ -306,8 +308,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
   public Response updateUser(@Context HttpServletRequest request,
                              @RequestBody(description = "User Object") UserRestEntity userEntity) throws Exception {
     Identity identity = ConversationState.getCurrent().getIdentity();
-    if (!userACL.isUserInGroup(identity, DELEGATED_GROUP)
-        && !userACL.isAdministrator(ConversationState.getCurrent().getIdentity())) {
+    if (!userACL.isAdministrator(identity)) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     if (userEntity == null) {
@@ -545,12 +546,20 @@ public class UserRestResourcesV1 implements ResourceContainer {
   @ApiResponses(
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+          @ApiResponse(responseCode = "403", description = "User not allowed to list the group memberships"),
           @ApiResponse(responseCode = "404", description = "User not found"),
           @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
       }
   )
   public Response getUserMemberships(
                                      @Parameter(description = "User name identifier", required = true) @PathParam("id") String userName,
+                                     @Parameter(description = "Group id to filter only its memberships, ex: /platform")
+                                     @QueryParam("groupId")
+                                     String groupId,
+                                     @Parameter(description = "When filtering by groupId, whether to also include memberships on groups nested, at any level, inside the given group")
+                                     @Schema(defaultValue = "false")
+                                     @QueryParam("includeNestedGroups")
+                                     boolean includeNestedGroups,
                                      @Parameter(description = "Offset", required = false) @Schema(defaultValue = "0")
                                      @QueryParam("offset") int offset,
                                      @Parameter(description = "Limit", required = false) @Schema(defaultValue = "20")
@@ -560,8 +569,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                      boolean returnSize) throws Exception {
 
     boolean isAdmin = isMemberOfAdminGroup();
-    if (!isAdmin && !isMemberOfDelegatedGroup(userName)) {
-      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+    if (!isAdmin && !canListGroupMemberships(groupId)) {
+      throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     offset = offset > 0 ? offset : 0;
     limit = limit > 0 ? limit : DEFAULT_LIMIT;
@@ -573,7 +582,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
     List<MembershipRestEntity> membershipEntities = new ArrayList<>();
     int totalSize = 0;
-    if (isAdmin) {
+    if (StringUtils.isBlank(groupId)) {
       ListAccess<Membership> membershipsByUser = organizationService.getMembershipHandler().findAllMembershipsByUser(user);
       totalSize = membershipsByUser.getSize();
       Membership[] memberships;
@@ -592,19 +601,11 @@ public class UserRestResourcesV1 implements ResourceContainer {
         }
       }
     } else {
-      Set<String> groupIds = ConversationState.getCurrent()
-                                              .getIdentity()
-                                              .getMemberships()
-                                              .stream()
-                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType())
-                                                           || StringUtils.equals("*", m.getMembershipType()))
-                                              .map(MembershipEntry::getGroup)
-                                              .collect(Collectors.toSet());
-
-      Identity userIdentity = userACL.getUserIdentity(userName);
-      List<MembershipEntry> memberships = userIdentity.getMemberships()
+      List<Membership> memberships = organizationService.getMembershipHandler().findMembershipsByUser(userName)
                                                       .stream()
-                                                      .filter(m -> groupIds.contains(m.getGroup()))
+                                                      .filter(m -> StringUtils.equals(groupId, m.getGroupId())
+                                                                   || (includeNestedGroups
+                                                                       && isNestedInGroup(m.getGroupId(), groupId)))
                                                       .toList();
       totalSize = memberships.size();
       memberships = memberships.stream()
@@ -613,10 +614,10 @@ public class UserRestResourcesV1 implements ResourceContainer {
                                 .toList();
       memberships.forEach(m -> {
         try {
-          Group group = organizationService.getGroupHandler().findGroupById(m.getGroup());
+          Group group = organizationService.getGroupHandler().findGroupById(m.getGroupId());
           membershipEntities.add(new MembershipRestEntity(m.getMembershipType(), group, user));
         } catch (Exception e) {
-          LOG.warn("Error retrieving group {}", m.getGroup(), e);
+          LOG.warn("Error retrieving group {}", m.getGroupId(), e);
         }
       });
     }
@@ -639,26 +640,6 @@ public class UserRestResourcesV1 implements ResourceContainer {
   )
   public Response isSuperUser() {
     return Response.ok().entity("{\"isSuperUser\":\"" + userACL.isSuperUser(ConversationState.getCurrent().getIdentity()) + "\"}").build();
-  }
-
-  @GET
-  @Path("isDelegatedAdministrator")
-  @Produces(MediaType.APPLICATION_JSON)
-  @RolesAllowed("users")
-  @Operation(
-          summary = "Check if current user is a delegated administrator",
-          description = "Check if current user is a delegated administrator",
-          method = "GET")
-  @ApiResponses(
-          value = {
-                  @ApiResponse(responseCode = "200", description = "Request fulfilled"),
-                  @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
-          }
-  )
-  public Response isDelegatedAdministrator() {
-    boolean isDelegatedAdministrator = userACL.isUserInGroup(ConversationState.getCurrent().getIdentity(), DELEGATED_GROUP)
-                                       && !userACL.isAdministrator(ConversationState.getCurrent().getIdentity());
-    return Response.ok().entity("{\"result\":\"" + isDelegatedAdministrator + "\"}").build();
   }
 
   @GET
@@ -708,20 +689,45 @@ public class UserRestResourcesV1 implements ResourceContainer {
     return ConversationState.getCurrent().getIdentity().isMemberOf(ADMINISTRATOR_GROUP);
   }
 
-  public boolean isMemberOfDelegatedGroup(String userName) {
-    if (!ConversationState.getCurrent().getIdentity().isMemberOf(DELEGATED_GROUP)) {
+  private boolean isNestedInGroup(String groupId, String targetGroupId) {
+    return isNestedInGroup(groupId, targetGroupId, new HashSet<>());
+  }
+
+  private boolean isNestedInGroup(String groupId, String targetGroupId, Set<String> visitedGroupIds) {
+    if (!visitedGroupIds.add(groupId)) { // Cycle guard
       return false;
-    } else {
-      Set<String> groupIds = ConversationState.getCurrent()
-                                              .getIdentity()
-                                              .getMemberships()
-                                              .stream()
-                                              .filter(m -> StringUtils.equals("manager", m.getMembershipType()) || StringUtils.equals("*", m.getMembershipType()))
-                                              .map(MembershipEntry::getGroup)
-                                              .collect(Collectors.toSet());
-      Identity userIdentity = userACL.getUserIdentity(userName);
-      return groupIds.stream().anyMatch(userIdentity::isMemberOf);
     }
+    try {
+      Group group = organizationService.getGroupHandler().findGroupById(groupId);
+      return group != null
+             && CollectionUtils.isNotEmpty(group.getEnclosingMemberships())
+             && group.getEnclosingMemberships()
+                     .stream()
+                     .anyMatch(enclosingMembership -> StringUtils.equals(targetGroupId, enclosingMembership.getGroupId())
+                                                      || isNestedInGroup(enclosingMembership.getGroupId(),
+                                                                         targetGroupId,
+                                                                         visitedGroupIds));
+    } catch (Exception e) {
+      LOG.warn("Error retrieving enclosing groups of group {}", groupId, e);
+      return false;
+    }
+  }
+
+  /**
+   * Check if the authenticated user can list the memberships of the given
+   * group, checked through the 'group' ACL plugin contributed at runtime by
+   * the social addon
+   *
+   * @param groupId group id to check
+   * @return true if the authenticated user can list the group memberships
+   */
+  private boolean canListGroupMemberships(String groupId) {
+    return StringUtils.isNotBlank(groupId)
+           && userACL.hasAclPlugin(GROUP_OBJECT_TYPE)
+           && userACL.hasPermission(GROUP_OBJECT_TYPE,
+                                    groupId,
+                                    GROUP_LIST_MEMBERS_PERMISSION_TYPE,
+                                    ConversationState.getCurrent().getIdentity());
   }
 
 }
