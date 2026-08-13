@@ -70,6 +70,33 @@ public abstract class FutureCache<K, V, C> {
   }
 
   /**
+   * Forgets the load in flight for one key, so that a reader arriving after an
+   * eviction starts a fresh one instead of joining the load that was running
+   * when the value was evicted — and receiving, then re-caching, the very value
+   * the eviction was meant to drop.
+   * <p>
+   * The running load is not cancelled: it completes and its result is returned
+   * to whoever was already waiting on it. Only the sharing stops.
+   *
+   * @param key the key whose in-flight load must no longer be shared
+   */
+  public void removeFuture(K key) {
+    Retrieval<K, V, C> retrieval = futureEntries.remove(key);
+    if (retrieval != null) {
+      retrieval.invalidate();
+    }
+  }
+
+  /**
+   * Forgets every load in flight, for the same reason as
+   * {@link #removeFuture(Object)} applied to a whole-cache clear.
+   */
+  public void clearFutures() {
+    futureEntries.values().forEach(Retrieval::invalidate);
+    futureEntries.clear();
+  }
+
+  /**
    * Retrieves the cached value corresponding to the specified key from the
    * cache, it must returns null when the key does not exist. This method is
    * intended for internal use by the future cache only.
