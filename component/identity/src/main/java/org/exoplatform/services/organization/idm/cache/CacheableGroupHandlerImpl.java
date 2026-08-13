@@ -225,8 +225,8 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
   @Override
   public void updateGroup(Group group, boolean broadcast) throws Exception {
     disableCacheInThread.set(true);
-    Group existingGroup = findGroupById(group.getId());
     try {
+      Group existingGroup = findGroupById(group.getId());
       groupCache.remove(getGroupId(group));
       if (group.getParentId() == null) {
         groupCache.remove(computeChildrenKey((String) null));

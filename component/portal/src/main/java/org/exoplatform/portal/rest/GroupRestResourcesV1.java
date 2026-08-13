@@ -45,6 +45,8 @@ import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.rest.model.GroupRestEntity;
 import org.exoplatform.portal.rest.model.MembershipRestEntity;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.*;
 import org.exoplatform.services.organization.idm.MembershipImpl;
 import org.exoplatform.services.organization.impl.GroupImpl;
@@ -57,6 +59,8 @@ import org.exoplatform.services.security.Identity;
 @Path("v1/groups")
 @Tag(name = "v1/groups", description = "Manages groups operations")
 public class GroupRestResourcesV1 implements ResourceContainer {
+
+  private static final Log    LOG            = ExoLogger.getLogger(GroupRestResourcesV1.class);
 
   public static final int     DEFAULT_LIMIT  = 20;
 
@@ -399,6 +403,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "204", description = "Request fulfilled"),
           @ApiResponse(responseCode = "400", description = "Bad request"),
           @ApiResponse(responseCode = "401", description = "User not authorized to call this endpoint"),
+          @ApiResponse(responseCode = "403", description = "User not allowed to manage the group memberships"),
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
@@ -410,7 +415,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
       return Response.status(Response.Status.BAD_REQUEST).entity("GROUP_ID:MANDATORY").build();
     }
     if (!canManageGroupMemberships(membership.getGroupId())) {
-      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+      throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     if (StringUtils.isBlank(membership.getUserName())) {
       return Response.status(Response.Status.BAD_REQUEST).entity("USER:MANDATORY").build();
@@ -595,6 +600,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "204", description = "Request fulfilled"),
           @ApiResponse(responseCode = "400", description = "Bad request"),
           @ApiResponse(responseCode = "401", description = "User not authorized to call this endpoint"),
+          @ApiResponse(responseCode = "403", description = "User not allowed to manage the group memberships"),
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
@@ -609,7 +615,7 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     String[] membershipIdParts = membershipId.split(":", 3);
     String membershipGroupId = membershipIdParts.length == 3 ? membershipIdParts[2] : null;
     if (!canManageGroupMemberships(membershipGroupId)) {
-      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+      throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     if (organizationService.getMembershipHandler().findMembership(membershipId) == null) {
       return Response.status(Response.Status.NOT_FOUND)
@@ -772,6 +778,10 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                                               try {
                                                 return organizationService.getGroupHandler().findGroupById(id);
                                               } catch (Exception e) {
+                                                LOG.debug("Error retrieving nested group with id {} of parent group {}",
+                                                          id,
+                                                          groupId,
+                                                          e);
                                                 return null;
                                               }
                                             })

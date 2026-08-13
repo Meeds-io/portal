@@ -546,6 +546,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
   @ApiResponses(
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+          @ApiResponse(responseCode = "403", description = "User not allowed to list the group memberships"),
           @ApiResponse(responseCode = "404", description = "User not found"),
           @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
       }
@@ -569,7 +570,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
     boolean isAdmin = isMemberOfAdminGroup();
     if (!isAdmin && !canListGroupMemberships(groupId)) {
-      throw new WebApplicationException(Response.Status.UNAUTHORIZED);
+      throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
     offset = offset > 0 ? offset : 0;
     limit = limit > 0 ? limit : DEFAULT_LIMIT;
