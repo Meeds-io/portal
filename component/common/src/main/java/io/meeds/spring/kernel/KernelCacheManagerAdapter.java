@@ -127,6 +127,12 @@ public class KernelCacheManagerAdapter implements CacheManager {
           // Without it, a reader arriving just after the eviction would join the
           // pre-eviction load, get the stale value and let it be re-cached —
           // leaving the entry stale until the TTL instead of until the eviction.
+          //
+          // Not absolute: a load that has already passed its invalidation check
+          // can still write between that check and its own put. That window is
+          // a few instructions rather than a whole load duration, and the cache
+          // TTL remains the backstop, as it is for every other staleness source
+          // here.
           futureCache.removeFuture(serializableKey);
           cacheInstance.remove(serializableKey);
         }
