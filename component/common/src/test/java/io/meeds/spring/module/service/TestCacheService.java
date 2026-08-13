@@ -22,9 +22,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import lombok.Getter;
@@ -57,6 +59,11 @@ public class TestCacheService {
 
   @Getter
   private final CountDownLatch   evictLoadStarted = new CountDownLatch(1);
+
+  /** Self reference so the reentrant call below goes through the cache proxy. */
+  @Autowired
+  @Lazy
+  private TestCacheService       self;
 
   @Cacheable(CACHE_NAME)
   public int get(int i) {
@@ -120,6 +127,28 @@ public class TestCacheService {
     public TestCacheException(String message) {
       super(message);
     }
+  }
+
+  /**
+   * Calls itself for the same key through the proxy, which the future cache
+   * rejects as reentrancy. Its {@code IllegalStateException} carries no
+   * {@code ExecutionException}, so it exercises the unwrap fallback.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getReentrant(int i) {
+    return self.getReentrant(i);
+  }
+
+  /** Plain sync-cached read with no shared counter, so it cannot perturb the tests that assert on load counts. */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getForClear(int i) {
+    return i;
+  }
+
+  /** Clears the whole sync cache, exercising the adapter's clear(). */
+  @CacheEvict(cacheNames = SYNC_CACHE_NAME, allEntries = true)
+  public void clearSyncCache() {
+    // Nothing, just a full cache clear
   }
 
   @CacheEvict(CACHE_NAME)

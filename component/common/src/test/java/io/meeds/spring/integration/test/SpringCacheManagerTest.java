@@ -175,4 +175,42 @@ public class SpringCacheManagerTest extends CommonsDAOJPAImplTest { // NOSONAR
     assertEquals(2, testCacheService.getEvictLoadCount().get());
   }
 
+  /**
+   * A reentrant sync-cached call is rejected by the future cache with an
+   * `IllegalStateException` that carries no `ExecutionException`, so the
+   * unwrap must leave it alone rather than mistake it for a wrapped loader
+   * failure.
+   */
+  @Test
+  public void syncCacheRejectsReentrancyWithoutMisreportingIt() {
+    Exception thrown = assertThrows(Exception.class, () -> testCacheService.getReentrant(31));
+
+    assertTrue("Reentrancy must be reported as such, got: " + thrown,
+               containsMessage(thrown, "Reentrancy detected"));
+  }
+
+  /**
+   * `clear()` must drop the loads in flight as well as the values, for the
+   * same reason `evict()` does.
+   */
+  @Test
+  public void clearDropsCachedValues() {
+    assertEquals(51, testCacheService.getForClear(51));
+    ExoCache<Serializable, Object> syncCache = cacheService.getCacheInstance(TestCacheService.SYNC_CACHE_NAME);
+    assertEquals(51, syncCache.get(51));
+
+    testCacheService.clearSyncCache();
+
+    assertNull(syncCache.get(51));
+  }
+
+  private boolean containsMessage(Throwable throwable, String fragment) {
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      if (current.getMessage() != null && current.getMessage().contains(fragment)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 }
