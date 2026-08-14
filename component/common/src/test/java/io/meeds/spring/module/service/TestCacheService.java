@@ -18,19 +18,137 @@
  */
 package io.meeds.spring.module.service;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+
+import lombok.Getter;
 
 @Service
 public class TestCacheService {
 
-  public static final String CACHE_NAME = "cache-test";
+  public static final String     CACHE_NAME      = "cache-test";
+
+  public static final String     SYNC_CACHE_NAME = "cache-test-sync";
+
+  /** Counts how many times the sync-cached method body was actually executed. */
+  @Getter
+  private final AtomicInteger    syncLoadCount   = new AtomicInteger();
+
+  /** Released by the test to let a slow load complete. */
+  @Getter
+  private final CountDownLatch   loadGate        = new CountDownLatch(1);
+
+  /** Counted down as soon as a load starts, so the test knows one is in flight. */
+  @Getter
+  private final CountDownLatch   loadStarted     = new CountDownLatch(1);
+
+  /** Same three, dedicated to the eviction test so the gates are independent. */
+  @Getter
+  private final AtomicInteger    evictLoadCount  = new AtomicInteger();
+
+  @Getter
+  private final CountDownLatch   evictLoadGate   = new CountDownLatch(1);
+
+  @Getter
+  private final CountDownLatch   evictLoadStarted = new CountDownLatch(1);
+
+  /** Self reference so the reentrant call below goes through the cache proxy. */
+  @Autowired
+  @Lazy
+  private TestCacheService       self;
 
   @Cacheable(CACHE_NAME)
   public int get(int i) {
     return i;
+  }
+
+  /**
+   * Deliberately slow, so that concurrent callers overlap. With
+   * {@code sync = true} the body must run exactly once whatever the number of
+   * concurrent callers.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getSlow(int i) {
+    syncLoadCount.incrementAndGet();
+    loadStarted.countDown();
+    try {
+      loadGate.await(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return i;
+  }
+
+  @CacheEvict(cacheNames = SYNC_CACHE_NAME)
+  public void removeSlow(int i) {
+    // Nothing, just cache eviction
+  }
+
+  /**
+   * Throws the domain exception a caller is expected to see. With
+   * {@code sync = true} the value flows through a future, which wraps a failed
+   * load twice — the caller must still receive this exception, not the wrapper.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getFailing(int i) {
+    throw new TestCacheException("loader failed for " + i);
+  }
+
+  /**
+   * Same as {@link #getSlow(int)} but with its own gates and counter, so the
+   * eviction test does not depend on whether another test already released the
+   * shared ones.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getSlowForEviction(int i) {
+    evictLoadCount.incrementAndGet();
+    evictLoadStarted.countDown();
+    try {
+      evictLoadGate.await(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return i;
+  }
+
+  /** Stands for a domain exception the org's REST contract maps to a status. */
+  public static class TestCacheException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    public TestCacheException(String message) {
+      super(message);
+    }
+  }
+
+  /**
+   * Calls itself for the same key through the proxy, which the future cache
+   * rejects as reentrancy. Its {@code IllegalStateException} carries no
+   * {@code ExecutionException}, so it exercises the unwrap fallback.
+   */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getReentrant(int i) {
+    return self.getReentrant(i);
+  }
+
+  /** Plain sync-cached read with no shared counter, so it cannot perturb the tests that assert on load counts. */
+  @Cacheable(cacheNames = SYNC_CACHE_NAME, sync = true)
+  public int getForClear(int i) {
+    return i;
+  }
+
+  /** Clears the whole sync cache, exercising the adapter's clear(). */
+  @CacheEvict(cacheNames = SYNC_CACHE_NAME, allEntries = true)
+  public void clearSyncCache() {
+    // Nothing, just a full cache clear
   }
 
   @CacheEvict(CACHE_NAME)

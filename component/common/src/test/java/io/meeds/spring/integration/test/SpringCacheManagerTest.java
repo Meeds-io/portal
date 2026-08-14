@@ -18,7 +18,16 @@
  */
 package io.meeds.spring.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +40,7 @@ import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 
 import io.meeds.spring.module.service.TestCacheService;
+import io.meeds.spring.module.service.TestCacheService.TestCacheException;
 
 @SpringJUnitConfig(CommonsDAOJPAImplTest.class)
 public class SpringCacheManagerTest extends CommonsDAOJPAImplTest { // NOSONAR
@@ -70,6 +80,137 @@ public class SpringCacheManagerTest extends CommonsDAOJPAImplTest { // NOSONAR
     testCacheService.remove(7);
     assertNull(cacheInstance.get(5));
     assertNull(cacheInstance.get(7));
+  }
+
+  /**
+   * {@code @Cacheable(sync = true)} must load the value exactly once, however
+   * many callers miss the cache concurrently. Before the adapter delegated to
+   * {@code FutureExoCache}, its {@code get(key, valueLoader)} was a plain
+   * check-then-load-then-put with no per-key locking, so every concurrent
+   * caller ran the loader.
+   */
+  @Test
+  public void syncCacheLoadsOnlyOnceUnderConcurrency() throws Exception {
+    int key = 42;
+    int concurrentCallers = 8;
+
+    ExecutorService executor = Executors.newFixedThreadPool(concurrentCallers);
+    List<Future<Integer>> results = new ArrayList<>();
+    try {
+      // Make every caller reach the cache at the same moment
+      CyclicBarrier startTogether = new CyclicBarrier(concurrentCallers);
+      for (int i = 0; i < concurrentCallers; i++) {
+        results.add(executor.submit(() -> {
+          startTogether.await(10, TimeUnit.SECONDS);
+          return testCacheService.getSlow(key);
+        }));
+      }
+
+      // One load is now in flight and blocked; let it finish
+      assertTrue(testCacheService.getLoadStarted().await(10, TimeUnit.SECONDS));
+      testCacheService.getLoadGate().countDown();
+
+      for (Future<Integer> result : results) {
+        assertEquals(key, result.get(10, TimeUnit.SECONDS).intValue());
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // The whole point: one execution of the method body, not eight
+    assertEquals(1, testCacheService.getSyncLoadCount().get());
+
+    ExoCache<Serializable, Object> syncCache = cacheService.getCacheInstance(TestCacheService.SYNC_CACHE_NAME);
+    assertEquals(key, syncCache.get(key));
+
+    testCacheService.removeSlow(key);
+    assertNull(syncCache.get(key));
+  }
+
+  /**
+   * A {@code @Cacheable(sync = true)} method must surface the exception it
+   * threw, not the wrapper the future cache reports it as. Losing the type
+   * turns a domain exception the REST contract maps to a status into an
+   * {@code IllegalStateException}, i.e. a 500.
+   */
+  @Test
+  public void syncCachePropagatesTheLoaderExceptionType() {
+    TestCacheException thrown = assertThrows(TestCacheException.class, () -> testCacheService.getFailing(7));
+    assertTrue(thrown.getMessage().contains("loader failed for 7"));
+
+    // A failed load must leave nothing behind, so the next call retries
+    ExoCache<Serializable, Object> syncCache = cacheService.getCacheInstance(TestCacheService.SYNC_CACHE_NAME);
+    assertNull(syncCache.get(7));
+    assertThrows(TestCacheException.class, () -> testCacheService.getFailing(7));
+  }
+
+  /**
+   * Evicting must stop a reader from joining the load that was in flight when
+   * the value was evicted: joining it would return the pre-eviction value and
+   * let it be written back, leaving the cache stale until its TTL rather than
+   * until the eviction.
+   */
+  @Test
+  public void evictDoesNotLetALaterReaderJoinThePreEvictionLoad() throws Exception {
+    int key = 77;
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Integer> firstReader = executor.submit(() -> testCacheService.getSlowForEviction(key));
+      // A load is now in flight and blocked inside the method body
+      assertTrue(testCacheService.getEvictLoadStarted().await(10, TimeUnit.SECONDS));
+
+      testCacheService.removeSlow(key);
+
+      Future<Integer> readerAfterEviction = executor.submit(() -> testCacheService.getSlowForEviction(key));
+      testCacheService.getEvictLoadGate().countDown();
+
+      assertEquals(key, firstReader.get(10, TimeUnit.SECONDS).intValue());
+      assertEquals(key, readerAfterEviction.get(10, TimeUnit.SECONDS).intValue());
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // Two loads: the reader that arrived after the eviction ran its own rather
+    // than sharing the one the eviction invalidated
+    assertEquals(2, testCacheService.getEvictLoadCount().get());
+  }
+
+  /**
+   * A reentrant sync-cached call is rejected by the future cache with an
+   * `IllegalStateException` that carries no `ExecutionException`, so the
+   * unwrap must leave it alone rather than mistake it for a wrapped loader
+   * failure.
+   */
+  @Test
+  public void syncCacheRejectsReentrancyWithoutMisreportingIt() {
+    Exception thrown = assertThrows(Exception.class, () -> testCacheService.getReentrant(31));
+
+    assertTrue("Reentrancy must be reported as such, got: " + thrown,
+               containsMessage(thrown, "Reentrancy detected"));
+  }
+
+  /**
+   * `clear()` must drop the loads in flight as well as the values, for the
+   * same reason `evict()` does.
+   */
+  @Test
+  public void clearDropsCachedValues() {
+    assertEquals(51, testCacheService.getForClear(51));
+    ExoCache<Serializable, Object> syncCache = cacheService.getCacheInstance(TestCacheService.SYNC_CACHE_NAME);
+    assertEquals(51, syncCache.get(51));
+
+    testCacheService.clearSyncCache();
+
+    assertNull(syncCache.get(51));
+  }
+
+  private boolean containsMessage(Throwable throwable, String fragment) {
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      if (current.getMessage() != null && current.getMessage().contains(fragment)) {
+        return true;
+      }
+    }
+    return false;
   }
 
 }

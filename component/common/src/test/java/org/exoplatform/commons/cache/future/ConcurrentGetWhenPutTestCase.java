@@ -134,9 +134,8 @@ public class ConcurrentGetWhenPutTestCase extends TestCase {
             throw failure;
         }
 
-        //
-        List<String> expectedEvents = Arrays.asList("get/key1", "call/key1", "begin_put/key1/foo_value_1", "get/key2",
-                "end_put/key1");
+        List<String> expectedEvents = Arrays.asList("get/key1", "get/key1", "call/key1", "begin_put/key1/foo_value_1",
+                "get/key2", "end_put/key1");
 
         //
         assertEquals(expectedEvents, events.subList(0, expectedEvents.size()));
