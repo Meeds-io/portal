@@ -19,6 +19,9 @@
 package io.meeds.portal.security.service;
 
 import static io.meeds.portal.security.service.SecuritySettingService.ACCESS_TYPE_MODIFIED;
+import static io.meeds.portal.security.service.SecuritySettingService.ACCOUNT_DEACTIVATION_ENABLED_PARAM;
+import static io.meeds.portal.security.service.SecuritySettingService.ACCOUNT_DEACTIVATION_MODIFIED;
+import static io.meeds.portal.security.service.SecuritySettingService.DEFAULT_ACCOUNT_DEACTIVATION;
 import static io.meeds.portal.security.service.SecuritySettingService.DEFAULT_REGISTRATION_EXTERNAL_USER;
 import static io.meeds.portal.security.service.SecuritySettingService.DEFAULT_REGISTRATION_TYPE;
 import static io.meeds.portal.security.service.SecuritySettingService.EXTERNAL_USER_REG_MODIFIED;
@@ -80,6 +83,7 @@ public class SecuritySettingServiceTest {
     assertEquals(DEFAULT_REGISTRATION_EXTERNAL_USER, registrationSetting.isExternalUser());
     assertNotNull(registrationSetting.getExtraGroupIds());
     assertEquals(0, registrationSetting.getExtraGroupIds().length);
+    assertEquals(DEFAULT_ACCOUNT_DEACTIVATION, registrationSetting.isAccountDeactivationEnabled());
   }
 
   @Test
@@ -96,8 +100,11 @@ public class SecuritySettingServiceTest {
     when(settingService.get(SECURITY_CONTEXT,
                             SECURITY_SCOPE,
                             REGISTRATION_EXTERNAL_USER_PARAM)).thenReturn((SettingValue) SettingValue.create(true));
+    when(settingService.get(SECURITY_CONTEXT,
+                            SECURITY_SCOPE,
+                            ACCOUNT_DEACTIVATION_ENABLED_PARAM)).thenReturn((SettingValue) SettingValue.create(true));
     securitySettingService.saveRegistrationSetting(new RegistrationSetting());
-    verify(settingService, times(3)).set(eq(SECURITY_CONTEXT), eq(SECURITY_SCOPE), anyString(), any());
+    verify(settingService, times(4)).set(eq(SECURITY_CONTEXT), eq(SECURITY_SCOPE), anyString(), any());
   }
 
   @Test
@@ -188,6 +195,41 @@ public class SecuritySettingServiceTest {
                                          eq(REGISTRATION_EXTERNAL_USER_PARAM),
                                          argThat(args -> StringUtils.equals(args.getValue().toString(), "false")));
     verify(listenerService, times(1)).broadcast(EXTERNAL_USER_REG_MODIFIED, null, false);
+  }
+
+  @Test
+  public void testIsAccountDeactivationEnabled() {
+    assertEquals(DEFAULT_ACCOUNT_DEACTIVATION, securitySettingService.isAccountDeactivationEnabled());
+
+    when(settingService.get(SECURITY_CONTEXT,
+                            SECURITY_SCOPE,
+                            ACCOUNT_DEACTIVATION_ENABLED_PARAM)).thenReturn((SettingValue) SettingValue.create(true));
+    assertTrue(securitySettingService.isAccountDeactivationEnabled());
+
+    when(settingService.get(SECURITY_CONTEXT,
+                            SECURITY_SCOPE,
+                            ACCOUNT_DEACTIVATION_ENABLED_PARAM)).thenReturn((SettingValue) SettingValue.create(false));
+    assertFalse(securitySettingService.isAccountDeactivationEnabled());
+  }
+
+  @Test
+  public void testSaveAccountDeactivationEnabled() throws Exception {
+    securitySettingService.saveAccountDeactivationEnabled(true);
+    verify(settingService, times(1)).set(eq(SECURITY_CONTEXT),
+                                         eq(SECURITY_SCOPE),
+                                         eq(ACCOUNT_DEACTIVATION_ENABLED_PARAM),
+                                         argThat(args -> StringUtils.equals(args.getValue().toString(), "true")));
+    verify(listenerService, times(1)).broadcast(ACCOUNT_DEACTIVATION_MODIFIED, null, true);
+
+    when(settingService.get(SECURITY_CONTEXT,
+                            SECURITY_SCOPE,
+                            ACCOUNT_DEACTIVATION_ENABLED_PARAM)).thenReturn((SettingValue) SettingValue.create("true"));
+    securitySettingService.saveAccountDeactivationEnabled(false);
+    verify(settingService, times(1)).set(eq(SECURITY_CONTEXT),
+                                         eq(SECURITY_SCOPE),
+                                         eq(ACCOUNT_DEACTIVATION_ENABLED_PARAM),
+                                         argThat(args -> StringUtils.equals(args.getValue().toString(), "false")));
+    verify(listenerService, times(1)).broadcast(ACCOUNT_DEACTIVATION_MODIFIED, null, false);
   }
 
   @Test
