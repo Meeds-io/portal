@@ -43,6 +43,8 @@ public class SecuritySettingService {
 
   public static final String                  DEFAULT_GROUPS_MODIFIED            = "meeds.settings.access.defaultGroups.modified";
 
+  public static final String                  ACCOUNT_DEACTIVATION_MODIFIED      = "meeds.settings.access.accountDeactivation.modified";
+
   protected static final Context              SECURITY_CONTEXT                   = Context.GLOBAL.id("SECURITY");
 
   protected static final Scope                SECURITY_SCOPE                     = Scope.APPLICATION.id("SECURITY");
@@ -52,6 +54,8 @@ public class SecuritySettingService {
   protected static final String               REGISTRATION_EXTERNAL_USER_PARAM   = "REGISTRATION_EXTERNAL_USER";
 
   protected static final String               REGISTRATION_EXTRA_GROUPS_PARAM    = "REGISTRATION_EXTRA_GROUPS";
+
+  protected static final String               ACCOUNT_DEACTIVATION_ENABLED_PARAM = "ACCOUNT_DEACTIVATION_ENABLED";
 
   protected static final String               EXTRA_GROUPS_SEPARATOR             = ",";
 
@@ -64,6 +68,11 @@ public class SecuritySettingService {
                                                                                  Boolean.parseBoolean(System.getProperty("meeds.settings.access.externalUsers",
                                                                                                                          "false")
                                                                                                             .toLowerCase());
+
+  protected static final boolean              DEFAULT_ACCOUNT_DEACTIVATION       =
+                                                                           Boolean.parseBoolean(System.getProperty("meeds.settings.access.accountDeactivation",
+                                                                                                                   "false")
+                                                                                                      .toLowerCase());
 
   private static final Log                    LOG                                =
                                                   ExoLogger.getLogger(SecuritySettingService.class);
@@ -84,7 +93,8 @@ public class SecuritySettingService {
     if (registrationSetting == null) {
       registrationSetting = new RegistrationSetting(getRegistrationType(),
                                                     isRegistrationExternalUser(),
-                                                    getRegistrationGroupIds());
+                                                    getRegistrationGroupIds(),
+                                                    isAccountDeactivationEnabled());
     }
     return registrationSetting;
   }
@@ -93,6 +103,7 @@ public class SecuritySettingService {
     saveRegistrationType(registrationSetting.getType());
     saveRegistrationExternalUser(registrationSetting.isExternalUser());
     saveRegistrationGroupIds(registrationSetting.getExtraGroupIds());
+    saveAccountDeactivationEnabled(registrationSetting.isAccountDeactivationEnabled());
   }
 
   public String[] getRegistrationGroupIds() {
@@ -152,6 +163,29 @@ public class SecuritySettingService {
                            REGISTRATION_EXTERNAL_USER_PARAM,
                            SettingValue.create(String.valueOf(externalUser)));
         broadcastEvent(EXTERNAL_USER_REG_MODIFIED, null, externalUser);
+      } finally {
+        registrationSetting = null;
+      }
+    }
+  }
+
+  public boolean isAccountDeactivationEnabled() {
+    SettingValue<?> settingValue = settingService.get(SECURITY_CONTEXT, SECURITY_SCOPE, ACCOUNT_DEACTIVATION_ENABLED_PARAM);
+    if (settingValue == null || settingValue.getValue() == null) {
+      return DEFAULT_ACCOUNT_DEACTIVATION;
+    } else {
+      return Boolean.parseBoolean(settingValue.getValue().toString());
+    }
+  }
+
+  public void saveAccountDeactivationEnabled(boolean accountDeactivationEnabled) {
+    if (accountDeactivationEnabled != isAccountDeactivationEnabled()) {
+      try {
+        settingService.set(SECURITY_CONTEXT,
+                           SECURITY_SCOPE,
+                           ACCOUNT_DEACTIVATION_ENABLED_PARAM,
+                           SettingValue.create(String.valueOf(accountDeactivationEnabled)));
+        broadcastEvent(ACCOUNT_DEACTIVATION_MODIFIED, null, accountDeactivationEnabled);
       } finally {
         registrationSetting = null;
       }
