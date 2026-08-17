@@ -35,4 +35,6 @@ public class RegistrationSetting {
 
   private String[]             extraGroupIds;
 
+  private boolean              accountDeactivationEnabled;
+
 }
