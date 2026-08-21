@@ -25,6 +25,7 @@ import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.WebRequestHandler;
 import org.exoplatform.web.login.LoginUtils;
 import org.exoplatform.web.login.LogoutControl;
+import org.exoplatform.web.security.RedirectUrlValidator;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
 
@@ -55,8 +56,16 @@ public class LogoutHandler extends WebRequestHandler {
       logout(request, response);
     }
 
-    response.sendRedirect("/");
+    response.sendRedirect(getRedirectUri(request, response));
     return true;
+  }
+
+  private String getRedirectUri(HttpServletRequest request, HttpServletResponse response) {
+    String initialUri = request.getParameter("initialURI");
+    if (StringUtils.isBlank(initialUri)) {
+      return "/";
+    }
+    return response.encodeRedirectURL(RedirectUrlValidator.sanitizeInitialURI(request, initialUri));
   }
 
   private void logout(HttpServletRequest request, HttpServletResponse response) {
