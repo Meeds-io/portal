@@ -21,10 +21,13 @@ package org.exoplatform.web.logout;
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.wci.ServletContainerFactory;
 
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 import org.exoplatform.web.ControllerContext;
 import org.exoplatform.web.WebRequestHandler;
 import org.exoplatform.web.login.LoginUtils;
 import org.exoplatform.web.login.LogoutControl;
+import org.exoplatform.web.security.RedirectUrlValidator;
 import org.exoplatform.web.security.security.AbstractTokenService;
 import org.exoplatform.web.security.security.CookieTokenService;
 
@@ -33,6 +36,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 public class LogoutHandler extends WebRequestHandler {
+
+  private static final Log LOG = ExoLogger.getLogger(LogoutHandler.class);
 
   @Override
   public String getHandlerName() {
@@ -55,8 +60,20 @@ public class LogoutHandler extends WebRequestHandler {
       logout(request, response);
     }
 
-    response.sendRedirect("/");
+    response.sendRedirect(getRedirectUri(request, response));
     return true;
+  }
+
+  private String getRedirectUri(HttpServletRequest request, HttpServletResponse response) {
+    String initialUri = request.getParameter("initialURI");
+    if (StringUtils.isBlank(initialUri)) {
+      return "/";
+    }
+    String sanitizedInitialUri = RedirectUrlValidator.sanitizeInitialURI(request, initialUri);
+    if (!StringUtils.equals(initialUri, sanitizedInitialUri)) {
+      LOG.warn("Unsafe initial URI in logout link. Redirecting to the portal context path instead.");
+    }
+    return response.encodeRedirectURL(sanitizedInitialUri);
   }
 
   private void logout(HttpServletRequest request, HttpServletResponse response) {
