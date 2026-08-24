@@ -18,6 +18,8 @@
  */
 package io.meeds.portal.security.model;
 
+import java.util.Map;
+
 import io.meeds.portal.security.constant.UserRegistrationType;
 
 import lombok.AllArgsConstructor;
@@ -36,5 +38,11 @@ public class RegistrationSetting {
   private String[]             extraGroupIds;
 
   private boolean              accountDeactivationEnabled;
+
+  private boolean              accountDeletionEnabled;
+
+  private boolean              accountDeletionAnonymizationEnabled;
+
+  private Map<String, String>  deletedUserLabels;
 
 }

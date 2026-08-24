@@ -21,6 +21,13 @@ package io.meeds.portal.security.service;
 import static io.meeds.portal.security.constant.UserRegistrationType.OPEN;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -31,6 +38,8 @@ import org.exoplatform.commons.api.settings.data.Scope;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.services.resources.LocaleConfig;
+import org.exoplatform.services.resources.LocaleConfigService;
 
 import io.meeds.portal.security.constant.UserRegistrationType;
 import io.meeds.portal.security.model.RegistrationSetting;
@@ -45,6 +54,13 @@ public class SecuritySettingService {
 
   public static final String                  ACCOUNT_DEACTIVATION_MODIFIED      = "meeds.settings.access.accountDeactivation.modified";
 
+  public static final String                  ACCOUNT_DELETION_MODIFIED          = "meeds.settings.access.accountDeletion.modified";
+
+  public static final String                  ACCOUNT_DELETION_ANONYMIZATION_MODIFIED =
+                                                                                      "meeds.settings.access.accountDeletionAnonymization.modified";
+
+  public static final String                  DELETED_USER_LABELS_MODIFIED       = "meeds.settings.access.deletedUserLabels.modified";
+
   protected static final Context              SECURITY_CONTEXT                   = Context.GLOBAL.id("SECURITY");
 
   protected static final Scope                SECURITY_SCOPE                     = Scope.APPLICATION.id("SECURITY");
@@ -56,6 +72,13 @@ public class SecuritySettingService {
   protected static final String               REGISTRATION_EXTRA_GROUPS_PARAM    = "REGISTRATION_EXTRA_GROUPS";
 
   protected static final String               ACCOUNT_DEACTIVATION_ENABLED_PARAM = "ACCOUNT_DEACTIVATION_ENABLED";
+
+  protected static final String               ACCOUNT_DELETION_ENABLED_PARAM     = "ACCOUNT_DELETION_ENABLED";
+
+  protected static final String               ACCOUNT_DELETION_ANONYMIZATION_ENABLED_PARAM =
+                                                                                           "ACCOUNT_DELETION_ANONYMIZATION_ENABLED";
+
+  protected static final String               DELETED_USER_LABEL_PARAM_PREFIX    = "DELETED_USER_LABEL_";
 
   protected static final String               EXTRA_GROUPS_SEPARATOR             = ",";
 
@@ -74,6 +97,22 @@ public class SecuritySettingService {
                                                                                                                    "false")
                                                                                                       .toLowerCase());
 
+  protected static final boolean              DEFAULT_ACCOUNT_DELETION           =
+                                                                       Boolean.parseBoolean(System.getProperty("meeds.settings.access.accountDeletion",
+                                                                                                               "false")
+                                                                                                  .toLowerCase());
+
+  protected static final boolean              DEFAULT_ACCOUNT_DELETION_ANONYMIZATION =
+                                                                                     Boolean.parseBoolean(System.getProperty("meeds.settings.access.accountDeletionAnonymization",
+                                                                                                                             "false")
+                                                                                                                .toLowerCase());
+
+  protected static final String               DEFAULT_DELETED_USER_LABEL         =
+                                                                         System.getProperty("meeds.settings.access.deletedUserLabel",
+                                                                                            "Deleted user");
+
+  protected static final String               MACHINE_LOCALE_NAME                = "ma";
+
   private static final Log                    LOG                                =
                                                   ExoLogger.getLogger(SecuritySettingService.class);
 
@@ -83,10 +122,14 @@ public class SecuritySettingService {
 
   private ListenerService                     listenerService;
 
+  private LocaleConfigService                 localeConfigService;
+
   public SecuritySettingService(SettingService settingService,
-                                ListenerService listenerService) {
+                                ListenerService listenerService,
+                                LocaleConfigService localeConfigService) {
     this.settingService = settingService;
     this.listenerService = listenerService;
+    this.localeConfigService = localeConfigService;
   }
 
   public RegistrationSetting getRegistrationSetting() {
@@ -94,7 +137,10 @@ public class SecuritySettingService {
       registrationSetting = new RegistrationSetting(getRegistrationType(),
                                                     isRegistrationExternalUser(),
                                                     getRegistrationGroupIds(),
-                                                    isAccountDeactivationEnabled());
+                                                    isAccountDeactivationEnabled(),
+                                                    isAccountDeletionEnabled(),
+                                                    isAccountDeletionAnonymizationEnabled(),
+                                                    getDeletedUserLabels());
     }
     return registrationSetting;
   }
@@ -104,6 +150,9 @@ public class SecuritySettingService {
     saveRegistrationExternalUser(registrationSetting.isExternalUser());
     saveRegistrationGroupIds(registrationSetting.getExtraGroupIds());
     saveAccountDeactivationEnabled(registrationSetting.isAccountDeactivationEnabled());
+    saveAccountDeletionEnabled(registrationSetting.isAccountDeletionEnabled());
+    saveAccountDeletionAnonymizationEnabled(registrationSetting.isAccountDeletionAnonymizationEnabled());
+    saveDeletedUserLabels(registrationSetting.getDeletedUserLabels());
   }
 
   public String[] getRegistrationGroupIds() {
@@ -189,6 +238,115 @@ public class SecuritySettingService {
       } finally {
         registrationSetting = null;
       }
+      if (!accountDeactivationEnabled) {
+        saveAccountDeletionEnabled(false);
+      }
+    }
+  }
+
+  public boolean isAccountDeletionEnabled() {
+    SettingValue<?> settingValue = settingService.get(SECURITY_CONTEXT, SECURITY_SCOPE, ACCOUNT_DELETION_ENABLED_PARAM);
+    if (settingValue == null || settingValue.getValue() == null) {
+      return DEFAULT_ACCOUNT_DELETION;
+    } else {
+      return Boolean.parseBoolean(settingValue.getValue().toString());
+    }
+  }
+
+  public void saveAccountDeletionEnabled(boolean accountDeletionEnabled) {
+    if (accountDeletionEnabled && !isAccountDeactivationEnabled()) {
+      LOG.debug("Account deletion can't be enabled while account deactivation is disabled, keeping it disabled");
+      accountDeletionEnabled = false;
+    }
+    if (accountDeletionEnabled != isAccountDeletionEnabled()) {
+      try {
+        settingService.set(SECURITY_CONTEXT,
+                           SECURITY_SCOPE,
+                           ACCOUNT_DELETION_ENABLED_PARAM,
+                           SettingValue.create(String.valueOf(accountDeletionEnabled)));
+        broadcastEvent(ACCOUNT_DELETION_MODIFIED, null, accountDeletionEnabled);
+      } finally {
+        registrationSetting = null;
+      }
+      if (!accountDeletionEnabled) {
+        saveAccountDeletionAnonymizationEnabled(false);
+      }
+    }
+  }
+
+  public boolean isAccountDeletionAnonymizationEnabled() {
+    SettingValue<?> settingValue = settingService.get(SECURITY_CONTEXT,
+                                                      SECURITY_SCOPE,
+                                                      ACCOUNT_DELETION_ANONYMIZATION_ENABLED_PARAM);
+    if (settingValue == null || settingValue.getValue() == null) {
+      return DEFAULT_ACCOUNT_DELETION_ANONYMIZATION;
+    } else {
+      return Boolean.parseBoolean(settingValue.getValue().toString());
+    }
+  }
+
+  public void saveAccountDeletionAnonymizationEnabled(boolean accountDeletionAnonymizationEnabled) {
+    if (accountDeletionAnonymizationEnabled && !isAccountDeletionEnabled()) {
+      LOG.debug("Deleted accounts anonymization can't be enabled while account deletion is disabled, keeping it disabled");
+      accountDeletionAnonymizationEnabled = false;
+    }
+    if (accountDeletionAnonymizationEnabled != isAccountDeletionAnonymizationEnabled()) {
+      try {
+        settingService.set(SECURITY_CONTEXT,
+                           SECURITY_SCOPE,
+                           ACCOUNT_DELETION_ANONYMIZATION_ENABLED_PARAM,
+                           SettingValue.create(String.valueOf(accountDeletionAnonymizationEnabled)));
+        broadcastEvent(ACCOUNT_DELETION_ANONYMIZATION_MODIFIED, null, accountDeletionAnonymizationEnabled);
+      } finally {
+        registrationSetting = null;
+      }
+    }
+  }
+
+  public Map<String, String> getDeletedUserLabels() {
+    return readDeletedUserLabels();
+  }
+
+  public String getDeletedUserLabel(Locale locale) {
+    Map<String, String> deletedUserLabels = readDeletedUserLabels();
+    String label = null;
+    if (locale != null) {
+      label = deletedUserLabels.get(locale.toString());
+      if (StringUtils.isBlank(label)) {
+        label = deletedUserLabels.get(locale.getLanguage());
+      }
+    }
+    if (StringUtils.isBlank(label)) {
+      label = deletedUserLabels.get(getDefaultLanguage());
+    }
+    return StringUtils.isBlank(label) ? DEFAULT_DELETED_USER_LABEL : label;
+  }
+
+  public void saveDeletedUserLabels(Map<String, String> deletedUserLabels) {
+    Map<String, String> labels = deletedUserLabels == null ? Collections.emptyMap() :
+                                                           deletedUserLabels.entrySet()
+                                                                            .stream()
+                                                                            .filter(label -> StringUtils.isNotBlank(label.getValue()))
+                                                                            .collect(HashMap::new,
+                                                                                     (map, label) -> map.put(label.getKey(),
+                                                                                                             label.getValue()),
+                                                                                     HashMap::putAll);
+    if (!Objects.equals(labels, readDeletedUserLabels())) {
+      try {
+        for (String language : getSupportedLanguages()) {
+          if (labels.containsKey(language)) {
+            settingService.set(SECURITY_CONTEXT,
+                               SECURITY_SCOPE,
+                               DELETED_USER_LABEL_PARAM_PREFIX + language,
+                               SettingValue.create(labels.get(language)));
+          } else {
+            settingService.remove(SECURITY_CONTEXT, SECURITY_SCOPE, DELETED_USER_LABEL_PARAM_PREFIX + language);
+          }
+        }
+        broadcastEvent(DELETED_USER_LABELS_MODIFIED, null, labels);
+      } finally {
+        registrationSetting = null;
+      }
     }
   }
 
@@ -205,6 +363,36 @@ public class SecuritySettingService {
     } finally {
       registrationSetting = null;
     }
+  }
+
+  private Map<String, String> readDeletedUserLabels() {
+    Map<String, String> deletedUserLabels = new HashMap<>();
+    for (String language : getSupportedLanguages()) {
+      SettingValue<?> settingValue = settingService.get(SECURITY_CONTEXT,
+                                                        SECURITY_SCOPE,
+                                                        DELETED_USER_LABEL_PARAM_PREFIX + language);
+      if (settingValue != null && settingValue.getValue() != null && StringUtils.isNotBlank(settingValue.getValue().toString())) {
+        deletedUserLabels.put(language, settingValue.getValue().toString());
+      }
+    }
+    return deletedUserLabels;
+  }
+
+  private List<String> getSupportedLanguages() {
+    Collection<LocaleConfig> localeConfigs = localeConfigService.getLocalConfigs();
+    if (localeConfigs == null || localeConfigs.isEmpty()) {
+      return Collections.singletonList(getDefaultLanguage());
+    } else {
+      return localeConfigs.stream()
+                          .map(LocaleConfig::getLocaleName)
+                          .filter(language -> !StringUtils.equals(language, MACHINE_LOCALE_NAME))
+                          .toList();
+    }
+  }
+
+  private String getDefaultLanguage() {
+    LocaleConfig defaultLocaleConfig = localeConfigService.getDefaultLocaleConfig();
+    return defaultLocaleConfig == null ? Locale.ENGLISH.getLanguage() : defaultLocaleConfig.getLocaleName();
   }
 
   private void broadcastEvent(String eventName, Object source, Object data) {
