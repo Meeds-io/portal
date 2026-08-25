@@ -43,6 +43,14 @@
         <property name="mail.smtp.socketFactory.port" value="${gatein.email.smtp.socketFactory.port}"/>
         <property name="mail.smtp.socketFactory.class" value="${gatein.email.smtp.socketFactory.class}"/>
         <property name="mail.smtp.socketFactory.fallback" value="false"/>
+        <!-- DKIM signing of outgoing mail, disabled by default -->
+        <property name="mail.dkim.enabled" value="${gatein.email.dkim.enabled}"/>
+        <property name="mail.dkim.domain" value="${gatein.email.dkim.domain}"/>
+        <property name="mail.dkim.selector" value="${gatein.email.dkim.selector}"/>
+        <property name="mail.dkim.privateKeyPath" value="${gatein.email.dkim.privateKeyPath}"/>
+        <property name="mail.dkim.signingAlgorithm" value="${gatein.email.dkim.signingAlgorithm}"/>
+        <property name="mail.dkim.identity" value="${gatein.email.dkim.identity}"/>
+        <property name="mail.dkim.checkDomainKey" value="${gatein.email.dkim.checkDomainKey}"/>
       </properties-param>
     </init-params>
   </component>
