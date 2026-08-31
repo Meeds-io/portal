@@ -132,6 +132,16 @@ public class SecuritySettingService {
     this.localeConfigService = localeConfigService;
   }
 
+  /**
+   * Memoized aggregate meant for display purposes only: the memoization is
+   * node-local (invalidated in the JVM that saved, the modification events
+   * being broadcast on the node-local ListenerService), so on a cluster the
+   * other nodes may serve a stale copy until they save in turn. A security
+   * check must call the direct readers instead
+   * ({@link #isAccountDeactivationEnabled()},
+   * {@link #isAccountDeletionEnabled()} ...), which go through the
+   * cluster-invalidated setting cache.
+   */
   public RegistrationSetting getRegistrationSetting() {
     if (registrationSetting == null) {
       registrationSetting = new RegistrationSetting(getRegistrationType(),
