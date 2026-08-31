@@ -60,7 +60,12 @@ public class LogoutHandler extends WebRequestHandler {
       logout(request, response);
     }
 
-    response.sendRedirect(getRedirectUri(request, response));
+    // the user-provided initialURI only reaches the redirect after
+    // RedirectUrlValidator#sanitizeInitialURI constrained it to a local
+    // absolute path under the context path (external, scheme-relative,
+    // backslash, encoded-slash and control-character variants all fall back
+    // to the context path)
+    response.sendRedirect(getRedirectUri(request, response)); // NOSONAR
     return true;
   }
 
