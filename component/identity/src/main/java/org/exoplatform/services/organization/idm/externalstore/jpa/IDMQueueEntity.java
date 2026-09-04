@@ -21,37 +21,38 @@ package org.exoplatform.services.organization.idm.externalstore.jpa;
 import java.io.Serializable;
 import java.util.Calendar;
 
-import jakarta.persistence.*;
-
-import org.exoplatform.commons.api.persistence.ExoEntity;
 import org.exoplatform.services.organization.externalstore.model.IDMOperationType;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+import io.meeds.common.persistence.PortableSequence;
+import jakarta.persistence.Table;
+
 @Entity(name = "IDMQueueEntity")
-@ExoEntity
 @Table(name = "IDM_QUEUE")
-@NamedQueries({
-    @NamedQuery(name = "IDMQueueEntity.countAllNotProcessedAndMaxNbRetries", query = "SELECT count(q) FROM IDMQueueEntity q "
-        + " WHERE q.processed = FALSE AND nbRetries < :nbRetries "),
-    @NamedQuery(name = "IDMQueueEntity.countAllNotProcessedAndNbRetries", query = "SELECT count(q) FROM IDMQueueEntity q "
-        + " WHERE q.processed = FALSE AND nbRetries = :nbRetries "),
-    @NamedQuery(name = "IDMQueueEntity.getEntriesNotProcessedWithNBRetries", query = "SELECT q FROM IDMQueueEntity q "
-        + " WHERE q.processed = FALSE AND nbRetries = :nbRetries ORDER BY q.creationDate DESC, q.id ASC"),
-    @NamedQuery(name = "IDMQueueEntity.setEntriesAsProcessed", query = "UPDATE IDMQueueEntity q "
-        + " SET q.processed = TRUE WHERE q.id IN (:ids)"),
-    @NamedQuery(name = "IDMQueueEntity.incrementEntriesRetry", query = "UPDATE IDMQueueEntity q "
-        + " SET q.nbRetries = (q.nbRetries + 1) WHERE q.id IN (:ids)"),
-    @NamedQuery(name = "IDMQueueEntity.deleteProcessedEntries", query = "DELETE FROM IDMQueueEntity q "
-        + " WHERE q.processed = TRUE"),
-    @NamedQuery(name = "IDMQueueEntity.deleteExceededRetriesEntries", query = "DELETE FROM IDMQueueEntity q "
-        + " WHERE q.nbRetries >= :maxRetries") })
+@NamedQuery(name = "IDMQueueEntity.countAllNotProcessedAndMaxNbRetries", query = "SELECT count(q) FROM IDMQueueEntity q "
+    + " WHERE q.processed = FALSE AND nbRetries < :nbRetries ")
+@NamedQuery(name = "IDMQueueEntity.countAllNotProcessedAndNbRetries", query = "SELECT count(q) FROM IDMQueueEntity q "
+    + " WHERE q.processed = FALSE AND nbRetries = :nbRetries ")
+@NamedQuery(name = "IDMQueueEntity.getEntriesNotProcessedWithNBRetries", query = "SELECT q FROM IDMQueueEntity q "
+    + " WHERE q.processed = FALSE AND nbRetries = :nbRetries ORDER BY q.creationDate DESC, q.id ASC")
+@NamedQuery(name = "IDMQueueEntity.setEntriesAsProcessed", query = "UPDATE IDMQueueEntity q "
+    + " SET q.processed = TRUE WHERE q.id IN (:ids)")
+@NamedQuery(name = "IDMQueueEntity.incrementEntriesRetry", query = "UPDATE IDMQueueEntity q "
+    + " SET q.nbRetries = (q.nbRetries + 1) WHERE q.id IN (:ids)")
+@NamedQuery(name = "IDMQueueEntity.deleteProcessedEntries", query = "DELETE FROM IDMQueueEntity q "
+    + " WHERE q.processed = TRUE")
+@NamedQuery(name = "IDMQueueEntity.deleteExceededRetriesEntries", query = "DELETE FROM IDMQueueEntity q "
+    + " WHERE q.nbRetries >= :maxRetries")
 public class IDMQueueEntity implements Serializable {
 
   private static final long serialVersionUID = 7102348817269095013L;
 
   @Id
   @Column(name = "IDM_QUEUE_ID")
-  @SequenceGenerator(name = "SEQ_IDM_QUEUE_ID", sequenceName = "SEQ_IDM_QUEUE_ID", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_IDM_QUEUE_ID")
+  @PortableSequence(name = "SEQ_IDM_QUEUE_ID")
   private long              id;
 
   @Column(name = "CREATE_DATE")

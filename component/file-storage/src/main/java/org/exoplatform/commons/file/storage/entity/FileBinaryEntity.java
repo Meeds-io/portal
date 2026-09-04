@@ -22,11 +22,9 @@ import java.util.Date;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.NamedQuery;
-import jakarta.persistence.SequenceGenerator;
+import io.meeds.common.persistence.PortableSequence;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
@@ -37,9 +35,8 @@ import jakarta.persistence.TemporalType;
 public class FileBinaryEntity {
     @Id
     @Column(name = "BLOB_ID")
-    @SequenceGenerator(name = "SEQ_FILES_BINARY_BLOB_ID", sequenceName = "SEQ_FILES_BINARY_BLOB_ID", allocationSize = 1)
-    @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_FILES_BINARY_BLOB_ID")
-    private Long            id;
+    @PortableSequence(name = "SEQ_FILES_BINARY_BLOB_ID")
+      private Long            id;
 
     @Column(name = "NAME")
     private String          name;

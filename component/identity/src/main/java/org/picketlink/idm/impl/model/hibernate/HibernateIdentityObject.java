@@ -33,14 +33,14 @@ import org.picketlink.idm.common.exception.PolicyValidationException;
 import org.picketlink.idm.spi.model.IdentityObject;
 import org.picketlink.idm.spi.model.IdentityObjectCredentialType;
 
+import io.meeds.common.persistence.PortableSequence;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -48,7 +48,6 @@ import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.Data;
 
@@ -90,8 +89,7 @@ import lombok.Data;
 public class HibernateIdentityObject implements IdentityObject {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.AUTO, generator="JBID_IO_ID_SEQ")
-  @SequenceGenerator(name = "JBID_IO_ID_SEQ", sequenceName = "JBID_IO_ID_SEQ", allocationSize = 1)
+  @PortableSequence(name = "JBID_IO_ID_SEQ")
   @Column(name = "ID")
   private Long                                     id;
 

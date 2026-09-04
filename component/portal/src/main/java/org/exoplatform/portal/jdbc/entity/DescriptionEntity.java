@@ -22,7 +22,20 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.persistence.*;
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.NamedQueries;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
 
 @Entity(name = "GateInDescription")
 @Table(name = "PORTAL_DESCRIPTIONS")
@@ -33,8 +46,7 @@ public class DescriptionEntity implements Serializable {
   private static final long serialVersionUID = 1173817577220348267L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_PORTAL_DESCRIPTIONS_ID", sequenceName = "SEQ_PORTAL_DESCRIPTIONS_ID", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_PORTAL_DESCRIPTIONS_ID")
+  @PortableSequence(name = "SEQ_PORTAL_DESCRIPTIONS_ID")
   @Column(name = "DESCRIPTION_ID")
   private Long              id;
 

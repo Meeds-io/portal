@@ -19,10 +19,11 @@
 package io.meeds.spring.liquibase;
 
 import java.sql.SQLException;
+import java.util.List;
 
 import javax.sql.DataSource;
 
-import org.springframework.boot.autoconfigure.liquibase.LiquibaseProperties;
+import org.springframework.boot.liquibase.autoconfigure.LiquibaseProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +43,7 @@ import liquibase.integration.spring.SpringLiquibase;
 @EnableConfigurationProperties(LiquibaseProperties.class)
 public class LiquibaseIntegration {
 
-  private static final Log           LOG      = ExoLogger.getLogger(LiquibaseIntegration.class);
+  private static final Log LOG = ExoLogger.getLogger(LiquibaseIntegration.class);
 
   @Bean
   public SpringLiquibase liquibase(LiquibaseProperties liquibaseProperties) {
@@ -51,7 +52,10 @@ public class LiquibaseIntegration {
     SpringLiquibase liquibase = new SpringLiquibase();
     DataSource datasource = liquibaseDataInitializer.getDatasource();
     liquibase.setDataSource(datasource);
-    liquibase.setContexts(liquibaseDataInitializer.getContexts());
+    liquibase.setContexts(asCommaSeparatedString(liquibaseDataInitializer.getContexts()));
+    liquibase.setLabelFilter(asCommaSeparatedString(liquibaseProperties.getLabelFilter()));
+    liquibase.setChangeLogParameters(liquibaseProperties.getParameters());
+    liquibase.setClearCheckSums(liquibaseProperties.isClearChecksums());
     String schema = getSchema(datasource, liquibaseProperties);
     liquibase.setDefaultSchema(schema);
     liquibase.setLiquibaseSchema(schema);
@@ -70,6 +74,17 @@ public class LiquibaseIntegration {
                e);
       return liquibaseProperties.getDefaultSchema();
     }
+  }
+
+  private String asCommaSeparatedString(List<String> values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return String.join(",", values);
+  }
+
+  private String asCommaSeparatedString(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
 }

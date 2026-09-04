@@ -18,14 +18,12 @@
  */
 package io.meeds.spring.kernel;
 
-import static org.springframework.data.elasticsearch.client.elc.ElasticsearchClients.ElasticsearchHttpClientConfigurationCallback.from;
-
 import java.time.Duration;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.apache.http.impl.nio.reactor.IOReactorConfig;
-import org.elasticsearch.client.RestClient;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
+import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.elasticsearch.client.ClientConfiguration;
@@ -33,6 +31,7 @@ import org.springframework.data.elasticsearch.client.ClientConfiguration.ClientC
 import org.springframework.data.elasticsearch.client.ClientConfiguration.MaybeSecureClientConfigurationBuilder;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchConfiguration;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.client.elc.rest5_client.Rest5Clients;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.RefreshPolicy;
 import org.springframework.data.elasticsearch.core.convert.ElasticsearchConverter;
@@ -40,6 +39,7 @@ import org.springframework.data.elasticsearch.core.convert.ElasticsearchConverte
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.JsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest5_client.low_level.Rest5Client;
 import lombok.Setter;
 
 @Configuration
@@ -70,7 +70,7 @@ public class KernelElasticsearchConfiguration extends ElasticsearchConfiguration
   private static ClientConfiguration    clientConfiguration;
 
   @Setter
-  private static RestClient             elasticsearchRestClient;
+  private static Rest5Client            elasticsearchRestClient;
 
   @Setter
   private static ElasticsearchTransport elasticsearchTransport;
@@ -95,16 +95,17 @@ public class KernelElasticsearchConfiguration extends ElasticsearchConfiguration
       }
       setClientConfiguration(connectionBuilder.withConnectTimeout(Duration.ofSeconds(connectionTimeout))
                                               .withSocketTimeout(Duration.ofSeconds(socketTimeout))
-                                              .withClientConfigurer(from(this::setMaxThreads))
+                                              .withClientConfigurer(Rest5Clients.ElasticsearchHttpClientConfigurationCallback.from(this::setIoThreads))
+                                              .withClientConfigurer(Rest5Clients.ElasticsearchConnectionManagerCallback.from(this::setMaxConnections))
                                               .build());
     }
     return clientConfiguration;
   }
 
   @Override
-  public RestClient elasticsearchRestClient(ClientConfiguration clientConfiguration) {
+  public Rest5Client elasticsearchRest5Client(ClientConfiguration clientConfiguration) {
     if (elasticsearchRestClient == null) {
-      setElasticsearchRestClient(super.elasticsearchRestClient(clientConfiguration));
+      setElasticsearchRestClient(super.elasticsearchRest5Client(clientConfiguration));
     }
     return elasticsearchRestClient;
   }
@@ -118,7 +119,7 @@ public class KernelElasticsearchConfiguration extends ElasticsearchConfiguration
   }
 
   @Override
-  public ElasticsearchTransport elasticsearchTransport(RestClient restClient, JsonpMapper jsonpMapper) {
+  public ElasticsearchTransport elasticsearchTransport(Rest5Client restClient, JsonpMapper jsonpMapper) {
     if (elasticsearchTransport == null) {
       setElasticsearchTransport(super.elasticsearchTransport(restClient, jsonpMapper));
     }
@@ -141,13 +142,16 @@ public class KernelElasticsearchConfiguration extends ElasticsearchConfiguration
     return elasticsearchTemplate;
   }
 
-  private HttpAsyncClientBuilder setMaxThreads(HttpAsyncClientBuilder httpClientBuilder) {
+  private HttpAsyncClientBuilder setIoThreads(HttpAsyncClientBuilder httpClientBuilder) {
     int ioThreadsCount = Math.min(Runtime.getRuntime().availableProcessors(), 4);
-    return httpClientBuilder.setDefaultIOReactorConfig(IOReactorConfig.custom()
-                                                                      .setIoThreadCount(ioThreadsCount)
-                                                                      .build())
-                            .setMaxConnTotal(maxPoolConnections)
-                            .setMaxConnPerRoute(maxPoolConnections);
+
+    return httpClientBuilder.setIOReactorConfig(IOReactorConfig.custom()
+                                                               .setIoThreadCount(ioThreadsCount)
+                                                               .build());
   }
 
+  private PoolingAsyncClientConnectionManagerBuilder setMaxConnections(PoolingAsyncClientConnectionManagerBuilder connectionManagerBuilder) {
+    return connectionManagerBuilder.setMaxConnTotal(maxPoolConnections)
+                                   .setMaxConnPerRoute(maxPoolConnections);
+  }
 }

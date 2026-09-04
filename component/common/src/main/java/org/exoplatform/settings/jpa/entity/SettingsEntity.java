@@ -20,14 +20,12 @@ package org.exoplatform.settings.jpa.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedQueries;
 import jakarta.persistence.NamedQuery;
-import jakarta.persistence.SequenceGenerator;
+import io.meeds.common.persistence.PortableSequence;
 import jakarta.persistence.Table;
 
 /**
@@ -78,8 +76,7 @@ import jakarta.persistence.Table;
 public class SettingsEntity {
   @Id
   @Column(name = "SETTING_ID")
-  @SequenceGenerator(name="SEQ_STG_SETTINGS_COMMON_ID", sequenceName="SEQ_STG_SETTINGS_COMMON_ID", allocationSize = 1)
-  @GeneratedValue(strategy=GenerationType.AUTO, generator="SEQ_STG_SETTINGS_COMMON_ID")
+  @PortableSequence(name = "SEQ_STG_SETTINGS_COMMON_ID")
   private Long id;
 
   @Column(name = "NAME")

@@ -98,7 +98,8 @@ public class PortalAuthenticationManager implements AuthenticationProvider {
 
   @Override
   public boolean supports(Class<?> authentication) {
-    return true;
+    return PreAuthenticatedAuthenticationToken.class.isAssignableFrom(authentication)
+           || AnonymousAuthenticationToken.class.isAssignableFrom(authentication);
   }
 
   private Identity getCurrentIdentity(HttpServletRequest httpRequest) throws Exception {

@@ -22,10 +22,18 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
-import jakarta.persistence.*;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+
+import io.meeds.common.persistence.PortableSequence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQueries;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity(name = "GateInContainer")
 @Table(name = "PORTAL_CONTAINERS")
@@ -35,8 +43,7 @@ public class ContainerEntity extends ComponentEntity implements Serializable {
   private static final long     serialVersionUID = -8045606258160322858L;
 
   @Id
-  @SequenceGenerator(name = "SEQ_CONTAINER_ID_GENERATOR", sequenceName = "SEQ_CONTAINER_ID_GENERATOR", allocationSize = 1)
-  @GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_CONTAINER_ID_GENERATOR")
+  @PortableSequence(name = "SEQ_CONTAINER_ID_GENERATOR")
   @Column(name = "ID")
   protected Long                id;
 

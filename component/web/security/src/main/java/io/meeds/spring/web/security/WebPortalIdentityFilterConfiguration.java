@@ -18,9 +18,14 @@
  */
 package io.meeds.spring.web.security;
 
+import java.util.EnumSet;
+import java.util.List;
+
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration("webPortalIdentityFilterConfiguration")
 public class WebPortalIdentityFilterConfiguration {
@@ -29,7 +34,8 @@ public class WebPortalIdentityFilterConfiguration {
   public FilterRegistrationBean<PortalIdentityFilter> identityFilter() {
     FilterRegistrationBean<PortalIdentityFilter> registrationBean = new FilterRegistrationBean<>();
     registrationBean.setFilter(new PortalIdentityFilter());
-    registrationBean.addUrlPatterns("/rest/*");
+    registrationBean.setUrlPatterns(List.of("/rest/*"));
+    registrationBean.setDispatcherTypes(EnumSet.allOf(DispatcherType.class));
     registrationBean.setOrder(2);
     return registrationBean;
   }

@@ -27,19 +27,18 @@ import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
 import org.picketlink.idm.spi.model.IdentityObjectAttribute;
 
+import io.meeds.common.persistence.PortableSequence;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedQuery;
-import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 @Entity(name = "HibernateIdentityObjectAttribute")
@@ -54,8 +53,7 @@ public class HibernateIdentityObjectAttribute implements IdentityObjectAttribute
   public static final String                          TYPE_BINARY = "binary";
 
   @Id
-  @GeneratedValue(strategy = GenerationType.AUTO, generator="JBID_IO_ATTR_ID_SEQ")
-  @SequenceGenerator(name = "JBID_IO_ATTR_ID_SEQ", sequenceName = "JBID_IO_ATTR_ID_SEQ", allocationSize = 1)
+  @PortableSequence(name = "JBID_IO_ATTR_ID_SEQ")
   @Column(name = "ATTRIBUTE_ID")
   private Long                                        id;
 

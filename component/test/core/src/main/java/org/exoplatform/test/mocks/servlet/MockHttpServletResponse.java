@@ -134,9 +134,9 @@ public class MockHttpServletResponse implements HttpServletResponse {
 
   }
 
-  public void sendRedirect(String arg0) throws IOException {
+  @Override
+  public void sendRedirect(String location, int sc, boolean clearBuffer) throws IOException {
     // TODO Auto-generated method stub
-
   }
 
   public void setDateHeader(String arg0, long arg1) {

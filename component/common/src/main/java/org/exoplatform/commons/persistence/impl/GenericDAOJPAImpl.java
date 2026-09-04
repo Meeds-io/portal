@@ -22,18 +22,18 @@ import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Root;
-
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.hibernate.Session;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.internal.SessionFactoryImpl;
 
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.api.persistence.GenericDAO;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 
 public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<E, I> {
 
@@ -52,7 +52,7 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
 
     Root<E> entity = query.from(modelClass);
 
-    //Selecting the count
+    // Selecting the count
     query.select(cb.count(entity));
 
     return getEntityManager().createQuery(query).getSingleResult();
@@ -64,17 +64,18 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
   }
 
   /**
-   * This method makes 2 calls to getEntityManager():
-   * 1- The first one to get the CriteriaBuilder
-   * 2- The second one to create the query
-   * If there is no EntityManager in the threadLocal (i.e: EntityManagerService.getEntityManager() returns null),
-   * the EntityManagerHolder will return 2 distinct EntityManager instances.
-   * This will result in a org.hibernate.SessionException: Session is closed!.
-   *
-   * Thus, this method shall always be invoked with an EntityManager in the ThreadLocal
-   * (for example, from a request managed by the portal lifecycle or from a method annotated with  @ExoTransactional)
+   * This method makes 2 calls to getEntityManager(): 1- The first one to get
+   * the CriteriaBuilder 2- The second one to create the query If there is no
+   * EntityManager in the threadLocal (i.e:
+   * EntityManagerService.getEntityManager() returns null), the
+   * EntityManagerHolder will return 2 distinct EntityManager instances. This
+   * will result in a org.hibernate.SessionException: Session is closed!. Thus,
+   * this method shall always be invoked with an EntityManager in the
+   * ThreadLocal (for example, from a request managed by the portal lifecycle or
+   * from a method annotated with @ExoTransactional)
    */
-  //Another option is to implement something similar to Spring's DeferredQueryInvocationHandler
+  // Another option is to implement something similar to Spring's
+  // DeferredQueryInvocationHandler
   @Override
   public List<E> findAll() {
     CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
@@ -82,7 +83,7 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
 
     Root<E> entity = query.from(modelClass);
 
-    //Selecting the entity
+    // Selecting the entity
     query.select(entity);
 
     return getEntityManager().createQuery(query).getResultList();
@@ -141,6 +142,7 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
 
   /**
    * Return an EntityManager instance.
+   * 
    * @return An EntityManger instance.
    */
   protected EntityManager getEntityManager() {
@@ -155,13 +157,12 @@ public class GenericDAOJPAImpl<E, I extends Serializable> implements GenericDAO<
 
   protected boolean isMSSQLDialect() {
     Dialect hibernateDialect = getHibernateDialect();
-    return hibernateDialect != null && (StringUtils.contains(hibernateDialect.getClass().getName(), "MsSQL")
-        || StringUtils.contains(hibernateDialect.getClass().getName(), "SQLServer"));
+    return hibernateDialect != null && (Strings.CS.contains(hibernateDialect.getClass().getName(), "MsSQL")
+                                        || Strings.CS.contains(hibernateDialect.getClass().getName(), "SQLServer"));
   }
 
   protected boolean isOrcaleDialect() {
     Dialect hibernateDialect = getHibernateDialect();
-    return hibernateDialect != null && StringUtils.contains(hibernateDialect.getClass().getName(), "Oracle");
+    return hibernateDialect != null && Strings.CS.contains(hibernateDialect.getClass().getName(), "Oracle");
   }
 }
-

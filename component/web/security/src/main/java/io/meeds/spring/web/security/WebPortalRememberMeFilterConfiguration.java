@@ -18,9 +18,14 @@
  */
 package io.meeds.spring.web.security;
 
+import java.util.EnumSet;
+import java.util.List;
+
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration("webPortalRememberMeFilterConfiguration")
 public class WebPortalRememberMeFilterConfiguration {
@@ -29,7 +34,8 @@ public class WebPortalRememberMeFilterConfiguration {
   public FilterRegistrationBean<PortalRememberMeFilter> rememberMeFilter() {
     FilterRegistrationBean<PortalRememberMeFilter> registrationBean = new FilterRegistrationBean<>();
     registrationBean.setFilter(new PortalRememberMeFilter());
-    registrationBean.addUrlPatterns("/rest/*");
+    registrationBean.setUrlPatterns(List.of("/rest/*"));
+    registrationBean.setDispatcherTypes(EnumSet.allOf(DispatcherType.class));
     registrationBean.setOrder(3);
     return registrationBean;
   }
