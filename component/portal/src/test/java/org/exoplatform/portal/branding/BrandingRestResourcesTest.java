@@ -147,6 +147,27 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("test1", caturedBranding.getCompanyName());
   }
 
+  public void testUpdateBrandingInformationRefusedWithMessageCode() throws Exception {
+    // Given: a value the service refuses (invalid theme value or a stylesheet that does not compile)
+    String path = "/v1/platform/branding/";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "PUT", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+    doThrow(new IllegalArgumentException("branding.theme.invalidValue:appMarginTop")).when(brandingService)
+                                                                                     .updateBrandingInformation(any());
+    JSONObject jsonBranding = new JSONObject();
+    jsonBranding.put("companyName", "test1");
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Content-Type", Arrays.asList("application/json"));
+
+    // When
+    ContainerResponse resp = launcher.service("PUT", path, "", headers, jsonBranding.toString().getBytes(), envctx);
+
+    // Then: 400 with the message code as body, not a 500
+    assertEquals(400, resp.getStatus());
+    assertEquals("branding.theme.invalidValue:appMarginTop", resp.getEntity());
+  }
+
   public void testGetBrandingFavicon() throws Exception {
     // Given
     String path = "/v1/platform/branding/favicon?v=test";

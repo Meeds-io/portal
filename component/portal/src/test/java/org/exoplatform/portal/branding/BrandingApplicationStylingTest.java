@@ -158,6 +158,8 @@ public class BrandingApplicationStylingTest {
     assertEquals("12px", defaults.get("appMarginLeft"));
     // legacy name:value still accepted
     assertEquals("#3f8487", defaults.get("primaryColor"));
+    // an exo.properties override written for the old declaration (X=X:value) keeps working: the name prefix is dropped
+    assertEquals("#abcdef", defaults.get("secondaryColor"));
     // empty default = declared but not set: absent from the effective style, present in the declaration
     assertTrue(defaults.containsKey("appMarginTop"));
     assertEquals("", defaults.get("appMarginTop"));
@@ -262,6 +264,74 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
+  public void shouldNeutralizeValuesTheGrammarAcceptsButLessWouldParse() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    // values accepted by the grammar that less4j refuses when written plain: written as Less escapes, they travel
+    // verbatim to the CSS (the browser ignores an invalid declaration), the stylesheet never breaks
+    SettingService settingService = mock(SettingService.class);
+    stub(settingService, "appTextTitleFontWeight", "-");
+    stub(settingService, "appBoxShadow", "unit(a)");
+    stub(settingService, "appBackgroundImage", "linear-gradient(lighten(x), red)");
+    stub(settingService, "sideBarBackgroundImage", "lighten(x)");
+    stub(settingService, "drawerBackgroundImage", "data-uri(x)");
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+    assertNotNull(css);
+    assertTrue(css, css.contains("--allPagesAppTextTitleFontWeight: -;"));
+    assertTrue(css, css.contains("--allPagesAppBoxShadow: unit(a);"));
+    assertTrue(css, css.contains("--allPagesAppBackgroundImage: linear-gradient(lighten(x), red);"));
+    assertTrue(css, css.contains("--allPagesSideBarBackgroundImage: lighten(x);"));
+    assertTrue(css, css.contains("--allPagesDrawerBackgroundImage: data-uri(x);"));
+    // colours and sizes stay plain Less values: the template still derives its shades from them
+    assertTrue(css, css.contains("--allPagesPrimaryColor: #3f8487;"));
+    // a quote can never close the escape
+    assertEquals("~\"a\"", BrandingServiceImpl.toLessEscape("a\"\\\n"));
+  }
+
+  @Test
+  public void shouldKeepLastCompiledStylesheetWhenAValueDoesNotCompile() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+    String goodCss = brandingService.getThemeCSSContent();
+    assertNotNull(goodCss);
+
+    // a stored value of a non-escaped key that breaks the template (e.g. written outside the validated PUT path)
+    stub(settingService, "borderRadius", "8px; }");
+    brandingService.updateLastUpdatedTime(1);
+    assertEquals("the last compiled stylesheet is served, not nothing", goodCss, brandingService.getThemeCSSContent());
+  }
+
+  @Test
+  public void shouldRefuseAThemeValueThatDoesNotCompileBeforeStoringIt() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    // passes the character grammar (not an app key) but not the compiler: refused with a message code, nothing stored
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> brandingService.updateBrandingInformation(branding("borderRadius", "8px; }")));
+    assertEquals("branding.theme.stylesheetCompilationError", e.getMessage());
+    verify(settingService, never()).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq("borderRadius"), any());
+    // the grammar refusal carries the key
+    e = assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("appMarginTop", "12px; }")));
+    assertEquals("branding.theme.invalidValue:appMarginTop", e.getMessage());
+  }
+
+  @Test
   public void shouldRejectMalformedApplicationStylingValues() {
     SettingService settingService = mock(SettingService.class);
     ConfigurationManager configurationManager = mock(ConfigurationManager.class);
@@ -316,12 +386,14 @@ public class BrandingApplicationStylingTest {
     InitParams initParams = new InitParams();
     ValuesParam themeVariables = new ValuesParam();
     themeVariables.setName(BRANDING_THEME_VARIABLES);
-    List<String> variables = Arrays.asList("primaryColor:#3f8487", // legacy form
+    List<String> variables = Arrays.asList("primaryColor:#3f8487", // legacy declaration form
+                                           "secondaryColor=secondaryColor:#abcdef", // legacy override form (exo.properties X=X:value)
                                            "textColor=#20282c",
                                            "borderRadius=8px",
                                            "topBarBackgroundColor=#FFFFFFFF",
                                            "topBarBackgroundImage=none",
                                            "sideBarBackgroundImage=none",
+                                           "drawerBackgroundImage=none",
                                            "pageMarginTop=",
                                            "pageMarginRight=",
                                            "appMarginTop=",
