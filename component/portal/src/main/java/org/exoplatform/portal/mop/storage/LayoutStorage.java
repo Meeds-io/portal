@@ -1018,6 +1018,18 @@ public class LayoutStorage {
     if (attrs.containsKey(MappedAttributes.APP_BACKGROUND_ATTACHMENT.getName())) {
       cssStyle.setBackgroundAttachment((String) attrs.get(MappedAttributes.APP_BACKGROUND_ATTACHMENT.getName()));
     }
+    if (attrs.containsKey(MappedAttributes.APP_MARGIN_TOP.getName())) {
+      cssStyle.setMarginTop(Integer.parseInt((String) attrs.get(MappedAttributes.APP_MARGIN_TOP.getName())));
+    }
+    if (attrs.containsKey(MappedAttributes.APP_MARGIN_BOTTOM.getName())) {
+      cssStyle.setMarginBottom(Integer.parseInt((String) attrs.get(MappedAttributes.APP_MARGIN_BOTTOM.getName())));
+    }
+    if (attrs.containsKey(MappedAttributes.APP_MARGIN_RIGHT.getName())) {
+      cssStyle.setMarginRight(Integer.parseInt((String) attrs.get(MappedAttributes.APP_MARGIN_RIGHT.getName())));
+    }
+    if (attrs.containsKey(MappedAttributes.APP_MARGIN_LEFT.getName())) {
+      cssStyle.setMarginLeft(Integer.parseInt((String) attrs.get(MappedAttributes.APP_MARGIN_LEFT.getName())));
+    }
     return cssStyle;
   }
 
@@ -1245,6 +1257,18 @@ public class LayoutStorage {
     }
     if (StringUtils.isNotBlank(cssStyle.getBackgroundAttachment())) {
       properties.put(MappedAttributes.APP_BACKGROUND_ATTACHMENT.getName(), cssStyle.getBackgroundAttachment());
+    }
+    if (cssStyle.getMarginTop() != null) {
+      properties.put(MappedAttributes.APP_MARGIN_TOP.getName(), String.valueOf(cssStyle.getMarginTop()));
+    }
+    if (cssStyle.getMarginBottom() != null) {
+      properties.put(MappedAttributes.APP_MARGIN_BOTTOM.getName(), String.valueOf(cssStyle.getMarginBottom()));
+    }
+    if (cssStyle.getMarginRight() != null) {
+      properties.put(MappedAttributes.APP_MARGIN_RIGHT.getName(), String.valueOf(cssStyle.getMarginRight()));
+    }
+    if (cssStyle.getMarginLeft() != null) {
+      properties.put(MappedAttributes.APP_MARGIN_LEFT.getName(), String.valueOf(cssStyle.getMarginLeft()));
     }
   }
 

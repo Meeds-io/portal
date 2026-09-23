@@ -26,6 +26,7 @@ import jakarta.persistence.EntityTransaction;
 import org.json.simple.JSONArray;
 
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
+import org.exoplatform.portal.config.model.ApplicationBackgroundStyle;
 import org.exoplatform.portal.config.model.ModelStyle;
 import org.exoplatform.portal.jdbc.entity.ComponentEntity;
 import org.exoplatform.portal.jdbc.entity.ContainerEntity;
@@ -214,6 +215,53 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertEquals("center", loadedStyle.getBackgroundPosition());
     assertEquals("no-repeat", loadedStyle.getBackgroundRepeat());
     assertEquals("fixed", loadedStyle.getBackgroundAttachment());
+  }
+
+  public void testApplicationMarginsPersistedAndReloaded() {
+    // eXIP 7.3.0.30: default margins of the applications of a page, stored as app-margin-* attributes
+    ApplicationBackgroundStyle appStyle = new ApplicationBackgroundStyle();
+    appStyle.setBackgroundColor("#FFFFFFFF");
+    appStyle.setMarginTop(0);
+    appStyle.setMarginRight(12);
+    appStyle.setMarginBottom(24);
+    appStyle.setMarginLeft(null);
+
+    ContainerData containerData = new ContainerData(null,
+                                                    "testApplicationMargins",
+                                                    "testApplicationMargins",
+                                                    null,
+                                                    "system:/groovy/portal/webui/container/UIContainer.gtmpl",
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    appStyle,
+                                                    Collections.emptyList(),
+                                                    Collections.emptyList());
+
+    List<ComponentEntity> saved = layoutStorage.saveChildren(new JSONArray(),
+                                                             Collections.<ComponentData> singletonList(containerData));
+    assertEquals(1, saved.size());
+    restartTransaction();
+
+    ContainerEntity savedEntity = (ContainerEntity) saved.get(0);
+    JSONArray body = new JSONArray();
+    body.add(savedEntity.toJSON());
+
+    List<ComponentData> loaded = layoutStorage.buildChildren(body);
+    assertEquals(1, loaded.size());
+    ApplicationBackgroundStyle loadedStyle = ((ContainerData) loaded.get(0)).getAppBackgroundStyle();
+    assertNotNull(loadedStyle);
+    assertEquals("#FFFFFFFF", loadedStyle.getBackgroundColor());
+    // 0 is a value (an explicit "no margin"), null is "not set"
+    assertEquals(Integer.valueOf(0), loadedStyle.getMarginTop());
+    assertEquals(Integer.valueOf(12), loadedStyle.getMarginRight());
+    assertEquals(Integer.valueOf(24), loadedStyle.getMarginBottom());
+    assertNull(loadedStyle.getMarginLeft());
   }
 
 }
