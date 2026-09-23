@@ -286,6 +286,60 @@ public interface BrandingService {
   String getTopBarBackgroundPath();
 
   /**
+   * @return Application default Background File technical identifier
+   *         (Branding and Theme &gt; Pages &amp; Apps style &gt; Application
+   *         Styling)
+   */
+  Long getAppBackgroundId();
+
+  /**
+   * @return Application default {@link Background}
+   */
+  Background getAppBackground();
+
+  /**
+   * @return {@link Background} URL to retrieve the application default
+   *         background
+   */
+  String getAppBackgroundPath();
+
+  /**
+   * @return true when the platform-wide default is to keep the Topbar fixed
+   *         while scrolling (theme variable 'topBarSticky')
+   */
+  boolean isTopBarSticky();
+
+  /**
+   * @return Application title text default {@link Background} file identifier
+   */
+  Long getAppTextTitleBackgroundId();
+
+  /**
+   * @return Application title text default {@link Background}
+   */
+  Background getAppTextTitleBackground();
+
+  /**
+   * @return URL to retrieve the application title text default background
+   */
+  String getAppTextTitleBackgroundPath();
+
+  /**
+   * @return Application header text default {@link Background} file identifier
+   */
+  Long getAppTextHeaderBackgroundId();
+
+  /**
+   * @return Application header text default {@link Background}
+   */
+  Background getAppTextHeaderBackground();
+
+  /**
+   * @return URL to retrieve the application header text default background
+   */
+  String getAppTextHeaderBackgroundPath();
+
+  /**
    * @return Sidebar Background File technical identifier
    */
   Long getSideBarBackgroundId();
