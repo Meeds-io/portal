@@ -27,6 +27,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_THEME
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -36,10 +37,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
@@ -240,28 +245,66 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
-  public void shouldExposeShippedStylesheetVersionWithoutWriting() {
-    // no stored time (fresh instance): the exposed time is never older than the shipped template, nothing is written at startup
+  public void shouldChangeStylesheetVersionWithTheShippedTemplateWithoutWriting() throws Exception {
+    // nothing stored, two different shipped templates: two different v= values, no write at startup
     SettingService settingService = mock(SettingService.class);
-    BrandingServiceImpl brandingService = newBrandingService(settingService, mock(ConfigurationManager.class), defaultInitParams());
-    brandingService.start();
-    assertTrue(brandingService.getLastUpdatedTime() >= BrandingServiceImpl.THEME_TEMPLATE_VERSION_TIME);
+    ConfigurationManager templateA = mock(ConfigurationManager.class);
+    when(templateA.getInputStream(LESS_FILE_PATH)).thenAnswer(i -> new ByteArrayInputStream("@a: 1;".getBytes(StandardCharsets.UTF_8)));
+    ConfigurationManager templateB = mock(ConfigurationManager.class);
+    when(templateB.getInputStream(LESS_FILE_PATH)).thenAnswer(i -> new ByteArrayInputStream("@a: 2;".getBytes(StandardCharsets.UTF_8)));
+    BrandingServiceImpl serviceA = newBrandingService(settingService, templateA, defaultInitParams());
+    serviceA.start();
+    BrandingServiceImpl serviceB = newBrandingService(settingService, templateB, defaultInitParams());
+    serviceB.start();
+    assertNotEquals(serviceA.getLastUpdatedTime(), serviceB.getLastUpdatedTime());
+    assertNotEquals(serviceA.getTemplateHash(), serviceB.getTemplateHash());
     verify(settingService, never()).set(eq(Context.GLOBAL), eq(Scope.GLOBAL), eq(BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY), any());
-    verify(settingService, never()).set(eq(Context.GLOBAL), eq(Scope.GLOBAL), eq("branding.themeTemplateVersion"), any());
 
-    // a stored time older than the shipped template (pre-upgrade save): the template time wins, the v= parameter changes
-    SettingService older = mock(SettingService.class);
-    when(older.get(Context.GLOBAL, Scope.GLOBAL, BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY))
-        .thenReturn((SettingValue) SettingValue.create(String.valueOf(BrandingServiceImpl.THEME_TEMPLATE_VERSION_TIME - 1000)));
-    assertEquals(BrandingServiceImpl.THEME_TEMPLATE_VERSION_TIME,
-                 newBrandingService(older, mock(ConfigurationManager.class), defaultInitParams()).getLastUpdatedTime());
+    // the hash is computed once, and a later save (greater stored time) still changes the exposed time
+    assertEquals(serviceA.getTemplateHash(), serviceA.getTemplateHash());
+    long before = serviceA.getLastUpdatedTime();
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY))
+        .thenReturn((SettingValue) SettingValue.create(String.valueOf(System.currentTimeMillis() + 60000)));
+    assertTrue(serviceA.getLastUpdatedTime() > before);
+  }
 
-    // a later save wins over the template time
-    SettingService newer = mock(SettingService.class);
-    when(newer.get(Context.GLOBAL, Scope.GLOBAL, BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY))
-        .thenReturn((SettingValue) SettingValue.create(String.valueOf(BrandingServiceImpl.THEME_TEMPLATE_VERSION_TIME + 5000)));
-    assertEquals(BrandingServiceImpl.THEME_TEMPLATE_VERSION_TIME + 5000,
-                 newBrandingService(newer, mock(ConfigurationManager.class), defaultInitParams()).getLastUpdatedTime());
+  @Test
+  public void shouldStripImageLayersSentBackByClientsAndRefuseUnbalancedParentheses() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    // the server is the only source of the image URL: the stored value round-tripped by the UI (even doubled by an
+    // older version) is reduced to its effect, so two consecutive saves are accepted and heal the stored value
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p?v=1)"));
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p?v=1), url(/p?v=1)"));
+    assertEquals(LINEAR_GRADIENT, BrandingServiceImpl.stripImageLayers("url(/p?v=1), url(/p?v=1), " + LINEAR_GRADIENT));
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(https://tracker.example.com/p.png)"));
+    ArgumentCaptor<SettingValue> stored = ArgumentCaptor.forClass(SettingValue.class);
+    brandingService.updateBrandingInformation(branding("sideBarBackgroundImage", "url(/p?v=1), url(/p?v=1)"));
+    brandingService.updateBrandingInformation(branding("sideBarBackgroundImage", "url(/p?v=1), " + CONIC_GRADIENT));
+    verify(settingService, times(2)).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq("sideBarBackgroundImage"), stored.capture());
+    // no image uploaded in this test: the effect alone is stored (processBackgroundImage adds the URL when a file exists)
+    assertEquals("none", stored.getAllValues().get(0).getValue());
+    assertEquals(CONIC_GRADIENT, stored.getAllValues().get(1).getValue());
+
+    // unbalanced parentheses would keep the browser's parser open until the end of the stylesheet: refused
+    for (String[] probe : new String[][] {
+        { "sideBarBackgroundImage", "linear-gradient((red)" },
+        { "sideBarBackgroundImage", "linear-gradient(red, a(b)" },
+        { "drawerBackgroundImage", "linear-gradient((#fff)" },
+        { "appBoxShadow", "rgb(0 0 0" } }) {
+      IllegalArgumentException e = assertThrows(probe[1],
+                                                IllegalArgumentException.class,
+                                                () -> brandingService.updateBrandingInformation(branding(probe[0], probe[1])));
+      assertEquals("branding.theme.invalidValue:" + probe[0], e.getMessage());
+    }
+    assertTrue(BrandingServiceImpl.hasBalancedParentheses("rgba(0, 0, 0, 0.2) 0px 3px"));
+    assertFalse(BrandingServiceImpl.hasBalancedParentheses(")("));
   }
 
   @Test
