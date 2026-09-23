@@ -314,7 +314,9 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
       CacheControl cc = new CacheControl();
       cc.setMaxAge(86400);
       builder.type("text/css");
-      builder.lastModified(new Date(lastUpdated));
+      // the exposed time also carries the shipped template's fingerprint (v= parameter, ETag): as a date it may lie
+      // in the future, which RFC 9110 forbids for Last-Modified, so the header is capped to now
+      builder.lastModified(new Date(Math.min(lastUpdated, System.currentTimeMillis())));
       if (StringUtils.isNotBlank(lastModified)) {
         builder.expires(new Date(System.currentTimeMillis() + CACHE_IN_MILLI_SECONDS));
       }

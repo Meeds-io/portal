@@ -168,6 +168,31 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("branding.theme.invalidValue:appMarginTop", resp.getEntity());
   }
 
+  public void testGetBrandingCssLastModifiedNeverInTheFuture() throws Exception {
+    // Given: the exposed time carries the template fingerprint and may exceed now by up to 2^32 ms
+    String path = "/v1/platform/branding/css?v=1";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+    long future = System.currentTimeMillis() + 40L * 24 * 3600 * 1000;
+    when(brandingService.getLastUpdatedTime()).thenReturn(future);
+    when(brandingService.getThemeCSSContent()).thenReturn(":root {}");
+
+    // When
+    long before = System.currentTimeMillis();
+    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
+
+    // Then: the ETag keeps the fingerprint, Last-Modified is capped to now
+    assertEquals(200, resp.getStatus());
+    assertEquals("\"" + future + "\"", String.valueOf(resp.getHttpHeaders().getFirst("ETag")));
+    Object lastModified = resp.getHttpHeaders().getFirst("Last-Modified");
+    assertNotNull(lastModified);
+    long lastModifiedTime = lastModified instanceof Date date ? date.getTime()
+                                                              : new java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.US).parse(String.valueOf(lastModified)).getTime();
+    assertTrue("Last-Modified must not be in the future: " + lastModified, lastModifiedTime <= System.currentTimeMillis() + 1000);
+    assertTrue(lastModifiedTime >= before - 1000);
+  }
+
   public void testGetBrandingFavicon() throws Exception {
     // Given
     String path = "/v1/platform/branding/favicon?v=test";
