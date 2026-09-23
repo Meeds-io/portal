@@ -43,4 +43,17 @@ public class ApplicationBackgroundStyle implements Serializable {
 
   private String            backgroundAttachment;
 
+  /**
+   * Default outer margins (px) of the applications of this container, e.g. a
+   * page. Resolved by the skin as: application own margin classes &gt; this
+   * value &gt; platform-wide default (Branding and Theme)
+   */
+  private Integer           marginTop;
+
+  private Integer           marginRight;
+
+  private Integer           marginBottom;
+
+  private Integer           marginLeft;
+
 }

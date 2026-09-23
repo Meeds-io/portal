@@ -78,6 +78,10 @@
   if (bodyClasses == null) {
     bodyClasses = "";
   }
+  if (brandingService.isTopBarSticky()) {
+    // Platform-wide "Fix Position when Scrolling" default of the Topbar (Branding and Theme), consumed by the skin
+    bodyClasses += " topbar-sticky";
+  }
   def bodyStyle = "";
   if (brandingService.getPageBackgroundColor() != null) {
     bodyStyle += "--allPagesBackgroundColor: " + brandingService.getPageBackgroundColor() + ";";

@@ -176,34 +176,9 @@ public class ModelStyle implements Serializable {
   public String getCssClass(String existingCssClass, boolean sectionStyle, int diff) { // NOSONAR
     StringBuilder cssClass = new StringBuilder();
     if (!sectionStyle) {
-      if (marginTop != null && !StringUtils.contains(existingCssClass, "mt-")) {
-        cssClass.append(" mt-");
-        if (marginTop < diff) {
-          cssClass.append("n");
-        }
-        cssClass.append(Math.abs((marginTop - diff) / 4));
-      }
-      if (marginBottom != null && !StringUtils.contains(existingCssClass, "mb-")) {
-        cssClass.append(" mb-");
-        if (marginBottom < diff) {
-          cssClass.append("n");
-        }
-        cssClass.append(Math.abs((marginBottom - diff) / 4));
-      }
-      if (marginRight != null && !StringUtils.contains(existingCssClass, "me-")) {
-        cssClass.append(" me-");
-        if (marginRight < diff) {
-          cssClass.append("n");
-        }
-        cssClass.append(Math.abs((marginRight - diff) / 4));
-      }
-      if (marginLeft != null && !StringUtils.contains(existingCssClass, "ms-")) {
-        cssClass.append(" ms-");
-        if (marginLeft < diff) {
-          cssClass.append("n");
-        }
-        cssClass.append(Math.abs((marginLeft - diff) / 4));
-      }
+      // eXIP 7.3.0.30: margins are no longer rendered through Vuetify spacing tokens (mt-/mb-/ms-/me-) but through
+      // the --appMargin* custom properties emitted by the layout renderer from the margin attributes, on the
+      // platform-wide scale where 20 is "no extra margin" (the scale of the page XML definitions and of the editors)
       if (radiusTopRight != null && !StringUtils.contains(existingCssClass, "brtr-")) {
         cssClass.append(" brtr-");
         cssClass.append(radiusTopRight / 4);

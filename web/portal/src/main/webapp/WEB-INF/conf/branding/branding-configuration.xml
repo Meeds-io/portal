@@ -57,63 +57,146 @@
         <value>${portal.authentication.subtitle:UILoginForm.label.pageSubTitle}</value>
       </value-param>
       <value-param>
+        <name>exo.branding.page.width</name>
+        <value>${exo.branding.page.width:}</value>
+      </value-param>
+      <value-param>
+        <name>exo.branding.page.backgroundColor</name>
+        <value>${exo.branding.page.backgroundColor:}</value>
+      </value-param>
+      <value-param>
+        <name>exo.branding.page.backgroundEffect</name>
+        <value>${exo.branding.page.backgroundEffect:}</value>
+      </value-param>
+      <value-param>
         <name>exo.branding.theme.path</name>
         <value>${exo.branding.theme.path:war:/conf/branding/branding.less}</value>
       </value-param>
       <values-param>
         <name>exo.branding.theme.variables</name>
-        <value>${exo.branding.theme.primaryColor:primaryColor:#3f8487}</value>
-        <value>${exo.branding.theme.secondaryColor:secondaryColor:#e25d5d}</value>
-        <value>${exo.branding.theme.tertiaryColor:tertiaryColor:#e25d5d}</value>
-        <value>${exo.branding.theme.greyColorLighten1:greyColorLighten1:#707070}</value>
-        <value>${exo.branding.theme.textColor:textColor:#20282c}</value>
-        <value>${exo.branding.theme.borderRadius:borderRadius:8px}</value>
+        <!-- Declaration format: <name>=${exo.branding.theme.<name>:<default>}. A technical administrator overrides a variable with
+             exo.branding.theme.<name>=<value> in exo.properties; an empty default means "not set" (the skin's built-in default applies).
+             The legacy <name>:<default> form is still accepted for extensions that redefine this component. -->
+        <value>primaryColor=${exo.branding.theme.primaryColor:#3f8487}</value>
+        <value>secondaryColor=${exo.branding.theme.secondaryColor:#e25d5d}</value>
+        <value>tertiaryColor=${exo.branding.theme.tertiaryColor:#e25d5d}</value>
+        <value>greyColorLighten1=${exo.branding.theme.greyColorLighten1:#707070}</value>
+        <value>textColor=${exo.branding.theme.textColor:#20282c}</value>
+        <value>borderRadius=${exo.branding.theme.borderRadius:8px}</value>
 
-        <value>${exo.branding.theme.topBarTextColor:topBarTextColor:#20282c}</value>
-        <value>${exo.branding.theme.topBarTextFontSize:topBarTextFontSize:16px}</value>
-        <value>${exo.branding.theme.topBarTextFontStyle:topBarTextFontStyle:normal}</value>
-        <value>${exo.branding.theme.topBarTextFontWeight:topBarTextFontWeight:normal}</value>
-        <value>${exo.branding.theme.topBarBackgroundColor:topBarBackgroundColor:#FFFFFFFF}</value>
-        <value>${exo.branding.theme.topBarBackgroundPosition:topBarBackgroundPosition:left top}</value>
-        <value>${exo.branding.theme.topBarBackgroundSize:topBarBackgroundSize:cover}</value>
-        <value>${exo.branding.theme.topBarBackgroundImage:topBarBackgroundImage:none}</value>
-        <value>${exo.branding.theme.topBarBackgroundRepeat:topBarBackgroundRepeat:no-repeat}</value>
+        <value>topBarTextColor=${exo.branding.theme.topBarTextColor:#20282c}</value>
+        <value>topBarTextFontSize=${exo.branding.theme.topBarTextFontSize:16px}</value>
+        <value>topBarTextFontStyle=${exo.branding.theme.topBarTextFontStyle:normal}</value>
+        <value>topBarTextFontWeight=${exo.branding.theme.topBarTextFontWeight:normal}</value>
+        <value>topBarBackgroundColor=${exo.branding.theme.topBarBackgroundColor:#FFFFFFFF}</value>
+        <value>topBarBackgroundPosition=${exo.branding.theme.topBarBackgroundPosition:left top}</value>
+        <value>topBarBackgroundSize=${exo.branding.theme.topBarBackgroundSize:cover}</value>
+        <value>topBarBackgroundImage=${exo.branding.theme.topBarBackgroundImage:none}</value>
+        <value>topBarBackgroundRepeat=${exo.branding.theme.topBarBackgroundRepeat:no-repeat}</value>
 
-        <value>${exo.branding.theme.sideBarTextColor:sideBarTextColor:#20282c}</value>
-        <value>${exo.branding.theme.sideBarTextFontSize:sideBarTextFontSize:16px}</value>
-        <value>${exo.branding.theme.sideBarTextFontStyle:sideBarTextFontStyle:normal}</value>
-        <value>${exo.branding.theme.sideBarTextFontWeight:sideBarTextFontWeight:normal}</value>
-        <value>${exo.branding.theme.sideBarTextSubtitleColor:sideBarTextSubtitleColor:#707070}</value>
-        <value>${exo.branding.theme.sideBarTextSubtitleFontSize:sideBarTextSubtitleFontSize:12px}</value>
-        <value>${exo.branding.theme.sideBarTextSubtitleFontStyle:sideBarTextSubtitleFontStyle:normal}</value>
-        <value>${exo.branding.theme.sideBarTextSubtitleFontWeight:sideBarTextSubtitleFontWeight:normal}</value>
-        <value>${exo.branding.theme.sideBarBackgroundColor:sideBarBackgroundColor:#FFFFFFFF}</value>
-        <value>${exo.branding.theme.sideBarBackgroundPosition:sideBarBackgroundPosition:left top}</value>
-        <value>${exo.branding.theme.sideBarBackgroundSize:sideBarBackgroundSize:cover}</value>
-        <value>${exo.branding.theme.sideBarBackgroundImage:sideBarBackgroundImage:none}</value>
-        <value>${exo.branding.theme.sideBarBackgroundRepeat:sideBarBackgroundRepeat:no-repeat}</value>
+        <value>sideBarTextColor=${exo.branding.theme.sideBarTextColor:#20282c}</value>
+        <value>sideBarTextFontSize=${exo.branding.theme.sideBarTextFontSize:16px}</value>
+        <value>sideBarTextFontStyle=${exo.branding.theme.sideBarTextFontStyle:normal}</value>
+        <value>sideBarTextFontWeight=${exo.branding.theme.sideBarTextFontWeight:normal}</value>
+        <value>sideBarTextSubtitleColor=${exo.branding.theme.sideBarTextSubtitleColor:#707070}</value>
+        <value>sideBarTextSubtitleFontSize=${exo.branding.theme.sideBarTextSubtitleFontSize:12px}</value>
+        <value>sideBarTextSubtitleFontStyle=${exo.branding.theme.sideBarTextSubtitleFontStyle:normal}</value>
+        <value>sideBarTextSubtitleFontWeight=${exo.branding.theme.sideBarTextSubtitleFontWeight:normal}</value>
+        <value>sideBarBackgroundColor=${exo.branding.theme.sideBarBackgroundColor:#FFFFFFFF}</value>
+        <value>sideBarBackgroundPosition=${exo.branding.theme.sideBarBackgroundPosition:left top}</value>
+        <value>sideBarBackgroundSize=${exo.branding.theme.sideBarBackgroundSize:cover}</value>
+        <value>sideBarBackgroundImage=${exo.branding.theme.sideBarBackgroundImage:none}</value>
+        <value>sideBarBackgroundRepeat=${exo.branding.theme.sideBarBackgroundRepeat:no-repeat}</value>
 
-        <value>${exo.branding.theme.drawerTextTitleColor:drawerTextTitleColor:#20282c}</value>
-        <value>${exo.branding.theme.drawerTextTitleFontSize:drawerTextTitleFontSize:20px}</value>
-        <value>${exo.branding.theme.drawerTextTitleFontStyle:drawerTextTitleFontStyle:normal}</value>
-        <value>${exo.branding.theme.drawerTextTitleFontWeight:drawerTextTitleFontWeight:bold}</value>
-        <value>${exo.branding.theme.drawerTextHeaderColor:drawerTextHeaderColor:#707070}</value>
-        <value>${exo.branding.theme.drawerTextHeaderFontSize:drawerTextHeaderFontSize:18px}</value>
-        <value>${exo.branding.theme.drawerTextHeaderFontStyle:drawerTextHeaderFontStyle:normal}</value>
-        <value>${exo.branding.theme.drawerTextHeaderFontWeight:drawerTextHeaderFontWeight:normal}</value>
-        <value>${exo.branding.theme.drawerTextColor:drawerTextColor:#20282c}</value>
-        <value>${exo.branding.theme.drawerTextFontSize:drawerTextFontSize:16px}</value>
-        <value>${exo.branding.theme.drawerTextFontStyle:drawerTextFontStyle:normal}</value>
-        <value>${exo.branding.theme.drawerTextFontWeight:drawerTextFontWeight:normal}</value>
-        <value>${exo.branding.theme.drawerTextSubtitleColor:drawerTextSubtitleColor:#707070}</value>
-        <value>${exo.branding.theme.drawerTextSubtitleFontSize:drawerTextSubtitleFontSize:12px}</value>
-        <value>${exo.branding.theme.drawerTextSubtitleFontStyle:drawerTextSubtitleFontStyle:normal}</value>
-        <value>${exo.branding.theme.drawerTextSubtitleFontWeight:drawerTextSubtitleFontWeight:normal}</value>
-        <value>${exo.branding.theme.drawerBackgroundColor:drawerBackgroundColor:#FFFFFFFF}</value>
-        <value>${exo.branding.theme.drawerBackgroundPosition:drawerBackgroundPosition:left top}</value>
-        <value>${exo.branding.theme.drawerBackgroundSize:drawerBackgroundSize:cover}</value>
-        <value>${exo.branding.theme.drawerBackgroundImage:drawerBackgroundImage:none}</value>
-        <value>${exo.branding.theme.drawerBackgroundRepeat:drawerBackgroundRepeat:no-repeat}</value>
+        <value>drawerTextTitleColor=${exo.branding.theme.drawerTextTitleColor:#20282c}</value>
+        <value>drawerTextTitleFontSize=${exo.branding.theme.drawerTextTitleFontSize:20px}</value>
+        <value>drawerTextTitleFontStyle=${exo.branding.theme.drawerTextTitleFontStyle:normal}</value>
+        <value>drawerTextTitleFontWeight=${exo.branding.theme.drawerTextTitleFontWeight:bold}</value>
+        <value>drawerTextHeaderColor=${exo.branding.theme.drawerTextHeaderColor:#707070}</value>
+        <value>drawerTextHeaderFontSize=${exo.branding.theme.drawerTextHeaderFontSize:18px}</value>
+        <value>drawerTextHeaderFontStyle=${exo.branding.theme.drawerTextHeaderFontStyle:normal}</value>
+        <value>drawerTextHeaderFontWeight=${exo.branding.theme.drawerTextHeaderFontWeight:normal}</value>
+        <value>drawerTextColor=${exo.branding.theme.drawerTextColor:#20282c}</value>
+        <value>drawerTextFontSize=${exo.branding.theme.drawerTextFontSize:16px}</value>
+        <value>drawerTextFontStyle=${exo.branding.theme.drawerTextFontStyle:normal}</value>
+        <value>drawerTextFontWeight=${exo.branding.theme.drawerTextFontWeight:normal}</value>
+        <value>drawerTextSubtitleColor=${exo.branding.theme.drawerTextSubtitleColor:#707070}</value>
+        <value>drawerTextSubtitleFontSize=${exo.branding.theme.drawerTextSubtitleFontSize:12px}</value>
+        <value>drawerTextSubtitleFontStyle=${exo.branding.theme.drawerTextSubtitleFontStyle:normal}</value>
+        <value>drawerTextSubtitleFontWeight=${exo.branding.theme.drawerTextSubtitleFontWeight:normal}</value>
+        <value>drawerBackgroundColor=${exo.branding.theme.drawerBackgroundColor:#FFFFFFFF}</value>
+        <value>drawerBackgroundPosition=${exo.branding.theme.drawerBackgroundPosition:left top}</value>
+        <value>drawerBackgroundSize=${exo.branding.theme.drawerBackgroundSize:cover}</value>
+        <value>drawerBackgroundImage=${exo.branding.theme.drawerBackgroundImage:none}</value>
+        <value>drawerBackgroundRepeat=${exo.branding.theme.drawerBackgroundRepeat:no-repeat}</value>
+
+        <!-- eXIP 7.3.0.30 - Page Design > Page Margins: platform default of the page padding (site and page values keep precedence) -->
+        <value>pageMarginTop=${exo.branding.theme.pageMarginTop:}</value>
+        <value>pageMarginRight=${exo.branding.theme.pageMarginRight:}</value>
+        <value>pageMarginBottom=${exo.branding.theme.pageMarginBottom:}</value>
+        <value>pageMarginLeft=${exo.branding.theme.pageMarginLeft:}</value>
+
+        <!-- eXIP 7.3.0.30 - Platform-wide default styling of every application (Branding and Theme > Pages & Apps style > Application Styling).
+             Empty = not set: branding.less then emits the skin's built-in default, so a toggle turned off equals the built-in look.
+             Margins are on the editors' scale (20 = no extra margin). An addon that redefines this component (digital-workplace does)
+             must repeat the whole list. -->
+        <value>appMarginTop=${exo.branding.theme.appMarginTop:}</value>
+        <value>appMarginRight=${exo.branding.theme.appMarginRight:}</value>
+        <value>appMarginBottom=${exo.branding.theme.appMarginBottom:}</value>
+        <value>appMarginLeft=${exo.branding.theme.appMarginLeft:}</value>
+        <value>appBorderColor=${exo.branding.theme.appBorderColor:}</value>
+        <value>appBorderSize=${exo.branding.theme.appBorderSize:}</value>
+        <value>appBoxShadow=${exo.branding.theme.appBoxShadow:}</value>
+        <value>appBorderRadiusTopLeft=${exo.branding.theme.appBorderRadiusTopLeft:}</value>
+        <value>appBorderRadiusTopRight=${exo.branding.theme.appBorderRadiusTopRight:}</value>
+        <value>appBorderRadiusBottomLeft=${exo.branding.theme.appBorderRadiusBottomLeft:}</value>
+        <value>appBorderRadiusBottomRight=${exo.branding.theme.appBorderRadiusBottomRight:}</value>
+        <value>appBackgroundColor=${exo.branding.theme.appBackgroundColor:}</value>
+        <value>appBackgroundImage=${exo.branding.theme.appBackgroundImage:}</value>
+        <value>appBackgroundPosition=${exo.branding.theme.appBackgroundPosition:}</value>
+        <value>appBackgroundSize=${exo.branding.theme.appBackgroundSize:}</value>
+        <value>appBackgroundRepeat=${exo.branding.theme.appBackgroundRepeat:}</value>
+        <value>appBackgroundAttachment=${exo.branding.theme.appBackgroundAttachment:}</value>
+        <value>appTextTitleColor=${exo.branding.theme.appTextTitleColor:}</value>
+        <value>appTextTitleFontSize=${exo.branding.theme.appTextTitleFontSize:}</value>
+        <value>appTextTitleFontStyle=${exo.branding.theme.appTextTitleFontStyle:}</value>
+        <value>appTextTitleFontWeight=${exo.branding.theme.appTextTitleFontWeight:}</value>
+        <value>appTextHeaderColor=${exo.branding.theme.appTextHeaderColor:}</value>
+        <value>appTextHeaderFontSize=${exo.branding.theme.appTextHeaderFontSize:}</value>
+        <value>appTextHeaderFontStyle=${exo.branding.theme.appTextHeaderFontStyle:}</value>
+        <value>appTextHeaderFontWeight=${exo.branding.theme.appTextHeaderFontWeight:}</value>
+        <value>appTextColor=${exo.branding.theme.appTextColor:}</value>
+        <value>appTextFontSize=${exo.branding.theme.appTextFontSize:}</value>
+        <value>appTextFontStyle=${exo.branding.theme.appTextFontStyle:}</value>
+        <value>appTextFontWeight=${exo.branding.theme.appTextFontWeight:}</value>
+        <value>appTextSubtitleColor=${exo.branding.theme.appTextSubtitleColor:}</value>
+        <value>appTextSubtitleFontSize=${exo.branding.theme.appTextSubtitleFontSize:}</value>
+        <value>appTextSubtitleFontStyle=${exo.branding.theme.appTextSubtitleFontStyle:}</value>
+        <value>appTextSubtitleFontWeight=${exo.branding.theme.appTextSubtitleFontWeight:}</value>
+        <value>appTextTitleBackgroundColor=${exo.branding.theme.appTextTitleBackgroundColor:}</value>
+        <value>appTextTitleBackgroundImage=${exo.branding.theme.appTextTitleBackgroundImage:}</value>
+        <value>appTextTitleBackgroundPosition=${exo.branding.theme.appTextTitleBackgroundPosition:}</value>
+        <value>appTextTitleBackgroundSize=${exo.branding.theme.appTextTitleBackgroundSize:}</value>
+        <value>appTextTitleBackgroundRepeat=${exo.branding.theme.appTextTitleBackgroundRepeat:}</value>
+        <value>appTextTitleBackgroundPaddingTop=${exo.branding.theme.appTextTitleBackgroundPaddingTop:}</value>
+        <value>appTextTitleBackgroundPaddingRight=${exo.branding.theme.appTextTitleBackgroundPaddingRight:}</value>
+        <value>appTextTitleBackgroundPaddingBottom=${exo.branding.theme.appTextTitleBackgroundPaddingBottom:}</value>
+        <value>appTextTitleBackgroundPaddingLeft=${exo.branding.theme.appTextTitleBackgroundPaddingLeft:}</value>
+        <value>appTextTitleBackgroundRadius=${exo.branding.theme.appTextTitleBackgroundRadius:}</value>
+        <value>appTextHeaderBackgroundColor=${exo.branding.theme.appTextHeaderBackgroundColor:}</value>
+        <value>appTextHeaderBackgroundImage=${exo.branding.theme.appTextHeaderBackgroundImage:}</value>
+        <value>appTextHeaderBackgroundPosition=${exo.branding.theme.appTextHeaderBackgroundPosition:}</value>
+        <value>appTextHeaderBackgroundSize=${exo.branding.theme.appTextHeaderBackgroundSize:}</value>
+        <value>appTextHeaderBackgroundRepeat=${exo.branding.theme.appTextHeaderBackgroundRepeat:}</value>
+        <value>appTextHeaderBackgroundPaddingTop=${exo.branding.theme.appTextHeaderBackgroundPaddingTop:}</value>
+        <value>appTextHeaderBackgroundPaddingRight=${exo.branding.theme.appTextHeaderBackgroundPaddingRight:}</value>
+        <value>appTextHeaderBackgroundPaddingBottom=${exo.branding.theme.appTextHeaderBackgroundPaddingBottom:}</value>
+        <value>appTextHeaderBackgroundPaddingLeft=${exo.branding.theme.appTextHeaderBackgroundPaddingLeft:}</value>
+        <value>appTextHeaderBackgroundRadius=${exo.branding.theme.appTextHeaderBackgroundRadius:}</value>
+
+        <!-- eXIP 7.3.0.30 - Topbar "Fix Position when Scrolling" default of site-layout Topbars, and its On Scroll colour -->
+        <value>topBarSticky=${exo.branding.theme.topBarSticky:false}</value>
+        <value>topBarBackgroundScrollColor=${exo.branding.theme.topBarBackgroundScrollColor:}</value>
       </values-param>
     </init-params>
   </component>

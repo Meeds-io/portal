@@ -192,6 +192,57 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   }
 
   @GET
+  @Path("/appBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default application Background image", description = "Get the platform-wide default application background image (Branding and Theme > Pages & Apps style)", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getAppBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getAppBackground(), request, version);
+  }
+
+  @GET
+  @Path("/appTextTitleBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default application title text Background image", description = "Get the platform-wide default application title text background image (Branding and Theme > Pages & Apps style)", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getAppTextTitleBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getAppTextTitleBackground(), request, version);
+  }
+
+  @GET
+  @Path("/appTextHeaderBackground")
+  @Produces(IMAGE_MIME_TYPE)
+  @Operation(summary = "Get Default application header text Background image", description = "Get the platform-wide default application header text background image (Branding and Theme > Pages & Apps style)", method = "GET")
+  @ApiResponses(value = {
+          @ApiResponse(responseCode = "200", description = "Request fullfilled"),
+          @ApiResponse(responseCode = "404", description = "Object not found"),
+  })
+  public Response getAppTextHeaderBackground(
+          @Context
+          Request request,
+          @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
+          @QueryParam("v")
+          String version) {
+    return getBrandingFileResponse(brandingService.getAppTextHeaderBackground(), request, version);
+  }
+
+  @GET
   @Path("/favicon")
   @Produces(IMAGE_MIME_TYPE)
   @Operation(summary = "Get Branding favicon", description = "Get Branding favicon", method = "GET")

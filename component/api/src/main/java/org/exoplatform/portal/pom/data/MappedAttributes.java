@@ -174,6 +174,14 @@ public class MappedAttributes {
 
   public static final Key<String>  APP_BACKGROUND_ATTACHMENT  = Key.create("app-background-attachment", ValueType.STRING);
 
+  public static final Key<String>  APP_MARGIN_TOP             = Key.create("app-margin-top", ValueType.STRING);
+
+  public static final Key<String>  APP_MARGIN_BOTTOM          = Key.create("app-margin-bottom", ValueType.STRING);
+
+  public static final Key<String>  APP_MARGIN_LEFT            = Key.create("app-margin-left", ValueType.STRING);
+
+  public static final Key<String>  APP_MARGIN_RIGHT           = Key.create("app-margin-right", ValueType.STRING);
+
   public static final Key<String>  BORDER_SIZE                = Key.create("border-size", ValueType.STRING);
 
   public static final Key<String>  BOX_SHADOW                 = Key.create("box-shadow", ValueType.STRING);
