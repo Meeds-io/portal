@@ -27,6 +27,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_THEME
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -312,7 +313,32 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
-  public void shouldRefuseAThemeValueThatDoesNotCompileBeforeStoringIt() throws Exception {
+  public void shouldRefuseASaveWhoseEffectiveStylesheetDoesNotCompile() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    // a stored value that breaks the template (legacy data, the read path is not re-validated)
+    SettingService settingService = mock(SettingService.class);
+    stub(settingService, "borderRadius", "8px; }");
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    // the trial compiles the effective stylesheet (stored values + submitted ones): refused, nothing stored
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> brandingService.updateBrandingInformation(branding("primaryColor", "#476A9C")));
+    assertEquals("branding.theme.stylesheetCompilationError", e.getMessage());
+    verify(settingService, never()).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq("primaryColor"), any());
+    // a save that repairs the broken value compiles and is accepted
+    brandingService.updateBrandingInformation(branding("borderRadius", "8px"));
+    verify(settingService).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq("borderRadius"), any());
+    // the grammar refusal carries the key
+    e = assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("appMarginTop", "12px; }")));
+    assertEquals("branding.theme.invalidValue:appMarginTop", e.getMessage());
+  }
+
+  @Test
+  public void shouldRefuseFreeFormValuesOfEveryAreaThatWouldInjectCss() throws Exception {
     File lessFile = new File(BRANDING_LESS_PATH);
     assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
     SettingService settingService = mock(SettingService.class);
@@ -321,14 +347,48 @@ public class BrandingApplicationStylingTest {
     BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
     brandingService.start();
 
-    // passes the character grammar (not an app key) but not the compiler: refused with a message code, nothing stored
+    // Topbar, Sidebar and Drawer keys follow the same grammar as the application keys: a value that would compile
+    // under the Less escape but inject CSS is refused before anything is stored
+    for (String[] probe : new String[][] {
+        { "sideBarBackgroundImage", "none; } body { display: none } x {" },
+        { "topBarTextFontWeight", "bold; } * { visibility: hidden } a {" },
+        { "drawerBackgroundPosition", "left; } :root { --allPagesPrimaryColor: red } a {" },
+        { "topBarBackgroundImage", "linear-gradient(rgba(1;} body{display:none} a{), #fff)" },
+        { "primaryColor", "red; } body { display: none } a {" } }) {
+      IllegalArgumentException e = assertThrows(probe[0],
+                                                IllegalArgumentException.class,
+                                                () -> brandingService.updateBrandingInformation(branding(probe[0], probe[1])));
+      assertEquals("branding.theme.invalidValue:" + probe[0], e.getMessage());
+      verify(settingService, never()).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq(probe[0]), any());
+    }
+    // the grammar the UI and the server produce is accepted for those areas too
+    brandingService.updateBrandingInformation(branding("sideBarBackgroundImage", CONIC_GRADIENT));
+    brandingService.updateBrandingInformation(branding("topBarBackgroundImage", "url(/portal/rest/v1/platform/branding/topBarBackground?v=12), " + LINEAR_GRADIENT));
+    brandingService.updateBrandingInformation(branding("drawerBackgroundPosition", "left top"));
+    brandingService.updateBrandingInformation(branding("primaryColor", "#476A9C"));
+    // the historical check answers with a message code, never with the submitted value
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                                              () -> brandingService.updateBrandingInformation(branding("borderRadius", "8px; }")));
-    assertEquals("branding.theme.stylesheetCompilationError", e.getMessage());
-    verify(settingService, never()).set(eq(BRANDING_CONTEXT), eq(BRANDING_SCOPE), eq("borderRadius"), any());
-    // the grammar refusal carries the key
-    e = assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("appMarginTop", "12px; }")));
-    assertEquals("branding.theme.invalidValue:appMarginTop", e.getMessage());
+                                              () -> brandingService.updateBrandingInformation(branding("primaryColor", "javascript:alert(1)")));
+    assertEquals("branding.css.forbiddenValue", e.getMessage());
+  }
+
+  @Test
+  public void shouldServePristineTemplateWhenTheFirstCompileFails() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    // a stored value that breaks the template before anything compiled (the read path is not re-validated)
+    SettingService settingService = mock(SettingService.class);
+    stub(settingService, "borderRadius", "8px; }");
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+    assertNotNull("the pristine template is served, not nothing", css);
+    assertTrue(css, css.contains("--allPagesBorderRadius: 8px;"));
+    // remembered: the failing compile does not run again on the next request
+    assertSame(css, brandingService.getThemeCSSContent());
   }
 
   @Test
