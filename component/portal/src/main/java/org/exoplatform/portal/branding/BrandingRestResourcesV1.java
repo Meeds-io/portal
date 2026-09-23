@@ -42,6 +42,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Path("/v1/platform/branding")
 @Tag(name = "/v1/platform/branding", description = "Managing branding information")
 public class BrandingRestResourcesV1 implements ResourceContainer {
+
+  private static final Log LOG = ExoLogger.getLogger(BrandingRestResourcesV1.class);
 
   private static final String IMAGE_MIME_TYPE        = "image/png";
 
@@ -99,10 +103,17 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   @Operation(summary = "Update Branding information", description = "Update Branding information", method = "PUT")
   @ApiResponses(value = {
                           @ApiResponse(responseCode = "204", description = "Branding information updated"),
+                          @ApiResponse(responseCode = "400", description = "Invalid value, the body is the message code"),
   })
   public Response updateBrandingInformation(Branding branding) {
-    brandingService.updateBrandingInformation(branding);
-    return Response.noContent().build();
+    try {
+      brandingService.updateBrandingInformation(branding);
+      return Response.noContent().build();
+    } catch (IllegalArgumentException e) {
+      // expected refusal of an invalid theme or CSS value: the message code lets the Branding UI explain it
+      LOG.debug("Branding update refused: {}", e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).type(MediaType.TEXT_PLAIN).build();
+    }
   }
 
   @GET

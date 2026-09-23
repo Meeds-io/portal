@@ -166,12 +166,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   BRANDING_APP_HEADER_BG_ID_KEY      = "app.textHeader.background";
 
   /**
-   * Version of the branding Less template shipped with this build: when it
-   * differs from the stored one, the stylesheet version (last-updated time) is
-   * bumped once so that browsers holding the cached stylesheet fetch the one
-   * the current skin reads (eXIP 7.3.0.30)
-   */
-  /**
    * Time of the shipped stylesheet template (2026-09-15, eXIP 7.3.0.30). The
    * last-updated time exposed in the stylesheet URL (v= parameter, ETag) is
    * never older than this value, so browsers holding the previous stylesheet
@@ -316,6 +310,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private String               lessThemeContent                   = null;
 
   private String               themeCSSContent                    = null;
+
+  /** Last stylesheet that compiled: served while a newer value does not compile (fail-safe) */
+  private String               lastCompiledThemeCSS               = null;
+
+  private boolean              legacyOverrideFormReported         = false;
 
   private Logo                 logo                               = null;
 
@@ -1207,6 +1206,16 @@ public class BrandingServiceImpl implements BrandingService, Startable {
           }
           String variableName = themeVariable.substring(0, separator).trim();
           String variableValue = themeVariable.substring(separator + 1).trim();
+          if (variableValue.startsWith(variableName + ":")) {
+            // Override written for the pre-7.3.0.30 declaration (exo.branding.theme.X=X:value): the value is what follows
+            variableValue = variableValue.substring(variableName.length() + 1).trim();
+            if (!legacyOverrideFormReported) {
+              legacyOverrideFormReported = true;
+              LOG.info("Theme variable '{}' is overridden with the legacy '<name>:<value>' form; the plain value is now expected (exo.branding.theme.{}=<value>)",
+                       variableName,
+                       variableName);
+            }
+          }
           if (!isValidApplicationThemeStyleValue(variableName, variableValue)) {
             // Configuration follows the same grammar as the UI: a malformed value is not emitted in the platform stylesheet
             LOG.warn("Invalid configured value '{}' for theme variable '{}', ignored (the built-in default applies)",
@@ -1495,16 +1504,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private String computeThemeCSS() {// NOSONAR
-    if (StringUtils.isNotBlank(lessFilePath)) {
-      try {
-        InputStream inputStream = configurationManager.getInputStream(lessFilePath);
-        lessThemeContent = IOUtil.getStreamContentAsString(inputStream);
-      } catch (Exception e) {
-        LOG.warn("Error retrieving less file content", e);
-      }
-    }
-
-    if (themeVariables != null && !themeVariables.isEmpty()) {
+    if (themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent())) {
       // Effective values: stored, else configured default, blank = not set (the template default stays);
       // the Topbar gradient is neutralized like on the read path
       Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
@@ -1516,34 +1516,85 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
         effectiveValues.put("pageNoMarginBottom", "0px");
       }
-      for (Map.Entry<String, String> entry : effectiveValues.entrySet()) {
-        String themeVariable = entry.getKey();
-        String value = entry.getValue();
-        if (StringUtils.isNotBlank(value) && StringUtils.isNotBlank(lessThemeContent)) {
-          // The whole template value is replaced, whatever its grammar (keywords with '-', variable references...)
-          lessThemeContent = lessThemeContent.replaceAll("@" + Pattern.quote(themeVariable) + ":[^;\\r\\n]*;?\\r?\\n",
-                                                         "@" + themeVariable + ": " + Matcher.quoteReplacement(value) + ";\n");
-        }
-      }
-
-      if (StringUtils.isNotBlank(lessThemeContent)) {
-        LessCompiler compiler = new ThreadUnsafeLessCompiler();
-        try {
-          Configuration configuration = new Configuration();
-          configuration.getSourceMapConfiguration().setLinkSourceMap(false);
-          LessCompiler.CompilationResult result = compiler.compile(lessThemeContent, configuration);
-          this.themeCSSContent = result.getCss();
-        } catch (Less4jException e) {
-          LOG.warn("Error compiling less file content", e);
-        }
+      try {
+        this.themeCSSContent = compileThemeCSS(effectiveValues);
+        this.lastCompiledThemeCSS = this.themeCSSContent;
+      } catch (Less4jException e) {
+        // Fail-safe: the stylesheet every user loads is never removed by one value the compiler refuses
+        LOG.warn("Error compiling less file content, the last compiled stylesheet is served", e);
+        this.themeCSSContent = this.lastCompiledThemeCSS;
       }
     }
     if (StringUtils.isNotBlank(getCustomCssContent())
         && getFeatureService() != null
         && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      this.themeCSSContent += "\n" + this.customCss;
+      this.themeCSSContent = (this.themeCSSContent == null ? "" : this.themeCSSContent) + "\n" + this.customCss;
     }
     return this.themeCSSContent;
+  }
+
+  /**
+   * Substitutes the given values into the shipped Less template and compiles
+   * it with the real compiler. Free-form values (keywords, shadows, gradients,
+   * background images) are written as Less escapes (~"value") so that a value
+   * the grammar accepts but Less would parse (a lone '-', a function name)
+   * travels verbatim to the CSS instead of breaking the compilation; colours
+   * and sizes stay plain since the template derives other variables from them.
+   *
+   * @param values effective theme values by variable name
+   * @return the compiled CSS
+   * @throws Less4jException when the template does not compile with these values
+   */
+  private String compileThemeCSS(Map<String, String> values) throws Less4jException {
+    String content = getLessThemeContent();
+    for (Map.Entry<String, String> entry : values.entrySet()) {
+      String themeVariable = entry.getKey();
+      String value = entry.getValue();
+      if (StringUtils.isNotBlank(value)) {
+        String lessValue = isFreeFormThemeValue(themeVariable) ? toLessEscape(value) : value;
+        // The whole template value is replaced, whatever its grammar (keywords with '-', variable references...)
+        content = content.replaceAll("@" + Pattern.quote(themeVariable) + ":[^;\\r\\n]*;?\\r?\\n",
+                                     "@" + themeVariable + ": " + Matcher.quoteReplacement(lessValue) + ";\n");
+      }
+    }
+    LessCompiler compiler = new ThreadUnsafeLessCompiler();
+    Configuration configuration = new Configuration();
+    configuration.getSourceMapConfiguration().setLinkSourceMap(false);
+    return compiler.compile(content, configuration).getCss();
+  }
+
+  /**
+   * @param key theme variable name
+   * @return true for values emitted verbatim in the CSS (never used in Less
+   *         arithmetic or colour functions): background images and gradients
+   *         of every area, the application shadow, and the CSS keywords
+   */
+  static boolean isFreeFormThemeValue(String key) {
+    return key.endsWith("BackgroundImage")
+           || "appBoxShadow".equals(key)
+           || key.endsWith("FontWeight")
+           || key.endsWith("FontStyle")
+           || key.endsWith("BackgroundPosition")
+           || key.endsWith("BackgroundSize")
+           || key.endsWith("BackgroundRepeat")
+           || key.endsWith("BackgroundAttachment");
+  }
+
+  static String toLessEscape(String value) {
+    // no grammar allows a quote; one is stripped anyway so that the escape cannot be closed from inside the value
+    return "~\"" + value.replaceAll("[\"\\\\\\r\\n]", "") + "\"";
+  }
+
+  private String getLessThemeContent() {
+    if (lessThemeContent == null && StringUtils.isNotBlank(lessFilePath)) {
+      try {
+        InputStream inputStream = configurationManager.getInputStream(lessFilePath);
+        lessThemeContent = IOUtil.getStreamContentAsString(inputStream);
+      } catch (Exception e) {
+        LOG.warn("Error retrieving less file content", e);
+      }
+    }
+    return lessThemeContent;
   }
 
   private String getCustomCssContent() {
@@ -1656,6 +1707,31 @@ public class BrandingServiceImpl implements BrandingService, Startable {
           .forEach(this::validateCSSStyleValue);
     branding.getThemeStyle().values().forEach(this::validateCSSStyleValue);
     branding.getThemeStyle().forEach(this::validateApplicationThemeStyleValue);
+    validateThemeStyleCompiles(branding.getThemeStyle());
+  }
+
+  /**
+   * The grammar bounds the characters of a value, not its Less validity: the
+   * whole stylesheet is trial-compiled with the submitted values before
+   * anything is stored, so that a value the compiler refuses is answered 400
+   * and never removes the platform stylesheet (eXIP 7.3.0.30, §2 Security)
+   */
+  private void validateThemeStyleCompiles(Map<String, String> submittedThemeStyle) {
+    if (submittedThemeStyle == null || submittedThemeStyle.isEmpty() || StringUtils.isBlank(getLessThemeContent())) {
+      return;
+    }
+    Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
+    submittedThemeStyle.forEach((key, value) -> {
+      if (value != null) {
+        effectiveValues.put(key, value);
+      }
+    });
+    try {
+      compileThemeCSS(effectiveValues);
+    } catch (Less4jException e) {
+      LOG.debug("Submitted theme style does not compile, refused", e);
+      throw new IllegalArgumentException("branding.theme.stylesheetCompilationError");
+    }
   }
 
   /**
@@ -1665,7 +1741,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    */
   private void validateApplicationThemeStyleValue(String key, String value) {
     if (!isValidApplicationThemeStyleValue(key, value)) {
-      throw new IllegalArgumentException(String.format("Invalid css value input %s for theme variable %s", value, key));
+      LOG.debug("Invalid css value input '{}' for theme variable '{}', refused", value, key);
+      throw new IllegalArgumentException("branding.theme.invalidValue:" + key);
     }
   }
 
