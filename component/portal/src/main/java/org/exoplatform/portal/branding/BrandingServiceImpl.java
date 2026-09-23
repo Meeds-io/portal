@@ -34,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -95,6 +97,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_DRAWER_BG_BASE_PATH       = "/portal/rest/v1/platform/branding/drawerBackground?v=";
 
+  public static final String   BRANDING_APP_BG_BASE_PATH          = "/portal/rest/v1/platform/branding/appBackground?v=";
+
+  public static final String   BRANDING_APP_TITLE_BG_BASE_PATH    = "/portal/rest/v1/platform/branding/appTextTitleBackground?v=";
+
+  public static final String   BRANDING_APP_HEADER_BG_BASE_PATH   = "/portal/rest/v1/platform/branding/appTextHeaderBackground?v=";
+
   public static final String   BRANDING_COMPANY_NAME_INIT_PARAM   = "exo.branding.company.name";
 
   // Will be used in Mail notification Footer by example
@@ -110,6 +118,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   BRANDING_LOGIN_BG_INIT_PARAM       = "authentication.background";
 
   public static final String   BRANDING_LOGO_INIT_PARAM           = "exo.branding.company.logo";
+
+  public static final String   BRANDING_PAGE_WIDTH_INIT_PARAM     = "exo.branding.page.width";
+
+  public static final String   BRANDING_PAGE_BG_COLOR_INIT_PARAM  = "exo.branding.page.backgroundColor";
+
+  public static final String   BRANDING_PAGE_BG_EFFECT_INIT_PARAM = "exo.branding.page.backgroundEffect";
 
   public static final String   BRANDING_FAVICON_INIT_PARAM        = "exo.branding.company.favicon";
 
@@ -145,6 +159,26 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_DRAWER_BG_ID_SETTING_KEY  = "drawer.background";
 
+  public static final String   BRANDING_APP_BG_ID_SETTING_KEY     = "app.background";
+
+  public static final String   BRANDING_APP_TITLE_BG_ID_KEY       = "app.textTitle.background";
+
+  public static final String   BRANDING_APP_HEADER_BG_ID_KEY      = "app.textHeader.background";
+
+  /**
+   * Version of the branding Less template shipped with this build: when it
+   * differs from the stored one, the stylesheet version (last-updated time) is
+   * bumped once so that browsers holding the cached stylesheet fetch the one
+   * the current skin reads (eXIP 7.3.0.30)
+   */
+  /**
+   * Time of the shipped stylesheet template (2026-09-15, eXIP 7.3.0.30). The
+   * last-updated time exposed in the stylesheet URL (v= parameter, ETag) is
+   * never older than this value, so browsers holding the previous stylesheet
+   * fetch the new one after an upgrade without any write at startup.
+   */
+  public static final long     THEME_TEMPLATE_VERSION_TIME        = 1789430400000L;
+
   public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
 
   public static final String   BRANDING_CUSTOM_CSS                = "page.customCss";
@@ -152,6 +186,38 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   SIDEBAR_BG_IMAGE_THEME_STYLE_KEY   = "sideBarBackgroundImage";
 
   public static final String   DRAWER_BG_IMAGE_THEME_STYLE_KEY    = "drawerBackgroundImage";
+
+  public static final String   APP_BG_IMAGE_THEME_STYLE_KEY       = "appBackgroundImage";
+
+  public static final String   APP_TITLE_BG_IMAGE_THEME_KEY       = "appTextTitleBackgroundImage";
+
+  public static final String   APP_HEADER_BG_IMAGE_THEME_KEY      = "appTextHeaderBackgroundImage";
+
+  public static final String   TOP_BAR_STICKY_THEME_STYLE_KEY     = "topBarSticky";
+
+  public static final String   TOP_BAR_BG_COLOR_THEME_STYLE_KEY   = "topBarBackgroundColor";
+
+  private static final String  THEME_APP_PREFIX                   = "app";
+
+  private static final String  THEME_PAGE_PREFIX                  = "page";
+
+  private static final Pattern GRADIENT_PATTERN                   = Pattern.compile("(linear|radial|conic)-gradient\\(");
+
+  private static final Pattern URL_PATTERN                        = Pattern.compile("url\\([^)]*\\)");
+
+  private static final Pattern FIRST_COLOR_PATTERN                = Pattern.compile("#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\)");
+
+  private static final Pattern THEME_COLOR_PATTERN                = Pattern.compile("^(#[0-9a-fA-F]{3,8}|transparent|initial)$");
+
+  private static final Pattern THEME_SIZE_PATTERN                 = Pattern.compile("^(-?\\d{1,4}(px)?|initial)$");
+
+  private static final Pattern THEME_RADIUS_PATTERN               = Pattern.compile("^(initial|(-?\\d{1,4}(px)?)( -?\\d{1,4}(px)?){0,3})$");
+
+  private static final Pattern THEME_KEYWORD_PATTERN              = Pattern.compile("^[a-zA-Z -]{1,30}$");
+
+  private static final Pattern THEME_BOX_SHADOW_PATTERN           = Pattern.compile("^(initial|none|[0-9a-z\\s(),.-]{1,200})$");
+
+  private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|(linear|radial|conic)-gradient\\([#0-9a-zA-Z(),.%\\s-]{1,300}\\))$");
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -184,6 +250,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   SIDEBAR_BACKGROUND_NAME            = "sideBarBackground.png";
 
   public static final String   DRAWER_BACKGROUND_NAME             = "drawerBackground.png";
+
+  public static final String   APP_BACKGROUND_NAME                = "appBackground.png";
+
+  public static final String   APP_TITLE_BACKGROUND_NAME          = "appTextTitleBackground.png";
+
+  public static final String   APP_HEADER_BACKGROUND_NAME         = "appTextHeaderBackground.png";
 
   public static final String   PAGE_BACKGROUND_NAME               = "pageBackground.png";
 
@@ -261,6 +333,18 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Background           drawerBackground                   = null;
 
+  private Background           appBackground                      = null;
+
+  private Background           appTextTitleBackground             = null;
+
+  private Background           appTextHeaderBackground            = null;
+
+  private String               defaultPageWidth                   = null;
+
+  private String               defaultPageBackgroundColor         = null;
+
+  private String               defaultPageBackgroundEffect        = null;
+
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
                              SettingService settingService,
@@ -331,6 +415,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setTopBarBackground(getTopBarBackground());
     branding.setSideBarBackground(getSideBarBackground());
     branding.setDrawerBackground(getDrawerBackground());
+    branding.setAppBackground(getAppBackground());
+    branding.setAppTextTitleBackground(getAppTextTitleBackground());
+    branding.setAppTextHeaderBackground(getAppTextHeaderBackground());
     branding.setLoginBackgroundTextColor(getLoginBackgroundTextColor());
     branding.setLoginBackgroundAltText(getLoginBackgroundAltText());
     branding.setPageBackground(getPageBackground());
@@ -382,6 +469,21 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         brandingFile.setData(null);
         branding.setDrawerBackground(brandingFile);
       }
+      if (branding.getAppBackground() != null && branding.getAppBackground().getData() != null) {
+        Background brandingFile = branding.getAppBackground().clone();
+        brandingFile.setData(null);
+        branding.setAppBackground(brandingFile);
+      }
+      if (branding.getAppTextTitleBackground() != null && branding.getAppTextTitleBackground().getData() != null) {
+        Background brandingFile = branding.getAppTextTitleBackground().clone();
+        brandingFile.setData(null);
+        branding.setAppTextTitleBackground(brandingFile);
+      }
+      if (branding.getAppTextHeaderBackground() != null && branding.getAppTextHeaderBackground().getData() != null) {
+        Background brandingFile = branding.getAppTextHeaderBackground().clone();
+        brandingFile.setData(null);
+        branding.setAppTextHeaderBackground(brandingFile);
+      }
     }
     return branding;
   }
@@ -389,11 +491,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public long getLastUpdatedTime() {
     String lastUpdatedTime = getPropertyValue(BRANDING_LAST_UPDATED_TIME_KEY);
-    if (lastUpdatedTime == null) {
-      return DEFAULT_LAST_MODIFED;
-    } else {
-      return Long.parseLong(lastUpdatedTime);
-    }
+    long storedTime = lastUpdatedTime == null ? DEFAULT_LAST_MODIFED : Long.parseLong(lastUpdatedTime);
+    // never older than the shipped template: an upgrade changes the stylesheet URL without a startup write
+    return Math.max(storedTime, THEME_TEMPLATE_VERSION_TIME);
   }
 
   @Override
@@ -409,6 +509,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       updateTopBarBackground(branding.getTopBarBackground(), false);
       updateSideBarBackground(branding.getSideBarBackground(), false);
       updateDrawerBackground(branding.getDrawerBackground(), false);
+      updateAppBackground(branding.getAppBackground(), false);
+      updateAppTextTitleBackground(branding.getAppTextTitleBackground(), false);
+      updateAppTextHeaderBackground(branding.getAppTextHeaderBackground(), false);
       updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
       updateLoginBackgroundAltText(branding.getLoginBackgroundAltText(), false);
       updatePageBackground(branding.getPageBackground(), false);
@@ -454,7 +557,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundColor() {
-    return getPropertyValue(BRANDING_PAGE_BG_COLOR_KEY);
+    return getPropertyValue(BRANDING_PAGE_BG_COLOR_KEY, defaultPageBackgroundColor);
   }
 
   @Override
@@ -464,7 +567,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundEffect() {
-    return getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY);
+    return getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY, defaultPageBackgroundEffect);
   }
 
   @Override
@@ -491,7 +594,18 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageWidth() {
-    return getPropertyValue(BRANDING_PAGE_WIDTH_KEY);
+    return getPropertyValue(BRANDING_PAGE_WIDTH_KEY, defaultPageWidth);
+  }
+
+  @Override
+  public boolean isTopBarSticky() {
+    if (themeVariables == null || !themeVariables.containsKey(TOP_BAR_STICKY_THEME_STYLE_KEY)) {
+      return false;
+    }
+    SettingValue<?> storedValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, TOP_BAR_STICKY_THEME_STYLE_KEY);
+    String value = storedValue == null || storedValue.getValue() == null ? themeVariables.get(TOP_BAR_STICKY_THEME_STYLE_KEY) :
+                                                                          storedValue.getValue().toString();
+    return Boolean.parseBoolean(value);
   }
 
   @Override
@@ -582,6 +696,21 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Long getDrawerBackgroundId() {
     return getPropertyValueLong(BRANDING_DRAWER_BG_ID_SETTING_KEY);
+  }
+
+  @Override
+  public Long getAppBackgroundId() {
+    return getPropertyValueLong(BRANDING_APP_BG_ID_SETTING_KEY);
+  }
+
+  @Override
+  public Long getAppTextTitleBackgroundId() {
+    return getPropertyValueLong(BRANDING_APP_TITLE_BG_ID_KEY);
+  }
+
+  @Override
+  public Long getAppTextHeaderBackgroundId() {
+    return getPropertyValueLong(BRANDING_APP_HEADER_BG_ID_KEY);
   }
 
   @Override
@@ -712,6 +841,69 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public Background getAppBackground() {
+    if (this.appBackground == null) {
+      try {
+        Long imageId = getAppBackgroundId();
+        if (imageId != null) {
+          this.appBackground = retrieveStoredBrandingFile(imageId, new Background());
+        } else {
+          this.appBackground = new Background();
+        }
+      } catch (Exception e) {
+        LOG.warn("Error retrieving application default background", e);
+      }
+    }
+    return this.appBackground;
+  }
+
+  @Override
+  public String getAppBackgroundPath() {
+    Background background = getAppBackground();
+    return background == null
+           || background.getData() == null ? null : BRANDING_APP_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  @Override
+  public Background getAppTextTitleBackground() {
+    if (this.appTextTitleBackground == null) {
+      this.appTextTitleBackground = retrieveBackground(getAppTextTitleBackgroundId(), "application title background");
+    }
+    return this.appTextTitleBackground;
+  }
+
+  @Override
+  public String getAppTextTitleBackgroundPath() {
+    Background background = getAppTextTitleBackground();
+    return background == null
+           || background.getData() == null ? null : BRANDING_APP_TITLE_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  @Override
+  public Background getAppTextHeaderBackground() {
+    if (this.appTextHeaderBackground == null) {
+      this.appTextHeaderBackground = retrieveBackground(getAppTextHeaderBackgroundId(), "application header background");
+    }
+    return this.appTextHeaderBackground;
+  }
+
+  @Override
+  public String getAppTextHeaderBackgroundPath() {
+    Background background = getAppTextHeaderBackground();
+    return background == null
+           || background.getData() == null ? null : BRANDING_APP_HEADER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  private Background retrieveBackground(Long imageId, String label) {
+    try {
+      return imageId != null ? retrieveStoredBrandingFile(imageId, new Background()) : new Background();
+    } catch (Exception e) {
+      LOG.warn("Error retrieving {}", label, e);
+      return null;
+    }
+  }
+
+  @Override
   public String getLogoPath() {
     Logo brandingLogo = getLogo();
     return brandingLogo == null
@@ -809,15 +1001,62 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         themeStyleVariables.put(themeVariable, styleValue);
       }
     }
+    neutralizeTopBarGradient(themeStyleVariables);
     return themeStyleVariables;
+  }
+
+  /**
+   * eXIP 7.3.0.30: the gradient option is removed from the Topbar. A gradient
+   * still stored in the Topbar background is ignored at read time (never
+   * rewritten): the image URL part is kept and the gradient's first colour
+   * becomes the Topbar colour (PO decision 5). Only when no colour can be read
+   * from the gradient does the stored colour stay, and when that one is
+   * transparent or absent it is dropped so that the platform default applies.
+   * The picker always stores a plain colour (white by default) next to a
+   * gradient, which is why the stored colour cannot take precedence.
+   */
+  static void neutralizeTopBarGradient(Map<String, String> themeStyle) {
+    String backgroundImage = themeStyle.get(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
+    if (StringUtils.isBlank(backgroundImage) || !GRADIENT_PATTERN.matcher(backgroundImage).find()) {
+      return;
+    }
+    Matcher urlMatcher = URL_PATTERN.matcher(backgroundImage);
+    String urlPart = urlMatcher.find() ? urlMatcher.group() : null;
+    String gradientPart = urlPart == null ? backgroundImage : backgroundImage.replace(urlPart, "");
+    themeStyle.put(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, urlPart == null ? "none" : urlPart);
+    Matcher colorMatcher = FIRST_COLOR_PATTERN.matcher(gradientPart);
+    if (colorMatcher.find()) {
+      themeStyle.put(TOP_BAR_BG_COLOR_THEME_STYLE_KEY, colorMatcher.group());
+    } else {
+      String color = themeStyle.get(TOP_BAR_BG_COLOR_THEME_STYLE_KEY);
+      if (StringUtils.isBlank(color) || isTransparent(color)) {
+        themeStyle.remove(TOP_BAR_BG_COLOR_THEME_STYLE_KEY);
+      }
+    }
+  }
+
+  private static boolean isTransparent(String color) {
+    return "transparent".equalsIgnoreCase(color)
+           || (color.length() == 9 && color.startsWith("#") && color.toUpperCase().endsWith("00"));
   }
 
   @Override
   public Map<String, String> getDefaultThemeStyle() {
-    if (themeVariables == null || themeVariables.isEmpty()) {
-      return Collections.emptyMap();
+    Map<String, String> defaultStyle = new HashMap<>();
+    if (themeVariables != null) {
+      defaultStyle.putAll(themeVariables);
     }
-    return themeVariables;
+    // Page design defaults, configurable without the UI (exo.branding.page.*)
+    if (StringUtils.isNotBlank(defaultPageWidth)) {
+      defaultStyle.put("pageWidth", defaultPageWidth);
+    }
+    if (StringUtils.isNotBlank(defaultPageBackgroundColor)) {
+      defaultStyle.put("pageBackgroundColor", defaultPageBackgroundColor);
+    }
+    if (StringUtils.isNotBlank(defaultPageBackgroundEffect)) {
+      defaultStyle.put("pageBackgroundEffect", defaultPageBackgroundEffect);
+    }
+    return defaultStyle;
   }
 
   @Override
@@ -929,6 +1168,21 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         this.defaultLoginSubtitle = loginSubtitleParam.getValue();
       }
 
+      ValueParam pageWidthParam = initParams.getValueParam(BRANDING_PAGE_WIDTH_INIT_PARAM);
+      if (pageWidthParam != null && StringUtils.isNotBlank(pageWidthParam.getValue())) {
+        this.defaultPageWidth = pageWidthParam.getValue().trim();
+      }
+
+      ValueParam pageBackgroundColorParam = initParams.getValueParam(BRANDING_PAGE_BG_COLOR_INIT_PARAM);
+      if (pageBackgroundColorParam != null && StringUtils.isNotBlank(pageBackgroundColorParam.getValue())) {
+        this.defaultPageBackgroundColor = pageBackgroundColorParam.getValue().trim();
+      }
+
+      ValueParam pageBackgroundEffectParam = initParams.getValueParam(BRANDING_PAGE_BG_EFFECT_INIT_PARAM);
+      if (pageBackgroundEffectParam != null && StringUtils.isNotBlank(pageBackgroundEffectParam.getValue())) {
+        this.defaultPageBackgroundEffect = pageBackgroundEffectParam.getValue().trim();
+      }
+
       ValueParam lessFileParam = initParams.getValueParam(BRANDING_THEME_LESS_PATH);
       if (lessFileParam != null) {
         this.lessFilePath = lessFileParam.getValue();
@@ -939,11 +1193,28 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         List<String> variables = lessVariablesParam.getValues();
         this.themeVariables = new HashMap<>();
         for (String themeVariable : variables) {
-          if (StringUtils.isBlank(themeVariable) || !themeVariable.contains(":")) {
+          if (StringUtils.isBlank(themeVariable)) {
             continue;
           }
-          String[] themeVariablesPart = themeVariable.split(":");
-          this.themeVariables.put(themeVariablesPart[0], themeVariablesPart[1]);
+          // Declaration format: <name>=<value> (the value is the resolved ${exo.branding.theme.<name>:<default>},
+          // possibly empty = not set). The legacy <name>:<value> form is still accepted.
+          int separator = themeVariable.indexOf('=');
+          if (separator < 0) {
+            separator = themeVariable.indexOf(':');
+          }
+          if (separator <= 0) {
+            continue;
+          }
+          String variableName = themeVariable.substring(0, separator).trim();
+          String variableValue = themeVariable.substring(separator + 1).trim();
+          if (!isValidApplicationThemeStyleValue(variableName, variableValue)) {
+            // Configuration follows the same grammar as the UI: a malformed value is not emitted in the platform stylesheet
+            LOG.warn("Invalid configured value '{}' for theme variable '{}', ignored (the built-in default applies)",
+                     variableValue,
+                     variableName);
+            variableValue = "";
+          }
+          this.themeVariables.put(variableName, variableValue);
         }
       }
     }
@@ -1126,6 +1397,24 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
   }
 
+  private void updateAppTextTitleBackground(Background background, boolean updateLastUpdatedTime) {
+    updateBrandingFile(background, APP_TITLE_BACKGROUND_NAME, this.getAppTextTitleBackgroundId(), BRANDING_APP_TITLE_BG_ID_KEY);
+    this.appTextTitleBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
+  private void updateAppTextHeaderBackground(Background background, boolean updateLastUpdatedTime) {
+    updateBrandingFile(background, APP_HEADER_BACKGROUND_NAME, this.getAppTextHeaderBackgroundId(), BRANDING_APP_HEADER_BG_ID_KEY);
+    this.appTextHeaderBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
+  private void updateAppBackground(Background appBackground, boolean updateLastUpdatedTime) {
+    updateBrandingFile(appBackground, APP_BACKGROUND_NAME, this.getAppBackgroundId(), BRANDING_APP_BG_ID_SETTING_KEY);
+    this.appBackground = null;
+    triggerBrandingUpdated(updateLastUpdatedTime, updateLastUpdatedTime);
+  }
+
   private void updateDrawerBackground(Background drawerBackground, boolean updateLastUpdatedTime) {
     updateBrandingFile(drawerBackground, DRAWER_BACKGROUND_NAME, this.getDrawerBackgroundId(), BRANDING_DRAWER_BG_ID_SETTING_KEY);
     this.drawerBackground = null;
@@ -1216,15 +1505,24 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
 
     if (themeVariables != null && !themeVariables.isEmpty()) {
-      Set<String> variables = themeVariables.keySet();
-      for (String themeVariable : variables) {
-        SettingValue<?> storedColorValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
-        String colorValue = storedColorValue == null
-                            || storedColorValue.getValue() == null ? themeVariables.get(themeVariable) :
-                                                                   storedColorValue.getValue().toString();
-        if (StringUtils.isNotBlank(colorValue) && StringUtils.isNotBlank(lessThemeContent)) {
-          lessThemeContent = lessThemeContent.replaceAll("@" + themeVariable + ":[ #a-zA-Z0-9]*;?\r?\n",
-                                                         "@" + themeVariable + ": " + colorValue + ";\n");
+      // Effective values: stored, else configured default, blank = not set (the template default stays);
+      // the Topbar gradient is neutralized like on the read path
+      Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
+      // A platform page margin also neutralises the first and last section's own 10px padding, as the site and
+      // page levels do (--allPagesNoMarginTop/Bottom: 0px next to --allPagesMarginTop/Bottom); both stay 'initial' otherwise
+      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
+        effectiveValues.put("pageNoMarginTop", "0px");
+      }
+      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
+        effectiveValues.put("pageNoMarginBottom", "0px");
+      }
+      for (Map.Entry<String, String> entry : effectiveValues.entrySet()) {
+        String themeVariable = entry.getKey();
+        String value = entry.getValue();
+        if (StringUtils.isNotBlank(value) && StringUtils.isNotBlank(lessThemeContent)) {
+          // The whole template value is replaced, whatever its grammar (keywords with '-', variable references...)
+          lessThemeContent = lessThemeContent.replaceAll("@" + Pattern.quote(themeVariable) + ":[^;\\r\\n]*;?\\r?\\n",
+                                                         "@" + themeVariable + ": " + Matcher.quoteReplacement(value) + ";\n");
         }
       }
 
@@ -1357,6 +1655,47 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                   branding.getPageBackgroundColor())
           .forEach(this::validateCSSStyleValue);
     branding.getThemeStyle().values().forEach(this::validateCSSStyleValue);
+    branding.getThemeStyle().forEach(this::validateApplicationThemeStyleValue);
+  }
+
+  /**
+   * Strict grammar for the theme variables introduced with the platform-wide
+   * application styling (app* keys, topBarSticky, topBarBackgroundScrollColor):
+   * they are written verbatim in the platform stylesheet served to every user
+   */
+  private void validateApplicationThemeStyleValue(String key, String value) {
+    if (!isValidApplicationThemeStyleValue(key, value)) {
+      throw new IllegalArgumentException(String.format("Invalid css value input %s for theme variable %s", value, key));
+    }
+  }
+
+  private boolean isValidApplicationThemeStyleValue(String key, String value) {
+    if (StringUtils.isBlank(value)
+        || (!key.startsWith(THEME_APP_PREFIX) && !key.startsWith(THEME_PAGE_PREFIX)
+            && !TOP_BAR_STICKY_THEME_STYLE_KEY.equals(key)
+            && !"topBarBackgroundScrollColor".equals(key))) {
+      return true;
+    }
+    boolean valid;
+    if (TOP_BAR_STICKY_THEME_STYLE_KEY.equals(key)) {
+      valid = "true".equals(value) || "false".equals(value);
+    } else if (key.endsWith("Color")) {
+      valid = THEME_COLOR_PATTERN.matcher(value).matches();
+    } else if (key.startsWith("appMargin") || key.startsWith("pageMargin") || key.startsWith("appBorderRadius")
+               || "appBorderSize".equals(key) || key.endsWith("FontSize") || key.contains("BackgroundPadding")) {
+      valid = THEME_SIZE_PATTERN.matcher(value).matches();
+    } else if (key.endsWith("BackgroundRadius")) {
+      // border-radius shorthand of the shared styling input: one to four corner sizes
+      valid = THEME_RADIUS_PATTERN.matcher(value).matches();
+    } else if (key.endsWith("BackgroundImage")) {
+      valid = THEME_BG_EFFECT_PATTERN.matcher(value).matches();
+    } else if ("appBoxShadow".equals(key)) {
+      valid = THEME_BOX_SHADOW_PATTERN.matcher(value).matches();
+    } else {
+      // font style/weight, background position/size/repeat/attachment: CSS keywords
+      valid = THEME_KEYWORD_PATTERN.matcher(value).matches();
+    }
+    return valid;
   }
 
   private void validateCSSStyleValue(String value) {
@@ -1380,6 +1719,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     processBackgroundImage(themeStyles, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY, getTopBarBackgroundPath());
     processBackgroundImage(themeStyles, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY, getSideBarBackgroundPath());
     processBackgroundImage(themeStyles, DRAWER_BG_IMAGE_THEME_STYLE_KEY, getDrawerBackgroundPath());
+    processBackgroundImage(themeStyles, APP_BG_IMAGE_THEME_STYLE_KEY, getAppBackgroundPath());
+    processBackgroundImage(themeStyles, APP_TITLE_BG_IMAGE_THEME_KEY, getAppTextTitleBackgroundPath());
+    processBackgroundImage(themeStyles, APP_HEADER_BG_IMAGE_THEME_KEY, getAppTextHeaderBackgroundPath());
   }
 
   private void processBackgroundImage(Map<String, String> themeStyles, String styleKey, String imagePath) {
