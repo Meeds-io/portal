@@ -174,10 +174,12 @@ public class TestLoadedPOM extends AbstractConfigTest {
 
     Application columnApplication = (Application) column.getChildren().get(0);
     assertNotNull(columnApplication.getCssClass());
-    assertTrue("'mt-n1' not found", columnApplication.getCssClass().contains("mt-n1"));
-    assertTrue("'mb-n3' not found", columnApplication.getCssClass().contains("mb-n3"));
-    assertTrue("'me-n4' not found", columnApplication.getCssClass().contains("me-n4"));
-    assertTrue("'ms-n5' not found", columnApplication.getCssClass().contains("ms-n5"));
+    // eXIP 7.3.0.30: margins stay in the style attributes (platform scale, 20 = neutral), no spacing token is emitted
+    assertEquals(Integer.valueOf(16), columnApplication.getCssStyle().getMarginTop());
+    assertEquals(Integer.valueOf(8), columnApplication.getCssStyle().getMarginBottom());
+    assertEquals(Integer.valueOf(4), columnApplication.getCssStyle().getMarginRight());
+    assertEquals(Integer.valueOf(0), columnApplication.getCssStyle().getMarginLeft());
+    assertFalse("spacing token emitted: " + columnApplication.getCssClass(), columnApplication.getCssClass().matches(".*\\b(mt|mb|me|ms)-n?\\d.*"));
     assertTrue("'brtr-4' not found", columnApplication.getCssClass().contains("brtr-4"));
     assertTrue("'brtl-2' not found", columnApplication.getCssClass().contains("brtl-2"));
     assertTrue("'brbr-1' not found", columnApplication.getCssClass().contains("brbr-1"));
@@ -208,10 +210,9 @@ public class TestLoadedPOM extends AbstractConfigTest {
     assertTrue("'grid-cell-rowspan-lg-3' not found", cell.getCssClass().contains("grid-cell-rowspan-lg-3"));
     assertTrue("'grid-cell-rowspan-xl-3' not found", cell.getCssClass().contains("grid-cell-rowspan-xl-3"));
     assertTrue("'TEST-grid-cell-class' custom class not found", cell.getCssClass().contains("TEST-grid-cell-class"));
-    assertTrue("'mt-n5' not found", cell.getCssClass().contains("mt-n5"));
-    assertTrue("'mb-n4' not found", cell.getCssClass().contains("mb-n4"));
-    assertTrue("'me-n3' not found", cell.getCssClass().contains("me-n3"));
-    assertTrue("'ms-n1' not found", cell.getCssClass().contains("ms-n1"));
+    assertEquals(Integer.valueOf(0), cell.getCssStyle().getMarginTop());
+    assertEquals(Integer.valueOf(16), cell.getCssStyle().getMarginLeft());
+    assertFalse("spacing token emitted: " + cell.getCssClass(), cell.getCssClass().matches(".*\\b(mt|mb|me|ms)-n?\\d.*"));
     assertTrue("'brtr-0' not found", cell.getCssClass().contains("brtr-0"));
     assertTrue("'brtl-1' not found", cell.getCssClass().contains("brtl-1"));
     assertTrue("'brbr-2' not found", cell.getCssClass().contains("brbr-2"));
