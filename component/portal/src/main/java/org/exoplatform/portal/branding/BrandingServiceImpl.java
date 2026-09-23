@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.CRC32;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -165,13 +167,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_APP_HEADER_BG_ID_KEY      = "app.textHeader.background";
 
-  /**
-   * Time of the shipped stylesheet template (2026-09-15, eXIP 7.3.0.30). The
-   * last-updated time exposed in the stylesheet URL (v= parameter, ETag) is
-   * never older than this value, so browsers holding the previous stylesheet
-   * fetch the new one after an upgrade without any write at startup.
-   */
-  public static final long     THEME_TEMPLATE_VERSION_TIME        = 1789430400000L;
 
   public static final String   TOP_BAR_BG_IMAGE_THEME_STYLE_KEY   = "topBarBackgroundImage";
 
@@ -213,11 +208,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private static final String  GRADIENT_GRAMMAR                   = "(linear|radial|conic)-gradient\\([#0-9a-zA-Z(),.%\\s-]{1,300}\\)";
 
-  private static final String  URL_GRAMMAR                        = "url\\([^)\"'\\s]{1,300}\\)";
+  /**
+   * A submitted background image is the effect only (none or a gradient): the
+   * image URL is added by the server (processBackgroundImage) and any url()
+   * layer a client sends is stripped first (Architects Lead decision)
+   */
+  private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|" + GRADIENT_GRAMMAR + ")$");
 
-  /** none, a gradient, an uploaded image (what processBackgroundImage produces), or the image followed by a gradient */
-  private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|" + GRADIENT_GRAMMAR + "|" + URL_GRAMMAR
-      + "|" + URL_GRAMMAR + ", " + GRADIENT_GRAMMAR + ")$");
+  private static final Pattern IMAGE_LAYER_PATTERN                = Pattern.compile("url\\([^)]*\\)\\s*,?\\s*");
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -319,6 +317,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   /** Last stylesheet that compiled: served while a newer value does not compile (fail-safe) */
   private String               lastCompiledThemeCSS               = null;
+
+  private Long                 templateHash                       = null;
 
   private boolean              legacyOverrideFormReported         = false;
 
@@ -497,12 +497,32 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public long getLastUpdatedTime() {
     String lastUpdatedTime = getPropertyValue(BRANDING_LAST_UPDATED_TIME_KEY);
     long storedTime = lastUpdatedTime == null ? DEFAULT_LAST_MODIFED : Long.parseLong(lastUpdatedTime);
-    // never older than the shipped template: an upgrade changes the stylesheet URL without a startup write
-    return Math.max(storedTime, THEME_TEMPLATE_VERSION_TIME);
+    // The exposed time (v= parameter, ETag) also carries the shipped Less template: an upgrade that changes the
+    // template changes the stylesheet URL with no write at startup, and a later save still changes it
+    // (Architects Lead decision, eXIP 7.3.0.30)
+    return storedTime + getTemplateHash();
+  }
+
+  /**
+   * @return CRC32 of the shipped branding Less template, computed once; 0 when
+   *         no template is configured
+   */
+  long getTemplateHash() {
+    if (templateHash == null) {
+      String template = getLessThemeContent();
+      if (StringUtils.isBlank(template)) {
+        return 0;
+      }
+      CRC32 crc = new CRC32();
+      crc.update(template.getBytes(StandardCharsets.UTF_8));
+      templateHash = crc.getValue();
+    }
+    return templateHash;
   }
 
   @Override
   public void updateBrandingInformation(Branding branding) {
+    stripSubmittedImageLayers(branding.getThemeStyle());
     validateCSSInputs(branding);
     try {
       updateCompanyName(branding.getCompanyName(), false);
@@ -1600,6 +1620,24 @@ public class BrandingServiceImpl implements BrandingService, Startable {
            || key.endsWith("BackgroundAttachment");
   }
 
+  /**
+   * An unclosed function keeps the browser's parser open until the end of the
+   * stylesheet and drops every later declaration and rule for every user; the
+   * grammar allows parentheses, so their balance is checked separately
+   * (Architects Lead decision)
+   */
+  static boolean hasBalancedParentheses(String value) {
+    int depth = 0;
+    for (char c : value.toCharArray()) {
+      if (c == '(') {
+        depth++;
+      } else if (c == ')' && --depth < 0) {
+        return false;
+      }
+    }
+    return depth == 0;
+  }
+
   static String toLessEscape(String value) {
     // no grammar allows a quote; one is stripped anyway so that the escape cannot be closed from inside the value
     return "~\"" + value.replaceAll("[\"\\\\\\r\\n]", "") + "\"";
@@ -1789,9 +1827,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                || key.contains("BorderRadius") || "borderRadius".equals(key)) {
       return THEME_SIZE_PATTERN.matcher(value).matches();
     } else if (key.endsWith("BackgroundImage")) {
-      return THEME_BG_EFFECT_PATTERN.matcher(value).matches();
+      return THEME_BG_EFFECT_PATTERN.matcher(value).matches() && hasBalancedParentheses(value);
     } else if (key.endsWith("BoxShadow")) {
-      return THEME_BOX_SHADOW_PATTERN.matcher(value).matches();
+      return THEME_BOX_SHADOW_PATTERN.matcher(value).matches() && hasBalancedParentheses(value);
     } else if (key.endsWith("FontWeight") || key.endsWith("FontStyle") || key.endsWith("BackgroundPosition")
                || key.endsWith("BackgroundSize") || key.endsWith("BackgroundRepeat") || key.endsWith("BackgroundAttachment")) {
       return THEME_KEYWORD_PATTERN.matcher(value).matches();
@@ -1814,6 +1852,28 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (triggerEvent) {
       listenerService.broadcast(BRANDING_UPDATED_EVENT, null, getBrandingInformation(false));
     }
+  }
+
+  /**
+   * The server is the only source of the image URL of a *BackgroundImage
+   * value: url(...) layers a client sends back (the stored value round-tripped
+   * by the Branding UI, or an external URL) are removed before validation, so
+   * that a save is idempotent and a stored value doubled by an older version
+   * heals on its next save.
+   */
+  static void stripSubmittedImageLayers(Map<String, String> themeStyles) {
+    if (themeStyles == null) {
+      return;
+    }
+    themeStyles.replaceAll((key, value) -> key.endsWith("BackgroundImage") && StringUtils.isNotBlank(value)
+                                                                                   && value.contains("url(") ?
+                                                                                                                stripImageLayers(value) :
+                                                                                                                value);
+  }
+
+  static String stripImageLayers(String value) {
+    String effect = IMAGE_LAYER_PATTERN.matcher(value).replaceAll("").trim();
+    return StringUtils.isBlank(effect) ? "none" : effect;
   }
 
   private void processThemeBackgroundImages(Map<String, String> themeStyles) {
