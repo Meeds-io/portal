@@ -199,7 +199,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private static final Pattern URL_PATTERN                        = Pattern.compile("url\\([^)]*\\)");
 
-  private static final Pattern FIRST_COLOR_PATTERN                = Pattern.compile("#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\)");
+  private static final Pattern FIRST_COLOR_PATTERN                = Pattern.compile("#[0-9a-fA-F]{3,8}|rgba?\\([0-9.,%\\s]*\\)");
 
   private static final Pattern THEME_COLOR_PATTERN                = Pattern.compile("^(#[0-9a-fA-F]{3,8}|transparent|initial)$");
 
@@ -211,7 +211,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private static final Pattern THEME_BOX_SHADOW_PATTERN           = Pattern.compile("^(initial|none|[0-9a-z\\s(),.-]{1,200})$");
 
-  private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|(linear|radial|conic)-gradient\\([#0-9a-zA-Z(),.%\\s-]{1,300}\\))$");
+  private static final String  GRADIENT_GRAMMAR                   = "(linear|radial|conic)-gradient\\([#0-9a-zA-Z(),.%\\s-]{1,300}\\)";
+
+  private static final String  URL_GRAMMAR                        = "url\\([^)\"'\\s]{1,300}\\)";
+
+  /** none, a gradient, an uploaded image (what processBackgroundImage produces), or the image followed by a gradient */
+  private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|" + GRADIENT_GRAMMAR + "|" + URL_GRAMMAR
+      + "|" + URL_GRAMMAR + ", " + GRADIENT_GRAMMAR + ")$");
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -1522,6 +1528,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       } catch (Less4jException e) {
         // Fail-safe: the stylesheet every user loads is never removed by one value the compiler refuses
         LOG.warn("Error compiling less file content, the last compiled stylesheet is served", e);
+        if (this.lastCompiledThemeCSS == null) {
+          // nothing compiled yet (a stored or configured value broke the very first compile): the pristine
+          // template is the fallback, and it is remembered so that the failing compile does not run on every request
+          this.lastCompiledThemeCSS = compilePristineTemplate();
+        }
         this.themeCSSContent = this.lastCompiledThemeCSS;
       }
     }
@@ -1531,6 +1542,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       this.themeCSSContent = (this.themeCSSContent == null ? "" : this.themeCSSContent) + "\n" + this.customCss;
     }
     return this.themeCSSContent;
+  }
+
+  private String compilePristineTemplate() {
+    try {
+      return compileThemeCSS(Collections.emptyMap());
+    } catch (Less4jException e) {
+      LOG.error("The shipped branding Less template does not compile, no branding stylesheet is served", e);
+      return "";
+    }
   }
 
   /**
@@ -1726,6 +1746,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         effectiveValues.put(key, value);
       }
     });
+    // same transformation as the read path, so the trial compiles what will really be compiled
+    neutralizeTopBarGradient(effectiveValues);
     try {
       compileThemeCSS(effectiveValues);
     } catch (Less4jException e) {
@@ -1746,40 +1768,42 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
   }
 
+  /**
+   * Grammar of a theme value, chosen by the key's suffix whatever its prefix
+   * (app*, page*, topBar*, sideBar*, drawer*, the palette): every value is
+   * written in the stylesheet served to every user. A key with no known
+   * suffix keeps the historical check only.
+   */
   private boolean isValidApplicationThemeStyleValue(String key, String value) {
-    if (StringUtils.isBlank(value)
-        || (!key.startsWith(THEME_APP_PREFIX) && !key.startsWith(THEME_PAGE_PREFIX)
-            && !TOP_BAR_STICKY_THEME_STYLE_KEY.equals(key)
-            && !"topBarBackgroundScrollColor".equals(key))) {
+    if (StringUtils.isBlank(value)) {
       return true;
     }
-    boolean valid;
     if (TOP_BAR_STICKY_THEME_STYLE_KEY.equals(key)) {
-      valid = "true".equals(value) || "false".equals(value);
-    } else if (key.endsWith("Color")) {
-      valid = THEME_COLOR_PATTERN.matcher(value).matches();
-    } else if (key.startsWith("appMargin") || key.startsWith("pageMargin") || key.startsWith("appBorderRadius")
-               || "appBorderSize".equals(key) || key.endsWith("FontSize") || key.contains("BackgroundPadding")) {
-      valid = THEME_SIZE_PATTERN.matcher(value).matches();
+      return "true".equals(value) || "false".equals(value);
+    } else if (key.contains("Color")) {
+      return THEME_COLOR_PATTERN.matcher(value).matches();
     } else if (key.endsWith("BackgroundRadius")) {
-      // border-radius shorthand of the shared styling input: one to four corner sizes
-      valid = THEME_RADIUS_PATTERN.matcher(value).matches();
+      // text-background radius of the shared styling input: a border-radius shorthand, one to four corner sizes
+      return THEME_RADIUS_PATTERN.matcher(value).matches();
+    } else if (key.contains("Margin") || key.endsWith("BorderSize") || key.endsWith("FontSize") || key.contains("BackgroundPadding")
+               || key.contains("BorderRadius") || "borderRadius".equals(key)) {
+      return THEME_SIZE_PATTERN.matcher(value).matches();
     } else if (key.endsWith("BackgroundImage")) {
-      valid = THEME_BG_EFFECT_PATTERN.matcher(value).matches();
-    } else if ("appBoxShadow".equals(key)) {
-      valid = THEME_BOX_SHADOW_PATTERN.matcher(value).matches();
-    } else {
-      // font style/weight, background position/size/repeat/attachment: CSS keywords
-      valid = THEME_KEYWORD_PATTERN.matcher(value).matches();
+      return THEME_BG_EFFECT_PATTERN.matcher(value).matches();
+    } else if (key.endsWith("BoxShadow")) {
+      return THEME_BOX_SHADOW_PATTERN.matcher(value).matches();
+    } else if (key.endsWith("FontWeight") || key.endsWith("FontStyle") || key.endsWith("BackgroundPosition")
+               || key.endsWith("BackgroundSize") || key.endsWith("BackgroundRepeat") || key.endsWith("BackgroundAttachment")) {
+      return THEME_KEYWORD_PATTERN.matcher(value).matches();
     }
-    return valid;
+    return true;
   }
 
   private void validateCSSStyleValue(String value) {
     if (StringUtils.isNotBlank(value)
         && (value.contains("javascript") || value.contains("eval"))) {
-      throw new IllegalArgumentException(String.format("Invalid css value input %s",
-                                                       value));
+      LOG.debug("Forbidden css value input '{}', refused", value);
+      throw new IllegalArgumentException("branding.css.forbiddenValue");
     }
   }
 
