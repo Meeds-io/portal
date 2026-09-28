@@ -92,8 +92,10 @@ public class LogoutHandler extends WebRequestHandler {
       AbstractTokenService.getInstance(CookieTokenService.class)
                           .deleteToken(token);
 
+      // Same path as LoginHandler writes it: a cookie is only deleted by a
+      // Set-Cookie naming its own path, and this one is shared by every webapp
       Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-      cookie.setPath(request.getContextPath());
+      cookie.setPath("/");
       cookie.setMaxAge(0);
       response.addCookie(cookie);
     }
