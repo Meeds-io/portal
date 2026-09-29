@@ -174,7 +174,7 @@ public class TestLoadedPOM extends AbstractConfigTest {
 
     Application columnApplication = (Application) column.getChildren().get(0);
     assertNotNull(columnApplication.getCssClass());
-    // eXIP 7.3.0.30: margins stay in the style attributes (platform scale, 20 = neutral), no spacing token is emitted
+    // an application's margins stay in its style attributes (platform scale, 20 = neutral): no spacing token
     assertEquals(Integer.valueOf(16), columnApplication.getCssStyle().getMarginTop());
     assertEquals(Integer.valueOf(8), columnApplication.getCssStyle().getMarginBottom());
     assertEquals(Integer.valueOf(4), columnApplication.getCssStyle().getMarginRight());
@@ -212,7 +212,9 @@ public class TestLoadedPOM extends AbstractConfigTest {
     assertTrue("'TEST-grid-cell-class' custom class not found", cell.getCssClass().contains("TEST-grid-cell-class"));
     assertEquals(Integer.valueOf(0), cell.getCssStyle().getMarginTop());
     assertEquals(Integer.valueOf(16), cell.getCssStyle().getMarginLeft());
-    assertFalse("spacing token emitted: " + cell.getCssClass(), cell.getCssClass().matches(".*\\b(mt|mb|me|ms)-n?\\d.*"));
+    // a grid cell's margins are rendered through spacing tokens: 0 -> mt-n5, 16 -> ms-n1 on the 20-neutral scale
+    assertTrue("'mt-n5' not found in " + cell.getCssClass(), cell.getCssClass().contains("mt-n5"));
+    assertTrue("'ms-n1' not found in " + cell.getCssClass(), cell.getCssClass().contains("ms-n1"));
     assertTrue("'brtr-0' not found", cell.getCssClass().contains("brtr-0"));
     assertTrue("'brtl-1' not found", cell.getCssClass().contains("brtl-1"));
     assertTrue("'brbr-2' not found", cell.getCssClass().contains("brbr-2"));

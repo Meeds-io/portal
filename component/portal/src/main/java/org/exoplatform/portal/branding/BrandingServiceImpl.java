@@ -200,22 +200,26 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private static final Pattern THEME_SIZE_PATTERN                 = Pattern.compile("^(-?\\d{1,4}(px)?|initial)$");
 
+  private static final Pattern UNITLESS_SIZE_PATTERN              = Pattern.compile("^-?\\d{1,4}$");
+
+  private static final Pattern UNITLESS_SIZE_TOKEN_PATTERN        = Pattern.compile("(?<![\\w.-])(-?\\d{1,4})(?![\\w.%])");
+
   private static final Pattern THEME_RADIUS_PATTERN               = Pattern.compile("^(initial|(-?\\d{1,4}(px)?)( -?\\d{1,4}(px)?){0,3})$");
 
   private static final Pattern THEME_KEYWORD_PATTERN              = Pattern.compile("^[a-zA-Z -]{1,30}$");
 
-  private static final Pattern THEME_BOX_SHADOW_PATTERN           = Pattern.compile("^(initial|none|[0-9a-z\\s(),.-]{1,200})$");
+  private static final Pattern THEME_BOX_SHADOW_PATTERN           = Pattern.compile("^(initial|none|[0-9a-zA-Z#\\s(),.-]{1,200})$");
 
   private static final String  GRADIENT_GRAMMAR                   = "(linear|radial|conic)-gradient\\([#0-9a-zA-Z(),.%\\s-]{1,300}\\)";
 
   /**
    * A submitted background image is the effect only (none or a gradient): the
    * image URL is added by the server (processBackgroundImage) and any url()
-   * layer a client sends is stripped first (Architects Lead decision)
+   * layer a client sends is stripped first
    */
   private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|" + GRADIENT_GRAMMAR + ")$");
 
-  private static final Pattern IMAGE_LAYER_PATTERN                = Pattern.compile("url\\([^)]*\\)\\s*,?\\s*");
+  private static final Pattern IMAGE_LAYER_PATTERN                = Pattern.compile("url\\([^)]*(\\)|$)\\s*,?\\s*");
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -499,7 +503,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     long storedTime = lastUpdatedTime == null ? DEFAULT_LAST_MODIFED : Long.parseLong(lastUpdatedTime);
     // The exposed time (v= parameter, ETag) also carries the shipped Less template: an upgrade that changes the
     // template changes the stylesheet URL with no write at startup, and a later save still changes it
-    // (Architects Lead decision, eXIP 7.3.0.30)
     return storedTime + getTemplateHash();
   }
 
@@ -523,6 +526,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public void updateBrandingInformation(Branding branding) {
     stripSubmittedImageLayers(branding.getThemeStyle());
+    normalizeSubmittedSizeUnits(branding.getThemeStyle());
     validateCSSInputs(branding);
     try {
       updateCompanyName(branding.getCompanyName(), false);
@@ -1031,10 +1035,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   /**
-   * eXIP 7.3.0.30: the gradient option is removed from the Topbar. A gradient
+   * The Topbar background offers no gradient option. A gradient
    * still stored in the Topbar background is ignored at read time (never
    * rewritten): the image URL part is kept and the gradient's first colour
-   * becomes the Topbar colour (PO decision 5). Only when no colour can be read
+   * becomes the Topbar colour. Only when no colour can be read
    * from the gradient does the stored colour stay, and when that one is
    * transparent or absent it is dropped so that the platform default applies.
    * The picker always stores a plain colour (white by default) next to a
@@ -1242,6 +1246,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                        variableName);
             }
           }
+          variableValue = normalizeSizeUnits(variableName, variableValue);
           if (!isValidApplicationThemeStyleValue(variableName, variableValue)) {
             // Configuration follows the same grammar as the UI: a malformed value is not emitted in the platform stylesheet
             LOG.warn("Invalid configured value '{}' for theme variable '{}', ignored (the built-in default applies)",
@@ -1530,6 +1535,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private String computeThemeCSS() {// NOSONAR
+    String css = null;
     if (themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent())) {
       // Effective values: stored, else configured default, blank = not set (the template default stays);
       // the Topbar gradient is neutralized like on the read path
@@ -1543,8 +1549,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         effectiveValues.put("pageNoMarginBottom", "0px");
       }
       try {
-        this.themeCSSContent = compileThemeCSS(effectiveValues);
-        this.lastCompiledThemeCSS = this.themeCSSContent;
+        css = compileThemeCSS(effectiveValues);
+        this.lastCompiledThemeCSS = css;
       } catch (Less4jException e) {
         // Fail-safe: the stylesheet every user loads is never removed by one value the compiler refuses
         LOG.warn("Error compiling less file content, the last compiled stylesheet is served", e);
@@ -1553,16 +1559,19 @@ public class BrandingServiceImpl implements BrandingService, Startable {
           // template is the fallback, and it is remembered so that the failing compile does not run on every request
           this.lastCompiledThemeCSS = compilePristineTemplate();
         }
-        this.themeCSSContent = this.lastCompiledThemeCSS;
+        css = this.lastCompiledThemeCSS;
       }
     }
     if (StringUtils.isNotBlank(getCustomCssContent())
         && getFeatureService() != null
         && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      this.themeCSSContent = (this.themeCSSContent == null ? "" : this.themeCSSContent) + "\n" + this.customCss;
+      // built in a local and assigned once: two concurrent first requests never append the custom CSS twice
+      css = (css == null ? "" : css) + "\n" + this.customCss;
     }
-    return this.themeCSSContent;
+    this.themeCSSContent = css;
+    return css;
   }
+
 
   private String compilePristineTemplate() {
     try {
@@ -1624,7 +1633,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    * An unclosed function keeps the browser's parser open until the end of the
    * stylesheet and drops every later declaration and rule for every user; the
    * grammar allows parentheses, so their balance is checked separately
-   * (Architects Lead decision)
    */
   static boolean hasBalancedParentheses(String value) {
     int depth = 0;
@@ -1772,7 +1780,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    * The grammar bounds the characters of a value, not its Less validity: the
    * whole stylesheet is trial-compiled with the submitted values before
    * anything is stored, so that a value the compiler refuses is answered 400
-   * and never removes the platform stylesheet (eXIP 7.3.0.30, §2 Security)
+   * and never removes the platform stylesheet
    */
   private void validateThemeStyleCompiles(Map<String, String> submittedThemeStyle) {
     if (submittedThemeStyle == null || submittedThemeStyle.isEmpty() || StringUtils.isBlank(getLessThemeContent())) {
@@ -1823,8 +1831,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     } else if (key.endsWith("BackgroundRadius")) {
       // text-background radius of the shared styling input: a border-radius shorthand, one to four corner sizes
       return THEME_RADIUS_PATTERN.matcher(value).matches();
-    } else if (key.contains("Margin") || key.endsWith("BorderSize") || key.endsWith("FontSize") || key.contains("BackgroundPadding")
-               || key.contains("BorderRadius") || "borderRadius".equals(key)) {
+    } else if (isSizeThemeKey(key)) {
       return THEME_SIZE_PATTERN.matcher(value).matches();
     } else if (key.endsWith("BackgroundImage")) {
       return THEME_BG_EFFECT_PATTERN.matcher(value).matches() && hasBalancedParentheses(value);
@@ -1855,6 +1862,39 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   /**
+   * A theme key holding one size (a margin, border, font size, padding or
+   * corner radius), written in the stylesheet where the skin computes with it
+   */
+  static boolean isSizeThemeKey(String key) {
+    return key.contains("Margin") || key.endsWith("BorderSize") || key.endsWith("FontSize") || key.contains("BackgroundPadding")
+           || key.contains("BorderRadius") || "borderRadius".equals(key);
+  }
+
+  /**
+   * A size without a unit is stored with px: the skin combines these values in
+   * calc() and border-radius, where a unitless non-zero number makes the whole
+   * declaration invalid and drops it silently
+   */
+  static String normalizeSizeUnits(String key, String value) {
+    if (StringUtils.isBlank(value)) {
+      return value;
+    } else if (isSizeThemeKey(key) && UNITLESS_SIZE_PATTERN.matcher(value).matches()) {
+      return value + "px";
+    } else if (key.endsWith("BackgroundRadius")) {
+      return UNITLESS_SIZE_TOKEN_PATTERN.matcher(value).replaceAll("$1px");
+    } else {
+      return value;
+    }
+  }
+
+  static void normalizeSubmittedSizeUnits(Map<String, String> themeStyles) {
+    if (themeStyles == null || themeStyles.isEmpty()) {
+      return;
+    }
+    themeStyles.replaceAll(BrandingServiceImpl::normalizeSizeUnits);
+  }
+
+  /**
    * The server is the only source of the image URL of a *BackgroundImage
    * value: url(...) layers a client sends back (the stored value round-tripped
    * by the Branding UI, or an external URL) are removed before validation, so
@@ -1872,7 +1912,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   static String stripImageLayers(String value) {
-    String effect = IMAGE_LAYER_PATTERN.matcher(value).replaceAll("").trim();
+    // a stripped layer takes the comma after it; a stripped trailing layer leaves the comma before it
+    String effect = IMAGE_LAYER_PATTERN.matcher(value).replaceAll("").trim().replaceAll("^,\\s*|\\s*,$", "").trim();
     return StringUtils.isBlank(effect) ? "none" : effect;
   }
 

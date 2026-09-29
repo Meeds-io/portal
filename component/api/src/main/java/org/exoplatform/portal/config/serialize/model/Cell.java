@@ -49,7 +49,7 @@ public class Cell extends Container {
     cssClasses.append(" grid-cell-rowspan-xl-").append(rowSpan);
     if (cssStyle != null) {
       cssClasses.append(" ");
-      cssClasses.append(cssStyle.getCssClass());
+      cssClasses.append(cssStyle.getCellCssClass());
     }
     return cssClasses.toString();
   }
