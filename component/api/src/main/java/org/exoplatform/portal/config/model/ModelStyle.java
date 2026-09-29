@@ -174,11 +174,33 @@ public class ModelStyle implements Serializable {
   }
 
   public String getCssClass(String existingCssClass, boolean sectionStyle, int diff) { // NOSONAR
+    return getCssClass(existingCssClass, sectionStyle, diff, false);
+  }
+
+  /**
+   * Classes of a grid cell: the margins of a cell are rendered through
+   * Vuetify spacing tokens, the cell having no renderer of its own for the
+   * margin attributes
+   */
+  public String getCellCssClass() {
+    return getCssClass(null, false, 20, true);
+  }
+
+  /**
+   * Two rules for the margins, both on the platform-wide scale where 20 is "no
+   * extra margin" (the scale of the page XML definitions and of the editors):
+   * an application's margins stay in its margin attributes and are rendered
+   * through the --appMargin* custom properties the layout renderer emits, so
+   * no spacing token is generated for it; a grid cell's margins are rendered
+   * through the mt-/mb-/me-/ms- spacing tokens, generated when marginTokens
+   * is set
+   */
+  public String getCssClass(String existingCssClass, boolean sectionStyle, int diff, boolean marginTokens) { // NOSONAR
     StringBuilder cssClass = new StringBuilder();
     if (!sectionStyle) {
-      // eXIP 7.3.0.30: margins are no longer rendered through Vuetify spacing tokens (mt-/mb-/ms-/me-) but through
-      // the --appMargin* custom properties emitted by the layout renderer from the margin attributes, on the
-      // platform-wide scale where 20 is "no extra margin" (the scale of the page XML definitions and of the editors)
+      if (marginTokens) {
+        appendMarginTokens(cssClass, existingCssClass, diff);
+      }
       if (radiusTopRight != null && !StringUtils.contains(existingCssClass, "brtr-")) {
         cssClass.append(" brtr-");
         cssClass.append(radiusTopRight / 4);
@@ -202,4 +224,34 @@ public class ModelStyle implements Serializable {
     return cssClass.toString();
   }
 
+  private void appendMarginTokens(StringBuilder cssClass, String existingCssClass, int diff) {
+    if (marginTop != null && !StringUtils.contains(existingCssClass, "mt-")) {
+      cssClass.append(" mt-");
+      if (marginTop < diff) {
+        cssClass.append("n");
+      }
+      cssClass.append(Math.abs((marginTop - diff) / 4));
+    }
+    if (marginBottom != null && !StringUtils.contains(existingCssClass, "mb-")) {
+      cssClass.append(" mb-");
+      if (marginBottom < diff) {
+        cssClass.append("n");
+      }
+      cssClass.append(Math.abs((marginBottom - diff) / 4));
+    }
+    if (marginRight != null && !StringUtils.contains(existingCssClass, "me-")) {
+      cssClass.append(" me-");
+      if (marginRight < diff) {
+        cssClass.append("n");
+      }
+      cssClass.append(Math.abs((marginRight - diff) / 4));
+    }
+    if (marginLeft != null && !StringUtils.contains(existingCssClass, "ms-")) {
+      cssClass.append(" ms-");
+      if (marginLeft < diff) {
+        cssClass.append("n");
+      }
+      cssClass.append(Math.abs((marginLeft - diff) / 4));
+    }
+  }
 }

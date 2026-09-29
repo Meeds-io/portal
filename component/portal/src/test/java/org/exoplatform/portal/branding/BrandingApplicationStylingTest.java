@@ -34,6 +34,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -284,6 +285,11 @@ public class BrandingApplicationStylingTest {
     assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p?v=1), url(/p?v=1)"));
     assertEquals(LINEAR_GRADIENT, BrandingServiceImpl.stripImageLayers("url(/p?v=1), url(/p?v=1), " + LINEAR_GRADIENT));
     assertEquals("none", BrandingServiceImpl.stripImageLayers("url(https://tracker.example.com/p.png)"));
+    // a layer left unclosed by an older, truncating save is stripped too, so the Branding save is never blocked
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p"));
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p), url(/p"));
+    assertEquals("none", BrandingServiceImpl.stripImageLayers("url(/p), url(/p), url(/p"));
+    assertEquals(LINEAR_GRADIENT, BrandingServiceImpl.stripImageLayers("url(/p), " + LINEAR_GRADIENT + ", url(/p"));
     ArgumentCaptor<SettingValue> stored = ArgumentCaptor.forClass(SettingValue.class);
     brandingService.updateBrandingInformation(branding("sideBarBackgroundImage", "url(/p?v=1), url(/p?v=1)"));
     brandingService.updateBrandingInformation(branding("sideBarBackgroundImage", "url(/p?v=1), " + CONIC_GRADIENT));
@@ -305,6 +311,24 @@ public class BrandingApplicationStylingTest {
     }
     assertTrue(BrandingServiceImpl.hasBalancedParentheses("rgba(0, 0, 0, 0.2) 0px 3px"));
     assertFalse(BrandingServiceImpl.hasBalancedParentheses(")("));
+  }
+
+  @Test
+  public void shouldStoreUnitlessSizesWithPxAndAcceptHexShadows() {
+    assertEquals("32px", BrandingServiceImpl.normalizeSizeUnits("appMarginTop", "32"));
+    assertEquals("-8px", BrandingServiceImpl.normalizeSizeUnits("appMarginLeft", "-8"));
+    assertEquals("2px", BrandingServiceImpl.normalizeSizeUnits("appBorderSize", "2px"));
+    assertEquals("initial", BrandingServiceImpl.normalizeSizeUnits("appTextTitleFontSize", "initial"));
+    assertEquals("0px 4px 0px 4px", BrandingServiceImpl.normalizeSizeUnits("appTextTitleBackgroundRadius", "0 4px 0 4"));
+    assertEquals("#F5F5F5FF", BrandingServiceImpl.normalizeSizeUnits("appBackgroundColor", "#F5F5F5FF"));
+
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.updateBrandingInformation(branding("appBoxShadow", "0 2px 4px #0003"));
+    verify(settingService).set(any(), any(), eq("appBoxShadow"), argThat(v -> "0 2px 4px #0003".equals(v.getValue())));
+    brandingService.updateBrandingInformation(branding("appMarginTop", "32"));
+    verify(settingService).set(any(), any(), eq("appMarginTop"), argThat(v -> "32px".equals(v.getValue())));
   }
 
   @Test
