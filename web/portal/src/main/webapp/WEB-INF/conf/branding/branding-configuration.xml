@@ -130,13 +130,13 @@
         <value>drawerBackgroundImage=${exo.branding.theme.drawerBackgroundImage:none}</value>
         <value>drawerBackgroundRepeat=${exo.branding.theme.drawerBackgroundRepeat:no-repeat}</value>
 
-        <!-- eXIP 7.3.0.30 - Page Design > Page Margins: platform default of the page padding (site and page values keep precedence) -->
+        <!-- Page Design > Page Margins: platform default of the page padding (site and page values keep precedence) -->
         <value>pageMarginTop=${exo.branding.theme.pageMarginTop:}</value>
         <value>pageMarginRight=${exo.branding.theme.pageMarginRight:}</value>
         <value>pageMarginBottom=${exo.branding.theme.pageMarginBottom:}</value>
         <value>pageMarginLeft=${exo.branding.theme.pageMarginLeft:}</value>
 
-        <!-- eXIP 7.3.0.30 - Platform-wide default styling of every application (Branding and Theme > Pages & Apps style > Application Styling).
+        <!-- Platform-wide default styling of every application (Branding and Theme > Pages & Apps style > Application Styling).
              Empty = not set: branding.less then emits the skin's built-in default, so a toggle turned off equals the built-in look.
              Margins are on the editors' scale (20 = no extra margin). An addon that redefines this component (digital-workplace does)
              must repeat the whole list. -->
@@ -194,7 +194,7 @@
         <value>appTextHeaderBackgroundPaddingLeft=${exo.branding.theme.appTextHeaderBackgroundPaddingLeft:}</value>
         <value>appTextHeaderBackgroundRadius=${exo.branding.theme.appTextHeaderBackgroundRadius:}</value>
 
-        <!-- eXIP 7.3.0.30 - Topbar "Fix Position when Scrolling" default of site-layout Topbars, and its On Scroll colour -->
+        <!-- Topbar "Fix Position when Scrolling" default of site-layout Topbars, and its On Scroll colour -->
         <value>topBarSticky=${exo.branding.theme.topBarSticky:false}</value>
         <value>topBarBackgroundScrollColor=${exo.branding.theme.topBarBackgroundScrollColor:}</value>
       </values-param>
