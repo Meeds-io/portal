@@ -218,7 +218,7 @@ public class LayoutStorageTest extends AbstractDAOTest {
   }
 
   public void testApplicationMarginsPersistedAndReloaded() {
-    // eXIP 7.3.0.30: default margins of the applications of a page, stored as app-margin-* attributes
+    // default margins of the applications of a page, stored as app-margin-* attributes
     ApplicationBackgroundStyle appStyle = new ApplicationBackgroundStyle();
     appStyle.setBackgroundColor("#FFFFFFFF");
     appStyle.setMarginTop(0);

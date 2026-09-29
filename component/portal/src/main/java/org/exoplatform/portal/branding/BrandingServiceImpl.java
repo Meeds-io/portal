@@ -1913,7 +1913,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   static String stripImageLayers(String value) {
     // a stripped layer takes the comma after it; a stripped trailing layer leaves the comma before it
-    String effect = IMAGE_LAYER_PATTERN.matcher(value).replaceAll("").trim().replaceAll("^,\\s*|\\s*,$", "").trim();
+    String effect = IMAGE_LAYER_PATTERN.matcher(value).replaceAll("").trim().replaceAll("(^,\\s*)|(\\s*,$)", "").trim();
     return StringUtils.isBlank(effect) ? "none" : effect;
   }
 
