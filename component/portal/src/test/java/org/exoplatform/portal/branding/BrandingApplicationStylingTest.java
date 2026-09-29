@@ -71,7 +71,7 @@ import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.upload.UploadService;
 
 /**
- * eXIP 7.3.0.30, platform-wide application styling: the declaration loader
+ * Platform-wide application styling: the declaration loader
  * (new <code>name=value</code> form, empty default, legacy form), the real
  * Less compilation of the template with the new variables (a mock cannot tell
  * a value the compiler refuses), the Topbar gradient neutralized at read time,
