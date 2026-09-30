@@ -54,6 +54,10 @@ public class Branding implements Serializable {
 
   @Getter
   @Setter
+  private List<String>        supportedFontFamilies;
+
+  @Getter
+  @Setter
   private Logo                logo;
 
   @Getter

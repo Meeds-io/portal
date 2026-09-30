@@ -25,6 +25,7 @@ import org.exoplatform.portal.branding.model.Background;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 
 public interface BrandingService {
 
@@ -199,6 +200,16 @@ public interface BrandingService {
    * @return CSS content of colors for theme
    */
   String getThemeCSSContent();
+
+  /**
+   * @return the compiled branding stylesheet with the branding update time it
+   *         was compiled for, the value an HTTP response tags it with. After a
+   *         failed compilation the previous snapshot is returned, so its stamp
+   *         can be older than {@link #getLastUpdatedTime()}; when no snapshot
+   *         exists yet, an empty stylesheet tagged with the current update
+   *         time is returned and the compilation is retried on the next call.
+   */
+  ThemeStylesheet getThemeStylesheet();
 
   /**
    * Updated last updated time of one of Branding properties
