@@ -34,13 +34,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.picocontainer.Startable;
 
 import com.github.sommeri.less4j.Less4jException;
-import com.github.sommeri.less4j.LessCompiler;
 import com.github.sommeri.less4j.LessCompiler.Configuration;
 import com.github.sommeri.less4j.core.ThreadUnsafeLessCompiler;
 
@@ -63,6 +63,7 @@ import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
@@ -171,6 +172,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_LAST_UPDATED_TIME_KEY     = "branding.lastUpdatedTime";
 
+  public static final String   THEME_FONT_FAMILY_KEY              = "fontFamily";
+
+  public static final String   DEFAULT_FONT_FAMILY                = "Arimo";
+
+  public static final List<String> SUPPORTED_FONT_FAMILIES         = List.of(DEFAULT_FONT_FAMILY, "Inter", "Roboto", "Open Sans", "Public Sans");
+
+  public static final String   FONT_FAMILY_UNSUPPORTED_MESSAGE    = "branding.fontFamily.unsupported";
+
   public static final String   FILE_API_NAME_SPACE                = "CompanyBranding";
 
   public static final String   LOGO_NAME                          = "logo.png";
@@ -241,13 +250,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Map<String, String>  supportedLanguages                 = null;
 
-  private String               lessThemeContent                   = null;
+  private final AtomicReference<ThemeStylesheet> themeStylesheet  = new AtomicReference<>();
 
-  private String               themeCSSContent                    = null;
+  private volatile long        themeCSSFailedStamp                = -1;
+
+  private final Object         themeCSSLock                       = new Object();
 
   private Logo                 logo                               = null;
-
-  private String               customCss                          = null;
 
   private Favicon              favicon                            = null;
 
@@ -285,7 +294,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public void start() {
-    computeThemeCSS();
+    getThemeStylesheet();
     listenerService.addListener(ExoFeatureService.FEATURE_STATUS_CHANGED_EVENT, e -> {
       if (StringUtils.equals(BRANDING_CUSTOM_STYLE_FEATURE, (String) e.getSource())) {
         this.triggerBrandingUpdated(true, true);
@@ -300,10 +309,31 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getThemeCSSContent() {
-    if (themeCSSContent == null) {
-      this.computeThemeCSS();
+    return getThemeStylesheet().css();
+  }
+
+  @Override
+  public ThemeStylesheet getThemeStylesheet() {
+    long lastUpdatedTime = getLastUpdatedTime();
+    ThemeStylesheet stylesheet = themeStylesheet.get();
+    if (isCurrent(stylesheet, lastUpdatedTime)) {
+      return stylesheet;
     }
-    return themeCSSContent;
+    synchronized (themeCSSLock) {
+      lastUpdatedTime = getLastUpdatedTime();
+      stylesheet = themeStylesheet.get();
+      if (isCurrent(stylesheet, lastUpdatedTime)) {
+        return stylesheet;
+      }
+      String css = compileThemeCSS();
+      if (css == null) {
+        themeCSSFailedStamp = lastUpdatedTime;
+        return stylesheet == null ? new ThemeStylesheet(lastUpdatedTime, "") : stylesheet;
+      }
+      stylesheet = new ThemeStylesheet(lastUpdatedTime, css);
+      themeStylesheet.set(stylesheet);
+      return stylesheet;
+    }
   }
 
   /**
@@ -343,6 +373,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageWidth(getPageWidth());
     branding.setCustomCss(getCustomCss());
     branding.setThemeStyle(getThemeStyle());
+    branding.setSupportedFontFamilies(SUPPORTED_FONT_FAMILIES);
     branding.setLoginTitle(getLoginTitle());
     branding.setLoginSubtitle(getLoginSubtitle());
     branding.setLastUpdatedTime(getLastUpdatedTime());
@@ -768,8 +799,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     } else {
       settingService.set(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY, SettingValue.create(lastUpdatedTimestamp));
     }
-    this.themeCSSContent = null;
-    this.customCss = null;
   }
 
   @Override
@@ -801,10 +830,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     Map<String, String> themeStyleVariables = new HashMap<>();
     Set<String> variables = themeVariables.keySet();
     for (String themeVariable : variables) {
-      SettingValue<?> storedStyleValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
-      String styleValue = storedStyleValue == null
-                          || storedStyleValue.getValue() == null ? themeVariables.get(themeVariable) :
-                                                                 storedStyleValue.getValue().toString();
+      String styleValue = getThemeStyleValue(themeVariable);
       if (StringUtils.isNotBlank(styleValue)) {
         themeStyleVariables.put(themeVariable, styleValue);
       }
@@ -942,8 +968,22 @@ public class BrandingServiceImpl implements BrandingService, Startable {
           if (StringUtils.isBlank(themeVariable) || !themeVariable.contains(":")) {
             continue;
           }
-          String[] themeVariablesPart = themeVariable.split(":");
-          this.themeVariables.put(themeVariablesPart[0], themeVariablesPart[1]);
+          String[] themeVariablesPart = themeVariable.split(":", 2);
+          String name = themeVariablesPart[0];
+          String value = themeVariablesPart[1];
+          if (value.startsWith(name + ":")) {
+            value = value.substring(name.length() + 1);
+          }
+          this.themeVariables.put(name, value);
+        }
+        String configuredFontFamily = this.themeVariables.get(THEME_FONT_FAMILY_KEY);
+        if (configuredFontFamily != null && !isSupportedFontFamily(configuredFontFamily)) {
+          LOG.warn("Unsupported default font family '{}' in {}, using '{}'. Supported families: {}",
+                   configuredFontFamily,
+                   BRANDING_THEME_VARIABLES,
+                   DEFAULT_FONT_FAMILY,
+                   SUPPORTED_FONT_FAMILIES);
+          this.themeVariables.put(THEME_FONT_FAMILY_KEY, DEFAULT_FONT_FAMILY);
         }
       }
     }
@@ -1205,57 +1245,52 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return fileItem;
   }
 
-  private String computeThemeCSS() {// NOSONAR
-    if (StringUtils.isNotBlank(lessFilePath)) {
-      try {
-        InputStream inputStream = configurationManager.getInputStream(lessFilePath);
-        lessThemeContent = IOUtil.getStreamContentAsString(inputStream);
-      } catch (Exception e) {
-        LOG.warn("Error retrieving less file content", e);
-      }
-    }
-
-    if (themeVariables != null && !themeVariables.isEmpty()) {
-      Set<String> variables = themeVariables.keySet();
-      for (String themeVariable : variables) {
-        SettingValue<?> storedColorValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
-        String colorValue = storedColorValue == null
-                            || storedColorValue.getValue() == null ? themeVariables.get(themeVariable) :
-                                                                   storedColorValue.getValue().toString();
-        if (StringUtils.isNotBlank(colorValue) && StringUtils.isNotBlank(lessThemeContent)) {
-          lessThemeContent = lessThemeContent.replaceAll("@" + themeVariable + ":[ #a-zA-Z0-9]*;?\r?\n",
-                                                         "@" + themeVariable + ": " + colorValue + ";\n");
-        }
-      }
-
-      if (StringUtils.isNotBlank(lessThemeContent)) {
-        LessCompiler compiler = new ThreadUnsafeLessCompiler();
-        try {
-          Configuration configuration = new Configuration();
-          configuration.getSourceMapConfiguration().setLinkSourceMap(false);
-          LessCompiler.CompilationResult result = compiler.compile(lessThemeContent, configuration);
-          this.themeCSSContent = result.getCss();
-        } catch (Less4jException e) {
-          LOG.warn("Error compiling less file content", e);
-        }
-      }
-    }
-    if (StringUtils.isNotBlank(getCustomCssContent())
-        && getFeatureService() != null
-        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      this.themeCSSContent += "\n" + this.customCss;
-    }
-    return this.themeCSSContent;
+  private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {
+    return stylesheet != null && (stylesheet.stamp() == lastUpdatedTime || themeCSSFailedStamp == lastUpdatedTime);
   }
 
-  private String getCustomCssContent() {
-    if (this.customCss == null) {
-      this.customCss = getCustomCss();
-      if (this.customCss == null) {
-        this.customCss = "";
+  private String compileThemeCSS() {
+    String lessContent = readThemeLessTemplate();
+    if (lessContent == null) {
+      return null;
+    }
+    String css = "";
+    if (StringUtils.isNotBlank(lessContent) && themeVariables != null && !themeVariables.isEmpty()) {
+      for (String themeVariable : themeVariables.keySet()) {
+        String styleValue = getThemeStyleValue(themeVariable);
+        if (StringUtils.isNotBlank(styleValue)) {
+          lessContent = lessContent.replaceAll("@" + themeVariable + ":[ #a-zA-Z0-9]*;?\r?\n",
+                                               "@" + themeVariable + ": " + styleValue + ";\n");
+        }
+      }
+      try {
+        Configuration configuration = new Configuration();
+        configuration.getSourceMapConfiguration().setLinkSourceMap(false);
+        css = new ThreadUnsafeLessCompiler().compile(lessContent, configuration).getCss();
+      } catch (Less4jException e) {
+        LOG.warn("Error compiling less file content", e);
+        return null;
       }
     }
-    return this.customCss;
+    String customCss = getCustomCss();
+    if (StringUtils.isNotBlank(customCss)
+        && getFeatureService() != null
+        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
+      css += "\n" + customCss;
+    }
+    return css;
+  }
+
+  private String readThemeLessTemplate() {
+    if (StringUtils.isBlank(lessFilePath)) {
+      return "";
+    }
+    try (InputStream inputStream = configurationManager.getInputStream(lessFilePath)) {
+      return IOUtil.getStreamContentAsString(inputStream);
+    } catch (Exception e) {
+      LOG.warn("Error retrieving less file content", e);
+      return null;
+    }
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
@@ -1357,6 +1392,28 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                   branding.getPageBackgroundColor())
           .forEach(this::validateCSSStyleValue);
     branding.getThemeStyle().values().forEach(this::validateCSSStyleValue);
+    validateFontFamily(branding.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
+  }
+
+  private void validateFontFamily(String fontFamily) {
+    if (StringUtils.isNotBlank(fontFamily) && !isSupportedFontFamily(fontFamily)) {
+      throw new IllegalArgumentException(FONT_FAMILY_UNSUPPORTED_MESSAGE);
+    }
+  }
+
+  private boolean isSupportedFontFamily(String fontFamily) {
+    return SUPPORTED_FONT_FAMILIES.contains(fontFamily);
+  }
+
+  private String getThemeStyleValue(String themeVariable) {
+    SettingValue<?> storedStyleValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
+    String styleValue = storedStyleValue == null
+                        || storedStyleValue.getValue() == null ? themeVariables.get(themeVariable) :
+                                                               storedStyleValue.getValue().toString();
+    if (THEME_FONT_FAMILY_KEY.equals(themeVariable) && !isSupportedFontFamily(styleValue)) {
+      return themeVariables.get(themeVariable);
+    }
+    return styleValue;
   }
 
   private void validateCSSStyleValue(String value) {

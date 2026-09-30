@@ -25,6 +25,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_COMPA
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_CONTEXT;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_FAVICON_ID_SETTING_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_FAVICON_INIT_PARAM;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN_BG_ID_SETTING_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN_BG_INIT_PARAM;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN_SUBTITLE_PARAM;
@@ -36,27 +37,38 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SCOPE
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SITE_NAME_INIT_PARAM;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SITE_NAME_SETTING_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SUBTITLE_SETTING_KEY;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_THEME_LESS_PATH;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_THEME_VARIABLES;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_TITLE_SETTING_KEY;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.DEFAULT_FONT_FAMILY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.FILE_API_NAME_SPACE;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.FONT_FAMILY_UNSUPPORTED_MESSAGE;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.LOGIN_BACKGROUND_NAME;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.SUPPORTED_FONT_FAMILIES;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.THEME_FONT_FAMILY_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +77,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.ServletContext;
 
@@ -73,6 +93,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
+import org.exoplatform.commons.api.settings.ExoFeatureService;
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
@@ -83,6 +104,7 @@ import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.commons.file.services.FileStorageException;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
+import org.exoplatform.container.xml.Deserializer;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.container.xml.ValuesParam;
@@ -90,6 +112,7 @@ import org.exoplatform.portal.branding.model.Background;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.resources.LocaleConfigService;
@@ -101,6 +124,23 @@ import org.exoplatform.upload.UploadService;
     "rawtypes", "unchecked"
 })
 public class BrandingServiceImplTest {
+
+  private static final String TEST_LESS_PATH     = "classpath:test-branding.less";
+
+  private static final String TEST_LESS_TEMPLATE = """
+      @primaryColor: #3f8487;
+      @fontFamily: Arimo;
+      @allPagesPrimaryColor: ~"--allPagesPrimaryColor";
+      @allPagesFontFamily: ~"--allPagesFontFamily";
+      :root {
+        @{allPagesPrimaryColor}: @primaryColor;
+        @{allPagesFontFamily}: @fontFamily;
+      }
+      """;
+
+  private static final String SHIPPED_BRANDING_CONFIGURATION = "../../web/portal/src/main/webapp/WEB-INF/conf/branding/branding-configuration.xml";
+
+  private static final Pattern FONT_FAMILY_VARIABLE_ENTRY    = Pattern.compile("<value>(fontFamily:\\$\\{exo\\.branding\\.theme\\.fontFamily:[^}]+\\})</value>");
 
   @Test
   public void shouldGetDefaultBrandingInformationWhenNoUpdate() {
@@ -1067,6 +1107,294 @@ public class BrandingServiceImplTest {
     LocaleConfigImpl localeConfig = new LocaleConfigImpl();
     localeConfig.setLocale(locale);
     return localeConfig;
+  }
+
+  @Test
+  public void shouldResolveFontFamilyVariableFromShippedConfiguration() throws Exception {
+    String configuration = Files.readString(new File(SHIPPED_BRANDING_CONFIGURATION).toPath(), StandardCharsets.UTF_8);
+    Matcher entry = FONT_FAMILY_VARIABLE_ENTRY.matcher(configuration);
+    assertTrue("fontFamily must be declared as fontFamily:${exo.branding.theme.fontFamily:<default>}", entry.find());
+    assertTrue(configuration, !configuration.contains("${exo.branding.theme.fontFamily:fontFamily:"));
+    String expression = entry.group(1);
+
+    String unset = Deserializer.resolveVariables(expression, null);
+    Map<String, Object> override = new HashMap<>();
+    override.put("exo.branding.theme.fontFamily", "Inter");
+    String set = Deserializer.resolveVariables(expression, override);
+
+    assertEquals(THEME_FONT_FAMILY_KEY + ":" + DEFAULT_FONT_FAMILY, unset);
+    assertEquals(THEME_FONT_FAMILY_KEY + ":Inter", set);
+    assertEquals(DEFAULT_FONT_FAMILY, newBrandingServiceWithVariable(unset).getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertEquals("Inter", newBrandingServiceWithVariable(set).getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+  }
+
+  @Test
+  public void shouldExposeArimoAsFontFamilyDefaultWhenNoOverride() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, mock(ConfigurationManager.class), "Arimo");
+
+    Branding branding = brandingService.getBrandingInformation();
+
+    assertEquals(DEFAULT_FONT_FAMILY, branding.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertEquals(DEFAULT_FONT_FAMILY, brandingService.getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertEquals(SUPPORTED_FONT_FAMILIES, branding.getSupportedFontFamilies());
+  }
+
+  @Test
+  public void shouldExposeConfiguredFontFamilyAsDefaultWhenOverridden() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, mock(ConfigurationManager.class), "Inter");
+
+    Branding branding = brandingService.getBrandingInformation();
+
+    assertEquals("Inter", branding.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertEquals("Inter", brandingService.getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+  }
+
+  @Test
+  public void shouldReplaceUnsupportedConfiguredFontFamilyByArimo() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, mock(ConfigurationManager.class), "Comic Sans");
+
+    Branding branding = brandingService.getBrandingInformation();
+
+    assertEquals(DEFAULT_FONT_FAMILY, branding.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertEquals(DEFAULT_FONT_FAMILY, brandingService.getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+  }
+
+  @Test
+  public void shouldRefuseUnsupportedFontFamilyOnUpdateAndStoreNothing() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, mock(ConfigurationManager.class), "Arimo");
+    Branding newBranding = new Branding();
+    newBranding.setCompanyName("New Company Name");
+    newBranding.setThemeStyle(new HashMap<>());
+    newBranding.getThemeStyle().put(THEME_FONT_FAMILY_KEY, "Comic Sans");
+
+    try {
+      brandingService.updateBrandingInformation(newBranding);
+      fail("An unsupported font family must be refused");
+    } catch (IllegalArgumentException e) {
+      assertEquals(FONT_FAMILY_UNSUPPORTED_MESSAGE, e.getMessage());
+    }
+    verify(settingService, never()).set(any(), any(), any(), any());
+  }
+
+  @Test
+  public void shouldStoreSupportedFontFamilyOnUpdate() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, mock(ConfigurationManager.class), "Arimo");
+    Branding newBranding = new Branding();
+    newBranding.setCompanyName("New Company Name");
+    newBranding.setThemeStyle(new HashMap<>());
+    newBranding.getThemeStyle().put(THEME_FONT_FAMILY_KEY, "Open Sans");
+
+    brandingService.updateBrandingInformation(newBranding);
+
+    verify(settingService, times(1)).set(eq(BRANDING_CONTEXT),
+                                         eq(BRANDING_SCOPE),
+                                         eq(THEME_FONT_FAMILY_KEY),
+                                         argThat(value -> "Open Sans".equals(value.getValue())));
+  }
+
+  @Test
+  public void shouldReadStoredUnsupportedFontFamilyAsDefault() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, THEME_FONT_FAMILY_KEY)).thenAnswer(invocation -> SettingValue.create("Comic Sans"));
+    ConfigurationManager configurationManager = lessConfigurationManager();
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, configurationManager, "Arimo");
+    brandingService.start();
+
+    assertEquals(DEFAULT_FONT_FAMILY, brandingService.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo"));
+  }
+
+  @Test
+  public void shouldPublishStoredFontFamilyInThemeCSS() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, THEME_FONT_FAMILY_KEY)).thenAnswer(invocation -> SettingValue.create("Open Sans"));
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, lessConfigurationManager(), "Arimo");
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+
+    assertTrue(css, css.contains("--allPagesFontFamily: Open Sans"));
+    assertTrue(css, css.contains("--allPagesPrimaryColor: #3f8487"));
+  }
+
+  @Test
+  public void shouldRecompileThemeCSSOncePerSharedLastUpdatedTime() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    AtomicReference<String> lastUpdatedTime = new AtomicReference<>("1");
+    AtomicReference<String> storedFontFamily = new AtomicReference<>("Arimo");
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> SettingValue.create(lastUpdatedTime.get()));
+    when(settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, THEME_FONT_FAMILY_KEY)).thenAnswer(invocation -> SettingValue.create(storedFontFamily.get()));
+    ConfigurationManager configurationManager = lessConfigurationManager();
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, configurationManager, "Arimo");
+    brandingService.start();
+
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo"));
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo"));
+    verify(configurationManager, times(1)).getInputStream(TEST_LESS_PATH);
+
+    storedFontFamily.set("Inter");
+    lastUpdatedTime.set("2");
+
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Inter"));
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Inter"));
+    assertEquals(2L, brandingService.getThemeStylesheet().stamp());
+    verify(configurationManager, times(2)).getInputStream(TEST_LESS_PATH);
+  }
+
+  @Test
+  public void shouldKeepPreviousStylesheetAndStampWhenRecompileFails() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    AtomicReference<String> lastUpdatedTime = new AtomicReference<>("1");
+    AtomicReference<String> template = new AtomicReference<>(TEST_LESS_TEMPLATE);
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> SettingValue.create(lastUpdatedTime.get()));
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(template.get().getBytes()));
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, configurationManager, "Arimo");
+    brandingService.start();
+    ThemeStylesheet compiled = brandingService.getThemeStylesheet();
+    assertEquals(1L, compiled.stamp());
+
+    template.set("@fontFamily: Arimo;\n:root { --allPagesFontFamily: @missing; }\n");
+    lastUpdatedTime.set("2");
+
+    ThemeStylesheet served = brandingService.getThemeStylesheet();
+    assertEquals(compiled, served);
+    assertEquals(compiled, brandingService.getThemeStylesheet());
+    assertEquals(compiled.css(), brandingService.getThemeCSSContent());
+    verify(configurationManager, times(2)).getInputStream(TEST_LESS_PATH);
+
+    template.set(TEST_LESS_TEMPLATE);
+    lastUpdatedTime.set("3");
+
+    assertEquals(3L, brandingService.getThemeStylesheet().stamp());
+    verify(configurationManager, times(3)).getInputStream(TEST_LESS_PATH);
+  }
+
+  @Test
+  public void shouldServeOnlyCompleteStylesheetsToConcurrentReadersDuringRecompile() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    AtomicReference<String> lastUpdatedTime = new AtomicReference<>("1");
+    AtomicReference<String> storedFontFamily = new AtomicReference<>("Arimo");
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> SettingValue.create(lastUpdatedTime.get()));
+    when(settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, THEME_FONT_FAMILY_KEY)).thenAnswer(invocation -> SettingValue.create(storedFontFamily.get()));
+    AtomicInteger reads = new AtomicInteger();
+    CountDownLatch recompileStarted = new CountDownLatch(1);
+    CountDownLatch releaseRecompile = new CountDownLatch(1);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> {
+      if (reads.incrementAndGet() > 1) {
+        recompileStarted.countDown();
+        releaseRecompile.await(10, TimeUnit.SECONDS);
+      }
+      return new ByteArrayInputStream(TEST_LESS_TEMPLATE.getBytes());
+    });
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, configurationManager, "Arimo");
+    brandingService.start();
+
+    storedFontFamily.set("Inter");
+    lastUpdatedTime.set("2");
+    CompletableFuture<ThemeStylesheet> recompiling = CompletableFuture.supplyAsync(brandingService::getThemeStylesheet);
+    assertTrue(recompileStarted.await(10, TimeUnit.SECONDS));
+    CompletableFuture<ThemeStylesheet> concurrent = CompletableFuture.supplyAsync(brandingService::getThemeStylesheet);
+    assertThrows(TimeoutException.class, () -> concurrent.get(200, TimeUnit.MILLISECONDS));
+    releaseRecompile.countDown();
+
+    ThemeStylesheet recompiled = recompiling.get(10, TimeUnit.SECONDS);
+    ThemeStylesheet observed = concurrent.get(10, TimeUnit.SECONDS);
+    assertEquals(2L, recompiled.stamp());
+    assertTrue(recompiled.css().contains("--allPagesFontFamily: Inter"));
+    assertEquals(recompiled, observed);
+    verify(configurationManager, times(2)).getInputStream(TEST_LESS_PATH);
+  }
+
+  @Test
+  public void shouldAppendCustomCssOnceAndKeepItAcrossAFailedRecompile() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    AtomicReference<String> lastUpdatedTime = new AtomicReference<>("1");
+    AtomicReference<String> template = new AtomicReference<>(TEST_LESS_TEMPLATE);
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> SettingValue.create(lastUpdatedTime.get()));
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BrandingServiceImpl.BRANDING_CUSTOM_CSS)).thenAnswer(invocation -> SettingValue.create(".custom { color: red; }"));
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(template.get().getBytes()));
+    PortalContainer container = mock(PortalContainer.class);
+    ExoFeatureService featureService = mock(ExoFeatureService.class);
+    when(featureService.isActiveFeature(BrandingServiceImpl.BRANDING_CUSTOM_STYLE_FEATURE)).thenReturn(true);
+    when(container.getComponentInstanceOfType(ExoFeatureService.class)).thenReturn(featureService);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             configurationManager,
+                                                             container,
+                                                             fontInitParams(THEME_FONT_FAMILY_KEY + ":Arimo"));
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+    assertEquals(css, 1, StringUtils.countMatches(css, ".custom { color: red; }"));
+    assertTrue(css, css.contains("--allPagesFontFamily: Arimo"));
+
+    template.set("@fontFamily: Arimo;\n:root { --allPagesFontFamily: @missing; }\n");
+    lastUpdatedTime.set("2");
+
+    assertEquals(css, brandingService.getThemeCSSContent());
+    assertEquals(css, brandingService.getThemeCSSContent());
+  }
+
+  @Test
+  public void shouldAcceptAConfiguredEntryRepeatingTheVariableName() {
+    BrandingServiceImpl brandingService = newBrandingServiceWithVariable(THEME_FONT_FAMILY_KEY + ":" + THEME_FONT_FAMILY_KEY + ":Inter");
+
+    assertEquals("Inter", brandingService.getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
+  }
+
+  private ConfigurationManager lessConfigurationManager() throws Exception {
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(TEST_LESS_TEMPLATE.getBytes()));
+    return configurationManager;
+  }
+
+  private BrandingServiceImpl newBrandingServiceWithVariable(String variableEntry) {
+    return newFontBrandingServiceWithEntry(mock(SettingService.class), mock(ConfigurationManager.class), variableEntry);
+  }
+
+  private BrandingServiceImpl newFontBrandingService(SettingService settingService,
+                                                     ConfigurationManager configurationManager,
+                                                     String configuredFontFamily) {
+    return newFontBrandingServiceWithEntry(settingService, configurationManager, THEME_FONT_FAMILY_KEY + ":" + configuredFontFamily);
+  }
+
+  private BrandingServiceImpl newFontBrandingServiceWithEntry(SettingService settingService,
+                                                              ConfigurationManager configurationManager,
+                                                              String fontFamilyEntry) {
+    return newBrandingService(settingService,
+                              mock(FileService.class),
+                              mock(UploadService.class),
+                              mock(LocaleConfigService.class),
+                              configurationManager,
+                              mock(PortalContainer.class),
+                              fontInitParams(fontFamilyEntry));
+  }
+
+  private InitParams fontInitParams(String fontFamilyEntry) {
+    InitParams initParams = new InitParams();
+    ValueParam companyName = new ValueParam();
+    companyName.setName(BRANDING_COMPANY_NAME_INIT_PARAM);
+    companyName.setValue("Default Company Name");
+    initParams.addParam(companyName);
+    ValueParam lessPath = new ValueParam();
+    lessPath.setName(BRANDING_THEME_LESS_PATH);
+    lessPath.setValue(TEST_LESS_PATH);
+    initParams.addParam(lessPath);
+    ValuesParam themeStyle = new ValuesParam();
+    themeStyle.setName(BRANDING_THEME_VARIABLES);
+    themeStyle.setValues(new ArrayList<>(Arrays.asList("primaryColor:#3f8487", fontFamilyEntry)));
+    initParams.addParam(themeStyle);
+    return initParams;
   }
 
   private BrandingServiceImpl newBrandingService(SettingService settingService,

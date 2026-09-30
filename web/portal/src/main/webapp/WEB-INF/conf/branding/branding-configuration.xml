@@ -68,6 +68,7 @@
         <value>${exo.branding.theme.greyColorLighten1:greyColorLighten1:#707070}</value>
         <value>${exo.branding.theme.textColor:textColor:#20282c}</value>
         <value>${exo.branding.theme.borderRadius:borderRadius:8px}</value>
+        <value>fontFamily:${exo.branding.theme.fontFamily:Arimo}</value>
 
         <value>${exo.branding.theme.topBarTextColor:topBarTextColor:#20282c}</value>
         <value>${exo.branding.theme.topBarTextFontSize:topBarTextFontSize:16px}</value>

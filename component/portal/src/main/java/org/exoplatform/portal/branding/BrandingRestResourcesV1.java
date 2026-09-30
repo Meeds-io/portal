@@ -42,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -99,9 +100,14 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   @Operation(summary = "Update Branding information", description = "Update Branding information", method = "PUT")
   @ApiResponses(value = {
                           @ApiResponse(responseCode = "204", description = "Branding information updated"),
+                          @ApiResponse(responseCode = "400", description = "Invalid branding value, the body carries the message code"),
   })
   public Response updateBrandingInformation(Branding branding) {
-    brandingService.updateBrandingInformation(branding);
+    try {
+      brandingService.updateBrandingInformation(branding);
+    } catch (IllegalArgumentException e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).type(MediaType.TEXT_PLAIN).build();
+    }
     return Response.noContent().build();
   }
 
@@ -242,12 +248,12 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                  @Parameter(description = "The value of lastModified parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
                                  @QueryParam("v")
                                  String lastModified) {
-    long lastUpdated = brandingService.getLastUpdatedTime();
+    ThemeStylesheet stylesheet = brandingService.getThemeStylesheet();
+    long lastUpdated = stylesheet.stamp();
     EntityTag eTag = new EntityTag(String.valueOf(lastUpdated));
     Response.ResponseBuilder builder = request.evaluatePreconditions(eTag);
     if (builder == null || StringUtils.isBlank(lastModified)) {
-      String themeCSS = brandingService.getThemeCSSContent();
-      builder = Response.ok(themeCSS, "text/css");
+      builder = Response.ok(stylesheet.css(), "text/css");
       builder.tag(eTag);
       CacheControl cc = new CacheControl();
       cc.setMaxAge(86400);
