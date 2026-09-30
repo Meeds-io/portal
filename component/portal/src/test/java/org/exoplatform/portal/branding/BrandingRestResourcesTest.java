@@ -33,6 +33,7 @@ import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.portal.rest.services.BaseRestServicesTestCase;
 import org.exoplatform.services.rest.impl.ContainerResponse;
 import org.exoplatform.services.rest.impl.EnvironmentContext;
@@ -168,6 +169,40 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("branding.theme.invalidValue:appMarginTop", resp.getEntity());
   }
 
+  public void testUpdateBrandingInformationRefusesUnsupportedFontFamily() throws Exception {
+    String path = "/v1/platform/branding/";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "PUT", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+    JSONObject jsonBranding = new JSONObject();
+    jsonBranding.put("companyName", "test1");
+    jsonBranding.put("themeStyle", new JSONObject().put("fontFamily", "Comic Sans"));
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Content-Type", Arrays.asList("application/json"));
+    doThrow(new IllegalArgumentException("branding.fontFamily.unsupported")).when(brandingService)
+                                                                             .updateBrandingInformation(any());
+
+    ContainerResponse resp = launcher.service("PUT", path, "", headers, jsonBranding.toString().getBytes(), envctx);
+
+    assertEquals(400, resp.getStatus());
+    assertEquals("branding.fontFamily.unsupported", resp.getEntity());
+  }
+
+  public void testGetBrandingCSSIsTaggedWithTheServedStylesheetStamp() throws Exception {
+    String path = "/v1/platform/branding/css?v=9";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+    when(brandingService.getLastUpdatedTime()).thenReturn(9L);
+    when(brandingService.getThemeStylesheet()).thenReturn(new ThemeStylesheet(7L, ".served { color: red; }"));
+
+    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
+
+    assertEquals(200, resp.getStatus());
+    assertEquals(".served { color: red; }", resp.getEntity());
+    assertEquals("\"7\"", String.valueOf(resp.getHttpHeaders().getFirst("ETag")));
+  }
+
   public void testGetBrandingCssLastModifiedNeverInTheFuture() throws Exception {
     // Given: the exposed time carries the template fingerprint and may exceed now by up to 2^32 ms
     String path = "/v1/platform/branding/css?v=1";
@@ -175,8 +210,7 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
     envctx.put(HttpServletRequest.class, httpRequest);
     long future = System.currentTimeMillis() + 40L * 24 * 3600 * 1000;
-    when(brandingService.getLastUpdatedTime()).thenReturn(future);
-    when(brandingService.getThemeCSSContent()).thenReturn(":root {}");
+    when(brandingService.getThemeStylesheet()).thenReturn(new ThemeStylesheet(future, ":root {}"));
 
     // When
     long before = System.currentTimeMillis();
