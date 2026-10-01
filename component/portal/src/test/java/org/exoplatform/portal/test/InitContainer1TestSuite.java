@@ -26,6 +26,7 @@ import org.junit.runners.Suite.SuiteClasses;
 import org.exoplatform.account.setup.web.AccountSetupServiceTest;
 import org.exoplatform.portal.TestJIBXXmlMapping;
 import org.exoplatform.portal.TestXSDCorruption;
+import org.exoplatform.portal.branding.BrandingApplicationStylingTest;
 import org.exoplatform.portal.branding.BrandingRestResourcesTest;
 import org.exoplatform.portal.branding.BrandingServiceImplTest;
 import org.exoplatform.portal.config.DefaultGroupVisibilityPluginTest;
@@ -76,6 +77,7 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     PermanentLinkServiceTest.class,
     AccountSetupServiceTest.class,
     BrandingServiceImplTest.class,
+    BrandingApplicationStylingTest.class,
     DefaultGroupVisibilityPluginTest.class,
     DynamicPortalLayoutMatcherPluginTest.class,
     DynamicPortalLayoutMatcherTest.class,

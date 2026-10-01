@@ -444,6 +444,9 @@ public class BrandingApplicationStylingTest {
     assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("pageMarginTop", "12px; }")));
     assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("appBorderColor", "red")));
     assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("topBarSticky", "yes")));
+    assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding("drawerIconColor", "red")));
+    assertThrows(IllegalArgumentException.class,
+                 () -> brandingService.updateBrandingInformation(branding("topBarIconColor", "#FF00FF; }")));
     assertThrows(IllegalArgumentException.class,
                  () -> brandingService.updateBrandingInformation(branding("appBackgroundImage", "url(javascript:alert(1))")));
     assertThrows(IllegalArgumentException.class,
@@ -469,6 +472,42 @@ public class BrandingApplicationStylingTest {
                                                        "0px 3px 3px -2px rgba(0, 0, 0, 0.2), 0px 3px 4px 0px rgba(0, 0, 0, 0.14), 0px 1px 8px 0px rgba(0, 0, 0, 0.12)"));
     brandingService.updateBrandingInformation(branding("topBarSticky", "true"));
     brandingService.updateBrandingInformation(branding("topBarBackgroundScrollColor", "#00FF00FF"));
+    brandingService.updateBrandingInformation(branding("sideBarIconColor", "#3F8487FF"));
+    brandingService.updateBrandingInformation(branding("topBarIconColor", "transparent"));
+  }
+
+  /**
+   * eXIP 7.3.0.31, container icon colours: a key that is not set is emitted as
+   * the CSS keyword {@code initial}, a guaranteed-invalid custom property the
+   * skin's fallback chains treat as absent (each icon family keeps its own
+   * built-in colour); a stored value travels verbatim.
+   */
+  @Test
+  public void shouldEmitContainerIconColoursAsInitialWhenUnsetAndVerbatimWhenSet() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+
+    SettingService settingService = mock(SettingService.class);
+    stub(settingService, "topBarIconColor", "#FF00FFFF");
+
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+    assertNotNull("The Less template must compile with the icon colour variables", css);
+    assertTrue(css, css.contains("--allPagesTopBarIconColor: #FF00FFFF;"));
+    assertTrue(css, css.contains("--allPagesSideBarIconColor: initial;"));
+    assertTrue(css, css.contains("--allPagesDrawerIconColor: initial;"));
+
+    Map<String, String> themeStyle = brandingService.getThemeStyle();
+    assertEquals("#FF00FFFF", themeStyle.get("topBarIconColor"));
+    assertFalse(themeStyle.containsKey("sideBarIconColor"));
+    assertFalse(themeStyle.containsKey("drawerIconColor"));
+    Map<String, String> defaults = brandingService.getDefaultThemeStyle();
+    assertEquals("", defaults.get("drawerIconColor"));
   }
 
   private Branding branding(String key, String value) {
@@ -515,7 +554,10 @@ public class BrandingApplicationStylingTest {
                                            "appTextTitleBackgroundImage=",
                                            "appTextTitleBackgroundRadius=",
                                            "topBarSticky=false",
-                                           "topBarBackgroundScrollColor=");
+                                           "topBarBackgroundScrollColor=",
+                                           "topBarIconColor=",
+                                           "sideBarIconColor=",
+                                           "drawerIconColor=");
     themeVariables.setValues(variables);
     initParams.addParam(themeVariables);
 
