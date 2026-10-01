@@ -124,6 +124,8 @@
 @appTextSubtitleFontSize: 12px;
 @appTextSubtitleFontStyle: normal;
 @appTextSubtitleFontWeight: normal;
+// 'initial' = not set: page-content icons keep their family's built-in colour unless a page or an app sets its own
+@appIconColor: initial;
 @appTextTitleBackgroundColor: transparent;
 @appTextTitleBackgroundImage: none;
 @appTextTitleBackgroundPosition: unset;
@@ -261,6 +263,7 @@
 @allPagesAppTextSubtitleFontSize: ~"--allPagesAppTextSubtitleFontSize";
 @allPagesAppTextSubtitleFontStyle: ~"--allPagesAppTextSubtitleFontStyle";
 @allPagesAppTextSubtitleFontWeight: ~"--allPagesAppTextSubtitleFontWeight";
+@allPagesAppIconColor: ~"--allPagesAppIconColor";
 @allPagesAppTextTitleBackgroundColor: ~"--allPagesAppTextTitleBackgroundColor";
 @allPagesAppTextTitleBackgroundImage: ~"--allPagesAppTextTitleBackgroundImage";
 @allPagesAppTextTitleBackgroundPosition: ~"--allPagesAppTextTitleBackgroundPosition";
@@ -399,6 +402,7 @@
     @{allPagesAppTextSubtitleFontSize}: @appTextSubtitleFontSize;
     @{allPagesAppTextSubtitleFontStyle}: @appTextSubtitleFontStyle;
     @{allPagesAppTextSubtitleFontWeight}: @appTextSubtitleFontWeight;
+    @{allPagesAppIconColor}: @appIconColor;
     @{allPagesAppTextTitleBackgroundColor}: @appTextTitleBackgroundColor;
     @{allPagesAppTextTitleBackgroundImage}: @appTextTitleBackgroundImage;
     @{allPagesAppTextTitleBackgroundPosition}: @appTextTitleBackgroundPosition;
