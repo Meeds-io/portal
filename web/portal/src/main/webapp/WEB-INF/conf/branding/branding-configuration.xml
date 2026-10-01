@@ -89,6 +89,8 @@
         <value>topBarTextFontSize=${exo.branding.theme.topBarTextFontSize:16px}</value>
         <value>topBarTextFontStyle=${exo.branding.theme.topBarTextFontStyle:normal}</value>
         <value>topBarTextFontWeight=${exo.branding.theme.topBarTextFontWeight:normal}</value>
+        <!-- eXIP 7.3.0.31 - Icon colour of the container: empty = the skin's built-in default per icon family -->
+        <value>topBarIconColor=${exo.branding.theme.topBarIconColor:}</value>
         <value>topBarBackgroundColor=${exo.branding.theme.topBarBackgroundColor:#FFFFFFFF}</value>
         <value>topBarBackgroundPosition=${exo.branding.theme.topBarBackgroundPosition:left top}</value>
         <value>topBarBackgroundSize=${exo.branding.theme.topBarBackgroundSize:cover}</value>
@@ -103,6 +105,7 @@
         <value>sideBarTextSubtitleFontSize=${exo.branding.theme.sideBarTextSubtitleFontSize:12px}</value>
         <value>sideBarTextSubtitleFontStyle=${exo.branding.theme.sideBarTextSubtitleFontStyle:normal}</value>
         <value>sideBarTextSubtitleFontWeight=${exo.branding.theme.sideBarTextSubtitleFontWeight:normal}</value>
+        <value>sideBarIconColor=${exo.branding.theme.sideBarIconColor:}</value>
         <value>sideBarBackgroundColor=${exo.branding.theme.sideBarBackgroundColor:#FFFFFFFF}</value>
         <value>sideBarBackgroundPosition=${exo.branding.theme.sideBarBackgroundPosition:left top}</value>
         <value>sideBarBackgroundSize=${exo.branding.theme.sideBarBackgroundSize:cover}</value>
@@ -125,6 +128,7 @@
         <value>drawerTextSubtitleFontSize=${exo.branding.theme.drawerTextSubtitleFontSize:12px}</value>
         <value>drawerTextSubtitleFontStyle=${exo.branding.theme.drawerTextSubtitleFontStyle:normal}</value>
         <value>drawerTextSubtitleFontWeight=${exo.branding.theme.drawerTextSubtitleFontWeight:normal}</value>
+        <value>drawerIconColor=${exo.branding.theme.drawerIconColor:}</value>
         <value>drawerBackgroundColor=${exo.branding.theme.drawerBackgroundColor:#FFFFFFFF}</value>
         <value>drawerBackgroundPosition=${exo.branding.theme.drawerBackgroundPosition:left top}</value>
         <value>drawerBackgroundSize=${exo.branding.theme.drawerBackgroundSize:cover}</value>
