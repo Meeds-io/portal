@@ -1235,7 +1235,7 @@ public class BrandingServiceImplTest {
 
     assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo"));
     assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo"));
-    verify(configurationManager, times(1)).getInputStream(TEST_LESS_PATH);
+    verify(settingService, times(1)).get(BRANDING_CONTEXT, BRANDING_SCOPE, "primaryColor");
 
     storedFontFamily.set("Inter");
     lastUpdatedTime.set("2");
@@ -1243,7 +1243,12 @@ public class BrandingServiceImplTest {
     assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Inter"));
     assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Inter"));
     assertEquals(brandingService.getLastUpdatedTime(), brandingService.getThemeStylesheet().stamp());
-    verify(configurationManager, times(1)).getInputStream(TEST_LESS_PATH);
+    verify(settingService, times(2)).get(BRANDING_CONTEXT, BRANDING_SCOPE, "primaryColor");
+
+    brandingService.updateLastUpdatedTime(3);
+
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Inter"));
+    verify(settingService, times(3)).get(BRANDING_CONTEXT, BRANDING_SCOPE, "primaryColor");
   }
 
   @Test

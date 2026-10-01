@@ -1019,6 +1019,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     } else {
       settingService.set(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY, SettingValue.create(lastUpdatedTimestamp));
     }
+    themeStylesheet.set(null);
   }
 
   @Override
