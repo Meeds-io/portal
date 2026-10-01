@@ -491,6 +491,8 @@ public class BrandingApplicationStylingTest {
     assertThrows(IllegalArgumentException.class,
                  () -> brandingService.updateBrandingInformation(branding("topBarIconColor", "#FF00FF; }")));
     assertThrows(IllegalArgumentException.class,
+                 () -> brandingService.updateBrandingInformation(branding("appIconColor", "#707070; }")));
+    assertThrows(IllegalArgumentException.class,
                  () -> brandingService.updateBrandingInformation(branding("appBackgroundImage", "url(javascript:alert(1))")));
     assertThrows(IllegalArgumentException.class,
                  () -> brandingService.updateBrandingInformation(branding("appTextTitleBackgroundImage", "url(javascript:alert(1))")));
@@ -517,10 +519,11 @@ public class BrandingApplicationStylingTest {
     brandingService.updateBrandingInformation(branding("topBarBackgroundScrollColor", "#00FF00FF"));
     brandingService.updateBrandingInformation(branding("sideBarIconColor", "#3F8487FF"));
     brandingService.updateBrandingInformation(branding("topBarIconColor", "transparent"));
+    brandingService.updateBrandingInformation(branding("appIconColor", "#707070"));
   }
 
   /**
-   * eXIP 7.3.0.31, container icon colours: a key that is not set is emitted as
+   * Container and platform-wide icon colours: a key that is not set is emitted as
    * the CSS keyword {@code initial}, a guaranteed-invalid custom property the
    * skin's fallback chains treat as absent (each icon family keeps its own
    * built-in colour); a stored value travels verbatim.
@@ -532,6 +535,7 @@ public class BrandingApplicationStylingTest {
 
     SettingService settingService = mock(SettingService.class);
     stub(settingService, "topBarIconColor", "#FF00FFFF");
+    stub(settingService, "appIconColor", "#00AA00FF");
 
     ConfigurationManager configurationManager = mock(ConfigurationManager.class);
     when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
@@ -544,13 +548,16 @@ public class BrandingApplicationStylingTest {
     assertTrue(css, css.contains("--allPagesTopBarIconColor: #FF00FFFF;"));
     assertTrue(css, css.contains("--allPagesSideBarIconColor: initial;"));
     assertTrue(css, css.contains("--allPagesDrawerIconColor: initial;"));
+    assertTrue(css, css.contains("--allPagesAppIconColor: #00AA00FF;"));
 
     Map<String, String> themeStyle = brandingService.getThemeStyle();
     assertEquals("#FF00FFFF", themeStyle.get("topBarIconColor"));
     assertFalse(themeStyle.containsKey("sideBarIconColor"));
     assertFalse(themeStyle.containsKey("drawerIconColor"));
+    assertEquals("#00AA00FF", themeStyle.get("appIconColor"));
     Map<String, String> defaults = brandingService.getDefaultThemeStyle();
     assertEquals("", defaults.get("drawerIconColor"));
+    assertEquals("", defaults.get("appIconColor"));
   }
 
   private Branding branding(String key, String value) {
@@ -601,7 +608,8 @@ public class BrandingApplicationStylingTest {
                                            "topBarBackgroundScrollColor=",
                                            "topBarIconColor=",
                                            "sideBarIconColor=",
-                                           "drawerIconColor=");
+                                           "drawerIconColor=",
+                                           "appIconColor=");
     themeVariables.setValues(variables);
     initParams.addParam(themeVariables);
 

@@ -178,6 +178,8 @@
         <value>appTextSubtitleFontSize=${exo.branding.theme.appTextSubtitleFontSize:}</value>
         <value>appTextSubtitleFontStyle=${exo.branding.theme.appTextSubtitleFontStyle:}</value>
         <value>appTextSubtitleFontWeight=${exo.branding.theme.appTextSubtitleFontWeight:}</value>
+        <!-- Platform-wide icon colour of page content, the outermost level of the app > page > platform cascade: empty = each icon family's built-in -->
+        <value>appIconColor=${exo.branding.theme.appIconColor:}</value>
         <value>appTextTitleBackgroundColor=${exo.branding.theme.appTextTitleBackgroundColor:}</value>
         <value>appTextTitleBackgroundImage=${exo.branding.theme.appTextTitleBackgroundImage:}</value>
         <value>appTextTitleBackgroundPosition=${exo.branding.theme.appTextTitleBackgroundPosition:}</value>
