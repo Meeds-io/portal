@@ -362,6 +362,25 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
+  public void shouldCompileRealTemplateWithASelectedFontFamily() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    stub(settingService, "fontFamily", "Open Sans");
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    String css = brandingService.getThemeCSSContent();
+    assertTrue(css, css.contains("--allPagesFontFamily: Open Sans;"));
+
+    stub(settingService, "fontFamily", "Comic Sans");
+    brandingService.updateLastUpdatedTime(1);
+    assertTrue(brandingService.getThemeCSSContent(), brandingService.getThemeCSSContent().contains("--allPagesFontFamily: Arimo;"));
+  }
+
+  @Test
   public void shouldKeepLastCompiledStylesheetWhenAValueDoesNotCompile() throws Exception {
     File lessFile = new File(BRANDING_LESS_PATH);
     assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
@@ -514,6 +533,7 @@ public class BrandingApplicationStylingTest {
     ValuesParam themeVariables = new ValuesParam();
     themeVariables.setName(BRANDING_THEME_VARIABLES);
     List<String> variables = Arrays.asList("primaryColor:#3f8487", // legacy declaration form
+                                           "fontFamily=Arimo",
                                            "secondaryColor=secondaryColor:#abcdef", // legacy override form (exo.properties X=X:value)
                                            "textColor=#20282c",
                                            "borderRadius=8px",

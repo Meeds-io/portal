@@ -35,10 +35,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.CRC32;
 import java.util.stream.Collectors;
+import java.util.zip.CRC32;
 
 import org.apache.commons.lang3.StringUtils;
 import org.picocontainer.Startable;
@@ -67,6 +68,7 @@ import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
@@ -239,6 +241,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_LAST_UPDATED_TIME_KEY     = "branding.lastUpdatedTime";
 
+  public static final String   THEME_FONT_FAMILY_KEY              = "fontFamily";
+
+  public static final String   DEFAULT_FONT_FAMILY                = "Arimo";
+
+  public static final List<String> SUPPORTED_FONT_FAMILIES         = List.of(DEFAULT_FONT_FAMILY, "Inter", "Roboto", "Open Sans", "Public Sans");
+
+  public static final String   FONT_FAMILY_UNSUPPORTED_MESSAGE    = "branding.fontFamily.unsupported";
+
   public static final String   FILE_API_NAME_SPACE                = "CompanyBranding";
 
   public static final String   LOGO_NAME                          = "logo.png";
@@ -315,11 +325,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Map<String, String>  supportedLanguages                 = null;
 
+  private final AtomicReference<ThemeStylesheet> themeStylesheet  = new AtomicReference<>();
+
+  private final Object         themeCSSLock                       = new Object();
+
   private String               lessThemeContent                   = null;
 
-  private String               themeCSSContent                    = null;
-
-  /** Last stylesheet that compiled: served while a newer value does not compile (fail-safe) */
   private String               lastCompiledThemeCSS               = null;
 
   private Long                 templateHash                       = null;
@@ -327,8 +338,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private boolean              legacyOverrideFormReported         = false;
 
   private Logo                 logo                               = null;
-
-  private String               customCss                          = null;
 
   private Favicon              favicon                            = null;
 
@@ -378,7 +387,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public void start() {
-    computeThemeCSS();
+    getThemeStylesheet();
     listenerService.addListener(ExoFeatureService.FEATURE_STATUS_CHANGED_EVENT, e -> {
       if (StringUtils.equals(BRANDING_CUSTOM_STYLE_FEATURE, (String) e.getSource())) {
         this.triggerBrandingUpdated(true, true);
@@ -393,10 +402,30 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getThemeCSSContent() {
-    if (themeCSSContent == null) {
-      this.computeThemeCSS();
+    return getThemeStylesheet().css();
+  }
+
+  private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {
+    return stylesheet != null && stylesheet.stamp() == lastUpdatedTime;
+  }
+
+  @Override
+  public ThemeStylesheet getThemeStylesheet() {
+    long lastUpdatedTime = getLastUpdatedTime();
+    ThemeStylesheet stylesheet = themeStylesheet.get();
+    if (isCurrent(stylesheet, lastUpdatedTime)) {
+      return stylesheet;
     }
-    return themeCSSContent;
+    synchronized (themeCSSLock) {
+      lastUpdatedTime = getLastUpdatedTime();
+      stylesheet = themeStylesheet.get();
+      if (isCurrent(stylesheet, lastUpdatedTime)) {
+        return stylesheet;
+      }
+      stylesheet = new ThemeStylesheet(lastUpdatedTime, compileThemeCSS());
+      themeStylesheet.set(stylesheet);
+      return stylesheet;
+    }
   }
 
   /**
@@ -439,6 +468,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setPageWidth(getPageWidth());
     branding.setCustomCss(getCustomCss());
     branding.setThemeStyle(getThemeStyle());
+    branding.setSupportedFontFamilies(SUPPORTED_FONT_FAMILIES);
     branding.setLoginTitle(getLoginTitle());
     branding.setLoginSubtitle(getLoginSubtitle());
     branding.setLastUpdatedTime(getLastUpdatedTime());
@@ -989,8 +1019,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     } else {
       settingService.set(Context.GLOBAL, Scope.GLOBAL, BRANDING_LAST_UPDATED_TIME_KEY, SettingValue.create(lastUpdatedTimestamp));
     }
-    this.themeCSSContent = null;
-    this.customCss = null;
+    themeStylesheet.set(null);
   }
 
   @Override
@@ -1022,10 +1051,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     Map<String, String> themeStyleVariables = new HashMap<>();
     Set<String> variables = themeVariables.keySet();
     for (String themeVariable : variables) {
-      SettingValue<?> storedStyleValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
-      String styleValue = storedStyleValue == null
-                          || storedStyleValue.getValue() == null ? themeVariables.get(themeVariable) :
-                                                                 storedStyleValue.getValue().toString();
+      String styleValue = getThemeStyleValue(themeVariable);
       if (StringUtils.isNotBlank(styleValue)) {
         themeStyleVariables.put(themeVariable, styleValue);
       }
@@ -1255,6 +1281,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
             variableValue = "";
           }
           this.themeVariables.put(variableName, variableValue);
+        }
+        String configuredFontFamily = this.themeVariables.get(THEME_FONT_FAMILY_KEY);
+        if (configuredFontFamily != null && !isSupportedFontFamily(configuredFontFamily)) {
+          LOG.warn("Unsupported default font family '{}' in {}, using '{}'. Supported families: {}",
+                   configuredFontFamily,
+                   BRANDING_THEME_VARIABLES,
+                   DEFAULT_FONT_FAMILY,
+                   SUPPORTED_FONT_FAMILIES);
+          this.themeVariables.put(THEME_FONT_FAMILY_KEY, DEFAULT_FONT_FAMILY);
         }
       }
     }
@@ -1534,45 +1569,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return fileItem;
   }
 
-  private String computeThemeCSS() {// NOSONAR
-    String css = null;
-    if (themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent())) {
-      // Effective values: stored, else configured default, blank = not set (the template default stays);
-      // the Topbar gradient is neutralized like on the read path
-      Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
-      // A platform page margin also neutralises the first and last section's own 10px padding, as the site and
-      // page levels do (--allPagesNoMarginTop/Bottom: 0px next to --allPagesMarginTop/Bottom); both stay 'initial' otherwise
-      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
-        effectiveValues.put("pageNoMarginTop", "0px");
-      }
-      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
-        effectiveValues.put("pageNoMarginBottom", "0px");
-      }
-      try {
-        css = compileThemeCSS(effectiveValues);
-        this.lastCompiledThemeCSS = css;
-      } catch (Less4jException e) {
-        // Fail-safe: the stylesheet every user loads is never removed by one value the compiler refuses
-        LOG.warn("Error compiling less file content, the last compiled stylesheet is served", e);
-        if (this.lastCompiledThemeCSS == null) {
-          // nothing compiled yet (a stored or configured value broke the very first compile): the pristine
-          // template is the fallback, and it is remembered so that the failing compile does not run on every request
-          this.lastCompiledThemeCSS = compilePristineTemplate();
-        }
-        css = this.lastCompiledThemeCSS;
-      }
-    }
-    if (StringUtils.isNotBlank(getCustomCssContent())
-        && getFeatureService() != null
-        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      // built in a local and assigned once: two concurrent first requests never append the custom CSS twice
-      css = (css == null ? "" : css) + "\n" + this.customCss;
-    }
-    this.themeCSSContent = css;
-    return css;
-  }
-
-
   private String compilePristineTemplate() {
     try {
       return compileThemeCSS(Collections.emptyMap());
@@ -1663,14 +1659,34 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return lessThemeContent;
   }
 
-  private String getCustomCssContent() {
-    if (this.customCss == null) {
-      this.customCss = getCustomCss();
-      if (this.customCss == null) {
-        this.customCss = "";
+  private String compileThemeCSS() {
+    String css = "";
+    if (themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent())) {
+      Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
+      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
+        effectiveValues.put("pageNoMarginTop", "0px");
+      }
+      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
+        effectiveValues.put("pageNoMarginBottom", "0px");
+      }
+      try {
+        css = compileThemeCSS(effectiveValues);
+        this.lastCompiledThemeCSS = css;
+      } catch (Less4jException e) {
+        LOG.warn("Error compiling less file content, the last compiled stylesheet is served", e);
+        if (this.lastCompiledThemeCSS == null) {
+          this.lastCompiledThemeCSS = compilePristineTemplate();
+        }
+        css = this.lastCompiledThemeCSS;
       }
     }
-    return this.customCss;
+    String customCss = getCustomCss();
+    if (StringUtils.isNotBlank(customCss)
+        && getFeatureService() != null
+        && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
+      css += "\n" + customCss;
+    }
+    return css;
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
@@ -1772,6 +1788,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
                   branding.getPageBackgroundColor())
           .forEach(this::validateCSSStyleValue);
     branding.getThemeStyle().values().forEach(this::validateCSSStyleValue);
+    validateFontFamily(branding.getThemeStyle().get(THEME_FONT_FAMILY_KEY));
     branding.getThemeStyle().forEach(this::validateApplicationThemeStyleValue);
     validateThemeStyleCompiles(branding.getThemeStyle());
   }
@@ -1800,6 +1817,27 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       LOG.debug("Submitted theme style does not compile, refused", e);
       throw new IllegalArgumentException("branding.theme.stylesheetCompilationError");
     }
+  }
+
+  private String getThemeStyleValue(String themeVariable) {
+    SettingValue<?> storedStyleValue = settingService.get(BRANDING_CONTEXT, BRANDING_SCOPE, themeVariable);
+    String styleValue = storedStyleValue == null
+                        || storedStyleValue.getValue() == null ? themeVariables.get(themeVariable) :
+                                                               storedStyleValue.getValue().toString();
+    if (THEME_FONT_FAMILY_KEY.equals(themeVariable) && !isSupportedFontFamily(styleValue)) {
+      return themeVariables.get(themeVariable);
+    }
+    return styleValue;
+  }
+
+  private void validateFontFamily(String fontFamily) {
+    if (StringUtils.isNotBlank(fontFamily) && !isSupportedFontFamily(fontFamily)) {
+      throw new IllegalArgumentException(FONT_FAMILY_UNSUPPORTED_MESSAGE);
+    }
+  }
+
+  private boolean isSupportedFontFamily(String fontFamily) {
+    return SUPPORTED_FONT_FAMILIES.contains(fontFamily);
   }
 
   /**

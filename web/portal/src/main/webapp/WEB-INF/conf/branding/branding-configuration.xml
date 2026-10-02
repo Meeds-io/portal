@@ -83,6 +83,7 @@
         <value>greyColorLighten1=${exo.branding.theme.greyColorLighten1:#707070}</value>
         <value>textColor=${exo.branding.theme.textColor:#20282c}</value>
         <value>borderRadius=${exo.branding.theme.borderRadius:8px}</value>
+        <value>fontFamily=${exo.branding.theme.fontFamily:Arimo}</value>
 
         <value>topBarTextColor=${exo.branding.theme.topBarTextColor:#20282c}</value>
         <value>topBarTextFontSize=${exo.branding.theme.topBarTextFontSize:16px}</value>

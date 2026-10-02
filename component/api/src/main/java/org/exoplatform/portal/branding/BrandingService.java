@@ -25,6 +25,7 @@ import org.exoplatform.portal.branding.model.Background;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.Favicon;
 import org.exoplatform.portal.branding.model.Logo;
+import org.exoplatform.portal.branding.model.ThemeStylesheet;
 
 public interface BrandingService {
 
@@ -199,6 +200,16 @@ public interface BrandingService {
    * @return CSS content of colors for theme
    */
   String getThemeCSSContent();
+
+  /**
+   * @return the compiled branding stylesheet with the branding update time it
+   *         was compiled for, the value an HTTP response tags it with. The
+   *         stamp is always {@link #getLastUpdatedTime()}: when the theme
+   *         values do not compile, the last theme compile that did (the
+   *         shipped template's when none did yet) is served under the current
+   *         stamp, with the current custom CSS appended.
+   */
+  ThemeStylesheet getThemeStylesheet();
 
   /**
    * Updated last updated time of one of Branding properties
