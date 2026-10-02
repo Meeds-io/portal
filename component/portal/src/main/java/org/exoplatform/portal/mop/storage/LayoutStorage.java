@@ -896,6 +896,9 @@ public class LayoutStorage {
     if (attrs.containsKey(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName())) {
       cssStyle.setTextSubtitleFontStyle((String) attrs.get(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName()));
     }
+    if (attrs.containsKey(MappedAttributes.ICON_COLOR.getName())) {
+      cssStyle.setIconColor((String) attrs.get(MappedAttributes.ICON_COLOR.getName()));
+    }
     if (attrs.containsKey(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName())) {
       cssStyle.setTextTitleBackgroundColor((String) attrs.get(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName()));
     }
@@ -1136,6 +1139,9 @@ public class LayoutStorage {
     }
     if (StringUtils.isNotBlank(cssStyle.getTextSubtitleFontStyle())) {
       properties.put(MappedAttributes.TEXT_SUBTITLE_FONT_STYLE.getName(), cssStyle.getTextSubtitleFontStyle());
+    }
+    if (StringUtils.isNotBlank(cssStyle.getIconColor())) {
+      properties.put(MappedAttributes.ICON_COLOR.getName(), cssStyle.getIconColor());
     }
     if (StringUtils.isNotBlank(cssStyle.getTextTitleBackgroundColor())) {
       properties.put(MappedAttributes.TEXT_TITLE_BACKGROUND_COLOR.getName(), cssStyle.getTextTitleBackgroundColor());
