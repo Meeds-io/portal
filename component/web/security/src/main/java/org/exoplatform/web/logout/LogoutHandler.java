@@ -92,10 +92,7 @@ public class LogoutHandler extends WebRequestHandler {
       AbstractTokenService.getInstance(CookieTokenService.class)
                           .deleteToken(token);
 
-      Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-      cookie.setPath(request.getContextPath());
-      cookie.setMaxAge(0);
-      response.addCookie(cookie);
+      LoginUtils.clearRememberMeCookie(request, response);
     }
   }
 
