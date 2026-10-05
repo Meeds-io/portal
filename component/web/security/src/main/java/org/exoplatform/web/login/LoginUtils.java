@@ -52,7 +52,7 @@ public class LoginUtils {
   /**
    * Deletes the remember me cookie from the browser. The cookie is written at
    * path "/" and shared by every webapp, and a browser deletes a cookie only on
-   * a Set-Cookie naming the same path: the deletion is sent at "/".
+   * a Set-Cookie naming the same path, so every deletion goes through here.
    *
    * @param request the incoming request
    * @param response the response carrying the deletion
