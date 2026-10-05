@@ -28,7 +28,6 @@ import jakarta.servlet.FilterConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -106,7 +105,7 @@ public class RememberMeFilter extends AbstractFilter {
             // every Spring WAR, so deleting it on a transient IDM or database
             // failure cost users their remember-me everywhere at once.
             if (request.getAttribute(FilterDisabledLoginModule.DISABLED_USER_NAME) != null) {
-              clearTokenCookie(request, response);
+              LoginUtils.clearRememberMeCookie(request, response);
             }
             // Debug, not warn: Tomcat's JAASRealm has already logged the
             // underlying LoginException with its stack at warn
@@ -122,15 +121,6 @@ public class RememberMeFilter extends AbstractFilter {
 
     // Continue
     chain.doFilter(request, response);
-  }
-
-  private void clearTokenCookie(HttpServletRequest request, HttpServletResponse response) {
-    Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-    cookie.setPath("/");
-    cookie.setMaxAge(0);
-    cookie.setHttpOnly(true);
-    cookie.setSecure(request.isSecure());
-    response.addCookie(cookie);
   }
 
   public void begin(OrganizationService orgService) {
