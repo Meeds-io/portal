@@ -76,6 +76,10 @@ public class PageParsingTest extends TestCase {
       // an application's margins stay in its style attributes (platform scale, 20 = neutral): no spacing token
       assertEquals(Integer.valueOf(20), columnApplication.getCssStyle().getMarginTop());
       assertEquals(Integer.valueOf(8), columnApplication.getCssStyle().getMarginBottom());
+      // eXIP 7.3.0.31: the icon colour a page definition ships is read from the css-style element; the JiBX
+      // mapping is ordered, so icon-color is its last child, after the text elements (text-color here)
+      assertEquals("#112233", columnApplication.getCssStyle().getTextColor());
+      assertEquals("#AABBCC", columnApplication.getCssStyle().getIconColor());
       assertFalse("spacing token emitted: " + columnApplication.getCssClass(), columnApplication.getCssClass().matches(".*\\b(mt|mb|me|ms)-n?\\d.*"));
       assertTrue("'brtr-4' not found", columnApplication.getCssClass().contains("brtr-4"));
       assertTrue("'brtl-2' not found", columnApplication.getCssClass().contains("brtl-2"));
@@ -114,6 +118,8 @@ public class PageParsingTest extends TestCase {
       // a grid cell's margins are rendered through spacing tokens: 0 -> mt-n5, 16 -> ms-n1 on the 20-neutral scale
       assertTrue("'mt-n5' not found in " + cell.getCssClass(), cell.getCssClass().contains("mt-n5"));
       assertTrue("'ms-n1' not found in " + cell.getCssClass(), cell.getCssClass().contains("ms-n1"));
+      // a css-style without the element leaves the colour unset (no default is ever stored at this level)
+      assertNull(cell.getCssStyle().getIconColor());
       assertTrue("'brtr-0' not found", cell.getCssClass().contains("brtr-0"));
       assertTrue("'brtl-1' not found", cell.getCssClass().contains("brtl-1"));
       assertTrue("'brbr-2' not found", cell.getCssClass().contains("brbr-2"));

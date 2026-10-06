@@ -52,6 +52,8 @@
             <radius-bottom-left>0</radius-bottom-left>
             <mobile-hidden>true</mobile-hidden>
             <border-color>#CCAABB</border-color>
+            <text-color>#112233</text-color>
+            <icon-color>#AABBCC</icon-color>
           </css-style>
         </portlet-application>
         <container />
