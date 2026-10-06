@@ -82,6 +82,8 @@ public class MappedAttributes {
 
   public static final Key<String>  TEXT_SUBTITLE_FONT_STYLE   = Key.create("text-subtitle-font-style", ValueType.STRING);
 
+  public static final Key<String>  ICON_COLOR                 = Key.create("icon-color", ValueType.STRING);
+
   public static final Key<String>  TEXT_TITLE_BACKGROUND_COLOR = Key.create("text-title-background-color", ValueType.STRING);
 
   public static final Key<String>  TEXT_TITLE_BACKGROUND_IMAGE = Key.create("text-title-background-image", ValueType.STRING);
