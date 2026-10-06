@@ -217,6 +217,46 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertEquals("fixed", loadedStyle.getBackgroundAttachment());
   }
 
+  public void testIconColorPersistedAndReloaded() {
+    // eXIP 7.3.0.31: the page/app icon colour, stored as the icon-color attribute next to text-color
+    ModelStyle style = new ModelStyle();
+    style.setTextColor("#20282C");
+    style.setIconColor("#AABBCC");
+
+    ContainerData containerData = new ContainerData(null,
+                                                    "testIconColor",
+                                                    "testIconColor",
+                                                    null,
+                                                    "system:/groovy/portal/webui/container/UIContainer.gtmpl",
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    style,
+                                                    null,
+                                                    Collections.emptyList(),
+                                                    Collections.emptyList());
+
+    List<ComponentEntity> saved = layoutStorage.saveChildren(new JSONArray(),
+                                                             Collections.<ComponentData> singletonList(containerData));
+    assertEquals(1, saved.size());
+    restartTransaction();
+
+    ContainerEntity savedEntity = (ContainerEntity) saved.get(0);
+    JSONArray body = new JSONArray();
+    body.add(savedEntity.toJSON());
+
+    List<ComponentData> loaded = layoutStorage.buildChildren(body);
+    assertEquals(1, loaded.size());
+    ModelStyle loadedStyle = ((ContainerData) loaded.get(0)).getCssStyle();
+    assertNotNull(loadedStyle);
+    assertEquals("#20282C", loadedStyle.getTextColor());
+    assertEquals("#AABBCC", loadedStyle.getIconColor());
+  }
+
   public void testApplicationMarginsPersistedAndReloaded() {
     // default margins of the applications of a page, stored as app-margin-* attributes
     ApplicationBackgroundStyle appStyle = new ApplicationBackgroundStyle();
