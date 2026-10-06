@@ -194,10 +194,7 @@ public class UIPortal extends UIContainer {
       }
 
       LogoutControl.wantLogout();
-      Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-      cookie.setPath(req.getContextPath());
-      cookie.setMaxAge(0);
-      prContext.getResponse().addCookie(cookie);
+      LoginUtils.clearRememberMeCookie(req, prContext.getResponse());
 
       prContext.sendRedirect("/");
     }
