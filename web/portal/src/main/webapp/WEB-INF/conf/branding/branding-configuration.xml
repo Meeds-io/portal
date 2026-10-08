@@ -89,7 +89,7 @@
         <value>topBarTextFontSize=${exo.branding.theme.topBarTextFontSize:16px}</value>
         <value>topBarTextFontStyle=${exo.branding.theme.topBarTextFontStyle:normal}</value>
         <value>topBarTextFontWeight=${exo.branding.theme.topBarTextFontWeight:normal}</value>
-        <!-- eXIP 7.3.0.31 - Icon colour of the container: empty = the skin's built-in default per icon family -->
+        <!-- Icon colour of the container: empty = the skin's built-in default per icon family -->
         <value>topBarIconColor=${exo.branding.theme.topBarIconColor:}</value>
         <value>topBarBackgroundColor=${exo.branding.theme.topBarBackgroundColor:#FFFFFFFF}</value>
         <value>topBarBackgroundPosition=${exo.branding.theme.topBarBackgroundPosition:left top}</value>
