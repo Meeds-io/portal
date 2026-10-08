@@ -76,7 +76,7 @@ public class PageParsingTest extends TestCase {
       // an application's margins stay in its style attributes (platform scale, 20 = neutral): no spacing token
       assertEquals(Integer.valueOf(20), columnApplication.getCssStyle().getMarginTop());
       assertEquals(Integer.valueOf(8), columnApplication.getCssStyle().getMarginBottom());
-      // eXIP 7.3.0.31: the icon colour a page definition ships is read from the css-style element; the JiBX
+      // The icon colour a page definition ships is read from the css-style element; the JiBX
       // mapping is ordered, so icon-color is its last child, after the text elements (text-color here)
       assertEquals("#112233", columnApplication.getCssStyle().getTextColor());
       assertEquals("#AABBCC", columnApplication.getCssStyle().getIconColor());

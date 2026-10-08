@@ -218,7 +218,7 @@ public class LayoutStorageTest extends AbstractDAOTest {
   }
 
   public void testIconColorPersistedAndReloaded() {
-    // eXIP 7.3.0.31: the page/app icon colour, stored as the icon-color attribute next to text-color
+    // The page/app icon colour, stored as the icon-color attribute next to text-color
     ModelStyle style = new ModelStyle();
     style.setTextColor("#20282C");
     style.setIconColor("#AABBCC");
