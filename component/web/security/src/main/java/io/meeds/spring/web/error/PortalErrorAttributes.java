@@ -33,12 +33,13 @@ import jakarta.servlet.RequestDispatcher;
  * Error body attributes of the platform's Spring MVC error page. The
  * {@code message} attribute, included by
  * {@code spring.web.error.include-message=always}, is kept only for a client
- * error raised with an explicit reason: a {@code ResponseStatusException}
- * reason or a {@code sendError} message, the message code the client
- * translates. Any other message is an exception's own text (a framework 4xx's
- * handler signature or parser error, a 5xx's SQL or file path) and must not
- * reach the browser. An error whose status is not among the attributes keeps
- * no message either.
+ * error raised with an explicit reason, and is then that reason: a
+ * {@code ResponseStatusException} reason or a {@code sendError} message, which
+ * is the refusal's message code, or the request echo Spring's own 4xx
+ * refusals carry. Any other message is an exception's own text (a framework
+ * 4xx's handler signature or parser error, a validation error's bound object
+ * or method, a 5xx's SQL or file path) and must not reach the browser. An
+ * error whose status is not among the attributes keeps no message either.
  */
 @Component
 public class PortalErrorAttributes extends DefaultErrorAttributes {
@@ -50,17 +51,17 @@ public class PortalErrorAttributes extends DefaultErrorAttributes {
   @Override
   public Map<String, Object> getErrorAttributes(WebRequest webRequest, ErrorAttributeOptions options) {
     Map<String, Object> errorAttributes = super.getErrorAttributes(webRequest, options);
-    if (!isClientErrorWithReason(webRequest, errorAttributes)) {
+    Object reason = webRequest.getAttribute(RequestDispatcher.ERROR_MESSAGE, RequestAttributes.SCOPE_REQUEST);
+    if (isClientError(errorAttributes) && !ObjectUtils.isEmpty(reason)) {
+      errorAttributes.computeIfPresent(MESSAGE_ATTRIBUTE, (name, message) -> reason.toString());
+    } else {
       errorAttributes.remove(MESSAGE_ATTRIBUTE);
     }
     return errorAttributes;
   }
 
-  private boolean isClientErrorWithReason(WebRequest webRequest, Map<String, Object> errorAttributes) {
-    return errorAttributes.get(STATUS_ATTRIBUTE) instanceof Integer status
-           && status >= 400
-           && status < 500
-           && !ObjectUtils.isEmpty(webRequest.getAttribute(RequestDispatcher.ERROR_MESSAGE, RequestAttributes.SCOPE_REQUEST));
+  private boolean isClientError(Map<String, Object> errorAttributes) {
+    return errorAttributes.get(STATUS_ATTRIBUTE) instanceof Integer status && status >= 400 && status < 500;
   }
 
 }

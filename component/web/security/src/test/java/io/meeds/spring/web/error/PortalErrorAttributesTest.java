@@ -46,10 +46,14 @@ import org.springframework.boot.webmvc.autoconfigure.WebMvcAutoConfiguration;
 import org.springframework.boot.webmvc.autoconfigure.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -160,6 +164,39 @@ class PortalErrorAttributesTest {
                                 .get("message"));
     assertFalse(errorAttributes.getErrorAttributes(new ServletWebRequest(request), ErrorAttributeOptions.of(Include.MESSAGE))
                                .containsKey("message"));
+  }
+
+  @Test
+  void refusalReasonStaysOutWhenMessageIsNotIncluded() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, HttpStatus.BAD_REQUEST.value());
+    request.setAttribute(RequestDispatcher.ERROR_MESSAGE, REFUSAL_CODE);
+
+    assertFalse(new PortalErrorAttributes().getErrorAttributes(new ServletWebRequest(request), ErrorAttributeOptions.of(Include.STATUS))
+                                           .containsKey("message"));
+  }
+
+  /**
+   * A validation error's own message names the bound object or the handler
+   * method: the refusal's reason replaces it.
+   */
+  @Test
+  void refusalReasonReplacesTheValidationErrorText() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, HttpStatus.BAD_REQUEST.value());
+    request.setAttribute(RequestDispatcher.ERROR_MESSAGE, REFUSAL_CODE);
+    BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "payload");
+    bindingResult.reject("payload.invalid");
+    MethodParameter parameter = new MethodParameter(ErrorTestController.class.getMethod("body", Map.class), 0);
+    PortalErrorAttributes errorAttributes = new PortalErrorAttributes();
+    errorAttributes.resolveException(request,
+                                     new MockHttpServletResponse(),
+                                     null,
+                                     new MethodArgumentNotValidException(parameter, bindingResult));
+
+    assertEquals(REFUSAL_CODE,
+                 errorAttributes.getErrorAttributes(new ServletWebRequest(request), ErrorAttributeOptions.of(Include.STATUS, Include.MESSAGE))
+                                .get("message"));
   }
 
   private void assertNoMessage(HttpResponse<String> response, HttpStatus status, String internalText) {
