@@ -25,7 +25,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
@@ -35,18 +39,26 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.tomcat.autoconfigure.servlet.TomcatServletWebServerAutoConfiguration;
+import org.springframework.boot.web.error.ErrorAttributeOptions;
+import org.springframework.boot.web.error.ErrorAttributeOptions.Include;
 import org.springframework.boot.webmvc.autoconfigure.DispatcherServletAutoConfiguration;
 import org.springframework.boot.webmvc.autoconfigure.WebMvcAutoConfiguration;
 import org.springframework.boot.webmvc.autoconfigure.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.servlet.RequestDispatcher;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -67,38 +79,108 @@ import tools.jackson.databind.json.JsonMapper;
   ErrorMvcAutoConfiguration.class,
 })
 @TestPropertySource(locations = "classpath:application-common.properties")
+@DirtiesContext
 class PortalErrorAttributesTest {
 
-  private static final String REFUSAL_CODE      = "x.code";
+  /**
+   * Set JVM-wide by the embedded Tomcat: the Kernel tests sharing the surefire
+   * JVM would then resolve their configuration under it and start no container
+   */
+  private static final String[]            CATALINA_PROPERTIES = { "catalina.home", "catalina.base" };
 
-  private static final String INTERNAL_MESSAGE  = "select * from SECRET_TABLE";
+  private static final Map<String, String> SAVED_PROPERTIES    = new HashMap<>();
+
+  private static final String              REFUSAL_CODE        = "x.code";
+
+  private static final String              INTERNAL_MESSAGE    = "select * from SECRET_TABLE";
 
   @LocalServerPort
-  private int                 port;
+  private int                              port;
+
+  @BeforeAll
+  static void saveCatalinaProperties() {
+    for (String name : CATALINA_PROPERTIES) {
+      SAVED_PROPERTIES.put(name, System.getProperty(name));
+    }
+  }
+
+  @AfterAll
+  static void restoreCatalinaProperties() {
+    SAVED_PROPERTIES.forEach((name, value) -> {
+      if (value == null) {
+        System.clearProperty(name);
+      } else {
+        System.setProperty(name, value);
+      }
+    });
+  }
 
   @Test
   void refusalReasonReachesTheClient() throws Exception {
-    HttpResponse<String> response = get("refusal");
+    HttpResponse<String> response = send(get("refusal"));
     assertEquals(HttpStatus.BAD_REQUEST.value(), response.statusCode());
     assertEquals(REFUSAL_CODE, JsonMapper.shared().readTree(response.body()).path("message").asString());
   }
 
   @Test
-  void serverErrorMessageNeverReachesTheClient() throws Exception {
-    HttpResponse<String> response = get("failure");
-    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), response.statusCode());
-    JsonNode body = JsonMapper.shared().readTree(response.body());
-    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), body.path("status").asInt());
-    assertFalse(body.has("message"), response.body());
-    assertFalse(response.body().contains(INTERNAL_MESSAGE), response.body());
+  void refusalWithoutReasonKeepsNoMessage() throws Exception {
+    HttpResponse<String> response = send(request("body").header("Content-Type", "application/json")
+                                                        .POST(HttpRequest.BodyPublishers.noBody()));
+    assertEquals(HttpStatus.BAD_REQUEST.value(), response.statusCode());
+    assertNoMessage(response, HttpStatus.BAD_REQUEST, "ErrorTestController");
   }
 
-  private HttpResponse<String> get(String path) throws Exception {
+  @Test
+  void serverErrorMessageNeverReachesTheClient() throws Exception {
+    HttpResponse<String> response = send(get("failure"));
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), response.statusCode());
+    assertNoMessage(response, HttpStatus.INTERNAL_SERVER_ERROR, INTERNAL_MESSAGE);
+  }
+
+  @Test
+  void serverErrorReasonNeverReachesTheClient() throws Exception {
+    HttpResponse<String> response = send(get("unavailable"));
+    assertEquals(HttpStatus.SERVICE_UNAVAILABLE.value(), response.statusCode());
+    assertNoMessage(response, HttpStatus.SERVICE_UNAVAILABLE, REFUSAL_CODE);
+  }
+
+  /**
+   * The status is read from the attributes, which a caller excluding
+   * {@link Include#STATUS} does not get: the message is then dropped too.
+   */
+  @Test
+  void errorWithoutStatusAttributeKeepsNoMessage() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, HttpStatus.BAD_REQUEST.value());
+    request.setAttribute(RequestDispatcher.ERROR_MESSAGE, REFUSAL_CODE);
+    PortalErrorAttributes errorAttributes = new PortalErrorAttributes();
+
+    assertEquals(REFUSAL_CODE,
+                 errorAttributes.getErrorAttributes(new ServletWebRequest(request), ErrorAttributeOptions.of(Include.STATUS, Include.MESSAGE))
+                                .get("message"));
+    assertFalse(errorAttributes.getErrorAttributes(new ServletWebRequest(request), ErrorAttributeOptions.of(Include.MESSAGE))
+                               .containsKey("message"));
+  }
+
+  private void assertNoMessage(HttpResponse<String> response, HttpStatus status, String internalText) {
+    JsonNode body = JsonMapper.shared().readTree(response.body());
+    assertEquals(status.value(), body.path("status").asInt());
+    assertFalse(body.has("message"), response.body());
+    assertFalse(response.body().contains(internalText), response.body());
+  }
+
+  private HttpRequest.Builder get(String path) {
+    return request(path).GET();
+  }
+
+  private HttpRequest.Builder request(String path) {
+    return HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/rest/test/error/" + path))
+                      .header("Accept", "application/json");
+  }
+
+  private HttpResponse<String> send(HttpRequest.Builder request) throws Exception {
     try (HttpClient client = HttpClient.newHttpClient()) {
-      HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/rest/test/error/" + path))
-                                       .header("Accept", "application/json")
-                                       .build();
-      return client.send(request, HttpResponse.BodyHandlers.ofString());
+      return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
   }
 
@@ -116,9 +198,19 @@ class PortalErrorAttributesTest {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, REFUSAL_CODE);
     }
 
+    @PostMapping("body")
+    public String body(@RequestBody Map<String, Object> body) {
+      return body.toString();
+    }
+
     @GetMapping("failure")
     public String failure() {
       throw new IllegalStateException(INTERNAL_MESSAGE);
+    }
+
+    @GetMapping("unavailable")
+    public String unavailable() {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, REFUSAL_CODE);
     }
 
   }
