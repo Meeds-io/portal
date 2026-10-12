@@ -35,6 +35,8 @@
 @topBarTextFontSize: 16px;
 @topBarTextFontStyle: normal;
 @topBarTextFontWeight: normal;
+// Icon colour per container: 'initial' = not set (the Vuetify and legacy icon families keep their own built-in colours)
+@topBarIconColor: initial;
 @topBarBackgroundColor: #FFFFFFFF;
 @topBarBackgroundPosition: left top;
 @topBarBackgroundSize: cover;
@@ -49,6 +51,7 @@
 @sideBarTextSubtitleFontSize: 12px;
 @sideBarTextSubtitleFontStyle: normal;
 @sideBarTextSubtitleFontWeight: normal;
+@sideBarIconColor: initial;
 @sideBarBackgroundColor: #FFFFFFFF;
 @sideBarBackgroundPosition: left top;
 @sideBarBackgroundSize: cover;
@@ -71,6 +74,7 @@
 @drawerTextSubtitleFontSize: 12px;
 @drawerTextSubtitleFontStyle: normal;
 @drawerTextSubtitleFontWeight: normal;
+@drawerIconColor: initial;
 @drawerBackgroundColor: #FFFFFFFF;
 @drawerBackgroundPosition: left top;
 @drawerBackgroundSize: cover;
@@ -120,6 +124,8 @@
 @appTextSubtitleFontSize: 12px;
 @appTextSubtitleFontStyle: normal;
 @appTextSubtitleFontWeight: normal;
+// 'initial' = not set: page-content icons keep their family's built-in colour unless a page or an app sets its own
+@appIconColor: initial;
 @appTextTitleBackgroundColor: transparent;
 @appTextTitleBackgroundImage: none;
 @appTextTitleBackgroundPosition: unset;
@@ -173,6 +179,7 @@
 @allPagesTopBarTextFontSize: ~"--allPagesTopBarTextFontSize";
 @allPagesTopBarTextFontStyle: ~"--allPagesTopBarTextFontStyle";
 @allPagesTopBarTextFontWeight: ~"--allPagesTopBarTextFontWeight";
+@allPagesTopBarIconColor: ~"--allPagesTopBarIconColor";
 @allPagesTopBarBackgroundColor: ~"--allPagesTopBarBackgroundColor";
 @allPagesTopBarBackgroundImage: ~"--allPagesTopBarBackgroundImage";
 @allPagesTopBarBackgroundPosition: ~"--allPagesTopBarBackgroundPosition";
@@ -187,6 +194,7 @@
 @allPagesSideBarTextSubtitleFontSize: ~"--allPagesSideBarTextSubtitleFontSize";
 @allPagesSideBarTextSubtitleFontStyle: ~"--allPagesSideBarTextSubtitleFontStyle";
 @allPagesSideBarTextSubtitleFontWeight: ~"--allPagesSideBarTextSubtitleFontWeight";
+@allPagesSideBarIconColor: ~"--allPagesSideBarIconColor";
 @allPagesSideBarBackgroundColor: ~"--allPagesSideBarBackgroundColor";
 @allPagesSideBarBackgroundImage: ~"--allPagesSideBarBackgroundImage";
 @allPagesSideBarBackgroundPosition: ~"--allPagesSideBarBackgroundPosition";
@@ -209,6 +217,7 @@
 @allPagesDrawerTextSubtitleFontSize: ~"--allPagesDrawerTextSubtitleFontSize";
 @allPagesDrawerTextSubtitleFontStyle: ~"--allPagesDrawerTextSubtitleFontStyle";
 @allPagesDrawerTextSubtitleFontWeight: ~"--allPagesDrawerTextSubtitleFontWeight";
+@allPagesDrawerIconColor: ~"--allPagesDrawerIconColor";
 @allPagesDrawerBackgroundColor: ~"--allPagesDrawerBackgroundColor";
 @allPagesDrawerBackgroundPosition: ~"--allPagesDrawerBackgroundPosition";
 @allPagesDrawerBackgroundSize: ~"--allPagesDrawerBackgroundSize";
@@ -254,6 +263,7 @@
 @allPagesAppTextSubtitleFontSize: ~"--allPagesAppTextSubtitleFontSize";
 @allPagesAppTextSubtitleFontStyle: ~"--allPagesAppTextSubtitleFontStyle";
 @allPagesAppTextSubtitleFontWeight: ~"--allPagesAppTextSubtitleFontWeight";
+@allPagesAppIconColor: ~"--allPagesAppIconColor";
 @allPagesAppTextTitleBackgroundColor: ~"--allPagesAppTextTitleBackgroundColor";
 @allPagesAppTextTitleBackgroundImage: ~"--allPagesAppTextTitleBackgroundImage";
 @allPagesAppTextTitleBackgroundPosition: ~"--allPagesAppTextTitleBackgroundPosition";
@@ -308,6 +318,7 @@
     @{allPagesTopBarTextFontStyle}: @topBarTextFontStyle;
     @{allPagesTopBarTextFontSize}: @topBarTextFontSize;
     @{allPagesTopBarTextFontWeight}: @topBarTextFontWeight;
+    @{allPagesTopBarIconColor}: @topBarIconColor;
     @{allPagesTopBarBackgroundColor}: @topBarBackgroundColor;
     @{allPagesTopBarBackgroundImage}: @topBarBackgroundImage;
     @{allPagesTopBarBackgroundPosition}: @topBarBackgroundPosition;
@@ -322,6 +333,7 @@
     @{allPagesSideBarTextSubtitleFontSize}: @sideBarTextSubtitleFontSize;
     @{allPagesSideBarTextSubtitleFontStyle}: @sideBarTextSubtitleFontStyle;
     @{allPagesSideBarTextSubtitleFontWeight}: @sideBarTextSubtitleFontWeight;
+    @{allPagesSideBarIconColor}: @sideBarIconColor;
     @{allPagesSideBarBackgroundColor}: @sideBarBackgroundColor;
     @{allPagesSideBarBackgroundImage}: @sideBarBackgroundImage;
     @{allPagesSideBarBackgroundPosition}: @sideBarBackgroundPosition;
@@ -344,6 +356,7 @@
     @{allPagesDrawerTextSubtitleFontSize}: @drawerTextSubtitleFontSize;
     @{allPagesDrawerTextSubtitleFontStyle}: @drawerTextSubtitleFontStyle;
     @{allPagesDrawerTextSubtitleFontWeight}: @drawerTextSubtitleFontWeight;
+    @{allPagesDrawerIconColor}: @drawerIconColor;
     @{allPagesDrawerBackgroundColor}: @drawerBackgroundColor;
     @{allPagesDrawerBackgroundPosition}: @drawerBackgroundPosition;
     @{allPagesDrawerBackgroundSize}: @drawerBackgroundSize;
@@ -389,6 +402,7 @@
     @{allPagesAppTextSubtitleFontSize}: @appTextSubtitleFontSize;
     @{allPagesAppTextSubtitleFontStyle}: @appTextSubtitleFontStyle;
     @{allPagesAppTextSubtitleFontWeight}: @appTextSubtitleFontWeight;
+    @{allPagesAppIconColor}: @appIconColor;
     @{allPagesAppTextTitleBackgroundColor}: @appTextTitleBackgroundColor;
     @{allPagesAppTextTitleBackgroundImage}: @appTextTitleBackgroundImage;
     @{allPagesAppTextTitleBackgroundPosition}: @appTextTitleBackgroundPosition;

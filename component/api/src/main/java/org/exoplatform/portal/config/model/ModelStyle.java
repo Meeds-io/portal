@@ -101,6 +101,8 @@ public class ModelStyle implements Serializable {
 
   private String            textSubtitleFontStyle;
 
+  private String            iconColor;
+
   private String            textTitleBackgroundColor;
 
   private String            textTitleBackgroundImage;

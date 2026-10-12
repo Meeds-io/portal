@@ -76,6 +76,7 @@
     <value name="text-subtitle-font-size" field="textSubtitleFontSize" usage="optional" />
     <value name="text-subtitle-font-weight" field="textSubtitleFontWeight" usage="optional" />
     <value name="text-subtitle-font-style" field="textSubtitleFontStyle" usage="optional" />
+    <value name="icon-color" field="iconColor" usage="optional" />
   </mapping>
 
   <mapping class="org.exoplatform.portal.config.serialize.model.Preference" name="preference" label="preference">
