@@ -69,6 +69,12 @@ public class PortalData extends ModelData {
 
   private long                      bannerFileId;
 
+  /**
+   * True when the stored layout of the site couldn't be read because its root
+   * container is missing: a save of this data keeps the stored layout.
+   */
+  private boolean                   layoutUnresolved;
+
   private PortalData() {
     super(null, null);
     this.key = null;

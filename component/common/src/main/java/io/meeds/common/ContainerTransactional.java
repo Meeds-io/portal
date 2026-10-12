@@ -26,11 +26,34 @@ import java.lang.annotation.Target;
 /**
  * Describe a method as transactional. This annotation will allow to:
  * - Set current container to PortalContainer
- * - Start a transaction for IDM and JPA sessions
+ * - Start the request lifecycle of the container: the IDM session transaction
+ *   and the JPA EntityManager. The JPA writes made through kernel DAOs commit
+ *   one DAO call at a time, unless {@link #atomic()} is set.
  *
- * This annotation is handled in io.meeds.commons.persistence.impl.ContainerTransactionalAspect.
+ * This annotation is handled in io.meeds.common.ContainerTransactionalAspect.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface ContainerTransactional {
+
+  /**
+   * @return true to run the method in one JPA transaction, committed when it
+   *         returns and rolled back when it throws. The writes made through
+   *         the kernel EntityManager (kernel DAOs, ExoTransactional methods)
+   *         join it. When the method begins the transaction, the Spring
+   *         transactional methods, Spring Data repositories included, join it
+   *         too, unless a Spring transaction of its own is active on the
+   *         thread, and the callbacks they register run once it is committed
+   *         or rolled back, unless a Spring transaction synchronization is
+   *         already active on the thread: their callbacks are then left to
+   *         that synchronization. A Spring cache eviction (CacheEvict) made
+   *         inside the method takes effect at once, before the commit. When a
+   *         call that failed marked the transaction
+   *         rollback-only, the method throws a RollbackException after the
+   *         rollback, even if it returned. When a JPA transaction is already
+   *         active on the thread, the method joins it and marks it
+   *         rollback-only when it throws.
+   */
+  boolean atomic() default false;
+
 }

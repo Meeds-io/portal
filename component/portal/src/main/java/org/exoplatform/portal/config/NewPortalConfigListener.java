@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -307,10 +308,21 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   }
 
   public void initPortalConfigDB(NewPortalConfig ele, boolean prepareImport) {
+    initPortalConfigDB(ele, prepareImport, null);
+  }
+
+  /**
+   * @param ele the sites configuration of an extension
+   * @param prepareImport true to import the sites even when the configuration
+   *          doesn't override them
+   * @param beforeImport applied to each site configuration before it's
+   *          imported, null to import it as is
+   */
+  public void initPortalConfigDB(NewPortalConfig ele, boolean prepareImport, Consumer<PortalConfig> beforeImport) {
     RequestLifeCycle.begin(PortalContainer.getInstance());
     try {
       if (ele.getOverrideMode() || prepareImport) {
-        initPortalConfigDB(ele);
+        initPortalConfigDB(ele, beforeImport);
       }
     } catch (Exception e) {
       log.error("NewPortalConfig error: " + e.getMessage(), e);
@@ -320,8 +332,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   }
 
   public void initPortalConfigDB(NewPortalConfig config) {
+    initPortalConfigDB(config, (Consumer<PortalConfig>) null);
+  }
+
+  private void initPortalConfigDB(NewPortalConfig config, Consumer<PortalConfig> beforeImport) {
     for (String owner : config.getPredefinedOwner()) {
-      if (createPortalConfig(config, owner)) {
+      if (createPortalConfig(config, owner, beforeImport)) {
         LOG.info("Importing Site of type '{}' with name '{}' from location '{}' wth mode '{}'",
                  config.getOwnerType(),
                  owner,
@@ -373,6 +389,10 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   }
 
   public boolean createPortalConfig(NewPortalConfig config, String owner) {
+    return createPortalConfig(config, owner, null);
+  }
+
+  private boolean createPortalConfig(NewPortalConfig config, String owner, Consumer<PortalConfig> beforeImport) {
     String type = config.getOwnerType();
     String fixedOwnerName = fixOwnerName(type, owner);
 
@@ -416,6 +436,9 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
 
     // If XML configuration of PortalConfig exists or PortalConfig doesn't exist
     // in storage, import PortalConfig switch default ImportMode
+    if (beforeImport != null) {
+      beforeImport.accept(pConfig);
+    }
     ImportMode importMode = getRightMode(config.getImportMode());
     PortalConfigImporter portalImporter = new PortalConfigImporter(importMode, pConfig, layoutService);
     try {

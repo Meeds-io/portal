@@ -173,6 +173,7 @@ public class UserPortalConfigService implements Startable {
     if (!canRestore(type, name)) {
       return false;
     }
+    PortalConfig previousSite = restoreSiteLayout ? layoutService.getPortalConfig(type, name) : null;
     List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(type, name);
     for(NewPortalConfig config : configs) {
       config = config.clone();
@@ -182,21 +183,9 @@ public class UserPortalConfigService implements Startable {
       ownerName.add(name);
       config.setPredefinedOwner(ownerName);
       if (restoreSiteLayout) {
-        PortalConfig previousSite = layoutService.getPortalConfig(type, name);
-        newPortalConfigListener.initPortalConfigDB(config, true);
-        PortalConfig site = layoutService.getPortalConfig(type, name);
-        if (previousSite != null) {
-          // Preserve previous version or properties
-          site.setLabel(previousSite.getLabel());
-          site.setDescription(previousSite.getDescription());
-          site.setAccessPermissions(previousSite.getAccessPermissions());
-          site.setEditPermission(previousSite.getEditPermission());
-          site.setDisplayed(previousSite.isDisplayed());
-          site.setDisplayOrder(previousSite.getDisplayOrder());
-          site.setIcon(previousSite.getIcon());
-          site.setProperties(previousSite.getProperties());
-          layoutService.save(site);
-        }
+        // The imported site carries the settings of the site it replaces, so
+        // that it is saved once, without being read again
+        newPortalConfigListener.initPortalConfigDB(config, true, importedSite -> keepSiteSettings(importedSite, previousSite));
       }
       if (restorePages) {
         newPortalConfigListener.initPageDB(config, true);
@@ -711,6 +700,19 @@ public class UserPortalConfigService implements Startable {
    */
   public void setMetaPortalConfig(PortalConfig metaPortalConfig) {
     this.metaPortalConfig = metaPortalConfig;
+  }
+
+  private void keepSiteSettings(PortalConfig importedSite, PortalConfig previousSite) {
+    if (previousSite != null) {
+      importedSite.setLabel(previousSite.getLabel());
+      importedSite.setDescription(previousSite.getDescription());
+      importedSite.setAccessPermissions(previousSite.getAccessPermissions());
+      importedSite.setEditPermission(previousSite.getEditPermission());
+      importedSite.setDisplayed(previousSite.isDisplayed());
+      importedSite.setDisplayOrder(previousSite.getDisplayOrder());
+      importedSite.setIcon(previousSite.getIcon());
+      importedSite.setProperties(previousSite.getProperties());
+    }
   }
 
   private PageContext getPage(PageKey pageRef, Identity userAclIdentity) {
