@@ -37,9 +37,11 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.portal.config.model.Application;
+import org.exoplatform.portal.config.model.Container;
 import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PageBody;
 import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.portal.config.model.Properties;
 import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
@@ -671,6 +673,48 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     String customSiteName = "customSiteName";
     userPortalConfigService.createUserPortalConfig(PortalConfig.PORTAL_TYPE, customSiteName, "test");
     assertFalse(userPortalConfigService.restoreSite("portal", customSiteName, ImportMode.OVERWRITE, false, true, false));
+  }
+
+  public void testRestoreSiteLayoutKeepsTheSiteSettings() {
+    PortalConfig originalSite = layoutService.getPortalConfig(PortalConfig.PORTAL_TYPE, "classic");
+    List<Event<?, ?>> siteUpdates = new ArrayList<>();
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, new Listener<Object, Object>() {
+      @Override
+      public void onEvent(Event<Object, Object> event) {
+        siteUpdates.add(event);
+      }
+    });
+    try {
+      PortalConfig site = layoutService.getPortalConfig(PortalConfig.PORTAL_TYPE, "classic");
+      site.setLabel("Customized label");
+      site.setDescription("Customized description");
+      site.setDisplayed(false);
+      site.setDisplayOrder(7);
+      site.setProperties(new Properties(Map.of("customized", "true")));
+      site.setPortalLayout(new Container());
+      layoutService.save(site);
+      siteUpdates.clear();
+
+      assertTrue(userPortalConfigService.restoreSite("portal", "classic", ImportMode.OVERWRITE, true, false, false));
+
+      assertEquals("The restored site is saved once, with the settings it replaces", 1, siteUpdates.size());
+      PortalConfig restoredSite = layoutService.getPortalConfig(PortalConfig.PORTAL_TYPE, "classic");
+      assertEquals("Customized label", restoredSite.getLabel());
+      assertEquals("Customized description", restoredSite.getDescription());
+      assertFalse(restoredSite.isDisplayed());
+      assertEquals(7, restoredSite.getDisplayOrder());
+      assertEquals("true", restoredSite.getProperty("customized"));
+      assertEquals(originalSite.getPortalLayout().getChildren().size(), restoredSite.getPortalLayout().getChildren().size());
+      assertFalse(restoredSite.getPortalLayout().getChildren().isEmpty());
+    } finally {
+      PortalConfig site = layoutService.getPortalConfig(PortalConfig.PORTAL_TYPE, "classic");
+      site.setLabel(originalSite.getLabel());
+      site.setDescription(originalSite.getDescription());
+      site.setDisplayed(originalSite.isDisplayed());
+      site.setDisplayOrder(originalSite.getDisplayOrder());
+      site.setProperties(originalSite.getProperties());
+      layoutService.save(site);
+    }
   }
 
   public void testRootGetPage() {

@@ -20,6 +20,9 @@ package org.exoplatform.portal.mop.dao;
 
 import java.util.List;
 
+import jakarta.persistence.EntityManager;
+
+import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.mop.SiteFilter;
 import org.exoplatform.portal.mop.SiteKey;
@@ -150,6 +153,40 @@ public class SiteDAOTest extends AbstractDAOTest {
     
     siteDAO.delete(siteEntity);
     siteDAO.delete(siteEntity2);
+  }
+
+  public void testRefreshReadsTheCommittedRow() {
+    SiteEntity siteEntity = createSiteEntity("refreshed", SiteType.PORTAL);
+    siteDAO.create(siteEntity);
+    restartTransaction();
+
+    SiteEntity loadedEntity = siteDAO.find(siteEntity.getId());
+    // A bulk update bypasses the persistence context, as a concurrent writer
+    // does: the entity loaded on this thread keeps the previous body
+    executeInTransaction("UPDATE GateInSite s SET s.siteBody = 'committedBody' WHERE s.id = " + siteEntity.getId());
+    assertEquals("refreshedBody", siteDAO.find(siteEntity.getId()).getSiteBody());
+
+    SiteEntity refreshedEntity = siteDAO.refresh(loadedEntity);
+    assertNotNull(refreshedEntity);
+    assertEquals("committedBody", refreshedEntity.getSiteBody());
+  }
+
+  public void testRefreshRemovedSite() {
+    SiteEntity siteEntity = createSiteEntity("removed", SiteType.PORTAL);
+    siteDAO.create(siteEntity);
+    restartTransaction();
+
+    SiteEntity loadedEntity = siteDAO.find(siteEntity.getId());
+    executeInTransaction("DELETE FROM GateInSite s WHERE s.id = " + siteEntity.getId());
+
+    assertNull(siteDAO.refresh(loadedEntity));
+  }
+
+  private void executeInTransaction(String statement) {
+    EntityManager entityManager = getContainer().getComponentInstanceOfType(EntityManagerService.class).getEntityManager();
+    entityManager.getTransaction().begin();
+    entityManager.createQuery(statement).executeUpdate();
+    entityManager.getTransaction().commit();
   }
 
   private void assertSite(SiteEntity expected, SiteEntity siteEntity) {
