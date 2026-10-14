@@ -430,16 +430,17 @@
 }
 
 // Comment bubbles on a coloured application or drawer background: that colour, 60% of it mixed with white.
-// Nothing is emitted for a white or unset background, so the skin keeps its default bubble colour
-// (@commentDefaultBackgroundColor in platform-ui variables.less, remapped for drawers by its .layout-drawer() mixin),
-// nor for a value that is not a CSS colour, which would make color-mix() invalid and the bubble transparent.
-// The value is classified as text, case-insensitively: less4j compares a 4- or 8-digit hex as text, not as a colour.
+// Nothing is emitted for a white, transparent (zero alpha included) or unset background, so the skin keeps its
+// default bubble colour (@commentDefaultBackgroundColor in platform-ui variables.less, remapped for drawers by its
+// .layout-drawer() mixin), nor for a value that is not a CSS colour, which would make color-mix() invalid and the
+// bubble transparent. The value is classified as text, case-insensitively: less4j compares a 4- or 8-digit hex as
+// text, not as a colour. The Branding preview (social SiteBranding.vue) applies the same two patterns.
 .commentBackgroundColor(@property, @background) {
   .commentBackgroundColorOf(@property, @background,
-    replace("@{background}", "^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$", "colour", "i"),
-    replace("@{background}", "^#(f{3,4}|f{6}|f{8})$", "white", "i"));
+    replace("@{background}", "^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$", "colour", "i"),
+    replace("@{background}", "^#(f{3,4}|f{6}|f{8}|[0-9a-f]{3}0|[0-9a-f]{6}00)$", "uncoloured", "i"));
 }
-.commentBackgroundColorOf(@property, @background, @colour, @white) when (@colour = "colour") and not (@white = "white") {
+.commentBackgroundColorOf(@property, @background, @colour, @uncoloured) when (@colour = "colour") and not (@uncoloured = "uncoloured") {
   @{property}: ~"color-mix(in srgb, @{background} 60%, white)";
 }
 @supports (color: color-mix(in srgb, white 60%, white)) {

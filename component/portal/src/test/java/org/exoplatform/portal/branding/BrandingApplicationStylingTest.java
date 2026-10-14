@@ -406,10 +406,11 @@ public class BrandingApplicationStylingTest {
     assertTrue("the derived values are emitted only where color-mix is supported: " + css,
                supports >= 0 && supports < css.indexOf("--allPagesCommentBackgroundColor"));
 
-    // every spelling of white the colour grammar accepts, the unset value, and the grammar's lengths that are not
-    // CSS colours (color-mix() would be invalid and the bubble transparent) emit nothing
+    // every spelling of white the colour grammar accepts, transparent (the keyword and a zero alpha), the unset value,
+    // and the grammar's lengths that are not CSS colours (color-mix() would be invalid and the bubble transparent)
+    // emit nothing
     for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFF", "#ffff", "#FFFFFFFF", "#ffffffff",
-        "#FfFfFfFf", "initial", "#AABBC", "#AABBCCD" }) {
+        "#FfFfFfFf", "transparent", "#00000000", "#AABBCC00", "#ABC0", "initial", "#AABBC", "#AABBCCD" }) {
       stub(settingService, "appBackgroundColor", white);
       stub(settingService, "drawerBackgroundColor", white);
       brandingService.updateLastUpdatedTime(time++);
@@ -419,8 +420,8 @@ public class BrandingApplicationStylingTest {
     }
 
     // any other colour compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
-    for (String[] colour : new String[][] { { "transparent", "transparent" }, { "#ABC", "#aabbcc" }, { "#ABCD", "#ABCD" },
-        { "#AABBCC80", "#AABBCC80" }, { "#FFFFFE", "#FFFFFE" }, { "#FFFFFFFE", "#FFFFFFFE" } }) {
+    for (String[] colour : new String[][] { { "#ABC", "#aabbcc" }, { "#ABCD", "#ABCD" }, { "#AABBCC80", "#AABBCC80" },
+        { "#AABBCC01", "#AABBCC01" }, { "#FFFFFE", "#FFFFFE" }, { "#FFFFFFFE", "#FFFFFFFE" } }) {
       stub(settingService, "appBackgroundColor", colour[0]);
       stub(settingService, "drawerBackgroundColor", colour[0]);
       brandingService.updateLastUpdatedTime(time++);
