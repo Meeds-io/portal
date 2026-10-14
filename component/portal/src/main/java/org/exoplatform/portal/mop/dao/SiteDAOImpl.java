@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
@@ -96,6 +97,17 @@ public class SiteDAOImpl extends AbstractDAO<SiteEntity> implements SiteDAO {
     } catch (NoResultException ex) {
       return null;
     }
+  }
+
+  @Override
+  public SiteEntity refresh(SiteEntity entity) {
+    EntityManager entityManager = getEntityManager();
+    if (entityManager.contains(entity)) {
+      // The site row is then read from the database instead of the
+      // persistence context
+      entityManager.detach(entity);
+    }
+    return find(entity.getId());
   }
 
   @Override

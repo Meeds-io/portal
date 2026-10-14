@@ -41,6 +41,8 @@ import org.exoplatform.services.log.Log;
 
 import io.meeds.portal.mop.storage.cache.model.DescriptionLocaleListCache;
 
+import io.meeds.common.TransactionCallbacks;
+
 public class CacheDescriptionStorage extends DescriptionStorageImpl {
 
   private static final Log                                                 LOG                           =
@@ -91,7 +93,7 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
     try {
       super.setDescription(id, locale, description);
     } finally {
-      clearCacheEntries(id);
+      removeFromCache(id);
     }
   }
 
@@ -100,7 +102,7 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
     try {
       super.setDescription(id, description);
     } finally {
-      clearCacheEntries(id);
+      removeFromCache(id);
     }
   }
 
@@ -109,7 +111,7 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
     try {
       super.setDescriptions(id, descriptions);
     } finally {
-      clearCacheEntries(id);
+      removeFromCache(id);
     }
   }
 
@@ -147,4 +149,20 @@ public class CacheDescriptionStorage extends DescriptionStorageImpl {
     }
   }
 
+  /**
+   * Inside a transaction, the cache entries are cleared again once the
+   * transaction completes: a concurrent read made before the commit caches the
+   * previous descriptions again. The loads in flight are invalidated first so
+   * that they don't cache them either, unless one is already writing its
+   * result: the cache expiry is then the backstop.
+   */
+  private void removeFromCache(String id) {
+    Runnable eviction = () -> {
+      descriptionFutureCache.clearFutures();
+      descriptionLocaleListFutureCache.clearFutures();
+      clearCacheEntries(id);
+    };
+    eviction.run();
+    TransactionCallbacks.afterCompletion(eviction);
+  }
 }

@@ -31,6 +31,8 @@ import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.listener.ListenerService;
 
+import io.meeds.common.TransactionCallbacks;
+
 public class CachePageStorage extends PageStorageImpl {
 
   public static final String                              PAGE_CACHE_NAME     = "portal.PageService";
@@ -62,8 +64,8 @@ public class CachePageStorage extends PageStorageImpl {
     try {
       return super.clone(srcPageKey, dstPageKey);
     } finally {
-      pageFutureCache.remove(srcPageKey);
-      pageFutureCache.remove(dstPageKey);
+      removeFromCache(srcPageKey);
+      removeFromCache(dstPageKey);
     }
   }
 
@@ -72,7 +74,7 @@ public class CachePageStorage extends PageStorageImpl {
     try {
       return super.savePage(page);
     } finally {
-      pageFutureCache.remove(page.getKey());
+      removeFromCache(page.getKey());
     }
   }
 
@@ -81,7 +83,7 @@ public class CachePageStorage extends PageStorageImpl {
     try {
       super.save(page);
     } finally {
-      pageFutureCache.remove(page.getKey().toMopPageKey());
+      removeFromCache(page.getKey().toMopPageKey());
     }
   }
 
@@ -90,7 +92,7 @@ public class CachePageStorage extends PageStorageImpl {
     try {
       return super.destroyPage(key);
     } finally {
-      pageFutureCache.remove(key);
+      removeFromCache(key);
     }
   }
 
@@ -110,4 +112,19 @@ public class CachePageStorage extends PageStorageImpl {
     return pageKey;
   }
 
+  /**
+   * Inside a transaction, the page is removed from the cache again once the
+   * transaction completes: a concurrent read made before the commit caches the
+   * previous state of the page again. The load in flight is invalidated first
+   * so that it doesn't cache it either, unless it's already writing its
+   * result: the cache expiry is then the backstop.
+   */
+  private void removeFromCache(PageKey pageKey) {
+    Runnable eviction = () -> {
+      pageFutureCache.removeFuture(pageKey);
+      pageFutureCache.remove(pageKey);
+    };
+    eviction.run();
+    TransactionCallbacks.afterCompletion(eviction);
+  }
 }

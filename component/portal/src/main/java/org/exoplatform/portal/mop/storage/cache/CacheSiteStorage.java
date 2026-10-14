@@ -38,6 +38,8 @@ import org.exoplatform.upload.UploadService;
 
 import java.util.List;
 
+import io.meeds.common.TransactionCallbacks;
+
 public class CacheSiteStorage extends SiteStorageImpl {
 
   public static final String                                SITE_CACHE_NAME                = "portal.SiteService";
@@ -105,8 +107,7 @@ public class CacheSiteStorage extends SiteStorageImpl {
     try {
       super.create(config);
     } finally {
-      siteFutureCache.remove(getSiteKey(config.getKey()));
-      clearSiteKeysByFilterFutureCache();
+      removeFromCache(getSiteKey(config.getKey()));
     }
   }
 
@@ -115,18 +116,16 @@ public class CacheSiteStorage extends SiteStorageImpl {
     try {
       super.save(config);
     } finally {
-      siteFutureCache.remove(getSiteKey(config.getKey()));
-      clearSiteKeysByFilterFutureCache();
+      removeFromCache(getSiteKey(config.getKey()));
     }
   }
 
   @Override
-  public void remove(PortalData config) {
+  public void remove(SiteKey siteKey) {
     try {
-      super.remove(config);
+      super.remove(siteKey);
     } finally {
-      siteFutureCache.remove(getSiteKey(config.getKey()));
-      clearSiteKeysByFilterFutureCache();
+      removeFromCache(siteKey);
     }
   }
 
@@ -150,6 +149,24 @@ public class CacheSiteStorage extends SiteStorageImpl {
 
   private SiteKey getSiteKey(PortalKey portalKey) {
     return new SiteKey(portalKey.getType(), portalKey.getId());
+  }
+
+  /**
+   * Inside a transaction, the site is removed from the cache again once the
+   * transaction completes: a concurrent read made before the commit caches the
+   * previous state of the site again. The loads in flight are invalidated
+   * first so that they don't cache it either, unless one is already writing
+   * its result: the cache expiry is then the backstop.
+   */
+  private void removeFromCache(SiteKey siteKey) {
+    Runnable eviction = () -> {
+      siteFutureCache.removeFuture(siteKey);
+      siteFutureCache.remove(siteKey);
+      siteKeysByFilterFutureCache.clearFutures();
+      clearSiteKeysByFilterFutureCache();
+    };
+    eviction.run();
+    TransactionCallbacks.afterCompletion(eviction);
   }
 
   private void clearSiteKeysByFilterFutureCache() {

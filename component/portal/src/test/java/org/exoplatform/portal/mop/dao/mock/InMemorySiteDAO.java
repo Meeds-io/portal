@@ -33,6 +33,12 @@ import org.exoplatform.portal.mop.dao.SiteDAO;
 public class InMemorySiteDAO extends AbstractInMemoryDAO<SiteEntity> implements SiteDAO {
 
   @Override
+  public SiteEntity refresh(SiteEntity entity) {
+    // No persistence context in memory: the stored entity is the current one
+    return find(entity.getId());
+  }
+
+  @Override
   public SiteEntity findByKey(SiteKey siteKey) {
     return entities.values()
                    .stream()
