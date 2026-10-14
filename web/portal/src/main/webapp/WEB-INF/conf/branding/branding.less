@@ -223,6 +223,7 @@
 @allPagesDrawerBackgroundSize: ~"--allPagesDrawerBackgroundSize";
 @allPagesDrawerBackgroundImage: ~"--allPagesDrawerBackgroundImage";
 @allPagesDrawerBackgroundRepeat: ~"--allPagesDrawerBackgroundRepeat";
+@allPagesDrawerCommentBackgroundColor: ~"--allPagesDrawerCommentBackgroundColor";
 
 @allPagesPageMarginTop: ~"--allPagesMarginTop";
 @allPagesPageMarginRight: ~"--allPagesMarginRight";
@@ -247,6 +248,7 @@
 @allPagesAppBackgroundSize: ~"--allPagesAppBackgroundSize";
 @allPagesAppBackgroundRepeat: ~"--allPagesAppBackgroundRepeat";
 @allPagesAppBackgroundAttachment: ~"--allPagesAppBackgroundAttachment";
+@allPagesCommentBackgroundColor: ~"--allPagesCommentBackgroundColor";
 @allPagesAppTextTitleColor: ~"--allPagesAppTextTitleColor";
 @allPagesAppTextTitleFontSize: ~"--allPagesAppTextTitleFontSize";
 @allPagesAppTextTitleFontStyle: ~"--allPagesAppTextTitleFontStyle";
@@ -425,4 +427,18 @@
     @{allPagesAppTextHeaderBackgroundRadius}: @appTextHeaderBackgroundRadius;
     @{allPagesTopBarBackgroundScrollColor}: @topBarBackgroundScrollColor;
 
+}
+
+// Comment bubbles on a coloured application or drawer background: that colour, 60% of it mixed with white.
+// On a white or unset background nothing is emitted, so the skin keeps its default bubble colour
+// (@commentBackgroundColor in platform-ui variables.less, remapped for drawers in its .layout-drawer() mixin).
+// less4j compares a 3- or 6-digit hex as a colour and an 8-digit one as text, hence both cases of the 8-digit white.
+.commentBackgroundColor(@property, @background) when not (@background = #FFFFFF) and not (@background = #FFFFFFFF) and not (@background = #ffffffff) and not (@background = initial) {
+  @{property}: ~"color-mix(in srgb, @{background} 60%, white)";
+}
+@supports (color: color-mix(in srgb, white 60%, white)) {
+  :root {
+    .commentBackgroundColor(@allPagesCommentBackgroundColor, @appBackgroundColor);
+    .commentBackgroundColor(@allPagesDrawerCommentBackgroundColor, @drawerBackgroundColor);
+  }
 }

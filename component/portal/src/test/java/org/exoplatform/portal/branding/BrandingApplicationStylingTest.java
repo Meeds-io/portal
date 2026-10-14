@@ -381,6 +381,55 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
+  public void shouldEmitCommentBackgroundOnlyForAColouredApplicationOrDrawerBackground() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    // template defaults: white application and drawer backgrounds keep the skin's default bubble colour
+    String css = brandingService.getThemeCSSContent();
+    assertFalse(css, css.contains("--allPagesCommentBackgroundColor"));
+    assertFalse(css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+
+    long time = 1;
+    stub(settingService, "appBackgroundColor", "#EBADCBFF");
+    stub(settingService, "drawerBackgroundColor", "#3F8487");
+    brandingService.updateLastUpdatedTime(time++);
+    css = brandingService.getThemeCSSContent();
+    assertTrue(css, css.contains("--allPagesCommentBackgroundColor: color-mix(in srgb, #EBADCBFF 60%, white);"));
+    assertTrue(css, css.contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, #3F8487 60%, white);"));
+    assertTrue("the derived values are emitted only where color-mix is supported",
+               css.indexOf("@supports (color: color-mix(") < css.indexOf("--allPagesCommentBackgroundColor"));
+
+    // every spelling of white the colour grammar accepts, and the unset value, emit nothing
+    for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFFFFFF", "#ffffffff", "initial" }) {
+      stub(settingService, "appBackgroundColor", white);
+      stub(settingService, "drawerBackgroundColor", white);
+      brandingService.updateLastUpdatedTime(time++);
+      css = brandingService.getThemeCSSContent();
+      assertFalse(white + ": " + css, css.contains("--allPagesCommentBackgroundColor"));
+      assertFalse(white + ": " + css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+    }
+
+    // any other value of the colour grammar compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
+    for (String[] colour : new String[][] { { "transparent", "transparent" }, { "#ABC", "#aabbcc" }, { "#ABCD", "#ABCD" },
+        { "#AABBC", "#AABBC" }, { "#AABBCC80", "#AABBCC80" }, { "#AABBCCD", "#AABBCCD" } }) {
+      stub(settingService, "appBackgroundColor", colour[0]);
+      stub(settingService, "drawerBackgroundColor", colour[0]);
+      brandingService.updateLastUpdatedTime(time++);
+      css = brandingService.getThemeCSSContent();
+      assertTrue(colour[0] + ": " + css,
+                 css.contains("--allPagesCommentBackgroundColor: color-mix(in srgb, " + colour[1] + " 60%, white);"));
+      assertTrue(colour[0] + ": " + css,
+                 css.contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, " + colour[1] + " 60%, white);"));
+    }
+  }
+
+  @Test
   public void shouldKeepLastCompiledStylesheetWhenAValueDoesNotCompile() throws Exception {
     File lessFile = new File(BRANDING_LESS_PATH);
     assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
@@ -596,8 +645,10 @@ public class BrandingApplicationStylingTest {
                                            "appBorderSize=",
                                            "appBoxShadow=",
                                            "appBorderRadiusTopLeft=8px; }", // malformed configured value
+                                           "appBackgroundColor=",
                                            "appBackgroundImage=",
                                            "appBackgroundRepeat=",
+                                           "drawerBackgroundColor=",
                                            "appTextTitleColor=",
                                            "appTextHeaderColor=",
                                            "appTextTitleFontWeight=",
