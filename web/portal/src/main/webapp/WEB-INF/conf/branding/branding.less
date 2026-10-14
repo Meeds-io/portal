@@ -430,10 +430,16 @@
 }
 
 // Comment bubbles on a coloured application or drawer background: that colour, 60% of it mixed with white.
-// On a white or unset background nothing is emitted, so the skin keeps its default bubble colour
-// (@commentBackgroundColor in platform-ui variables.less, remapped for drawers in its .layout-drawer() mixin).
-// less4j compares a 3- or 6-digit hex as a colour and an 8-digit one as text, hence both cases of the 8-digit white.
-.commentBackgroundColor(@property, @background) when not (@background = #FFFFFF) and not (@background = #FFFFFFFF) and not (@background = #ffffffff) and not (@background = initial) {
+// Nothing is emitted for a white or unset background, so the skin keeps its default bubble colour
+// (@commentDefaultBackgroundColor in platform-ui variables.less, remapped for drawers by its .layout-drawer() mixin),
+// nor for a value that is not a CSS colour, which would make color-mix() invalid and the bubble transparent.
+// The value is classified as text, case-insensitively: less4j compares a 4- or 8-digit hex as text, not as a colour.
+.commentBackgroundColor(@property, @background) {
+  .commentBackgroundColorOf(@property, @background,
+    replace("@{background}", "^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$", "colour", "i"),
+    replace("@{background}", "^#(f{3,4}|f{6}|f{8})$", "white", "i"));
+}
+.commentBackgroundColorOf(@property, @background, @colour, @white) when (@colour = "colour") and not (@white = "white") {
   @{property}: ~"color-mix(in srgb, @{background} 60%, white)";
 }
 @supports (color: color-mix(in srgb, white 60%, white)) {

@@ -402,11 +402,14 @@ public class BrandingApplicationStylingTest {
     css = brandingService.getThemeCSSContent();
     assertTrue(css, css.contains("--allPagesCommentBackgroundColor: color-mix(in srgb, #EBADCBFF 60%, white);"));
     assertTrue(css, css.contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, #3F8487 60%, white);"));
-    assertTrue("the derived values are emitted only where color-mix is supported",
-               css.indexOf("@supports (color: color-mix(") < css.indexOf("--allPagesCommentBackgroundColor"));
+    int supports = css.indexOf("@supports (color: color-mix(");
+    assertTrue("the derived values are emitted only where color-mix is supported: " + css,
+               supports >= 0 && supports < css.indexOf("--allPagesCommentBackgroundColor"));
 
-    // every spelling of white the colour grammar accepts, and the unset value, emit nothing
-    for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFFFFFF", "#ffffffff", "initial" }) {
+    // every spelling of white the colour grammar accepts, the unset value, and the grammar's lengths that are not
+    // CSS colours (color-mix() would be invalid and the bubble transparent) emit nothing
+    for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFF", "#ffff", "#FFFFFFFF", "#ffffffff",
+        "#FfFfFfFf", "initial", "#AABBC", "#AABBCCD" }) {
       stub(settingService, "appBackgroundColor", white);
       stub(settingService, "drawerBackgroundColor", white);
       brandingService.updateLastUpdatedTime(time++);
@@ -415,9 +418,9 @@ public class BrandingApplicationStylingTest {
       assertFalse(white + ": " + css, css.contains("--allPagesDrawerCommentBackgroundColor"));
     }
 
-    // any other value of the colour grammar compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
+    // any other colour compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
     for (String[] colour : new String[][] { { "transparent", "transparent" }, { "#ABC", "#aabbcc" }, { "#ABCD", "#ABCD" },
-        { "#AABBC", "#AABBC" }, { "#AABBCC80", "#AABBCC80" }, { "#AABBCCD", "#AABBCCD" } }) {
+        { "#AABBCC80", "#AABBCC80" }, { "#FFFFFE", "#FFFFFE" }, { "#FFFFFFFE", "#FFFFFFFE" } }) {
       stub(settingService, "appBackgroundColor", colour[0]);
       stub(settingService, "drawerBackgroundColor", colour[0]);
       brandingService.updateLastUpdatedTime(time++);
