@@ -84,6 +84,13 @@ import lombok.Data;
         AND enabledValue.ATTR_VALUE = 'false'
       WHERE enabledAttribute.IDENTITY_OBJECT_ID = identity.ID AND enabledAttribute.NAME = 'enabled'
     )
+    AND NOT EXISTS(
+      SELECT storeAttribute.IDENTITY_OBJECT_ID FROM jbid_io_attr storeAttribute
+      INNER JOIN jbid_io_attr_text_values storeValue
+        ON storeAttribute.ATTRIBUTE_ID = storeValue.TEXT_ATTR_VALUE_ID
+        AND storeValue.ATTR_VALUE <> 'internal'
+      WHERE storeAttribute.IDENTITY_OBJECT_ID = identity.ID AND storeAttribute.NAME = 'store'
+    )
     ORDER BY lastLoginTimeValue.ATTR_VALUE ASC
     """)
 @Data
