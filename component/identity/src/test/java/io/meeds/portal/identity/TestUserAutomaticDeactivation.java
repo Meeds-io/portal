@@ -97,6 +97,51 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   }
 
   @SuppressWarnings("deprecation")
+  public void testShouldNotDisableInactiveUsersOfExternalStore() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setOriginatingStore(OrganizationService.EXTERNAL_STORE);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+
+    assertEquals(0, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    // Read back only after the job: the job does not evict the user cache, so a
+    // read before it would leave a copy that no longer reflects the database
+    user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse(user.isInternalStore());
+    assertTrue("External store user must stay enabled", user.isEnabled());
+    assertFalse(user.isAutomaticDeactivation());
+  }
+
+  @SuppressWarnings("deprecation")
+  public void testShouldDisableInactiveUsersOfInternalStore() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setOriginatingStore(OrganizationService.INTERNAL_STORE);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    // Read back only after the job, for the same reason as above
+    user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertEquals(OrganizationService.INTERNAL_STORE, user.getOriginatingStore());
+    assertFalse("Internal store user must be disabled", user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
+  }
+
+  @SuppressWarnings("deprecation")
   public void testShouldDisableInactiveUsersBeyondFirstPage() throws Exception {
     List<String> createdUserNames = new ArrayList<>();
     List<String> activeUserNames = new ArrayList<>();
