@@ -184,7 +184,7 @@
    <script type="text/javascript" id="portalHeadScripts">
      eXo.env.portal.context = "<%=docBase%>";
      eXo.env.portal.accessMode = "<%= rcontext.getAccessPath() == 0 ? "public" : "private" %>";
-     eXo.env.portal.homeLink = "<%=userHomeLink%>";
+     eXo.env.portal.homeLink = <%=org.json.JSONObject.quote(String.valueOf(userHomeLink))%>;
      eXo.env.portal.containerName = "<%=PortalContainer.getInstance().getName()%>";
      eXo.env.portal.userName='<%= userName == null ? "" : userName %>';
      eXo.env.portal.language='<%= language %>';
@@ -199,7 +199,7 @@
      eXo.env.portal.csrfToken = "<%=CSRFTokenUtil.getToken(rcontext.getRequest())%>";
      eXo.env.portal.productName = "<%=productName%>";
      eXo.env.portal.productLink = "<%=productLink%>";
-     eXo.env.portal.defaultPath = "<%=defaultPath%>";
+     eXo.env.portal.defaultPath = <%=org.json.JSONObject.quote(String.valueOf(defaultPath))%>;
      eXo.env.portal.siteId = '<%=siteId%>';
      eXo.env.portal.siteLabel = '<%=rcontext.getSiteLabel() == null ? "" : rcontext.getSiteLabel().replaceAll("'", "\\\\'")%>';
      eXo.env.server.context = "<%=docBase%>";
