@@ -21,6 +21,7 @@ package org.exoplatform.commons.persistence.impl;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.PersistenceException;
+import jakarta.persistence.RollbackException;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -45,12 +46,22 @@ public class ExoTransactionalAspect {
 
   @Around("execution(* *(..)) && @annotation(org.exoplatform.commons.api.persistence.ExoTransactional)")
   public Object around(ProceedingJoinPoint point) throws Throwable {
+    return proceed(point, getService());
+  }
+
+  /**
+   * Runs the advised method in the active transaction of the thread, or in a
+   * new one that is committed once the method returns or throws, unless a call
+   * that failed marked it rollback-only: it is then rolled back, and a method
+   * that returned throws a RollbackException, so that the writes it lost don't
+   * go unnoticed.
+   */
+  Object proceed(ProceedingJoinPoint point, EntityManagerService service) throws Throwable {
     EntityManager entityManager;
     boolean begunTx = false;
     boolean emStarted = false;
 
     // Do we need to start EntityManager ?
-    EntityManagerService service = getService();
     entityManager = service.getEntityManager();
     if (entityManager == null) {
       LOG.debug("Injecting new PersistenceContext");
@@ -81,36 +92,56 @@ public class ExoTransactionalAspect {
       }
       begunTx = true;
     }
+    Object result;
     try {
-      return point.proceed();
-    } finally {
+      result = point.proceed();
+    } catch (Throwable e) { // NOSONAR the transaction ends whatever the error
+      endTransaction(service, entityManager, emStarted, tx, begunTx);
+      throw e;
+    }
+    if (endTransaction(service, entityManager, emStarted, tx, begunTx)) {
+      throw new RollbackException("The transaction of " + point.getSignature()
+          + " was marked rollback-only by a call that failed: none of its writes is committed");
+    }
+    return result;
+  }
+
+  /**
+   * @return true when the transaction that the advice began was marked
+   *         rollback-only, and is rolled back
+   */
+  private boolean endTransaction(EntityManagerService service,
+                                 EntityManager entityManager,
+                                 boolean emStarted,
+                                 EntityTransaction tx,
+                                 boolean begunTx) {
+    try {
       // Do we need to end Transaction ?
-      try {
-        if ((begunTx) && (tx.isActive())) {
-          if (!tx.getRollbackOnly()) {
-            LOG.debug("Committing current transaction");
-            tx.commit();
-          } else {
-            LOG.debug("Rollback current transaction set as RollbackOnly");
-            tx.rollback();
-          }
-        }
-      } catch (RuntimeException ex) {
-        try {
-          if (tx != null && tx.isActive()) {
-            tx.rollback();
-          }
-        } catch (RuntimeException rbEx) {
-          LOG.error("Could not roll back transaction", rbEx);
-        }
-        throw ex;
-      } finally {
-        // Do we need to close EntityManager ?
-        if (emStarted && (entityManager != null)) {
-          service.closeEntityManager();
+      if ((begunTx) && (tx.isActive())) {
+        if (!tx.getRollbackOnly()) {
+          LOG.debug("Committing current transaction");
+          tx.commit();
+        } else {
+          LOG.debug("Rollback current transaction set as RollbackOnly");
+          tx.rollback();
+          return true;
         }
       }
-
+      return false;
+    } catch (RuntimeException ex) {
+      try {
+        if (tx != null && tx.isActive()) {
+          tx.rollback();
+        }
+      } catch (RuntimeException rbEx) {
+        LOG.error("Could not roll back transaction", rbEx);
+      }
+      throw ex;
+    } finally {
+      // Do we need to close EntityManager ?
+      if (emStarted && (entityManager != null)) {
+        service.closeEntityManager();
+      }
     }
   }
 

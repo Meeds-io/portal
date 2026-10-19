@@ -108,8 +108,8 @@ public class ContainerTransactionalAspect {
     } catch (Throwable e) { // NOSONAR the enclosing transaction can't be committed whatever the error
       if (transaction.isActive()) {
         transaction.setRollbackOnly();
-        // The kernel rolls a transaction marked rollback-only back without
-        // throwing: a caller that catches the error loses its writes silently
+        // The method that began the transaction fails with a RollbackException
+        // once it returns over it: this log names the call that marked it
         LOG.warn("{} failed in a transaction it joined, which is marked rollback-only: none of its writes is committed. Cause: {}",
                  point.getSignature(),
                  e.toString());
