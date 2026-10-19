@@ -514,8 +514,9 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   /**
    * Removes the navigation nodes of a site that none of its configurations
    * defines, as the import mode removes orphan nodes. Nothing is removed when
-   * the navigation of a configuration can't be read, since the nodes it defines
-   * can't be told apart from the orphan ones then.
+   * the navigation file of a configuration can't be parsed, since the nodes it
+   * defines can't be told apart from the orphan ones then. A configuration
+   * whose navigation file can't be opened defines no node.
    *
    * @param configs the configurations of the site
    * @param owner the site name
@@ -541,9 +542,10 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
 
   /**
    * Removes the pages of a site that none of its configurations defines.
-   * Nothing is removed when the pages of a configuration can't be read, since
-   * the pages it defines can't be told apart from the orphan ones then, nor
-   * from a user site, whose pages an import doesn't remove.
+   * Nothing is removed when the pages file of a configuration can't be parsed,
+   * since the pages it defines can't be told apart from the orphan ones then,
+   * nor from a user site, whose pages an import doesn't remove. A
+   * configuration whose pages file can't be opened defines no page.
    *
    * @param configs the configurations of the site
    * @param owner the site name

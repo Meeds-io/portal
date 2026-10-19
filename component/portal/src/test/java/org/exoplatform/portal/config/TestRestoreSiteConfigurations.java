@@ -44,7 +44,7 @@ import org.exoplatform.portal.mop.storage.PageStorage;
  * home > section > node2 and home > section > node3, the second one also holds
  * home > section > node23, which references a page of the third one, and the
  * third one attaches home > attached3 > leaf3 to the home node. The site "partial" is defined by a
- * configuration and by another one whose pages and navigation can't be read.
+ * configuration and by another one whose pages and navigation can't be parsed.
  * The site "attached" is defined by a configuration that attaches section6 >
  * node6 to the node section6, which no configuration defines. The site
  * "startup" is defined by a configuration imported in insert mode and by
