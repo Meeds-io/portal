@@ -18,16 +18,11 @@
  */
 package io.meeds.common;
 
-import java.util.List;
-
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.container.ExoContainer;
@@ -35,9 +30,10 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.RootContainer;
 import org.exoplatform.container.component.RequestLifeCycle;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.RollbackException;
 
@@ -49,6 +45,8 @@ import jakarta.persistence.RollbackException;
  */
 @Aspect
 public class ContainerTransactionalAspect {
+
+  private static final Log LOG = ExoLogger.getLogger(ContainerTransactionalAspect.class);
 
   /**
    * The advice keeps this signature: the classes an addon wove at its own build
@@ -110,6 +108,11 @@ public class ContainerTransactionalAspect {
     } catch (Throwable e) { // NOSONAR the enclosing transaction can't be committed whatever the error
       if (transaction.isActive()) {
         transaction.setRollbackOnly();
+        // The kernel rolls a transaction marked rollback-only back without
+        // throwing: a caller that catches the error loses its writes silently
+        LOG.warn("{} failed in a transaction it joined, which is marked rollback-only: none of its writes is committed. Cause: {}",
+                 point.getSignature(),
+                 e.toString());
       }
       throw e;
     }
@@ -161,121 +164,6 @@ public class ContainerTransactionalAspect {
     } else {
       return false;
     }
-  }
-
-  /**
-   * Spring transactional methods, Spring Data repositories included, write
-   * through the EntityManager that Spring's transaction synchronization holds
-   * for the factory. The scope holds the thread's EntityManager there, as a
-   * transaction already active, so that they join the transaction instead of
-   * committing their own. When no Spring transaction synchronization is
-   * active on the thread, the scope opens one and collects the callbacks they
-   * register (a TransactionalEventListener event) so that they run with the
-   * outcome of the transaction. The before-commit and before-completion
-   * callbacks run inside the transaction. The EntityManager is then released
-   * and the synchronization closed, before the transaction is committed or
-   * rolled back: a Spring transactional method called by a callback of the
-   * commit or of the rollback (a TransactionCallbacks callback), or by an
-   * after-commit or after-completion callback, runs in a Spring transaction of
-   * its own, with callbacks of its own, and one called while the commit
-   * flushes the writes (an entity listener) doesn't join the transaction. When a
-   * synchronization is already active, as in a Spring transaction without an
-   * EntityManager of its own, the scope collects none of their callbacks: they
-   * are left to that synchronization, which runs them with its own outcome and,
-   * without an actual transaction, skips a TransactionalEventListener event
-   * unless its fallback execution runs it at once.
-   */
-  private static final class SpringTransactionScope {
-
-    private static final SpringTransactionScope NONE = new SpringTransactionScope(null, false);
-
-    private final EntityManagerFactory          boundFactory;
-
-    private final boolean                       synchronizing;
-
-    private boolean                             completing;
-
-    private List<TransactionSynchronization>    synchronizations;
-
-    private SpringTransactionScope(EntityManagerFactory boundFactory, boolean synchronizing) {
-      this.boundFactory = boundFactory;
-      this.synchronizing = synchronizing;
-    }
-
-    static SpringTransactionScope open(EntityManagerFactory entityManagerFactory, EntityManager entityManager) {
-      if (entityManagerFactory == null || TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-        // A Spring transaction of its own holds an EntityManager for the
-        // factory on the thread: the Spring writes stay in it
-        return NONE;
-      }
-      TransactionSynchronizationManager.bindResource(entityManagerFactory, new ThreadEntityManagerHolder(entityManager));
-      boolean synchronizing = !TransactionSynchronizationManager.isSynchronizationActive();
-      if (synchronizing) {
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-      }
-      return new SpringTransactionScope(entityManagerFactory, synchronizing);
-    }
-
-    void beforeCommit() {
-      if (synchronizing) {
-        TransactionSynchronizationUtils.triggerBeforeCommit(false);
-        beforeCompletion();
-      }
-    }
-
-    void beforeCompletion() {
-      if (synchronizing && !completing) {
-        completing = true;
-        TransactionSynchronizationUtils.triggerBeforeCompletion();
-      }
-    }
-
-    void close() {
-      release();
-      if (synchronizing && synchronizations == null) {
-        synchronizations = TransactionSynchronizationManager.getSynchronizations();
-        TransactionSynchronizationManager.clearSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(false);
-      }
-    }
-
-    void afterCommit() {
-      close();
-      if (synchronizing) {
-        TransactionSynchronizationUtils.invokeAfterCommit(synchronizations);
-      }
-    }
-
-    void end(int status) {
-      close();
-      if (synchronizing) {
-        TransactionSynchronizationUtils.invokeAfterCompletion(synchronizations, status);
-      }
-    }
-
-    private void release() {
-      if (boundFactory != null) {
-        TransactionSynchronizationManager.unbindResourceIfPossible(boundFactory);
-      }
-    }
-
-  }
-
-  private static class ThreadEntityManagerHolder extends EntityManagerHolder {
-
-    ThreadEntityManagerHolder(EntityManager entityManager) {
-      super(entityManager);
-      // The EntityManager is given to the repositories as is, without joining
-      // it to a transaction nor closing it with one
-      setSynchronizedWithTransaction(true);
-    }
-
-    @Override
-    protected boolean isTransactionActive() {
-      return getEntityManager().getTransaction().isActive();
-    }
-
   }
 
 }

@@ -111,6 +111,7 @@ class ContainerTransactionalAspectTest {
     order.verify(point).proceed();
     order.verify(transaction).commit();
     verify(transaction, never()).rollback();
+    assertTrue(isSpringScopeClosed());
   }
 
   @Test
@@ -126,6 +127,20 @@ class ContainerTransactionalAspectTest {
     verify(transaction).begin();
     verify(transaction).rollback();
     verify(transaction, never()).commit();
+    assertTrue(isSpringScopeClosed());
+  }
+
+  @Test
+  void testCloseTheSpringScopeWhenTheTransactionCantBegin() throws Throwable {
+    IllegalStateException error = new IllegalStateException("begin failed");
+    doThrow(error).when(transaction).begin();
+
+    assertSame(error, assertThrows(IllegalStateException.class, () -> aspect.proceedAtomically(point, entityManagerService)));
+
+    verify(point, never()).proceed();
+    verify(transaction, never()).commit();
+    verify(transaction, never()).rollback();
+    assertTrue(isSpringScopeClosed());
   }
 
   @Test
