@@ -54,9 +54,11 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.importer.NavigationImporter;
+import org.exoplatform.portal.mop.importer.NavigationOrphanRemover;
 import org.exoplatform.portal.mop.importer.PageImporter;
 import org.exoplatform.portal.mop.importer.PortalConfigImporter;
 import org.exoplatform.portal.mop.importer.Status;
+import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.storage.DescriptionStorage;
@@ -385,6 +387,76 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   public void initPageNavigationDB(NewPortalConfig config) {
     for (String owner : config.getPredefinedOwner()) {
       createPageNavigation(config, owner);
+    }
+  }
+
+  /**
+   * Removes the navigation nodes of a site that none of its configurations
+   * defines, as the import mode removes orphan nodes, once each configuration
+   * navigation is imported without removing any node. Nothing is removed when
+   * the navigation of a configuration can't be read, since the nodes it defines
+   * can't be told apart from the orphan ones then.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   * @param importMode the import mode requested for the site navigation
+   */
+  public void removeNavigationOrphans(List<NewPortalConfig> configs, String owner, ImportMode importMode) {
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      List<PageNavigation> navigations = new ArrayList<>();
+      for (NewPortalConfig config : configs) {
+        UnmarshalledObject<PageNavigation> navigation = getConfig(config, owner, "navigation", PageNavigation.class);
+        if (navigation != null) {
+          navigations.add(navigation.getObject());
+        }
+      }
+      new NavigationOrphanRemover(navigationService, navigations, importMode).perform();
+    } catch (Exception e) {
+      log.error("Error while removing the orphan navigation nodes of site {}, no node is removed", owner, e);
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
+  /**
+   * Removes the pages of a site that none of its configurations defines, as an
+   * overwrite of the site pages does, so that the pages of each configuration
+   * can then be imported in place and keep the navigation nodes of other sites
+   * that reference them. Nothing is removed when the pages of a configuration
+   * can't be read, since the pages it defines can't be told apart from the
+   * orphan ones then, nor from a user site, whose pages an import doesn't
+   * remove.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   */
+  public void removePageOrphans(List<NewPortalConfig> configs, String owner) {
+    if (configs.isEmpty()) {
+      return;
+    }
+    SiteKey siteKey = new SiteKey(configs.get(0).getOwnerType(), owner);
+    if (siteKey.getType().equals(SiteType.USER)) {
+      return;
+    }
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      Set<String> pageNames = new HashSet<>();
+      for (NewPortalConfig config : configs) {
+        UnmarshalledObject<PageSet> pageSet = getConfig(config, owner, "pages", PageSet.class);
+        if (pageSet != null) {
+          pageSet.getObject().getPages().forEach(page -> pageNames.add(page.getName()));
+        }
+      }
+      for (PageContext page : layoutService.findPages(siteKey)) {
+        if (!pageNames.contains(page.getKey().getName())) {
+          layoutService.remove(page.getKey());
+        }
+      }
+    } catch (Exception e) {
+      log.error("Error while removing the orphan pages of site {}", owner, e);
+    } finally {
+      RequestLifeCycle.end();
     }
   }
 

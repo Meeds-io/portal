@@ -53,6 +53,8 @@ import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
+import io.meeds.common.ContainerTransactional;
+
 public class PageStorageImpl implements PageStorage {
 
   private static final Log    LOG                  = ExoLogger.getLogger(PageStorageImpl.class);
@@ -173,19 +175,11 @@ public class PageStorageImpl implements PageStorage {
     if (key == null) {
       throw new IllegalArgumentException("PageKey is mandatory");
     }
-
-    PageEntity page = pageDAO.findByKey(key);
-    if (page != null) {
-      String pageBody = page.getPageBody();
-      JSONArray children = parseJsonArray(pageBody);
-      layoutStorage.deleteChildren(children);
-      layoutStorage.deletePermissions(PageEntity.class.getName(), page.getId());
-      pageDAO.delete(page);
-
+    boolean destroyed = deletePage(key);
+    if (destroyed) {
       broadcastEvent(EventType.PAGE_DESTROYED, key);
-      return true;
     }
-    return false;
+    return destroyed;
   }
 
   @Override
@@ -262,23 +256,7 @@ public class PageStorageImpl implements PageStorage {
 
   @Override
   public void save(PageData page) {
-    SiteKey siteKey = new SiteKey(page.getKey().getType(), page.getKey().getId());
-    org.exoplatform.portal.mop.page.PageKey mopKey =
-                                                   new org.exoplatform.portal.mop.page.PageKey(siteKey, page.getKey().getName());
-
-    PageEntity dst = pageDAO.findByKey(mopKey);
-    if (dst == null) {
-      throw new NoSuchDataException("The page " + page.getKey() + " not found");
-    }
-    List<ComponentData> children = page.getChildren();
-
-    JSONArray pageBodyJson = parseJsonArray(dst.getPageBody());
-    List<ComponentEntity> newPageBody = layoutStorage.saveChildren(pageBodyJson, children);
-    dst.setChildren(newPageBody);
-    dst.setPageBody(((JSONArray) dst.toJSON().get("children")).toJSONString());
-
-    pageDAO.update(dst);
-    broadcastEvent(EventType.PAGE_UPDATED, mopKey);
+    broadcastEvent(EventType.PAGE_UPDATED, savePageLayout(page));
   }
 
   @Override
@@ -326,6 +304,48 @@ public class PageStorageImpl implements PageStorage {
                         entity.isShowSharedLayout(),
                         entity.getPageType() != null ? entity.getPageType().name() : null,
                         entity.getLink());
+  }
+
+  /**
+   * Removes the page layout, permissions and row in one transaction, so that a
+   * page whose removal fails keeps its layout.
+   */
+  @ContainerTransactional(atomic = true)
+  private boolean deletePage(PageKey key) {
+    PageEntity page = pageDAO.findByKey(key);
+    if (page == null) {
+      return false;
+    }
+    layoutStorage.deleteChildren(parseJsonArray(page.getPageBody()));
+    layoutStorage.deletePermissions(PageEntity.class.getName(), page.getId());
+    pageDAO.delete(page);
+    return true;
+  }
+
+  /**
+   * Replaces the page layout in one transaction, so that a concurrent reader
+   * never reads a page whose removed windows are deleted while its new layout
+   * isn't committed yet, and a page whose update fails keeps its layout.
+   */
+  @ContainerTransactional(atomic = true)
+  private org.exoplatform.portal.mop.page.PageKey savePageLayout(PageData page) {
+    SiteKey siteKey = new SiteKey(page.getKey().getType(), page.getKey().getId());
+    org.exoplatform.portal.mop.page.PageKey mopKey =
+                                                   new org.exoplatform.portal.mop.page.PageKey(siteKey, page.getKey().getName());
+
+    PageEntity dst = pageDAO.findByKey(mopKey);
+    if (dst == null) {
+      throw new NoSuchDataException("The page " + page.getKey() + " not found");
+    }
+    List<ComponentData> children = page.getChildren();
+
+    JSONArray pageBodyJson = parseJsonArray(dst.getPageBody());
+    List<ComponentEntity> newPageBody = layoutStorage.saveChildren(pageBodyJson, children);
+    dst.setChildren(newPageBody);
+    dst.setPageBody(((JSONArray) dst.toJSON().get("children")).toJSONString());
+
+    pageDAO.update(dst);
+    return mopKey;
   }
 
   protected void broadcastEvent(String eventName, org.exoplatform.portal.mop.page.PageKey pageKey) {

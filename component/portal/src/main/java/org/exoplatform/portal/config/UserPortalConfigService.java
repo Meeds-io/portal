@@ -53,6 +53,7 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.Visibility;
 import org.exoplatform.portal.mop.importer.ImportMode;
+import org.exoplatform.portal.mop.importer.NavigationOrphanRemover;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NodeContext;
 import org.exoplatform.portal.mop.page.PageContext;
@@ -175,6 +176,18 @@ public class UserPortalConfigService implements Startable {
     }
     PortalConfig previousSite = restoreSiteLayout ? layoutService.getPortalConfig(type, name) : null;
     List<NewPortalConfig> configs = newPortalConfigListener.getPortalConfigs(type, name);
+    // An overwrite removes the pages that no configuration defines, then the
+    // pages of each configuration are imported in place, so that they keep the
+    // navigation nodes of other sites that reference them. The navigation of
+    // each configuration is imported without removing any node, then the nodes
+    // that no configuration defines are removed as the import mode does
+    boolean removePageOrphans = restorePages && importMode == ImportMode.OVERWRITE;
+    ImportMode pagesImportMode = removePageOrphans ? ImportMode.MERGE : importMode;
+    boolean removeNavigationOrphans = restoreNavigationTree && NavigationOrphanRemover.removesOrphans(importMode);
+    ImportMode navigationImportMode = removeNavigationOrphans ? ImportMode.MERGE : importMode;
+    if (removePageOrphans) {
+      newPortalConfigListener.removePageOrphans(configs, name);
+    }
     for(NewPortalConfig config : configs) {
       config = config.clone();
       config.setImportMode(importMode.name());
@@ -188,11 +201,16 @@ public class UserPortalConfigService implements Startable {
         newPortalConfigListener.initPortalConfigDB(config, true, importedSite -> keepSiteSettings(importedSite, previousSite));
       }
       if (restorePages) {
+        config.setImportMode(pagesImportMode.name());
         newPortalConfigListener.initPageDB(config, true);
       }
       if (restoreNavigationTree) {
+        config.setImportMode(navigationImportMode.name());
         newPortalConfigListener.initPageNavigationDB(config, true);
       }
+    }
+    if (removeNavigationOrphans) {
+      newPortalConfigListener.removeNavigationOrphans(configs, name, importMode);
     }
     return true;
   }

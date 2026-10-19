@@ -64,6 +64,7 @@ import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.dao.ContainerDAO;
+import org.exoplatform.portal.mop.dao.PageDAO;
 import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationState;
@@ -961,6 +962,33 @@ public class TestDataStorage extends AbstractKernelTest {
     assertNotNull(navService.loadNavigation(SiteKey.portal(siteName)));
   }
 
+  public void testDestroyPageKeepsThePageLayoutWhenThePageRemovalFails() throws Exception {
+    PageKey pageKey = createPageWithWindow("failingPageRemoval");
+    PageStorageImpl pageStorage = newPageStorageFailingOn("delete");
+
+    assertThrows(IllegalStateException.class, () -> pageStorage.destroyPage(pageKey));
+    restartTransaction();
+
+    Page storedPage = pageStorage.getPage(pageKey);
+    assertNotNull(storedPage);
+    assertEquals(1, storedPage.getChildren().size());
+    assertEquals(1, ((Container) storedPage.getChildren().get(0)).getChildren().size());
+  }
+
+  public void testSavePageKeepsThePageLayoutWhenThePageUpdateFails() throws Exception {
+    PageKey pageKey = createPageWithWindow("failingPageUpdate");
+    PageStorageImpl pageStorage = newPageStorageFailingOn("update");
+    Page page = pageStorage.getPage(pageKey);
+    ((Container) page.getChildren().get(0)).setChildren(new ArrayList<>());
+
+    assertThrows(IllegalStateException.class, () -> pageStorage.save(page.build()));
+    restartTransaction();
+
+    Page storedPage = pageStorage.getPage(pageKey);
+    assertEquals(1, storedPage.getChildren().size());
+    assertEquals(1, ((Container) storedPage.getChildren().get(0)).getChildren().size());
+  }
+
   public void testCachesAreClearedAgainOnceTheTransactionCompletes() throws Exception {
     PortalContainer container = PortalContainer.getInstance();
     CacheService cacheService = container.getComponentInstanceOfType(CacheService.class);
@@ -1107,6 +1135,41 @@ public class TestDataStorage extends AbstractKernelTest {
     assertNotNull(readSite.get());
     assertNull("The site read before the save is cached", siteCache.get(siteKey));
     assertEquals("Saved label", siteStorage.getPortalConfig(siteKey).getLabel());
+  }
+
+  private PageKey createPageWithWindow(String siteName) throws Exception {
+    createSite(SiteType.PORTAL, siteName);
+    Application application = new Application();
+    application.setState(new TransientApplicationState("test/test", null));
+    Container container = new Container();
+    container.setTemplate("test");
+    container.setChildren(new ArrayList<>(Collections.singletonList(application)));
+    Page page = new Page();
+    page.setOwnerType(PortalConfig.PORTAL_TYPE);
+    page.setOwnerId(siteName);
+    page.setName("foo");
+    page.setChildren(new ArrayList<>(Collections.singletonList(container)));
+    pageService.savePage(new PageContext(page.getPageKey(), null));
+    pageService.save(page.build());
+    restartTransaction();
+    return page.getPageKey();
+  }
+
+  private PageStorageImpl newPageStorageFailingOn(String pageDAOMethodName) {
+    PortalContainer container = PortalContainer.getInstance();
+    PageDAO pageDAO = container.getComponentInstanceOfType(PageDAO.class);
+    PageDAO failingPageDAO = (PageDAO) Proxy.newProxyInstance(PageDAO.class.getClassLoader(),
+                                                              new Class<?>[] { PageDAO.class },
+                                                              (proxy, method, args) -> {
+                                                                if (pageDAOMethodName.equals(method.getName())) {
+                                                                  throw new IllegalStateException("Page DAO failure");
+                                                                }
+                                                                return invoke(pageDAO, method, args);
+                                                              });
+    return new PageStorageImpl(listenerService,
+                               container.getComponentInstanceOfType(LayoutStorage.class),
+                               container.getComponentInstanceOfType(SiteDAO.class),
+                               failingPageDAO);
   }
 
   private SiteStorageImpl newSiteStorage(PageStorage pageStorage, SiteDAO siteDAO) {
