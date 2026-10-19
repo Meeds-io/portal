@@ -38,8 +38,11 @@ import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.future.FutureExoCache;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.OrganizationService;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.security.Authenticator;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
@@ -57,6 +60,10 @@ public class UserACL {
   public static final String                 EVERYONE               = "Everyone";
 
   private static final String                CACHE_NAME             = "portal.IdentityRegistry";
+
+  private static final String                DRAFT_OWNER_SEPARATOR  = "_draft_";
+
+  private static final Log                   LOG                    = ExoLogger.getLogger(UserACL.class);
 
   @Getter
   private String                             superUser;
@@ -89,6 +96,8 @@ public class UserACL {
   private Map<String, GroupVisibilityPlugin> groupVisibilityPlugins = new HashMap<>();
 
   private Authenticator                      authenticator;
+
+  private OrganizationService                organizationService;
 
   private CacheService                       cacheService;
 
@@ -375,7 +384,7 @@ public class UserACL {
                || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
     } else if (PortalConfig.DRAFT.equals(ownerType)) {
-      return identity != null && ownerId.endsWith("_" + identity.getUserId());
+      return isDraftOwner(identity, ownerId);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
@@ -409,7 +418,7 @@ public class UserACL {
                || PortalConfig.PORTAL_TEMPLATE.equalsIgnoreCase(ownerType)) {
       return isAdministrator(identity);
     } else if (PortalConfig.DRAFT.equals(ownerType)) {
-      return identity != null && ownerId.endsWith("_" + identity.getUserId());
+      return isDraftOwner(identity, ownerId);
     } else if (PortalConfig.USER_TYPE.equals(ownerType)) {
       return isSameUser(identity, ownerId);
     }
@@ -509,6 +518,13 @@ public class UserACL {
     return authenticator;
   }
 
+  public OrganizationService getOrganizationService() {
+    if (organizationService == null) {
+      organizationService = ExoContainerContext.getService(OrganizationService.class);
+    }
+    return organizationService;
+  }
+
   public CacheService getCacheService() {
     if (cacheService == null) {
       cacheService = ExoContainerContext.getService(CacheService.class);
@@ -540,6 +556,47 @@ public class UserACL {
 
   private boolean isSameUser(Identity identity, String ownerId) {
     return identity != null && identity.getUserId().equals(ownerId);
+  }
+
+  /**
+   * A draft site is named {@code <type>_<name>_draft_<owner>}. A site name may
+   * hold {@code _draft_} or end with {@code _draft}, and a username may hold
+   * {@code _draft_} or start with {@code draft_}, so every suffix following a
+   * {@code _draft_} of the name is a candidate owner. The identity owns the
+   * draft when it is a candidate and no other candidate is an existing user:
+   * two users who could both have produced the name are both refused.
+   */
+  private boolean isDraftOwner(Identity identity, String ownerId) {
+    if (identity == null || !StringUtils.endsWith(ownerId, DRAFT_OWNER_SEPARATOR + identity.getUserId())) {
+      return false;
+    }
+    String username = identity.getUserId();
+    return getDraftOwnerCandidates(ownerId).stream()
+                                           .filter(candidate -> !candidate.equals(username))
+                                           .noneMatch(this::isExistingUser);
+  }
+
+  private List<String> getDraftOwnerCandidates(String ownerId) {
+    List<String> candidates = new ArrayList<>();
+    int index = ownerId.indexOf(DRAFT_OWNER_SEPARATOR);
+    while (index >= 0) {
+      candidates.add(ownerId.substring(index + DRAFT_OWNER_SEPARATOR.length()));
+      index = ownerId.indexOf(DRAFT_OWNER_SEPARATOR, index + 1);
+    }
+    return candidates;
+  }
+
+  private boolean isExistingUser(String username) {
+    if (StringUtils.isBlank(username)) {
+      return false;
+    }
+    try {
+      return getOrganizationService().getUserHandler().findUserByName(username, UserStatus.ANY) != null;
+    } catch (Exception e) {
+      // A candidate that cannot be checked is taken as existing: the draft is refused
+      LOG.warn("Error while checking whether user {} exists to resolve a draft site owner", username, e);
+      return true;
+    }
   }
 
   @Data
