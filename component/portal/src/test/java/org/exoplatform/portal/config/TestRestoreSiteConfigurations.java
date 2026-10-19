@@ -18,6 +18,7 @@
  */
 package org.exoplatform.portal.config;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -119,6 +120,30 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
                    getRootNode(attachedSiteKey).get(CUSTOM_NAME).getState().getPageRef());
     } finally {
       removeCustomNode(attachedSiteKey);
+    }
+  }
+
+  public void testRestorePagesImportsThePagesOfASiteThatTheStartupDidntImport() {
+    PageKey pageKey = new PageKey(SITE_KEY, "page3");
+    pageStorage.destroyPage(pageKey);
+    restartTransaction();
+    // A startup that imports no configuration of the site, as a restart does
+    // when none of them overrides it
+    Set<String> createdOwners = userPortalConfigService.getNewPortalConfigListener().createdOwners;
+    Set<String> startupOwners = new HashSet<>(createdOwners);
+    createdOwners.clear();
+    try {
+      assertTrue(userPortalConfigService.restoreSite(PortalConfig.PORTAL_TYPE,
+                                                     SITE_NAME,
+                                                     ImportMode.RESTORE_DEFAULTS,
+                                                     false,
+                                                     true,
+                                                     true));
+      restartTransaction();
+
+      assertNotNull(pageStorage.getPage(pageKey));
+    } finally {
+      createdOwners.addAll(startupOwners);
     }
   }
 

@@ -574,6 +574,10 @@ public class UserPortalConfigService implements Startable {
     }
   }
 
+  NewPortalConfigListener getNewPortalConfigListener() {
+    return newPortalConfigListener;
+  }
+
   @Synchronized
   public void initListener(ComponentPlugin listener) {
     if (listener instanceof NewPortalConfigListener portalConfigListener) {

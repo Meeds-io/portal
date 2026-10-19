@@ -461,7 +461,8 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    * mode. An overwrite removes the pages that no configuration defines first,
    * then the pages of each configuration are imported in place, so that a
    * configuration doesn't remove the pages of the others, and the pages keep
-   * the navigation nodes of other sites that reference them.
+   * the navigation nodes of other sites that reference them. The pages are
+   * imported whether or not the site was imported at startup.
    *
    * @param configs the configurations of the site
    * @param owner the site name
@@ -473,7 +474,11 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
       removePageOrphans(configs, owner);
     }
     for (NewPortalConfig config : configs) {
-      initPageDB(getSiteConfig(config, owner, overwrite ? ImportMode.MERGE : importMode), true);
+      try {
+        createPage(getSiteConfig(config, owner, overwrite ? ImportMode.MERGE : importMode), owner);
+      } catch (Exception e) {
+        log.error("NewPortalConfig error: " + e.getMessage(), e);
+      }
     }
   }
 
