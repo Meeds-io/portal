@@ -198,9 +198,12 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
     assertEquals("An overwrite at startup keeps the pages of the other configurations",
                  Set.of("pageA", "pageB"),
                  getPageNames(startupSiteKey));
+    NodeContext<?> startupRootNode = getRootNode(startupSiteKey);
     assertEquals("An overwrite at startup keeps the nodes of the other configurations",
                  Set.of("nodeA", "nodeB"),
-                 getNodeNames(getRootNode(startupSiteKey)));
+                 getNodeNames(startupRootNode));
+    assertEquals(new PageKey(startupSiteKey, "pageA"), startupRootNode.get("nodeA").getState().getPageRef());
+    assertEquals(new PageKey(startupSiteKey, "pageB"), startupRootNode.get("nodeB").getState().getPageRef());
 
     PageKey customPageKey = new PageKey(startupSiteKey, CUSTOM_NAME);
     pageStorage.savePage(new PageContext(customPageKey, null));

@@ -69,6 +69,7 @@ import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationState;
 import org.exoplatform.portal.mop.navigation.NodeContext;
+import org.exoplatform.portal.mop.navigation.NodeData;
 import org.exoplatform.portal.mop.navigation.NodeModel;
 import org.exoplatform.portal.mop.navigation.Scope;
 import org.exoplatform.portal.mop.page.PageContext;
@@ -1074,6 +1075,39 @@ public class TestDataStorage extends AbstractKernelTest {
     assertNull(pageCache.get(pageKey));
     assertNull(navigationCache.get(siteKey));
     assertNull(siteCache.get(siteKey));
+  }
+
+  public void testUpdatedNodeCacheIsClearedAgainOnceTheTransactionCompletes() throws Exception {
+    String siteName = "updatedNodeCache";
+    createSite(SiteType.PORTAL, siteName);
+    NavigationContext navigation = navService.loadNavigation(SiteKey.portal(siteName));
+    NodeContext<?> rootNode = navService.loadNode(NodeModel.SELF_MODEL, navigation, Scope.CHILDREN, null);
+    rootNode.add(null, "updatedNode");
+    navService.saveNode(rootNode, null);
+    restartTransaction();
+
+    PortalContainer container = PortalContainer.getInstance();
+    NavigationStorage navigationStorage = container.getComponentInstanceOfType(NavigationStorage.class);
+    ExoCache<Long, Object> nodeCache = container.getComponentInstanceOfType(CacheService.class)
+                                                .getCacheInstance(CacheNavigationStorage.NODE_CACHE_NAME);
+    Long nodeId = Long.valueOf(rootNode.get("updatedNode").getId());
+    NodeData nodeData = navigationStorage.loadNode(nodeId);
+    Object cachedNode = nodeCache.get(nodeId);
+    assertNotNull(cachedNode);
+
+    EntityTransaction transaction = beginTransaction();
+    try {
+      navigationStorage.updateNode(nodeId, nodeData.getState().builder().label("Updated").build());
+      // A read made by another thread before the commit caches the node again
+      nodeCache.put(nodeId, cachedNode);
+      transaction.commit();
+    } finally {
+      if (transaction.isActive()) {
+        transaction.rollback();
+      }
+    }
+
+    assertNull(nodeCache.get(nodeId));
   }
 
   public void testSiteLoadInFlightDuringASaveIsNotCached() throws Exception {
