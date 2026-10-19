@@ -48,9 +48,10 @@ public @interface ContainerTransactional {
    *         already active on the thread: their callbacks are then left to
    *         that synchronization. A Spring cache eviction (CacheEvict) made
    *         inside the method takes effect at once, before the commit. When a
-   *         call that failed marked the transaction
-   *         rollback-only, the method throws a RollbackException after the
-   *         rollback, even if it returned. When a JPA transaction is already
+   *         call that failed marked the transaction rollback-only, a method
+   *         that returned throws a RollbackException after the rollback, and
+   *         a method that threw keeps its exception, unless the rollback
+   *         fails. When a JPA transaction is already
    *         active on the thread, the method joins it and marks it
    *         rollback-only when it throws.
    */
