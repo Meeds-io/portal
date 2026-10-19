@@ -25,6 +25,7 @@ import org.exoplatform.services.log.Log;
 
 import jakarta.persistence.EntityManager;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
@@ -64,7 +65,12 @@ public class EntityManagerHolder {
           LOG.debug("Using existing EntityManager");
         }
         return method.invoke(entityManager, args);
-
+      } catch (InvocationTargetException e) {
+        // Rethrow what the EntityManager threw, as its contract declares it:
+        // the proxy would wrap the reflection exception in an
+        // UndeclaredThrowableException, which a catch of the EntityManager's
+        // exception does not match
+        throw e.getTargetException();
       } finally {
         if (emStarted && (entityManager != null) && (!entityManager.getTransaction().isActive())) {
           LOG.debug("Closing new EntityManager");
