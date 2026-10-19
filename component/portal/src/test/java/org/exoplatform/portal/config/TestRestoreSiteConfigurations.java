@@ -40,11 +40,14 @@ import org.exoplatform.portal.mop.storage.PageStorage;
 /**
  * Restores the site "contributed", defined by three configurations: the first
  * one holds pages and no navigation, the two others hold pages and the nodes
- * home > section > node2 and home > section > node3, and the third one attaches
- * home > attached3 > leaf3 to the home node. The site "partial" is defined by a
+ * home > section > node2 and home > section > node3, the second one also holds
+ * home > section > node23, which references a page of the third one, and the
+ * third one attaches home > attached3 > leaf3 to the home node. The site "partial" is defined by a
  * configuration and by another one whose pages and navigation can't be read.
  * The site "attached" is defined by a configuration that attaches section6 >
- * node6 to the node section6, which no configuration defines.
+ * node6 to the node section6, which no configuration defines. The site
+ * "startup" is defined by a configuration imported in insert mode and by
+ * another one that overwrites the site at each startup.
  */
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
@@ -60,6 +63,8 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
   private static final String     PARTIAL_SITE_NAME = "partial";
 
   private static final String     ATTACHED_SITE_NAME = "attached";
+
+  private static final String     STARTUP_SITE_NAME  = "startup";
 
   private static final String     CUSTOM_NAME       = "custom";
 
@@ -98,8 +103,11 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
       assertEquals(Set.of(HOME), getNodeNames(rootNode));
       assertEquals(Set.of(SECTION, ATTACHED), getNodeNames(rootNode.get(HOME)));
       NodeContext<?> sectionNode = rootNode.get(HOME).get(SECTION);
-      assertEquals(Set.of("node2", "node3"), getNodeNames(sectionNode));
+      assertEquals(Set.of("node2", "node23", "node3"), getNodeNames(sectionNode));
       assertEquals(new PageKey(SITE_KEY, "page2"), sectionNode.get("node2").getState().getPageRef());
+      assertEquals("A node references the page of a later configuration, imported before any navigation",
+                   new PageKey(SITE_KEY, "page3"),
+                   sectionNode.get("node23").getState().getPageRef());
       assertEquals("A node references the removed default page that the restore creates again",
                    new PageKey(SITE_KEY, "page3"),
                    sectionNode.get("node3").getState().getPageRef());
@@ -136,7 +144,7 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
                    Set.of(SECTION, ATTACHED, CUSTOM_NAME),
                    getNodeNames(rootNode.get(HOME)));
       assertEquals("The nodes of each configuration are kept and the custom nested node is removed",
-                   Set.of("node2", "node3"),
+                   Set.of("node2", "node23", "node3"),
                    getNodeNames(rootNode.get(HOME).get(SECTION)));
       assertEquals("A custom node of a top-level node of a fragment attached to another node is kept",
                    Set.of("leaf3", CUSTOM_NAME),
@@ -182,6 +190,38 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
     } finally {
       pageStorage.destroyPage(customPageKey);
       restartTransaction();
+    }
+  }
+
+  public void testStartupOverwriteImportsTheSiteFromEveryConfiguration() {
+    SiteKey startupSiteKey = SiteKey.portal(STARTUP_SITE_NAME);
+    assertEquals("An overwrite at startup keeps the pages of the other configurations",
+                 Set.of("pageA", "pageB"),
+                 getPageNames(startupSiteKey));
+    assertEquals("An overwrite at startup keeps the nodes of the other configurations",
+                 Set.of("nodeA", "nodeB"),
+                 getNodeNames(getRootNode(startupSiteKey)));
+
+    PageKey customPageKey = new PageKey(startupSiteKey, CUSTOM_NAME);
+    pageStorage.savePage(new PageContext(customPageKey, null));
+    addCustomNode(getRootNode(startupSiteKey), customPageKey);
+    SiteKey attachedSiteKey = SiteKey.portal(ATTACHED_SITE_NAME);
+    addCustomNode(getRootNode(attachedSiteKey), new PageKey(startupSiteKey, "pageB"));
+    try {
+      userPortalConfigService.start();
+      restartTransaction();
+
+      assertEquals("An overwrite at startup removes the pages that no configuration defines only",
+                   Set.of("pageA", "pageB"),
+                   getPageNames(startupSiteKey));
+      assertEquals("An overwrite at startup removes the nodes that no configuration defines only",
+                   Set.of("nodeA", "nodeB"),
+                   getNodeNames(getRootNode(startupSiteKey)));
+      assertEquals("A node of another site keeps the page that an overwrite at startup imports",
+                   new PageKey(startupSiteKey, "pageB"),
+                   getRootNode(attachedSiteKey).get(CUSTOM_NAME).getState().getPageRef());
+    } finally {
+      removeCustomNode(attachedSiteKey);
     }
   }
 

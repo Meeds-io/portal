@@ -35,6 +35,11 @@
           <label>Node 2</label>
           <page-reference>portal::contributed::page2</page-reference>
         </node>
+        <node>
+          <name>node23</name>
+          <label>Node 2 to 3</label>
+          <page-reference>portal::contributed::page3</page-reference>
+        </node>
       </node>
     </node>
   </page-nodes>
