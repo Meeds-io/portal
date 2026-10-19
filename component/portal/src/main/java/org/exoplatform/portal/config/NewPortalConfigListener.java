@@ -254,23 +254,23 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   private Set<SiteKey> getOverwrittenSites(boolean prepareImport) {
     Set<SiteKey> sites = new HashSet<>();
     for (NewPortalConfig config : configs) {
-      if ((config.getOverrideMode() || prepareImport) && isOverwrite(config)) {
-        config.getPredefinedOwner()
-              .stream()
-              .filter(createdOwners::contains)
-              .forEach(owner -> sites.add(new SiteKey(config.getOwnerType(), owner)));
+      try {
+        if ((config.getOverrideMode() || prepareImport) && getRightMode(config.getImportMode()) == ImportMode.OVERWRITE) {
+          for (String owner : config.getPredefinedOwner()) {
+            if (createdOwners.contains(owner)) {
+              sites.add(new SiteKey(config.getOwnerType(), owner));
+            }
+          }
+        }
+      } catch (RuntimeException e) {
+        // The import of the configuration logs its unknown import mode or site
+        // type
+        LOG.debug("The configuration of sites {} is imported on its own: its import mode or site type is unknown",
+                  config.getPredefinedOwner(),
+                  e);
       }
     }
     return sites;
-  }
-
-  private boolean isOverwrite(NewPortalConfig config) {
-    try {
-      return getRightMode(config.getImportMode()) == ImportMode.OVERWRITE;
-    } catch (IllegalArgumentException e) {
-      // The import of the configuration logs its unknown import mode
-      return false;
-    }
   }
 
   /**
@@ -278,7 +278,9 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    */
   private NewPortalConfig withoutSites(NewPortalConfig config, Set<SiteKey> sites) {
     HashSet<String> owners = new HashSet<>(config.getPredefinedOwner());
-    if (owners.removeIf(owner -> sites.contains(new SiteKey(config.getOwnerType(), owner)))) {
+    if (owners.removeIf(owner -> sites.stream()
+                                      .anyMatch(site -> site.getTypeName().equalsIgnoreCase(config.getOwnerType())
+                                          && site.getName().equals(owner)))) {
       NewPortalConfig otherSitesConfig = config.clone();
       otherSitesConfig.setPredefinedOwner(owners);
       return otherSitesConfig;

@@ -180,6 +180,28 @@
             </field>
           </object>
         </object-param>
+        <object-param>
+          <name>contribution9</name>
+          <description>A site type that doesn't exist, overwriting a site of the same name: the other sites are imported all the same</description>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>startup</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>unknown</string>
+            </field>
+            <field name="importMode">
+              <string>overwrite</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution4</string>
+            </field>
+          </object>
+        </object-param>
       </init-params>
     </component-plugin>
   </external-component-plugins>
