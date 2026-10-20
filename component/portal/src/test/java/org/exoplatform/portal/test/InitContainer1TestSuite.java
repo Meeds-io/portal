@@ -39,6 +39,7 @@ import org.exoplatform.portal.config.TestSerialization;
 import org.exoplatform.portal.config.TestSiteDataImportConserve;
 import org.exoplatform.portal.config.TestSiteDataImportMerge;
 import org.exoplatform.portal.config.TestSiteDataImportOverwrite;
+import org.exoplatform.portal.config.UserACLTest;
 import org.exoplatform.portal.mop.dao.ContainerDAOTest;
 import org.exoplatform.portal.mop.dao.DescriptionDAOTest;
 import org.exoplatform.portal.mop.dao.NavigationDAOTest;
@@ -79,6 +80,7 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     BrandingServiceImplTest.class,
     BrandingApplicationStylingTest.class,
     DefaultGroupVisibilityPluginTest.class,
+    UserACLTest.class,
     DynamicPortalLayoutMatcherPluginTest.class,
     DynamicPortalLayoutMatcherTest.class,
     DynamicPortalLayoutServiceTest.class,
