@@ -545,7 +545,10 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
    * Nothing is removed when the pages file of a configuration can't be parsed,
    * since the pages it defines can't be told apart from the orphan ones then,
    * nor from a user site, whose pages an import doesn't remove. A
-   * configuration whose pages file can't be opened defines no page.
+   * configuration whose pages file can't be opened defines no page. The
+   * orphans are selected once, then removed one by one, each page row read
+   * again at its removal: a page removed since the selection is skipped, and a
+   * page created since then is kept, unless it is named after an orphan.
    *
    * @param configs the configurations of the site
    * @param owner the site name

@@ -68,6 +68,17 @@ public class PageDAOImpl extends AbstractDAO<PageEntity> implements PageDAO {
   }
 
   @Override
+  public PageEntity refresh(PageEntity entity) {
+    EntityManager entityManager = getEntityManager();
+    if (entityManager.contains(entity)) {
+      // The page row is then read from the database instead of the
+      // persistence context
+      entityManager.detach(entity);
+    }
+    return find(entity.getId());
+  }
+
+  @Override
   @ExoTransactional
   public void deleteByOwner(long id) {
     Query query = getEntityManager().createNamedQuery("PageEntity.deleteByOwner");

@@ -18,16 +18,29 @@
  */
 package org.exoplatform.portal.config;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.component.RequestLifeCycle;
+import org.exoplatform.portal.config.model.Container;
+import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.dao.ContainerDAO;
+import org.exoplatform.portal.mop.dao.PageDAO;
 import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NodeContext;
@@ -35,8 +48,12 @@ import org.exoplatform.portal.mop.navigation.NodeModel;
 import org.exoplatform.portal.mop.navigation.Scope;
 import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.page.PageKey;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.storage.PageStorage;
+import org.exoplatform.services.listener.Event;
+import org.exoplatform.services.listener.Listener;
+import org.exoplatform.services.listener.ListenerService;
 
 /**
  * Restores the site "contributed", defined by three configurations: the first
@@ -81,6 +98,12 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
 
   private PageStorage             pageStorage;
 
+  private ContainerDAO            containerDAO;
+
+  private PageDAO                 pageDAO;
+
+  private ListenerService         listenerService;
+
   @Override
   protected void setUp() throws Exception {
     super.setUp();
@@ -88,6 +111,9 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
     userPortalConfigService = container.getComponentInstanceOfType(UserPortalConfigService.class);
     navigationService = container.getComponentInstanceOfType(NavigationService.class);
     pageStorage = container.getComponentInstanceOfType(PageStorage.class);
+    containerDAO = container.getComponentInstanceOfType(ContainerDAO.class);
+    pageDAO = container.getComponentInstanceOfType(PageDAO.class);
+    listenerService = container.getComponentInstanceOfType(ListenerService.class);
   }
 
   public void testOverwriteRestoresThePagesAndNavigationOfEveryConfiguration() {
@@ -218,6 +244,47 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
     }
   }
 
+  public void testOverwriteRemovesTheLayoutSavedOnAnOrphanPageSinceTheRequestReadIt() throws Exception {
+    PageKey firstOrphanKey = new PageKey(SITE_KEY, "orphan1");
+    PageKey secondOrphanKey = new PageKey(SITE_KEY, "orphan2");
+    pageStorage.savePage(new PageContext(firstOrphanKey, null));
+    pageStorage.savePage(new PageContext(secondOrphanKey, null));
+    restartTransaction();
+    // The request reads the orphan pages before the restore, as a node load
+    // reads the pages its nodes reference
+    pageDAO.findByKey(firstOrphanKey);
+    pageDAO.findByKey(secondOrphanKey);
+    AtomicBoolean saveOnRemoval = new AtomicBoolean(true);
+    AtomicReference<String> savedContainerId = new AtomicReference<>();
+    listenerService.addListener(LayoutService.PAGE_REMOVED, new Listener<Object, Page>() {
+      @Override
+      public void onEvent(Event<Object, Page> event) throws Exception {
+        PageKey removedKey = event.getData().getPageKey();
+        if ((removedKey.equals(firstOrphanKey) || removedKey.equals(secondOrphanKey))
+            && saveOnRemoval.compareAndSet(true, false)) {
+          // The other orphan is saved by another request between two removals
+          savedContainerId.set(saveContainerInAnotherRequest(removedKey.equals(firstOrphanKey) ? secondOrphanKey :
+                                                                                                firstOrphanKey));
+        }
+      }
+    });
+    try {
+      assertTrue(userPortalConfigService.restoreSite(PortalConfig.PORTAL_TYPE, SITE_NAME, ImportMode.OVERWRITE, false, true, false));
+      restartTransaction();
+
+      assertNotNull(savedContainerId.get());
+      assertNull(pageStorage.loadPage(firstOrphanKey));
+      assertNull(pageStorage.loadPage(secondOrphanKey));
+      assertNull("The container saved on an orphan page since the request read it is removed with the page",
+                 containerDAO.find(Long.parseLong(savedContainerId.get())));
+    } finally {
+      saveOnRemoval.set(false);
+      pageStorage.destroyPage(firstOrphanKey);
+      pageStorage.destroyPage(secondOrphanKey);
+      restartTransaction();
+    }
+  }
+
   public void testStartupOverwriteImportsTheSiteFromEveryConfiguration() {
     SiteKey startupSiteKey = SiteKey.portal(STARTUP_SITE_NAME);
     assertEquals("An overwrite at startup keeps the pages of the other configurations",
@@ -283,6 +350,28 @@ public class TestRestoreSiteConfigurations extends AbstractConfigTest {
     addCustomNode(getRootNode(SITE_KEY).get(HOME), customPageKey);
     addCustomNode(getRootNode(SITE_KEY).get(HOME).get(SECTION), customPageKey);
     addCustomNode(getRootNode(SITE_KEY).get(HOME).get(ATTACHED), customPageKey);
+  }
+
+  private String saveContainerInAnotherRequest(PageKey pageKey) throws Exception {
+    PortalContainer container = getContainer();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      return executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(container);
+        RequestLifeCycle.begin(container);
+        try {
+          Page page = pageStorage.getPage(pageKey);
+          page.setChildren(new ArrayList<>(List.of(new Container())));
+          pageStorage.save(page.build());
+          return pageStorage.getPage(pageKey).getChildren().get(0).getStorageId();
+        } finally {
+          RequestLifeCycle.end();
+          ExoContainerContext.setCurrentContainer(null);
+        }
+      }).get(30, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   private void addCustomNode(NodeContext<?> parentNode, PageKey pageKey) {

@@ -308,11 +308,18 @@ public class PageStorageImpl implements PageStorage {
 
   /**
    * Removes the page layout, permissions and row in one transaction, so that a
-   * page whose removal fails keeps its layout.
+   * page whose removal fails keeps its layout. The layout removed is the one of
+   * the page row as stored, not as the current persistence context may hold it
+   * since an earlier read of the same request. That row is read without a lock:
+   * a layout another request commits on the page between that read and the
+   * deletion isn't removed.
    */
   @ContainerTransactional(atomic = true)
   private boolean deletePage(PageKey key) {
     PageEntity page = pageDAO.findByKey(key);
+    if (page != null) {
+      page = pageDAO.refresh(page);
+    }
     if (page == null) {
       return false;
     }
