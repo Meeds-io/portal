@@ -569,7 +569,13 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
       }
       for (PageContext page : layoutService.findPages(siteKey)) {
         if (!pageNames.contains(page.getKey().getName())) {
-          layoutService.remove(page.getKey());
+          try {
+            layoutService.remove(page.getKey());
+          } catch (RuntimeException e) {
+            // A page removed since the orphans were selected, for instance,
+            // doesn't stop the removal of the others
+            log.warn("Error while removing the orphan page {}", page.getKey(), e);
+          }
         }
       }
     } catch (Exception e) {

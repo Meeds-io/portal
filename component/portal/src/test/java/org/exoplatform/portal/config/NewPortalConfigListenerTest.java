@@ -23,7 +23,9 @@ import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.page.PageContext;
+import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.storage.DescriptionStorage;
@@ -111,5 +113,35 @@ public class NewPortalConfigListenerTest {
     newPortalConfigListener.initPageDB(newPortalConfig);
 
     verify(layoutService, times(0)).removePages(any());
+  }
+
+  @Test
+  public void testOverwriteRemovesTheOtherOrphanPagesWhenOneCantBeRemoved() {
+    ValueParam valueParam = new ValueParam();
+    valueParam.setName("meta.portal");
+    valueParam.setValue("classic");
+    when(initParams.getValueParam("meta.portal")).thenReturn(valueParam);
+    NewPortalConfigListener newPortalConfigListener = new NewPortalConfigListener(owner,
+                                                                                  layoutService,
+                                                                                  configurationManager,
+                                                                                  initParams,
+                                                                                  navigationService,
+                                                                                  descriptionStorage,
+                                                                                  userACL,
+                                                                                  localeConfigService);
+    NewPortalConfig newPortalConfig = mock(NewPortalConfig.class);
+    when(newPortalConfig.getOwnerType()).thenReturn(PortalConfig.PORTAL_TYPE);
+    when(newPortalConfig.clone()).thenReturn(newPortalConfig);
+    SiteKey siteKey = SiteKey.portal("global");
+    PageKey removedPageKey = new PageKey(siteKey, "removed");
+    PageKey orphanPageKey = new PageKey(siteKey, "orphan");
+    when(layoutService.findPages(siteKey)).thenReturn(List.of(new PageContext(removedPageKey, null),
+                                                              new PageContext(orphanPageKey, null)));
+    // The page was removed since the orphans were selected
+    doThrow(NullPointerException.class).when(layoutService).remove(removedPageKey);
+
+    newPortalConfigListener.importSitePages(List.of(newPortalConfig), "global", ImportMode.OVERWRITE);
+
+    verify(layoutService).remove(orphanPageKey);
   }
 }
