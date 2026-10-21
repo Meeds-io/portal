@@ -46,7 +46,8 @@ public class TestSiteDataImportOverwrite extends AbstractSiteDataImportTest {
     Application layoutPortlet = (Application) layout.getChildren().get(0);
     assertEquals("site2/layout", layoutService.getId(layoutPortlet.getState()));
     PageContext page = pageStorage.loadPage(PageKey.parse("portal::classic::home"));
-    assertNull(page);
+    assertNotNull(page);
+    assertEquals("site 1", page.getState().getDisplayName());
     page = pageStorage.loadPage(PageKey.parse("portal::classic::page1"));
     assertNotNull(page);
     assertEquals("site 2", page.getState().getDisplayName());

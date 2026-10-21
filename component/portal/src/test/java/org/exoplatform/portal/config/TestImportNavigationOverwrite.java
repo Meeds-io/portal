@@ -30,9 +30,17 @@ public class TestImportNavigationOverwrite extends AbstractImportNavigationTest 
 
     @Override
     protected final void afterOnePhaseBoot(NodeContext<?> root) {
-        assertState(root);
-        assertEquals(2, root.get("baz").getIndex());
+        // A configuration that overwrites the site keeps the nodes of the other
+        // configurations of the site
+        assertEquals(4, root.getNodeCount());
+        NodeContext<?> foo = root.get("foo");
+        assertEquals("foo_icon_2", foo.getState().getIcon());
+        assertEquals(1, foo.getNodeCount());
+        assertEquals("bar_icon", root.get("bar").getState().getIcon());
+        assertEquals("daa_icon", root.get("daa").getState().getIcon());
         assertEquals(0, root.get("foo").getIndex());
+        assertEquals(2, root.get("baz").getIndex());
+        assertEquals(3, root.get("daa").getIndex());
     }
 
     @Override

@@ -30,6 +30,8 @@ import org.exoplatform.portal.mop.storage.cache.model.WindowData;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 
+import io.meeds.common.TransactionCallbacks;
+
 public class CacheLayoutStorage extends LayoutStorage {
 
   public static final String                             PORTLET_PREFERENCES_CACHE_NAME = "portal.PortletPreferences";
@@ -74,7 +76,7 @@ public class CacheLayoutStorage extends LayoutStorage {
   protected WindowEntity createWindow(WindowEntity dstW) {
     WindowEntity window = super.createWindow(dstW);
     if (window != null && window.getId() != null) {
-      portletPreferencesCache.remove(window.getId());
+      removeFromCache(window.getId());
     }
     return window;
   }
@@ -84,7 +86,7 @@ public class CacheLayoutStorage extends LayoutStorage {
     try {
       return super.updateWindow(window);
     } finally {
-      portletPreferencesCache.remove(window.getId());
+      removeFromCache(window.getId());
     }
   }
 
@@ -99,7 +101,7 @@ public class CacheLayoutStorage extends LayoutStorage {
     try {
       super.deleteWindow(window);
     } finally {
-      portletPreferencesCache.remove(window.getId());
+      removeFromCache(window.getId());
     }
   }
 
@@ -108,7 +110,7 @@ public class CacheLayoutStorage extends LayoutStorage {
     try {
       super.deleteWindowById(id);
     } finally {
-      portletPreferencesCache.remove(id);
+      removeFromCache(id);
     }
   }
 
@@ -129,5 +131,21 @@ public class CacheLayoutStorage extends LayoutStorage {
     windowEntity.setContentId(window.getContentId());
     windowEntity.setCustomization(window.getCustomization());
     return windowEntity;
+  }
+
+  /**
+   * Inside a transaction, the window is removed from the cache again once the
+   * transaction completes: a concurrent read made before the commit caches the
+   * previous state of the window again. The load in flight is invalidated
+   * first so that it doesn't cache it either, unless it's already writing its
+   * result: the cache expiry is then the backstop.
+   */
+  private void removeFromCache(Long windowId) {
+    Runnable eviction = () -> {
+      portletPreferencesFutureCache.removeFuture(windowId);
+      portletPreferencesCache.remove(windowId);
+    };
+    eviction.run();
+    TransactionCallbacks.afterCompletion(eviction);
   }
 }

@@ -28,6 +28,16 @@ public interface PageDAO extends GenericDAO<PageEntity, Long> {
 
     PageEntity findByKey(PageKey pageKey);    
 
+    /**
+     * Reads the page row again from the database, bypassing the state already
+     * loaded in the current persistence context
+     *
+     * @param entity a page entity loaded by this DAO, detached from the
+     *          persistence context by this call
+     * @return the entity read again, null when the page was removed meanwhile
+     */
+    PageEntity refresh(PageEntity entity);
+
     ListAccess<PageKey> findByQuery(SiteType siteType, String siteName, String name, int offset, int limit);
 
     void deleteByOwner(long id);

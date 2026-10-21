@@ -30,8 +30,10 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.pom.data.PortalData;
 
+import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Setter;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -88,6 +90,14 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   private long                  bannerFileId;
 
+  /**
+   * True when the stored layout of the site couldn't be read because its root
+   * container is missing: a save keeps the stored layout, unless a layout is
+   * set with {@link #setPortalLayout(Container)}.
+   */
+  @Setter(AccessLevel.NONE)
+  private boolean               layoutUnresolved;
+
   public PortalConfig() {
     this(PORTAL_TYPE);
   }
@@ -127,6 +137,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
     this.displayed = data.isDisplayed();
     this.displayOrder = data.getDisplayOrder();
     this.bannerFileId = data.getBannerFileId();
+    this.layoutUnresolved = data.isLayoutUnresolved();
   }
 
   public long getId() {
@@ -139,6 +150,7 @@ public class PortalConfig extends ModelObject implements Cloneable {
 
   public void setPortalLayout(Container container) {
     portalLayout = container == null ? new SiteLayout() : new SiteLayout(container);
+    layoutUnresolved = false;
   }
 
   public String getProperty(String name) {
@@ -216,21 +228,23 @@ public class PortalConfig extends ModelObject implements Cloneable {
   }
 
   public PortalData build() {
-    return new PortalData(storageId,
-                          name,
-                          type,
-                          locale,
-                          label,
-                          description,
-                          accessPermissions == null ? Collections.emptyList() : Arrays.asList(accessPermissions),
-                          editPermission,
-                          properties == null ? Collections.emptyMap() : new Properties(properties),
-                          skin,
-                          portalLayout.build(),
-                          defaultLayout,
-                          displayed,
-                          displayOrder,
-                          bannerFileId);
+    PortalData portalData = new PortalData(storageId,
+                                           name,
+                                           type,
+                                           locale,
+                                           label,
+                                           description,
+                                           accessPermissions == null ? Collections.emptyList() : Arrays.asList(accessPermissions),
+                                           editPermission,
+                                           properties == null ? Collections.emptyMap() : new Properties(properties),
+                                           skin,
+                                           portalLayout.build(),
+                                           defaultLayout,
+                                           displayed,
+                                           displayOrder,
+                                           bannerFileId);
+    portalData.setLayoutUnresolved(layoutUnresolved);
+    return portalData;
   }
 
   @Override

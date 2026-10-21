@@ -72,6 +72,8 @@ import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.upload.UploadResource;
 import org.exoplatform.upload.UploadService;
 
+import io.meeds.common.ContainerTransactional;
+
 public class SiteStorageImpl implements SiteStorage {
 
   private static final String  DEFAULT_SHAREDLAYOUT_PATH = "war:/conf/portal/portal/sharedlayout.xml";   // NOSONAR
@@ -126,9 +128,10 @@ public class SiteStorageImpl implements SiteStorage {
   }
 
   @Override
+  @ContainerTransactional(atomic = true)
   public void create(PortalData config) {
     SiteEntity entity = new SiteEntity();
-    buildSiteEntity(entity, config);
+    buildSiteEntity(entity, config, false);
     entity = siteDAO.create(entity);
     savePermissions(entity.getId(), config);
   }
@@ -142,14 +145,28 @@ public class SiteStorageImpl implements SiteStorage {
     save(config.build());
   }
 
+  /**
+   * Replaces the site layout and its attributes in one transaction, so that a
+   * concurrent reader never reads a site whose layout containers are deleted
+   * while its new ones aren't committed yet. The layout replaced is the one of
+   * the site row as stored, not as the current persistence context may hold it
+   * since an earlier read of the same request.
+   */
   @Override
+  @ContainerTransactional(atomic = true)
   public void save(PortalData config) {
     SiteKey siteKey = new SiteKey(config.getKey().getType(), config.getKey().getId());
     SiteEntity entity = siteDAO.findByKey(siteKey);
+    if (entity != null) {
+      entity = siteDAO.refresh(entity);
+    }
     if (entity == null) {
       throw new IllegalStateException("Cannot update portal " + config.getName() + " that does not exist");
     }
-    buildSiteEntity(entity, config);
+    if (config.isLayoutUnresolved()) {
+      LOG.warn("The layout of site {} wasn't resolved when the site was read, the stored layout is kept", siteKey);
+    }
+    buildSiteEntity(entity, config, config.isLayoutUnresolved());
     entity = siteDAO.update(entity);
     savePermissions(entity.getId(), config);
   }
@@ -165,11 +182,25 @@ public class SiteStorageImpl implements SiteStorage {
     remove(siteKey);
   }
 
+  /**
+   * Removes the site layout, pages, navigation and row in one transaction, so
+   * that a concurrent reader never reads a site whose layout containers are
+   * already deleted. The layout removed is the one of the site row as stored,
+   * not as the current persistence context may hold it since an earlier read
+   * of the same request.
+   */
   @Override
+  @ContainerTransactional(atomic = true)
   public void remove(SiteKey siteKey) {
     PortalData config = getPortalConfig(siteKey);
     if (config != null && config.isRemovable()) {
       SiteEntity entity = siteDAO.findByKey(siteKey);
+      if (entity != null) {
+        entity = siteDAO.refresh(entity);
+      }
+      if (entity == null) {
+        throw new NoSuchDataException("Could not remove non existing portal " + siteKey);
+      }
       String siteBody = entity.getSiteBody();
       JSONArray children = parseJsonArray(siteBody);
       layoutStorage.deleteChildren(children);
@@ -199,18 +230,12 @@ public class SiteStorageImpl implements SiteStorage {
 
   @Override
   public PortalData getPortalConfig(SiteKey siteKey) {
-    SiteEntity entity = siteDAO.findByKey(siteKey);
-    if (entity != null) {
-      return buildPortalData(entity);
-    } else {
-      return null;
-    }
+    return buildResolvedPortalData(siteDAO.findByKey(siteKey));
   }
 
   @Override
   public PortalData getPortalConfig(long siteId) {
-    SiteEntity entity = siteDAO.find(siteId);
-    return buildPortalData(entity);
+    return buildResolvedPortalData(siteDAO.find(siteId));
   }
 
   @Override
@@ -284,7 +309,7 @@ public class SiteStorageImpl implements SiteStorage {
   }
 
 
-  private void buildSiteEntity(SiteEntity entity, PortalData config) {
+  private void buildSiteEntity(SiteEntity entity, PortalData config, boolean keepStoredLayout) {
     entity.setDescription(config.getDescription());
     entity.setLabel(config.getLabel());
     entity.setLocale(config.getLocale());
@@ -299,16 +324,36 @@ public class SiteStorageImpl implements SiteStorage {
     }
     entity.setProperties(propertiesString);
 
-    List<ComponentData> children = new ArrayList<>();
-    children.add(config.getPortalLayout());
+    if (!keepStoredLayout) {
+      List<ComponentData> children = new ArrayList<>();
+      children.add(config.getPortalLayout());
 
-    JSONArray siteBody = parseJsonArray(entity.getSiteBody());
-    List<ComponentEntity> newSiteBody = layoutStorage.saveChildren(siteBody, children);
-    entity.setChildren(newSiteBody);
-    entity.setSiteBody(((JSONArray) entity.toJSON().get("children")).toJSONString());
+      JSONArray siteBody = parseJsonArray(entity.getSiteBody());
+      List<ComponentEntity> newSiteBody = layoutStorage.saveChildren(siteBody, children);
+      entity.setChildren(newSiteBody);
+      entity.setSiteBody(((JSONArray) entity.toJSON().get("children")).toJSONString());
+    }
     entity.setDisplayed(config.isDisplayed());
     entity.setDisplayOrder(config.getDisplayOrder());
     entity.setBannerFileId(config.getBannerFileId());
+  }
+
+  /**
+   * A site row read while a concurrent save replaces its layout can reference
+   * root containers that this save already deleted: the row is then read again
+   * to get the committed layout.
+   */
+  private PortalData buildResolvedPortalData(SiteEntity entity) {
+    PortalData portalData = buildPortalData(entity);
+    if (portalData != null && portalData.isLayoutUnresolved()) {
+      portalData = buildPortalData(siteDAO.refresh(entity));
+      if (portalData != null && portalData.isLayoutUnresolved()) {
+        LOG.warn("The root container of the layout of site {}:{} doesn't exist, the site is read with an empty layout",
+                 portalData.getType(),
+                 portalData.getName());
+      }
+    }
+    return portalData;
   }
 
   @SuppressWarnings("unchecked")
@@ -341,21 +386,23 @@ public class SiteStorageImpl implements SiteStorage {
       });
     }
 
-    return new PortalData("site_" + entity.getId(),
-                          entity.getName(),
-                          entity.getSiteType().getName(),
-                          entity.getLocale(),
-                          entity.getLabel(),
-                          entity.getDescription(),
-                          access,
-                          editPermission,
-                          Collections.unmodifiableMap(properties),
-                          entity.getSkin(),
-                          rootContainer,
-                          entity.isDefaultSiteBody(),
-                          entity.isDisplayed(),
-                          entity.getDisplayOrder(),
-                          entity.getBannerFileId());
+    PortalData portalData = new PortalData("site_" + entity.getId(),
+                                           entity.getName(),
+                                           entity.getSiteType().getName(),
+                                           entity.getLocale(),
+                                           entity.getLabel(),
+                                           entity.getDescription(),
+                                           access,
+                                           editPermission,
+                                           Collections.unmodifiableMap(properties),
+                                           entity.getSkin(),
+                                           rootContainer,
+                                           entity.isDefaultSiteBody(),
+                                           entity.isDisplayed(),
+                                           entity.getDisplayOrder(),
+                                           entity.getBannerFileId());
+    portalData.setLayoutUnresolved(rootContainer == null && siteBody != null && !siteBody.isEmpty());
+    return portalData;
   }
 
   private void savePermissions(Long id, PortalData config) {

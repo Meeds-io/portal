@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.hibernate.annotations.DynamicUpdate;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
@@ -44,8 +45,13 @@ import jakarta.persistence.Transient;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * A page row has two writers, its properties save and its layout save: each
+ * writes only the columns it changed, so neither writes back the other's.
+ */
 @Entity(name = "GateInPage")
 @Table(name = "PORTAL_PAGES")
+@DynamicUpdate
 @NamedQuery(name = "PageEntity.deleteByOwner", query = "DELETE GateInPage p WHERE p.owner.id = :ownerId")
 @NamedQuery(name = "PageEntity.findByKey", query = "SELECT p FROM GateInPage p WHERE p.name = :name AND p.owner.siteType = :ownerType AND p.owner.name = :ownerId")
 public class PageEntity extends ComponentEntity implements Serializable {
