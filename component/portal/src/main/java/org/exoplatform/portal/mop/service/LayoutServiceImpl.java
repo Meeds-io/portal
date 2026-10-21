@@ -310,6 +310,16 @@ public class LayoutServiceImpl implements LayoutService {
   }
 
   @Override
+  public Portlet loadCommitted(String applicationStorageId) {
+    return layoutStorage.loadCommitted(applicationStorageId);
+  }
+
+  @Override
+  public boolean existsCommitted(String applicationStorageId) {
+    return layoutStorage.existsCommitted(applicationStorageId);
+  }
+
+  @Override
   public ApplicationState save(ApplicationState state, Portlet preferences) {
     return layoutStorage.save(state, preferences);
   }
