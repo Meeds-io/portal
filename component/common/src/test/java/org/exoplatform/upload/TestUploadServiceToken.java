@@ -634,6 +634,84 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
+   * A token upload the parser has marked uploaded, but whose file is not yet
+   * written and validated, is seen by an owner-checked consumer as uploading,
+   * with no store location, and cannot be removed by it. A mime type plugin
+   * holds the upload in that window: it runs after the parser's last progress
+   * event and before the file is written.
+   */
+  public void testTokenUploadIsNotHandedOutBeforeItIsWrittenAndValidated() throws Exception {
+    UploadService service = new UploadService(containerInfo(), null);
+    CountDownLatch inWindow = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    service.register(new BlockingMimeTypePlugin(inWindow, release));
+    String uploadId = newUploadId();
+    String token = service.createUploadToken("john", uploadId, 100);
+    MultipartRequest request = multipart("a.txt", "text/plain", "hello");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<UploadResource> upload = executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(getContainer());
+        return service.createUploadResourceWithToken(token, uploadId, request.request);
+      });
+      assertTrue("the upload reaches the window", inWindow.await(30, TimeUnit.SECONDS));
+
+      UploadResource registered = service.getUploadResource(uploadId);
+      assertEquals("the parser has marked it uploaded", UploadResource.UPLOADED_STATUS, registered.getStatus());
+      assertFalse("its file is not written yet", new File(registered.getStoreLocation()).exists());
+      UploadResource seen = service.getUploadResource(uploadId, "john");
+      assertNotNull(seen);
+      assertEquals(UploadResource.UPLOADING_STATUS, seen.getStatus());
+      assertNull(seen.getStoreLocation());
+      assertEquals("john", seen.getOwner());
+      assertFalse(service.removeUploadResource(uploadId, "john"));
+      assertSame(registered, service.getUploadResource(uploadId));
+
+      release.countDown();
+      UploadResource uploaded = upload.get(30, TimeUnit.SECONDS);
+      assertSame(uploaded, service.getUploadResource(uploadId, "john"));
+      assertEquals(UploadResource.UPLOADED_STATUS, uploaded.getStatus());
+      assertEquals(5, new File(uploaded.getStoreLocation()).length());
+      assertTrue(service.removeUploadResource(uploadId, "john"));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  /**
+   * A browser upload in the same window is handed out as before: the
+   * receiving view applies to token uploads only.
+   */
+  public void testBrowserUploadInTheWindowIsHandedOutAsBefore() throws Exception {
+    UploadService service = new UploadService(containerInfo(), null);
+    CountDownLatch inWindow = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    service.register(new BlockingMimeTypePlugin(inWindow, release));
+    String uploadId = newUploadId();
+    MultipartRequest request = multipart("a.txt", "text/plain", "hello");
+    when(request.request.getRemoteUser()).thenReturn("john");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> upload = executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(getContainer());
+        service.createUploadResource(uploadId, request.request);
+        return null;
+      });
+      assertTrue(inWindow.await(30, TimeUnit.SECONDS));
+      UploadResource seen = service.getUploadResource(uploadId, "john");
+      assertSame(service.getUploadResource(uploadId), seen);
+      assertEquals(UploadResource.UPLOADED_STATUS, seen.getStatus());
+      release.countDown();
+      upload.get(30, TimeUnit.SECONDS);
+      service.removeUploadResource(uploadId);
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  /**
    * Asserts the token is refused for the upload id.
    *
    * @param token token presented

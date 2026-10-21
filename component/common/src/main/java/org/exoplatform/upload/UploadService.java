@@ -116,6 +116,12 @@ public class UploadService {
    */
   private Map<String, UploadLimit>    uploadLimits           = Collections.synchronizedMap(new LinkedHashMap<>());
 
+  /**
+   * Token uploads registered but not yet written and validated: the
+   * owner-checked accessors never hand them out as uploaded.
+   */
+  private final Set<UploadResource>   receivingTokenUploads  = ConcurrentHashMap.newKeySet();
+
   /** Pending upload tokens, keyed by the SHA-256 digest of the token value. */
   private final Map<String, UploadToken> uploadTokens       = new ConcurrentHashMap<>();
 
@@ -314,7 +320,9 @@ public class UploadService {
                                         contentLength);
     }
     UploadResource upResource = newUploadResource(uploadId, uploadToken.username());
+    receivingTokenUploads.add(upResource);
     if (uploadResources.putIfAbsent(uploadId, upResource) != null) {
+      receivingTokenUploads.remove(upResource);
       throw new ObjectAlreadyExistsException(uploadId, UPLOAD_ID_ALREADY_IN_USE);
     }
 
@@ -334,6 +342,7 @@ public class UploadService {
       registered = true;
       return upResource;
     } finally {
+      receivingTokenUploads.remove(upResource);
       removeUploadLimit(uploadId);
       if (!registered && uploadResources.remove(uploadId, upResource)) {
         deleteStoredFile(upResource);
@@ -593,7 +602,11 @@ public class UploadService {
 
   /**
    * Returns the resource registered under the upload id only when the given
-   * user owns it.
+   * user owns it. A token upload still being written or validated is returned
+   * as a detached copy in {@link UploadResource#UPLOADING_STATUS}, without its
+   * store location: the parser marks it uploaded before its file is written and
+   * validated, and the copy cannot be removed through
+   * {@link #removeUploadResource(String, String)}.
    *
    * @param uploadId upload id
    * @param username the user the caller acts for
@@ -605,7 +618,29 @@ public class UploadService {
       return null;
     }
     UploadResource upResource = uploadResources.get(uploadId);
-    return upResource != null && username.equals(upResource.getOwner()) ? upResource : null;
+    if (upResource == null || !username.equals(upResource.getOwner())) {
+      return null;
+    }
+    return receivingTokenUploads.contains(upResource) ? receivingView(upResource) : upResource;
+  }
+
+  /**
+   * Builds what a consumer sees of a token upload still being received.
+   *
+   * @param upResource the registered resource
+   * @return a copy in {@link UploadResource#UPLOADING_STATUS}, with no store
+   *         location
+   */
+  private static UploadResource receivingView(UploadResource upResource) {
+    UploadResource view = new UploadResource(upResource.getUploadId(),
+                                             upResource.getFileName(),
+                                             upResource.getMimeType(),
+                                             null,
+                                             upResource.getUploadedSize(),
+                                             upResource.getEstimatedSize(),
+                                             UploadResource.UPLOADING_STATUS);
+    view.setOwner(upResource.getOwner());
+    return view;
   }
 
   /**
