@@ -20,6 +20,7 @@ package org.exoplatform.portal.mop.dao;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.persistence.EntityTransaction;
 
@@ -60,6 +61,61 @@ public class WindowDAOTest extends AbstractDAOTest {
     WindowEntity result = windowDAO.find(entity.getId());
     assertNotNull(result);
     assertContainer(entity, result);
+  }
+
+  /**
+   * A request's persistence context returns a window as the request first
+   * loaded it: fails the mutant reading the customization of that window
+   */
+  public void testFindCustomizationReadsWhatAnotherRequestCommitted() throws Exception {
+    WindowEntity entity = createInstance("App1/committedCustomization", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+    assertEquals("testCustom", new String(windowDAO.find(id).getCustomization()));
+
+    inAnotherRequest(() -> {
+      WindowEntity window = windowDAO.find(id);
+      window.setCustomization("committed".getBytes());
+      windowDAO.update(window);
+    });
+
+    assertEquals("testCustom", new String(windowDAO.find(id).getCustomization()));
+    assertEquals("committed", new String(windowDAO.findCustomization(id).orElseThrow()));
+  }
+
+  public void testFindCustomizationOfAWindowWithoutCustomizationIsEmpty() {
+    WindowEntity entity = createInstance("App1/noCustomization", AppType.PORTLET);
+    entity.setCustomization(null);
+    windowDAO.create(entity);
+    restartTransaction();
+
+    Optional<byte[]> customization = windowDAO.findCustomization(entity.getId());
+    assertTrue(customization.isPresent());
+    assertEquals(0, customization.get().length);
+  }
+
+  public void testFindCustomizationOfAMissingWindowIsEmpty() {
+    assertTrue(windowDAO.findCustomization(Long.MAX_VALUE).isEmpty());
+  }
+
+  /**
+   * A request's persistence context still holds a window another request
+   * deleted: fails the mutant answering from that window
+   */
+  public void testExistsByIdReadsWhatAnotherRequestCommitted() throws Exception {
+    WindowEntity entity = createInstance("App1/committedDeletion", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+    assertTrue(windowDAO.existsById(id));
+    assertNotNull(windowDAO.find(id));
+
+    inAnotherRequest(() -> windowDAO.delete(windowDAO.find(id)));
+
+    assertNotNull(windowDAO.find(id));
+    assertFalse(windowDAO.existsById(id));
+    assertFalse(windowDAO.existsById(Long.MAX_VALUE));
   }
 
   public void testFindByIds() {
