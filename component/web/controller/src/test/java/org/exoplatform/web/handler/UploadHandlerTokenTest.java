@@ -261,6 +261,32 @@ public class UploadHandlerTokenTest {
   }
 
   /**
+   * A file that cannot be written to the staging folder answers 500 "Upload
+   * failed" instead of escaping as a bare container error, and its resource is
+   * removed. The write fails because a non-empty folder sits at the file's
+   * store location.
+   */
+  @Test
+  public void testStagingWriteFailureIsServerError() throws Exception {
+    String uploadId = UUID.randomUUID().toString();
+    String token = uploadService.createUploadToken("john", uploadId, 100);
+    java.io.File blocker = new java.io.File(System.getProperty("java.io.tmpdir") + "/portal/eXoUpload/" + uploadId);
+    assertTrue(blocker.mkdirs());
+    java.io.File inside = new java.io.File(blocker, "occupied");
+    assertTrue(inside.createNewFile());
+    try {
+      handler.execute(request("upload", uploadId, "Bearer " + token, null, "a.txt", "hello"), response);
+
+      assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, status[0]);
+      assertEquals("Upload failed", responseBody.toString());
+      assertNull(uploadService.getUploadResource(uploadId));
+    } finally {
+      inside.delete();
+      blocker.delete();
+    }
+  }
+
+  /**
    * Without a token and without a user, an upload is still refused with 403.
    */
   @Test

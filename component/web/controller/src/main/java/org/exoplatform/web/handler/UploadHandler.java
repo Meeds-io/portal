@@ -33,6 +33,8 @@ import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 import org.exoplatform.upload.UploadResource;
 import org.exoplatform.upload.UploadService;
 import org.exoplatform.upload.UploadService.UploadLimit;
@@ -46,6 +48,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * Created by The eXo Platform SARL Author : Nhu Dinh Thuan nhudinhthuan@exoplatform.com Dec 9, 2006
  */
 public class UploadHandler extends WebRequestHandler {
+
+    private static final Log    LOG                   = ExoLogger.getLogger(UploadHandler.class);
 
     private static final String RESTRICT_PUBLIC_PARAM = "public-access-restriction";
 
@@ -171,8 +175,9 @@ public class UploadHandler extends WebRequestHandler {
      * {@code {"status":"uploaded","size":<bytes>}}, 401 for an unknown,
      * expired, already used or mismatched token, 411 without a
      * {@code Content-Length}, 413 above the token's size, 409 for an upload id
-     * already registered, and 400 when the request is not one multipart file or
-     * a validator refuses it.
+     * already registered, 400 when the request is not one multipart file or a
+     * validator refuses it, and 500 "Upload failed" when the file cannot be
+     * written to the staging folder (logged).
      *
      * @param req the request
      * @param res the response
@@ -202,6 +207,9 @@ public class UploadHandler extends WebRequestHandler {
             }
         } catch (FileUploadException e) {
             writeError(res, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            LOG.warn("Token upload of id {} failed while staging its file", req.getParameter("uploadId"), e);
+            writeError(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Upload failed");
         }
     }
 
