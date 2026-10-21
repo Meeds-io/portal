@@ -263,6 +263,31 @@ public interface LayoutService {
   Portlet load(ApplicationState state);
 
   /**
+   * Reads the preferences of a page window as committed: from its row, never
+   * through the preferences cache nor the window the current request's
+   * persistence context holds. Called inside a transaction already open,
+   * returns what that transaction sees.
+   *
+   * @param applicationStorageId the window's storage id
+   * @return the window's preferences, empty when it has none, null when no
+   *         window has this id
+   */
+  default Portlet loadCommitted(String applicationStorageId) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Whether a page window exists as committed, read as
+   * {@link #loadCommitted(String)} reads, its preferences not read.
+   *
+   * @param applicationStorageId the window's storage id
+   * @return true when a window has this id
+   */
+  default boolean existsCommitted(String applicationStorageId) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Save content state <br>
    * 
    * @param state - ApplicationState object. It must be CloneApplicationState or
