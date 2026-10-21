@@ -48,6 +48,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.rest.model.MembershipRestEntity;
 import org.exoplatform.portal.rest.model.UserRestEntity;
@@ -103,6 +104,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public static final String             CREATION_SOURCE_UI             = "ui";
 
+  public static final String             OTP_CODE_INVALID               = "OTP_CODE_INVALID";
+
   public static final UserFieldValidator USERNAME_VALIDATOR             = new UserFieldValidator("userName", true, false);
 
   public static final UserFieldValidator EMAIL_VALIDATOR                = new UserFieldValidator("email", false, false);
@@ -120,6 +123,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
   private UserACL                        userACL;
   
   private PasswordRecoveryService        passwordRecoveryService;
+
+  private UserAccountService             userAccountService;
 
   public UserRestResourcesV1(OrganizationService organizationService,
                              UserSearchService userSearchService,
@@ -219,11 +224,15 @@ public class UserRestResourcesV1 implements ResourceContainer {
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
           @ApiResponse(responseCode = "400", description = "Invalid query input"),
+          @ApiResponse(responseCode = "403", description = "The session has not been confirmed with a one-time password: OTP_REQUIRED"),
           @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
       }
   )
   public Response createUser(@Context HttpServletRequest request,
                              @RequestBody(description = "User Object") UserRestEntity userEntity) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (userEntity == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("empty user object").build();
     }
@@ -309,6 +318,7 @@ public class UserRestResourcesV1 implements ResourceContainer {
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
           @ApiResponse(responseCode = "400", description = "Invalid query input"),
+          @ApiResponse(responseCode = "403", description = "User not administrator, or the session has not been confirmed with a one-time password: OTP_REQUIRED"),
           @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
       }
   )
@@ -317,6 +327,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
     Identity identity = ConversationState.getCurrent().getIdentity();
     if (!userACL.isAdministrator(identity)) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
+    }
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
     }
     if (userEntity == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("empty user object").build();
@@ -411,13 +424,18 @@ public class UserRestResourcesV1 implements ResourceContainer {
       value = {
           @ApiResponse(responseCode = "204", description = "Request fulfilled"),
           @ApiResponse(responseCode = "401", description = "User not authorized to call this endpoint"),
+          @ApiResponse(responseCode = "403", description = "The session has not been confirmed with a one-time password: OTP_REQUIRED"),
           @ApiResponse(responseCode = "404", description = "User not found"),
           @ApiResponse(responseCode = "500", description = "Internal server error"),
       }
   )
-  public Response deleteUser(@Parameter(description = "User name identifier", required = true) @PathParam(
+  public Response deleteUser(@Context HttpServletRequest request,
+                             @Parameter(description = "User name identifier", required = true) @PathParam(
     "id"
   ) String userName) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
     if (user == null) {
       return Response.status(Response.Status.NOT_FOUND).build();
@@ -507,6 +525,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
     if (!isAdmin && !isSameUser) {
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
+    if (!isSameUser && !UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
 
     try {
       UserHandler userHandler = organizationService.getUserHandler();
@@ -540,6 +561,35 @@ public class UserRestResourcesV1 implements ResourceContainer {
     } catch (Exception e) {
       return Response.serverError().entity(PASSWORD_UNKNOWN_ERROR_CODE + ":" + e.getMessage()).build();
     }
+  }
+
+  @POST
+  @Path("confirmation")
+  @RolesAllowed("users")
+  @Operation(
+      summary = "Confirms the current session with a one-time password",
+      description = "Validates the one-time password sent by email to the authenticated user and marks the current"
+          + " session as confirmed, so that the administrator actions on user accounts are applied from it."
+          + " The code validates once. The confirmation proves the caller's identity only: each guarded"
+          + " endpoint keeps its own permission check.",
+      method = "POST")
+  @ApiResponses(
+      value = {
+          @ApiResponse(responseCode = "204", description = "Session confirmed"),
+          @ApiResponse(responseCode = "401", description = "Wrong, expired, already used or throttled code: OTP_CODE_INVALID"),
+      }
+  )
+  public Response confirmSession(@Context HttpServletRequest request,
+                                 @Parameter(description = "One-time password received by email", required = true)
+                                 @FormParam("otpCode") String otpCode) {
+    String username = getCurrentUsername();
+    try {
+      getUserAccountService().confirmSession(username, otpCode);
+    } catch (IllegalAccessException e) {
+      return Response.status(Response.Status.UNAUTHORIZED).entity(OTP_CODE_INVALID).build();
+    }
+    UserAccountConfirmation.confirm(request, username);
+    return Response.noContent().build();
   }
 
   @GET
@@ -694,6 +744,18 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public boolean isMemberOfAdminGroup() {
     return ConversationState.getCurrent().getIdentity().isMemberOf(ADMINISTRATOR_GROUP);
+  }
+
+  /**
+   * The service is implemented in the web security module, above this one in
+   * the module graph, and registered in the container at runtime by the
+   * Kernel-Spring bridge: it is resolved by type at call time, once
+   */
+  private UserAccountService getUserAccountService() {
+    if (userAccountService == null) {
+      userAccountService = ExoContainerContext.getService(UserAccountService.class);
+    }
+    return userAccountService;
   }
 
   private boolean isNestedInGroup(String groupId, String targetGroupId) {

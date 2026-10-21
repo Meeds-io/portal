@@ -18,7 +18,11 @@
  */
 package org.exoplatform.portal.rest;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -49,6 +53,8 @@ public class MembershipTypeRestResourcesTest extends BaseRestServicesTestCase {
 
   private static final String MEMBERSHIP_TYPE_7 = "mt7";
 
+  private MembershipTypeHandler membershipTypeHandler;
+
   protected Class<?> getComponentClass() {
     return MembershipTypeRestResourcesV1.class;
   }
@@ -58,7 +64,7 @@ public class MembershipTypeRestResourcesTest extends BaseRestServicesTestCase {
     super.setUp();
 
     OrganizationService organizationService = mock(OrganizationService.class);
-    MembershipTypeHandler membershipTypeHandler = mock(MembershipTypeHandler.class);
+    membershipTypeHandler = mock(MembershipTypeHandler.class);
 
     when(organizationService.getMembershipTypeHandler()).thenReturn(membershipTypeHandler);
     MembershipTypeImpl membershipType1 = new MembershipTypeImpl(MEMBERSHIP_TYPE_1, null, MEMBERSHIP_TYPE_1);
@@ -156,18 +162,32 @@ public class MembershipTypeRestResourcesTest extends BaseRestServicesTestCase {
   }
 
   public void testDeleteMembershipType() throws Exception {
-    ContainerResponse response = launcher.service("DELETE", "/v1/membershipTypes/NOT_EXISTING", "", null, null, null);
+    ContainerResponse response = launcher.service("DELETE", "/v1/membershipTypes/NOT_EXISTING", "", null, null, confirmedContext("testuser"));
     assertNotNull(response);
     assertEquals(404, response.getStatus());
 
-    response = launcher.service("DELETE", "/v1/membershipTypes/" + MANDATORY_MS_TYPE, "", null, null, null);
+    response = launcher.service("DELETE", "/v1/membershipTypes/" + MANDATORY_MS_TYPE, "", null, null, confirmedContext("testuser"));
     assertNotNull(response);
     assertEquals(400, response.getStatus());
     assertEquals("MandatoryMembershipType", response.getEntity());
 
-    response = launcher.service("DELETE", "/v1/membershipTypes/" + MEMBERSHIP_TYPE_1, "", null, null, null);
+    response = launcher.service("DELETE", "/v1/membershipTypes/" + MEMBERSHIP_TYPE_1, "", null, null, confirmedContext("testuser"));
     assertNotNull(response);
     assertEquals(204, response.getStatus());
+  }
+
+  public void testDeleteMembershipTypeRequiresConfirmedSession() throws Exception {
+    ContainerResponse response = launcher.service("DELETE",
+                                                  "/v1/membershipTypes/" + MEMBERSHIP_TYPE_1,
+                                                  "",
+                                                  null,
+                                                  null,
+                                                  unconfirmedContext("testuser"));
+    assertNotNull(response);
+    assertEquals(403, response.getStatus());
+    assertEquals(UserAccountConfirmation.OTP_REQUIRED, response.getEntity());
+    verify(membershipTypeHandler, never()).findMembershipType(anyString());
+    verify(membershipTypeHandler, never()).removeMembershipType(anyString(), anyBoolean());
   }
 
   public void testGetMembershipTypes() throws Exception {

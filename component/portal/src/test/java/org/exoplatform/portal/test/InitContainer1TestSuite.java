@@ -61,6 +61,8 @@ import org.exoplatform.portal.mop.storage.TestPageService;
 import org.exoplatform.portal.rest.MembershipTypeRestResourcesTest;
 import org.exoplatform.portal.rest.UserFieldValidatorTest;
 import org.exoplatform.portal.rest.GroupRestResourcesTest;
+import org.exoplatform.portal.rest.UserAccountConfirmationSettingsTest;
+import org.exoplatform.portal.rest.UserAccountConfirmationTest;
 import org.exoplatform.portal.rest.UserRestResourcesTest;
 import org.exoplatform.portal.tree.list.TestListTree;
 import org.exoplatform.settings.rest.SettingResourceTest;
@@ -69,6 +71,7 @@ import io.meeds.portal.mop.plugin.SiteAclPluginTest;
 import io.meeds.portal.permlink.service.PermanentLinkServiceTest;
 import io.meeds.portal.security.listener.DefaultUserMembershipListenerTest;
 import io.meeds.portal.security.listener.PortalRegistrationUpdateListenerTest;
+import io.meeds.portal.security.rest.RegistrationSettingRestTest;
 import io.meeds.portal.security.service.SecuritySettingServiceTest;
 
 @RunWith(Suite.class)
@@ -113,6 +116,9 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     MembershipTypeRestResourcesTest.class,
     UserFieldValidatorTest.class,
     UserRestResourcesTest.class,
+    UserAccountConfirmationTest.class,
+    UserAccountConfirmationSettingsTest.class,
+    RegistrationSettingRestTest.class,
     TestJIBXXmlMapping.class,
     TestXSDCorruption.class,
     TestListTree.class,
