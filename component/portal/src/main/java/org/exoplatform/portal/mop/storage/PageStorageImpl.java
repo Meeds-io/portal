@@ -144,8 +144,9 @@ public class PageStorageImpl implements PageStorage {
 
     PageEntity entity = pageDAO.findByKey(page.getKey());
     if (entity != null) {
-      // The update writes every column, the page body included: it's read
-      // from the row, not as an earlier read of this request left it
+      // The update writes the columns that differ from the loaded state: they're
+      // compared with the row as stored, not as an earlier read of this request
+      // left it
       entity = pageDAO.refresh(entity);
     }
     boolean created = false;

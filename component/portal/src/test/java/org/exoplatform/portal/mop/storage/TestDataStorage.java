@@ -61,6 +61,7 @@ import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PersistentApplicationState;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.config.model.TransientApplicationState;
+import org.exoplatform.portal.jdbc.entity.PageEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.QueryResult;
@@ -1205,6 +1206,24 @@ public class TestDataStorage extends AbstractKernelTest {
     assertEquals("The properties save keeps the layout saved since the request read the page",
                  savedContainerId,
                  savedPage.getChildren().get(savedPage.getChildren().size() - 1).getStorageId());
+  }
+
+  public void testPageRowUpdateWritesOnlyTheColumnsItChanged() throws Exception {
+    PageKey pageKey = createPageWithWindow("dynamicUpdate");
+    PageDAO pageDAO = getComponent(PageDAO.class);
+    PageEntity page = pageDAO.findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    page.setDisplayName("Changed");
+    pageDAO.update(page);
+    restartTransaction();
+
+    PageEntity storedPage = pageDAO.findByKey(pageKey);
+    assertEquals("Changed", storedPage.getDisplayName());
+    JSONArray storedBody = (JSONArray) new JSONParser().parse(storedPage.getPageBody());
+    assertEquals("An update of the page properties writes no layout column",
+                 savedContainerId,
+                 String.valueOf(((JSONObject) storedBody.get(storedBody.size() - 1)).get("id")));
   }
 
   public void testClonePageCopiesTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
