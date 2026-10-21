@@ -18,8 +18,12 @@
  */
 package org.exoplatform.portal.rest.services;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.lang.reflect.*;
 import java.security.Principal;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.ws.rs.core.MultivaluedMap;
@@ -28,11 +32,15 @@ import javax.ws.rs.core.SecurityContext;
 import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.component.test.*;
 import org.exoplatform.container.ExoContainer;
+import org.exoplatform.portal.rest.UserAccountConfirmation;
 import org.exoplatform.services.rest.impl.*;
 import org.exoplatform.services.rest.tools.ResourceLauncher;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.test.mock.MockPrincipal;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/portal/configuration.xml"),
@@ -92,6 +100,59 @@ public abstract class BaseRestServicesTestCase extends AbstractKernelTest {
     headers.putSingle("content-type", "application/json");
     headers.putSingle("content-length", "" + jsonData.length);
     return launcher.service(method, restPath, "", headers, jsonData, null);
+  }
+
+  protected ContainerResponse getResponse(String method,
+                                          String restPath,
+                                          String input,
+                                          EnvironmentContext envctx) throws Exception {
+    byte[] jsonData = input.getBytes("UTF-8");
+    MultivaluedMap<String, String> headers = new MultivaluedMapImpl();
+    headers.putSingle("content-type", "application/json");
+    headers.putSingle("content-length", "" + jsonData.length);
+    return launcher.service(method, restPath, "", headers, jsonData, envctx);
+  }
+
+  /**
+   * @param username signed-in user
+   * @return a request context whose session was confirmed with a one-time
+   *         password by the designated user
+   */
+  protected EnvironmentContext confirmedContext(String username) {
+    return requestContext(confirmedRequest(username));
+  }
+
+  /**
+   * @param username signed-in user
+   * @return a request context of the designated user whose session was never
+   *         confirmed
+   */
+  protected EnvironmentContext unconfirmedContext(String username) {
+    return requestContext(unconfirmedRequest(username));
+  }
+
+  protected HttpServletRequest confirmedRequest(String username) {
+    HttpServletRequest request = unconfirmedRequest(username);
+    HttpSession session = request.getSession(true);
+    when(session.getAttribute(UserAccountConfirmation.SESSION_ATTRIBUTE)).thenReturn(username);
+    return request;
+  }
+
+  protected HttpServletRequest unconfirmedRequest(String username) {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpSession session = mock(HttpSession.class);
+    when(request.getRemoteUser()).thenReturn(username);
+    when(request.getLocale()).thenReturn(Locale.ENGLISH);
+    when(request.getSession()).thenReturn(session);
+    when(request.getSession(false)).thenReturn(session);
+    when(request.getSession(true)).thenReturn(session);
+    return request;
+  }
+
+  protected EnvironmentContext requestContext(HttpServletRequest request) {
+    EnvironmentContext envctx = new EnvironmentContext();
+    envctx.put(HttpServletRequest.class, request);
+    return envctx;
   }
 
   protected <T> T createProxy(Class<T> type, final Map<String, Object> result) {

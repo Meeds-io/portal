@@ -278,7 +278,7 @@
                       <string>Root</string>
                     </field>
                     <field name="email">
-                      <string>root@gatein.com</string>
+                      <string>${exo.super.user.email:root@gatein.com}</string>
                     </field>
                     <field name="groups">
                       <string>*:/platform/administrators,*:/platform/web-contributors,*:/platform/users,*:/organization/employees,member:/organization/management/executive-board</string>

@@ -38,6 +38,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -223,7 +224,10 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response createGroup(GroupImpl group) throws Exception {
+  public Response createGroup(@Context HttpServletRequest request, GroupImpl group) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     String regex = "^[a-zA-Z0-9-_]+$";
     Pattern pattern = Pattern.compile(regex);
     Matcher matcher = pattern.matcher(group.getGroupName());
@@ -276,7 +280,10 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response updateGroup(GroupImpl group) throws Exception {
+  public Response updateGroup(@Context HttpServletRequest request, GroupImpl group) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (group == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Group object is required").build();
     }
@@ -304,9 +311,13 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response deleteGroup(@Parameter(description = "Group id", required = true) @QueryParam(
+  public Response deleteGroup(@Context HttpServletRequest request,
+                              @Parameter(description = "Group id", required = true) @QueryParam(
     "groupId"
   ) String groupId) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (StringUtils.isBlank(groupId)) {
       return Response.status(Response.Status.BAD_REQUEST).entity("ID:MANDATORY").build();
     }
@@ -407,7 +418,8 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response createMembership(@RequestBody(description = "Membership Object") MembershipImpl membership) throws Exception {
+  public Response createMembership(@Context HttpServletRequest request,
+                                   @RequestBody(description = "Membership Object") MembershipImpl membership) throws Exception {
     if (membership == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Membership object is required").build();
     }
@@ -416,6 +428,9 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     }
     if (!canManageGroupMemberships(membership.getGroupId())) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
+    }
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
     }
     if (StringUtils.isBlank(membership.getUserName())) {
       return Response.status(Response.Status.BAD_REQUEST).entity("USER:MANDATORY").build();
@@ -469,8 +484,12 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                   @ApiResponse(responseCode = "500", description = "Internal server error")
           }
   )
-  public Response createMultipleMembership(@RequestBody(description = "List of membership objects")
-                                                          List<MembershipImpl> memberships) throws Exception {
+  public Response createMultipleMembership(@Context HttpServletRequest request,
+                                           @RequestBody(description = "List of membership objects")
+                                           List<MembershipImpl> memberships) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     for (MembershipImpl membership : memberships) {
       if (membership == null) {
         return Response.status(Response.Status.BAD_REQUEST).entity("Membership object is required").build();
@@ -531,9 +550,13 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response updateMembership(@Parameter(description = "Membership identifier with format: MEMBERSHIP_TYPE:GROUP_ID:USER_NAME", required = true)
+  public Response updateMembership(@Context HttpServletRequest request,
+                                   @Parameter(description = "Membership identifier with format: MEMBERSHIP_TYPE:GROUP_ID:USER_NAME", required = true)
                                    @QueryParam("membershipId") String membershipId,
                                    @RequestBody(description = "Membership object") MembershipImpl membership) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (membership == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Membership object is required").build();
     }
@@ -604,7 +627,8 @@ public class GroupRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response deleteMembership(@Parameter(
+  public Response deleteMembership(@Context HttpServletRequest request,
+                                   @Parameter(
       description = "Membership identifier with format: MEMBERSHIP_TYPE:USER_NAME:GROUP_ID", required = true
   ) @QueryParam(
     "membershipId"
@@ -616,6 +640,9 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     String membershipGroupId = membershipIdParts.length == 3 ? membershipIdParts[2] : null;
     if (!canManageGroupMemberships(membershipGroupId)) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
+    }
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
     }
     if (organizationService.getMembershipHandler().findMembership(membershipId) == null) {
       return Response.status(Response.Status.NOT_FOUND)
