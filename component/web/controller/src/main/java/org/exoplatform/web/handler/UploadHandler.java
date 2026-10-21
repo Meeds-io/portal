@@ -20,6 +20,7 @@ package org.exoplatform.web.handler;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Writer;
 import java.net.URLEncoder;
 
@@ -220,7 +221,10 @@ public class UploadHandler extends WebRequestHandler {
             res.setStatus(status);
             res.setContentType("text/plain");
             res.setCharacterEncoding("UTF-8");
-            res.getWriter().write(StringUtils.defaultIfBlank(message, "Upload failed"));
+            PrintWriter writer = res.getWriter();
+            if (writer != null) {
+                writer.write(StringUtils.defaultIfBlank(message, "Upload failed"));
+            }
         }
     }
 
