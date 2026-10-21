@@ -21,6 +21,7 @@ package org.exoplatform.portal.mop.dao;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.persistence.EntityTransaction;
 
@@ -116,6 +117,32 @@ public class WindowDAOTest extends AbstractDAOTest {
     assertNotNull(windowDAO.find(id));
     assertFalse(windowDAO.existsById(id));
     assertFalse(windowDAO.existsById(Long.MAX_VALUE));
+  }
+
+  /**
+   * A request's persistence context holds a window with the columns it first
+   * loaded: fails the mutant writing the customization through that window,
+   * which writes them back over another request's commit
+   */
+  public void testUpdateCustomizationWritesThatColumnAlone() throws Exception {
+    WindowEntity entity = createInstance("App1/committedTitle", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+    assertEquals("testTitle", windowDAO.find(id).getTitle());
+
+    inAnotherRequest(() -> {
+      WindowEntity window = windowDAO.find(id);
+      window.setTitle("committed");
+      windowDAO.update(window);
+    });
+    assertEquals(1, windowDAO.updateCustomization(id, "written".getBytes()));
+
+    AtomicReference<WindowEntity> stored = new AtomicReference<>();
+    inAnotherRequest(() -> stored.set(windowDAO.find(id)));
+    assertEquals("committed", stored.get().getTitle());
+    assertEquals("written", new String(stored.get().getCustomization()));
+    assertEquals(0, windowDAO.updateCustomization(Long.MAX_VALUE, "written".getBytes()));
   }
 
   public void testFindByIds() {

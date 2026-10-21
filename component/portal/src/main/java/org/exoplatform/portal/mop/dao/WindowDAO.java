@@ -45,6 +45,17 @@ public interface WindowDAO extends GenericDAO<WindowEntity, Long> {
    */
   boolean existsById(Long id);
 
+  /**
+   * Writes the customization of a window to its row, and to that column
+   * alone: the other columns keep what is committed, and the window the
+   * persistence context holds keeps its former state
+   *
+   * @param id the window's id
+   * @param customization the window's customization, null for none
+   * @return the number of windows written, 0 when no window has this id
+   */
+  int updateCustomization(Long id, byte[] customization);
+
   void deleteById(Long id);
 
   List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit);

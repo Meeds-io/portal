@@ -63,6 +63,15 @@ public class WindowDAOImpl extends AbstractDAO<WindowEntity> implements WindowDA
 
   @Override
   @ExoTransactional
+  public int updateCustomization(Long id, byte[] customization) {
+    return getEntityManager().createQuery("UPDATE GateInWindow w SET w.customization = :customization WHERE w.id = :id")
+                             .setParameter("customization", customization)
+                             .setParameter("id", id)
+                             .executeUpdate();
+  }
+
+  @Override
+  @ExoTransactional
   public List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit) {
     if (contentIds == null || contentIds.isEmpty()) {
       return Collections.emptyList();

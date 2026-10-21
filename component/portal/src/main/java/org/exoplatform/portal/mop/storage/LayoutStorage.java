@@ -214,6 +214,21 @@ public class LayoutStorage {
     return id > 0 && windowDAO.existsById(id);
   }
 
+  /**
+   * Writes the preferences of a window to its row, and to that column alone:
+   * never from the preferences cache of {@link #findWindow(Long)} nor from the
+   * window the persistence context holds, whose former columns
+   * {@link #save(ApplicationState, Portlet)} writes back
+   *
+   * @param applicationStorageId the window's storage id
+   * @param preferences the window's preferences, null for none
+   * @return true when a window has this id
+   */
+  public boolean saveCommitted(String applicationStorageId, Portlet preferences) {
+    long id = Safe.parseLong(applicationStorageId);
+    return id > 0 && updateWindowCustomization(id, preferences == null ? null : serialize(preferences)) > 0;
+  }
+
   public List<ComponentEntity> saveChildren(JSONArray pageBody, List<ComponentData> children) {
     cleanDeletedComponents(pageBody, children);
     return saveChildren(children);
@@ -340,6 +355,10 @@ public class LayoutStorage {
 
   protected WindowEntity updateWindow(WindowEntity window) {
     return windowDAO.update(window);
+  }
+
+  protected int updateWindowCustomization(Long id, byte[] customization) {
+    return windowDAO.updateCustomization(id, customization);
   }
 
   protected WindowEntity findWindow(Long id) {

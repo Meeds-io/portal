@@ -288,6 +288,26 @@ public interface LayoutService {
   }
 
   /**
+   * Writes the preferences of a page window to its row, and to that column
+   * alone: its other columns keep what is committed, whatever the preferences
+   * cache or the current request's persistence context holds, which
+   * {@link #save(ApplicationState, Portlet)} writes back. The window's cache
+   * entry is emptied once the write ends, after its commit when no
+   * transaction was already open; the window the current request's
+   * persistence context holds keeps its former preferences. A page save
+   * writes every column of its windows from the window it read, preferences
+   * included: one that read the window before this write commits, through
+   * the cache or a persistence context, writes the former preferences back.
+   *
+   * @param applicationStorageId the window's storage id
+   * @param preferences the window's preferences, null for none
+   * @return true when a window has this id
+   */
+  default boolean saveCommitted(String applicationStorageId, Portlet preferences) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Save content state <br>
    * 
    * @param state - ApplicationState object. It must be CloneApplicationState or
