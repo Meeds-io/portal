@@ -18,12 +18,9 @@
  */
 package org.exoplatform.upload;
 
-import lombok.AllArgsConstructor;
-
 /**
  * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Dec 26, 2005
  */
-@AllArgsConstructor
 public class UploadResource {
 
     public static final int UPLOADING_STATUS = 0;
@@ -46,6 +43,36 @@ public class UploadResource {
 
     // private int limitMB_ = UploadService.uploadLimitMB_;
     private int status_ = UPLOADING_STATUS;
+
+    private String owner_;
+
+    /**
+     * Builds a resource with all its upload attributes and no owner.
+     *
+     * @param uploadId upload id
+     * @param fileName uploaded file name
+     * @param mimeType uploaded file mime type
+     * @param storeLocation path of the stored file
+     * @param uploadedSize number of bytes received
+     * @param estimatedSize expected number of bytes
+     * @param status one of {@link #UPLOADING_STATUS}, {@link #UPLOADED_STATUS},
+     *          {@link #FAILED_STATUS}
+     */
+    public UploadResource(String uploadId, // NOSONAR
+                          String fileName,
+                          String mimeType,
+                          String storeLocation,
+                          double uploadedSize,
+                          double estimatedSize,
+                          int status) {
+        uploadId_ = uploadId;
+        fileName_ = fileName;
+        mimeType_ = mimeType;
+        storeLocation_ = storeLocation;
+        uploadedSize_ = uploadedSize;
+        estimatedSize_ = estimatedSize;
+        status_ = status;
+    }
 
     public UploadResource(String uploadId) {
         uploadId_ = uploadId;
@@ -106,6 +133,29 @@ public class UploadResource {
 
     public void setStatus(int status) {
         status_ = status;
+    }
+
+    /**
+     * Returns the user who uploaded the resource: the authenticated user of the
+     * upload request, or the user an upload token was issued for.
+     *
+     * @return the owner's username, or null when the resource was registered
+     *         without one (an anonymous upload, or a server-side registration
+     *         that did not set it)
+     */
+    public String getOwner() {
+        return owner_;
+    }
+
+    /**
+     * Sets the user who uploaded the resource, checked by
+     * {@link UploadService#getUploadResource(String, String)} and
+     * {@link UploadService#removeUploadResource(String, String)}.
+     *
+     * @param owner the owner's username
+     */
+    public void setOwner(String owner) {
+        owner_ = owner;
     }
 
     // public int getLimitMB() { return limitMB_; }
