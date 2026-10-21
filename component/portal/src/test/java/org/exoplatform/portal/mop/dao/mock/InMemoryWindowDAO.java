@@ -45,6 +45,16 @@ public class InMemoryWindowDAO extends AbstractInMemoryDAO<WindowEntity> impleme
   }
 
   @Override
+  public int updateCustomization(Long id, byte[] customization) {
+    WindowEntity window = find(id);
+    if (window == null) {
+      return 0;
+    }
+    window.setCustomization(customization);
+    return 1;
+  }
+
+  @Override
   public List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit) {
     return entities.values()
                    .stream()
