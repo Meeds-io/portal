@@ -47,4 +47,34 @@ public interface OtpPlugin {
    */
   boolean validateOtp(String userName, String otpCode);
 
+  /**
+   * Consumes the OTP code of a designated user once it was validated, so that
+   * it never validates again. A method holding no code to consume answers
+   * true.
+   *
+   * @param userName
+   * @param otpCode
+   * @return true when this call consumed the code, false when the code was no
+   *         longer there (another request consumed it first, or it expired)
+   */
+  default boolean consumeOtp(String userName, String otpCode) {
+    return true;
+  }
+
+  /**
+   * @return validity of a sent code in minutes, 0 when the method does not
+   *         expire its codes
+   */
+  default long getCodeTtlMinutes() {
+    return 0;
+  }
+
+  /**
+   * @return minimal delay in seconds between two sends of a code to the same
+   *         user, 0 when the method does not throttle them
+   */
+  default long getSendIntervalSeconds() {
+    return 0;
+  }
+
 }

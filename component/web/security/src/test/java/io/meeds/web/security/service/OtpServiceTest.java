@@ -18,6 +18,15 @@
  */
 package io.meeds.web.security.service;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -118,5 +127,87 @@ public class OtpServiceTest {
     otpService.validateOtp("john", "sms", "1234");
 
     verify(otpTentativeCache).remove("john");
+  }
+
+  @Test
+  @SneakyThrows
+  public void testValidateAndConsumeOtpConsumesTheCode() {
+    when(otpTentativeCache.get("john")).thenReturn(0L);
+    when(otpPlugin.validateOtp("john", "1234")).thenReturn(true);
+    when(otpPlugin.consumeOtp("john", "1234")).thenReturn(true);
+
+    otpService.validateAndConsumeOtp("john", "sms", "1234");
+
+    verify(otpPlugin).consumeOtp("john", "1234");
+  }
+
+  /**
+   * Two validations of one code: the first consumes it, the second finds it
+   * gone and is refused like a wrong code, without counting a failed attempt
+   */
+  @Test
+  @SneakyThrows
+  public void testValidateAndConsumeOtpHasOneWinnerPerCode() {
+    when(otpTentativeCache.get("john")).thenReturn(0L);
+    when(otpPlugin.validateOtp("john", "1234")).thenReturn(true);
+    when(otpPlugin.consumeOtp("john", "1234")).thenReturn(true, false);
+
+    otpService.validateAndConsumeOtp("john", "sms", "1234");
+    try {
+      otpService.validateAndConsumeOtp("john", "sms", "1234");
+      fail("A consumed code must not validate twice");
+    } catch (IllegalAccessException e) {
+      // Expected
+    }
+    verify(otpTentativeCache, never()).put(anyString(), anyLong());
+  }
+
+  @Test
+  @SneakyThrows
+  public void testValidateAndConsumeOtpKeepsTheCodeOnWrongCode() {
+    when(otpTentativeCache.get("john")).thenReturn(0L);
+    when(otpPlugin.validateOtp("john", "0000")).thenReturn(false);
+    try {
+      otpService.validateAndConsumeOtp("john", "sms", "0000");
+      fail("A wrong code must be refused");
+    } catch (IllegalAccessException e) {
+      // Expected
+    }
+    verify(otpPlugin, never()).consumeOtp(anyString(), anyString());
+    verify(otpTentativeCache, times(1)).put("john", 1L);
+  }
+
+  @Test
+  @SneakyThrows
+  public void testValidateAndConsumeOtpRefusesThrottledUserWithoutConsuming() {
+    when(otpTentativeCache.get("john")).thenReturn(3L);
+    try {
+      otpService.validateAndConsumeOtp("john", "sms", "1234");
+      fail("A throttled user must be refused");
+    } catch (IllegalAccessException e) {
+      // Expected
+    }
+    verify(otpPlugin, never()).validateOtp(anyString(), anyString());
+    verify(otpPlugin, never()).consumeOtp(anyString(), anyString());
+  }
+
+  @Test
+  public void testConsumeOtpOfUnknownMethodConsumesNothing() {
+    assertFalse(otpService.consumeOtp("john", "email", "1234"));
+    verify(otpPlugin, never()).consumeOtp(anyString(), anyString());
+  }
+
+  @Test
+  public void testConsumeOtpDelegatesToThePlugin() {
+    when(otpPlugin.consumeOtp("john", "1234")).thenReturn(true);
+    assertTrue(otpService.consumeOtp("john", "sms", "1234"));
+  }
+
+  @Test
+  public void testDefaultPluginConsumptionHasNothingToConsume() {
+    OtpPlugin plugin = mock(OtpPlugin.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+    assertTrue(plugin.consumeOtp("john", "1234"));
+    assertEquals(0, plugin.getCodeTtlMinutes());
+    assertEquals(0, plugin.getSendIntervalSeconds());
   }
 }

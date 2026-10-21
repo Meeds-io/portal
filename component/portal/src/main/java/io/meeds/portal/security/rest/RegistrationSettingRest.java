@@ -24,9 +24,11 @@ import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.exoplatform.portal.rest.UserAccountConfirmation;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 
 import io.meeds.portal.security.model.RegistrationSetting;
@@ -36,6 +38,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Path("/registration/settings")
 @Tag(name = "/registration/settings", description = "Managing user registraion settings and flow")
@@ -61,8 +64,14 @@ public class RegistrationSettingRest implements ResourceContainer {
   @RolesAllowed("administrators")
   @Consumes(MediaType.APPLICATION_JSON)
   @Operation(summary = "Update user registraion settings and flow", description = "Update user registraion settings and flow", method = "PUT")
-  @ApiResponses(value = { @ApiResponse(responseCode = "204", description = "Request fulfilled") })
-  public Response updateRegistrationSetting(RegistrationSetting registrationSetting) {
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "204", description = "Request fulfilled"),
+      @ApiResponse(responseCode = "403", description = "The session has not been confirmed with a one-time password: OTP_REQUIRED"),
+  })
+  public Response updateRegistrationSetting(@Context HttpServletRequest request, RegistrationSetting registrationSetting) {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     securitySettingService.saveRegistrationSetting(registrationSetting);
     return Response.noContent().build();
   }
