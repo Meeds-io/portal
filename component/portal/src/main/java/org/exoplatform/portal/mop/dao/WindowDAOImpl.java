@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 
@@ -59,6 +60,25 @@ public class WindowDAOImpl extends AbstractDAO<WindowEntity> implements WindowDA
                               .setParameter("id", id)
                               .getResultList()
                               .isEmpty();
+  }
+
+  @Override
+  @ExoTransactional
+  public int updateCustomization(Long id, byte[] customization) {
+    EntityManager entityManager = getEntityManager();
+    int updated = entityManager.createQuery("UPDATE GateInWindow w SET w.customization = :customization WHERE w.id = :id")
+                               .setParameter("customization", customization)
+                               .setParameter("id", id)
+                               .executeUpdate();
+    if (updated > 0) {
+      // The update bypasses the window the persistence context holds, which a
+      // later read of this request would otherwise put back in the cache
+      WindowEntity heldWindow = entityManager.getReference(WindowEntity.class, id);
+      if (entityManager.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(heldWindow)) {
+        entityManager.refresh(heldWindow);
+      }
+    }
+    return updated;
   }
 
   @Override
