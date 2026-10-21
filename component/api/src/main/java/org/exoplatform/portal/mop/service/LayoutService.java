@@ -294,10 +294,15 @@ public interface LayoutService {
    * {@link #save(ApplicationState, Portlet)} writes back. The window's cache
    * entry is emptied once the write ends, after its commit when no
    * transaction was already open; the window the current request's
-   * persistence context holds keeps its former preferences. A page save
-   * writes every column of its windows from the window it read, preferences
-   * included: one that read the window before this write commits, through
-   * the cache or a persistence context, writes the former preferences back.
+   * persistence context holds, when it holds one, is read again from the row.
+   * A page save, and a portlet's preferences store, which goes through
+   * {@link #save(ApplicationState, Portlet)}, write every column of a window
+   * from the window they read, preferences included: one that read the window
+   * before this write commits, through the cache or a persistence context,
+   * writes the former preferences back. And the cache is filled from the
+   * persistence context of the request that misses it: another request that
+   * loaded the window before this write, or a load in flight across it, puts
+   * the former preferences back in the cache, which then serves them.
    *
    * @param applicationStorageId the window's storage id
    * @param preferences the window's preferences, null for none

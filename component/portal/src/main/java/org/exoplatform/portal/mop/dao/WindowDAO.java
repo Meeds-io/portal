@@ -47,8 +47,8 @@ public interface WindowDAO extends GenericDAO<WindowEntity, Long> {
 
   /**
    * Writes the customization of a window to its row, and to that column
-   * alone: the other columns keep what is committed, and the window the
-   * persistence context holds keeps its former state
+   * alone: the other columns keep what is committed. The window the
+   * persistence context holds, when it holds one, is read again from the row
    *
    * @param id the window's id
    * @param customization the window's customization, null for none

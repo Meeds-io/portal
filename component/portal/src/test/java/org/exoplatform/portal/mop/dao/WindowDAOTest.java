@@ -145,6 +145,48 @@ public class WindowDAOTest extends AbstractDAOTest {
     assertEquals(0, windowDAO.updateCustomization(Long.MAX_VALUE, "written".getBytes()));
   }
 
+  /**
+   * The update bypasses the window the request's persistence context holds:
+   * fails the mutant leaving that window with its former customization
+   */
+  public void testUpdateCustomizationRefreshesTheWindowTheRequestHolds() {
+    WindowEntity entity = createInstance("App1/heldWindow", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+    WindowEntity heldWindow = windowDAO.find(id);
+    assertEquals("testCustom", new String(heldWindow.getCustomization()));
+
+    assertEquals(1, windowDAO.updateCustomization(id, "written".getBytes()));
+    assertEquals("written", new String(heldWindow.getCustomization()));
+    assertSame(heldWindow, windowDAO.find(id));
+  }
+
+  public void testUpdateCustomizationOfAWindowTheRequestDoesNotHold() {
+    WindowEntity entity = createInstance("App1/notHeldWindow", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+
+    assertEquals(1, windowDAO.updateCustomization(id, "written".getBytes()));
+    assertEquals("written", new String(windowDAO.find(id).getCustomization()));
+  }
+
+  /**
+   * Refreshing a window whose row is gone throws: fails the mutant refreshing
+   * the held window when the update wrote no row
+   */
+  public void testUpdateCustomizationOfAHeldWindowAnotherRequestDeleted() throws Exception {
+    WindowEntity entity = createInstance("App1/deletedHeldWindow", AppType.PORTLET);
+    windowDAO.create(entity);
+    restartTransaction();
+    Long id = entity.getId();
+    assertNotNull(windowDAO.find(id));
+    inAnotherRequest(() -> windowDAO.delete(windowDAO.find(id)));
+
+    assertEquals(0, windowDAO.updateCustomization(id, "written".getBytes()));
+  }
+
   public void testFindByIds() {
     WindowEntity entity1 = createInstance("content1", AppType.PORTLET);
     windowDAO.create(entity1);

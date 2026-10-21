@@ -422,6 +422,27 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertFalse(layoutService.saveCommitted("notAnId", new Portlet()));
   }
 
+  /**
+   * After the write, a read of the request that holds the window fills the
+   * shared cache from that window: fails the mutant leaving it with its former
+   * preferences, which every request would then read
+   */
+  public void testSaveCommittedThroughTheServiceLetsTheHoldingRequestReadTheNewPreferences() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertNotNull(windowDAO.find(id));
+
+    assertTrue(layoutService.saveCommitted(storageId, new Portlet().setValue("name", "written")));
+
+    PersistentApplicationState state = new PersistentApplicationState(storageId);
+    assertEquals("written", layoutService.load(state).getValue("name"));
+    AtomicReference<String> otherRequestName = new AtomicReference<>();
+    inAnotherRequest(() -> otherRequestName.set(layoutService.load(state).getValue("name")));
+    assertEquals("written", otherRequestName.get());
+  }
+
   public void testLoadCommittedOfAWindowWithoutPreferencesIsEmpty() {
     WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
     WindowEntity window = new WindowEntity();
