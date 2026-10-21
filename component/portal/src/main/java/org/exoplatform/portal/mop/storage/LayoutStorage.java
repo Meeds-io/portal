@@ -182,6 +182,38 @@ public class LayoutStorage {
     return new Application(applicationData);
   }
 
+  /**
+   * Reads the preferences of a window from its row, never through the
+   * preferences cache of {@link #findWindow(Long)} nor the window the
+   * persistence context holds
+   *
+   * @param applicationStorageId the window's storage id
+   * @return the window's preferences, empty when it has none, null when no
+   *         window has this id
+   */
+  public Portlet loadCommitted(String applicationStorageId) {
+    long id = Safe.parseLong(applicationStorageId);
+    if (id <= 0) {
+      return null;
+    }
+    return windowDAO.findCustomization(id)
+                    .map(customization -> customization.length == 0 ? new Portlet() : (Portlet) unserialize(customization))
+                    .orElse(null);
+  }
+
+  /**
+   * Whether a window's row exists, never read through the preferences cache
+   * of {@link #findWindow(Long)} nor from the window the persistence context
+   * holds, its preferences not read
+   *
+   * @param applicationStorageId the window's storage id
+   * @return true when a window has this id
+   */
+  public boolean existsCommitted(String applicationStorageId) {
+    long id = Safe.parseLong(applicationStorageId);
+    return id > 0 && windowDAO.existsById(id);
+  }
+
   public List<ComponentEntity> saveChildren(JSONArray pageBody, List<ComponentData> children) {
     cleanDeletedComponents(pageBody, children);
     return saveChildren(children);

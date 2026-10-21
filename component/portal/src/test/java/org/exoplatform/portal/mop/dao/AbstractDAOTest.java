@@ -18,9 +18,16 @@
  */
 package org.exoplatform.portal.mop.dao;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
+import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.portal.config.AbstractConfigTest;
 
 @ConfiguredBy({
@@ -29,5 +36,27 @@ import org.exoplatform.portal.config.AbstractConfigTest;
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/config/conf/configuration.xml"
 )})
 public abstract class AbstractDAOTest extends AbstractConfigTest {
-  
+
+  /**
+   * Runs a task in a request of its own, on a thread of its own, and waits
+   * for it: its writes are committed once it returns
+   */
+  protected void inAnotherRequest(Runnable task) throws Exception {
+    PortalContainer container = getContainer();
+    ExecutorService otherRequest = Executors.newSingleThreadExecutor();
+    try {
+      otherRequest.submit(() -> {
+        ExoContainerContext.setCurrentContainer(container);
+        RequestLifeCycle.begin(container);
+        try {
+          task.run();
+        } finally {
+          RequestLifeCycle.end();
+        }
+      }).get(10, TimeUnit.SECONDS);
+    } finally {
+      otherRequest.shutdownNow();
+    }
+  }
+
 }
