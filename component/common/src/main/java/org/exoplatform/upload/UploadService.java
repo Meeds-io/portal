@@ -51,6 +51,7 @@ import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.PortalContainerInfo;
+import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
@@ -77,6 +78,8 @@ public class UploadService {
   private static final Log            log                    = ExoLogger.getLogger(UploadService.class);
 
   private static final String         UPLOAD_TOKEN_VALIDITY_PARAM           = "upload.token.validity.seconds";
+
+  private static final String         UPLOAD_LOCATION_PARAM                 = "upload.location";
 
   private static final int            UPLOAD_TOKEN_BYTE_LENGTH              = 32;
 
@@ -126,18 +129,62 @@ public class UploadService {
     KB, MB, GB
   };
 
+  /**
+   * Builds the service from its parameters: {@code upload.limit.size} (default
+   * limit in MB, 0 or absent for unlimited), {@code upload.location} (staging
+   * root, see {@link #resolveUploadLocation(InitParams, String)}) and
+   * {@code upload.token.validity.seconds}.
+   *
+   * @param pinfo the portal container, whose name separates the staging folders
+   *          of several containers
+   * @param params the service parameters, may be null
+   * @throws Exception when a numeric parameter is not a number
+   */
   public UploadService(PortalContainerInfo pinfo, InitParams params) throws Exception {
-    String tmpDir = System.getProperty("java.io.tmpdir");
     if (params == null || params.getValueParam("upload.limit.size") == null)
       defaultUploadLimitMB_ = new UploadLimit(0, UploadUnit.MB); // 0 means
                                                                  // unlimited
     else
       defaultUploadLimitMB_ = new UploadLimit(Integer.parseInt(params.getValueParam("upload.limit.size").getValue()),
                                               UploadUnit.MB);
-    uploadLocation_ = tmpDir + "/" + pinfo.getContainerName() + "/eXoUpload";
+    uploadLocation_ = resolveUploadLocation(params, pinfo.getContainerName());
     if (params != null && params.getValueParam(UPLOAD_TOKEN_VALIDITY_PARAM) != null) {
       uploadTokenValidityMillis = Long.parseLong(params.getValueParam(UPLOAD_TOKEN_VALIDITY_PARAM).getValue().trim()) * 1000;
     }
+  }
+
+  /**
+   * Resolves the folder uploads are staged in: {@code <root>/<container
+   * name>/eXoUpload}, where the root is the {@code upload.location} parameter
+   * when it is set and not blank, else {@code java.io.tmpdir}. The container
+   * name and {@code eXoUpload} are kept under a configured root too, so several
+   * portal containers sharing one root, or one volume shared by several nodes,
+   * never mix their files, and the layout is the same whatever the root. The
+   * folder is created at the first upload; a root that exists but is not a
+   * writable folder, or whose nearest existing parent is not writable, is
+   * logged as an error here, and uploads then fail when they write.
+   *
+   * @param params the service parameters, may be null
+   * @param containerName the portal container name
+   * @return the staging folder path
+   */
+  private static String resolveUploadLocation(InitParams params, String containerName) {
+    String root = System.getProperty("java.io.tmpdir");
+    ValueParam locationParam = params == null ? null : params.getValueParam(UPLOAD_LOCATION_PARAM);
+    if (locationParam != null && locationParam.getValue() != null && !locationParam.getValue().isBlank()) {
+      root = locationParam.getValue().trim();
+      File existing = new File(root).getAbsoluteFile();
+      while (existing != null && !existing.exists()) {
+        existing = existing.getParentFile();
+      }
+      if (existing == null || !existing.isDirectory() || !existing.canWrite()) {
+        log.error("Upload staging root '{}' set by '{}' (exo.upload.location) cannot be used: '{}' is not a writable folder. Uploads will fail until it is fixed.",
+                  root,
+                  UPLOAD_LOCATION_PARAM,
+                  existing);
+      }
+    }
+    return root + "/" + containerName + "/eXoUpload";
   }
 
   public void register(MimeTypeUploadPlugin plugin) {

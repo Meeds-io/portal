@@ -559,6 +559,81 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
+   * Without the {@code upload.location} parameter, uploads are staged under
+   * {@code java.io.tmpdir/<container>/eXoUpload}.
+   */
+  public void testUploadLocationDefaultsToTmpDirWithoutParam() throws Exception {
+    assertStagedUnder(new UploadService(containerInfo(), null), System.getProperty("java.io.tmpdir"));
+    assertStagedUnder(new UploadService(containerInfo(), new InitParams()), System.getProperty("java.io.tmpdir"));
+  }
+
+  /**
+   * A blank {@code upload.location} parameter, as {@code ${exo.upload.location:}}
+   * resolves when the property is unset, keeps the default folder.
+   */
+  public void testBlankUploadLocationDefaultsToTmpDir() throws Exception {
+    assertStagedUnder(new UploadService(containerInfo(), locationParams("")), System.getProperty("java.io.tmpdir"));
+    assertStagedUnder(new UploadService(containerInfo(), locationParams("  ")), System.getProperty("java.io.tmpdir"));
+  }
+
+  /**
+   * A set {@code upload.location} parameter becomes the staging root: browser
+   * and token uploads are both stored under {@code <root>/<container>/eXoUpload},
+   * created at the first upload.
+   */
+  public void testConfiguredUploadLocationIsTheStagingRoot() throws Exception {
+    File root = java.nio.file.Files.createTempDirectory("exo-upload-location").toFile();
+    File configuredRoot = new File(root, "not-yet-created");
+    UploadService service = new UploadService(containerInfo(), locationParams(" " + configuredRoot.getPath() + " "));
+    assertStagedUnder(service, configuredRoot.getPath());
+    assertTrue(new File(configuredRoot, "portal/eXoUpload").isDirectory());
+  }
+
+  /**
+   * Asserts that a browser upload and a token upload made with the service are
+   * stored under {@code <root>/portal/eXoUpload}.
+   *
+   * @param service the service
+   * @param root the expected staging root
+   */
+  private void assertStagedUnder(UploadService service, String root) throws Exception {
+    String expectedFolder = new File(root + "/portal/eXoUpload").getAbsolutePath();
+
+    String browserId = newUploadId();
+    MultipartRequest request = multipart("a.txt", "text/plain", "browser");
+    when(request.request.getRemoteUser()).thenReturn("john");
+    service.createUploadResource(browserId, request.request);
+    UploadResource browserResource = service.getUploadResource(browserId);
+    assertEquals(expectedFolder, new File(browserResource.getStoreLocation()).getParentFile().getAbsolutePath());
+    assertTrue(new File(browserResource.getStoreLocation()).isFile());
+    service.removeUploadResource(browserId);
+
+    String tokenId = newUploadId();
+    String token = service.createUploadToken("john", tokenId, 100);
+    UploadResource tokenResource = service.createUploadResourceWithToken(token,
+                                                                          tokenId,
+                                                                          multipart("b.txt", "text/plain", "token").request);
+    assertEquals(expectedFolder, new File(tokenResource.getStoreLocation()).getParentFile().getAbsolutePath());
+    assertTrue(new File(tokenResource.getStoreLocation()).isFile());
+    service.removeUploadResource(tokenId);
+  }
+
+  /**
+   * Builds service parameters with the given staging root.
+   *
+   * @param location value of {@code upload.location}
+   * @return the init params
+   */
+  private InitParams locationParams(String location) {
+    InitParams params = new InitParams();
+    ValueParam param = new ValueParam();
+    param.setName("upload.location");
+    param.setValue(location);
+    params.addParameter(param);
+    return params;
+  }
+
+  /**
    * Asserts the token is refused for the upload id.
    *
    * @param token token presented
