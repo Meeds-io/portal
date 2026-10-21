@@ -342,11 +342,13 @@ public class UploadService {
       registered = true;
       return upResource;
     } finally {
-      receivingTokenUploads.remove(upResource);
-      removeUploadLimit(uploadId);
+      // unregister a refused upload before dropping its receiving mark, so an
+      // owner-checked consumer never gets it as uploaded
       if (!registered && uploadResources.remove(uploadId, upResource)) {
         deleteStoredFile(upResource);
       }
+      receivingTokenUploads.remove(upResource);
+      removeUploadLimit(uploadId);
     }
   }
 

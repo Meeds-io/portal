@@ -682,6 +682,59 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
+   * A token upload refused after its file is written (here, a file one byte
+   * over the token's size) is never handed out by the owner-checked accessor
+   * as uploaded: it is unregistered before its receiving mark goes. The test
+   * holds the upload in the mime type plugin, then holds the monitor of the
+   * limit map, which the refusal's cleanup takes last, so the read below runs
+   * while the upload thread is stopped inside that cleanup.
+   */
+  public void testRefusedTokenUploadIsNeverHandedOutDuringCleanup() throws Exception {
+    UploadService service = new UploadService(containerInfo(), null);
+    CountDownLatch inWindow = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    service.register(new BlockingMimeTypePlugin(inWindow, release));
+    String uploadId = newUploadId();
+    String token = service.createUploadToken("john", uploadId, 4);
+    MultipartRequest request = multipart("a.txt", "text/plain", "hello");
+    Throwable[] outcome = new Throwable[1];
+    Thread uploader = new Thread(() -> {
+      ExoContainerContext.setCurrentContainer(getContainer());
+      try {
+        service.createUploadResourceWithToken(token, uploadId, request.request);
+      } catch (Throwable e) { // NOSONAR the test inspects it
+        outcome[0] = e;
+      }
+    });
+    uploader.start();
+    try {
+      assertTrue(inWindow.await(30, TimeUnit.SECONDS));
+      UploadResource registered = service.getUploadResource(uploadId);
+      assertNotSame(registered, service.getUploadResource(uploadId, "john"));
+      Map<String, UploadService.UploadLimit> limits = service.getUploadLimits();
+      synchronized (limits) {
+        release.countDown();
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (uploader.getState() != Thread.State.BLOCKED && System.currentTimeMillis() < deadline) {
+          Thread.onSpinWait();
+        }
+        assertEquals("the upload thread waits for the limit map in its cleanup", Thread.State.BLOCKED, uploader.getState());
+        UploadResource seen = service.getUploadResource(uploadId, "john");
+        assertNotSame("the refused upload is never handed out", registered, seen);
+        assertNull("the refused upload is already unregistered", seen);
+        assertFalse("its file is already deleted", new File(registered.getStoreLocation()).exists());
+      }
+      uploader.join(30_000);
+      assertTrue(outcome[0] instanceof FileUploadSizeException);
+      assertNull(service.getUploadResource(uploadId, "john"));
+      assertNull(service.getUploadResource(uploadId));
+    } finally {
+      release.countDown();
+      uploader.join(30_000);
+    }
+  }
+
+  /**
    * A browser upload in the same window is handed out as before: the
    * receiving view applies to token uploads only.
    */
