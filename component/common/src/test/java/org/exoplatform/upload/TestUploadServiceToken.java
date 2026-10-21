@@ -18,6 +18,7 @@
  */
 package org.exoplatform.upload;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -213,7 +214,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
     try {
       uploadService.createUploadResourceWithToken(token, uploadId, request.request);
     } catch (FileUploadSizeException e) {
-      assertFalse("the Content-Length check must accept a request at its bound", e.getActualSize() == atBound);
+      assertNotEquals("the Content-Length check must accept a request at its bound", atBound, e.getActualSize());
     } catch (FileUploadException e) {
       // the shorter body may fail to parse: not the check under test
     } finally {
@@ -330,7 +331,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
     String uploadId = newUploadId();
     String first = uploadService.createUploadToken("john", uploadId, 1);
     String second = uploadService.createUploadToken("john", uploadId, 1);
-    assertFalse(first.equals(second));
+    assertNotEquals(first, second);
     assertFalse(first.contains(uploadId));
     assertFalse(first.contains("john"));
     assertTrue(first.length() >= 43);
@@ -545,8 +546,9 @@ public class TestUploadServiceToken extends AbstractKernelTest {
         String first = futures.get(0).get(30, TimeUnit.SECONDS);
         String second = futures.get(1).get(30, TimeUnit.SECONDS);
         String winner = "conflict".equals(first) ? second : first;
-        assertTrue("trial " + trial + ": exactly one success and one conflict, got " + first + " and " + second,
-                   "conflict".equals(first) != "conflict".equals(second));
+        assertNotEquals("trial " + trial + ": exactly one success and one conflict, got " + first + " and " + second,
+                        "conflict".equals(first),
+                        "conflict".equals(second));
         UploadResource upResource = service.getUploadResource(uploadId);
         assertNotNull("trial " + trial + ": the winner's resource is kept", upResource);
         assertEquals(winner, upResource.getOwner());

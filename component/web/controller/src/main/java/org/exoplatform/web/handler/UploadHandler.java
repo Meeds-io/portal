@@ -19,6 +19,7 @@
 package org.exoplatform.web.handler;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Writer;
 import java.net.URLEncoder;
 
@@ -175,9 +176,9 @@ public class UploadHandler extends WebRequestHandler {
      * @param req the request
      * @param res the response
      * @param token the token taken from the {@code Authorization} header
-     * @throws Exception when writing the response fails
+     * @throws IOException when writing the response fails
      */
-    private void executeTokenUpload(HttpServletRequest req, HttpServletResponse res, String token) throws Exception {
+    private void executeTokenUpload(HttpServletRequest req, HttpServletResponse res, String token) throws IOException {
         res.setHeader("Cache-Control", "no-store");
         UploadService service = ExoContainerContext.getService(UploadService.class);
         try {
@@ -193,13 +194,13 @@ public class UploadHandler extends WebRequestHandler {
             writeError(res, HttpServletResponse.SC_CONFLICT, "Upload id already in use");
         } catch (FileUploadSizeException e) {
             if (e.getActualSize() < 0) {
-                writeError(res, HttpServletResponse.SC_LENGTH_REQUIRED, e.getMessage());
+                writeError(res, HttpServletResponse.SC_LENGTH_REQUIRED, "Content-Length is required for a token upload");
             } else {
                 writeError(res, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, e.getMessage() + ": " + e.getActualSize()
                     + " bytes, " + e.getPermitted() + " permitted");
             }
         } catch (FileUploadException e) {
-            writeError(res, HttpServletResponse.SC_BAD_REQUEST, StringUtils.defaultIfBlank(e.getMessage(), "Upload failed"));
+            writeError(res, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         }
     }
 
@@ -209,16 +210,17 @@ public class UploadHandler extends WebRequestHandler {
      *
      * @param res the response
      * @param status the HTTP status
-     * @param message the message, for the client to diagnose the refusal
-     * @throws Exception when writing the response fails
+     * @param message the message, for the client to diagnose the refusal;
+     *          "Upload failed" when null or blank
+     * @throws IOException when writing the response fails
      */
-    private void writeError(HttpServletResponse res, int status, String message) throws Exception {
+    private void writeError(HttpServletResponse res, int status, String message) throws IOException {
         if (!res.isCommitted()) {
             res.resetBuffer();
             res.setStatus(status);
             res.setContentType("text/plain");
             res.setCharacterEncoding("UTF-8");
-            res.getWriter().write(message);
+            res.getWriter().write(StringUtils.defaultIfBlank(message, "Upload failed"));
         }
     }
 
