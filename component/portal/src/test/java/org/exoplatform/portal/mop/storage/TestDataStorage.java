@@ -1208,6 +1208,28 @@ public class TestDataStorage extends AbstractKernelTest {
                  savedPage.getChildren().get(savedPage.getChildren().size() - 1).getStorageId());
   }
 
+  public void testSavePagePropertiesWritesBackAPropertyChangedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("stalePropertyValue");
+    PageState originalState = pageService.loadPage(pageKey).getState().builder().displayName("Original").build();
+    pageService.savePage(new PageContext(pageKey, originalState));
+    restartTransaction();
+    PageDAO pageDAO = getComponent(PageDAO.class);
+    pageDAO.findByKey(pageKey);
+    inAnotherRequest(() -> {
+      PageState state = pageService.loadPage(pageKey).getState();
+      pageService.savePage(new PageContext(pageKey, state.builder().displayName("Other").build()));
+      assertEquals("The other request's property is stored", "Other", pageDAO.findByKey(pageKey).getDisplayName());
+      return null;
+    });
+
+    pageService.savePage(new PageContext(pageKey, originalState));
+    restartTransaction();
+
+    assertEquals("A property saved back to the value the request first read is written",
+                 "Original",
+                 pageDAO.findByKey(pageKey).getDisplayName());
+  }
+
   public void testPageRowUpdateWritesOnlyTheColumnsItChanged() throws Exception {
     PageKey pageKey = createPageWithWindow("dynamicUpdate");
     PageDAO pageDAO = getComponent(PageDAO.class);
