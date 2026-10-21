@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.persistence.EntityTransaction;
 
@@ -38,10 +39,13 @@ import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
 import org.exoplatform.portal.mop.dao.AbstractDAOTest;
 import org.exoplatform.portal.mop.dao.WindowDAO;
 import org.exoplatform.portal.mop.service.LayoutService;
+import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
 import org.exoplatform.portal.mop.storage.utils.MOPUtils;
 import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.ContainerData;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
+import org.exoplatform.services.cache.CacheService;
+import org.exoplatform.services.cache.ExoCache;
 
 public class LayoutStorageTest extends AbstractDAOTest {
 
@@ -379,6 +383,64 @@ public class LayoutStorageTest extends AbstractDAOTest {
     inAnotherRequest(() -> windowDAO.delete(windowDAO.find(id)));
     assertNotNull(windowDAO.find(id));
     assertFalse(layoutService.existsCommitted(storageId));
+  }
+
+  /**
+   * The preferences cache keeps a window until a write through the storage
+   * empties it: fails the mutants of the storage and of the service writing
+   * the preferences from that cached window, whose former columns they write
+   * back, and the mutant keeping its cache entry
+   */
+  public void testSaveCommittedThroughTheServiceKeepsTheColumnsAnotherRequestCommitted() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    ExoCache<Long, ?> preferencesCache = getContainer().getComponentInstanceOfType(CacheService.class)
+                                                       .getCacheInstance(CacheLayoutStorage.PORTLET_PREFERENCES_CACHE_NAME);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertEquals("loaded", layoutService.load(new PersistentApplicationState(storageId)).getValue("name"));
+    assertNotNull(preferencesCache.get(id));
+
+    // Written through the DAO, the cache entry is kept
+    inAnotherRequest(() -> {
+      WindowEntity window = windowDAO.find(id);
+      window.setTitle("committed");
+      windowDAO.update(window);
+    });
+    assertTrue(layoutService.saveCommitted(storageId, new Portlet().setValue("name", "written")));
+    assertNull(preferencesCache.get(id));
+
+    AtomicReference<WindowEntity> stored = new AtomicReference<>();
+    inAnotherRequest(() -> stored.set(windowDAO.find(id)));
+    assertEquals("committed", stored.get().getTitle());
+    assertEquals("written", ((Portlet) MOPUtils.unserialize(stored.get().getCustomization())).getValue("name"));
+
+    assertTrue(layoutService.saveCommitted(storageId, null));
+    assertNotNull(layoutService.loadCommitted(storageId));
+    assertFalse(layoutService.loadCommitted(storageId).iterator().hasNext());
+    assertFalse(layoutService.saveCommitted(String.valueOf(Long.MAX_VALUE), new Portlet()));
+    assertFalse(layoutService.saveCommitted("notAnId", new Portlet()));
+  }
+
+  /**
+   * After the write, a read of the request that holds the window fills the
+   * shared cache from that window: fails the mutant leaving it with its former
+   * preferences, which every request would then read
+   */
+  public void testSaveCommittedThroughTheServiceLetsTheHoldingRequestReadTheNewPreferences() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertNotNull(windowDAO.find(id));
+
+    assertTrue(layoutService.saveCommitted(storageId, new Portlet().setValue("name", "written")));
+
+    PersistentApplicationState state = new PersistentApplicationState(storageId);
+    assertEquals("written", layoutService.load(state).getValue("name"));
+    AtomicReference<String> otherRequestName = new AtomicReference<>();
+    inAnotherRequest(() -> otherRequestName.set(layoutService.load(state).getValue("name")));
+    assertEquals("written", otherRequestName.get());
   }
 
   public void testLoadCommittedOfAWindowWithoutPreferencesIsEmpty() {
