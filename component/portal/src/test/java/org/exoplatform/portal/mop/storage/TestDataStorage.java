@@ -29,6 +29,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -1169,6 +1172,135 @@ public class TestDataStorage extends AbstractKernelTest {
     assertNotNull(readSite.get());
     assertNull("The site read before the save is cached", siteCache.get(siteKey));
     assertEquals("Saved label", siteStorage.getPortalConfig(siteKey).getLabel());
+  }
+
+  public void testSavePageLayoutRemovesTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("staleLayoutSave");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    Page page = new Page();
+    page.setOwnerType(PortalConfig.PORTAL_TYPE);
+    page.setOwnerId(pageKey.getSite().getName());
+    page.setName(pageKey.getName());
+    page.setChildren(new ArrayList<>(List.of(new Container())));
+    pageService.save(page.build());
+    restartTransaction();
+
+    assertNull("The container saved since the request read the page is replaced with the rest of its layout",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  public void testSavePagePropertiesKeepsTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("stalePropertiesSave");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    PageContext pageContext = pageService.loadPage(pageKey);
+    pageService.savePage(new PageContext(pageKey, pageContext.getState().builder().displayName("Changed").build()));
+    restartTransaction();
+
+    Page savedPage = pageService.getPage(pageKey);
+    assertEquals("Changed", pageService.loadPage(pageKey).getState().getDisplayName());
+    assertEquals("The properties save keeps the layout saved since the request read the page",
+                 savedContainerId,
+                 savedPage.getChildren().get(savedPage.getChildren().size() - 1).getStorageId());
+  }
+
+  public void testClonePageCopiesTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("staleClone");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    addPageContainerInAnotherRequest(pageKey);
+
+    PageKey cloneKey = new PageKey(pageKey.getSite(), "fooClone");
+    pageService.clone(pageKey, cloneKey);
+    restartTransaction();
+
+    assertEquals("The clone copies the layout saved since the request read the page",
+                 2,
+                 pageService.getPage(cloneKey).getChildren().size());
+  }
+
+  public void testSaveSiteRemovesTheLayoutSavedSinceTheRequestReadTheSite() throws Exception {
+    SiteKey siteKey = SiteKey.portal("staleSiteSave");
+    createSite(SiteType.PORTAL, siteKey.getName());
+    restartTransaction();
+    getComponent(SiteDAO.class).findByKey(siteKey);
+    String savedContainerId = addSiteContainerInAnotherRequest(siteKey);
+
+    PortalConfig site = new PortalConfig(modelStorage.getPortalConfig(siteKey));
+    site.getPortalLayout().setChildren(new ArrayList<>());
+    storage_.save(site);
+    restartTransaction();
+
+    assertNull("The container saved since the request read the site is replaced with the rest of its layout",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  public void testRemoveSiteRemovesTheLayoutSavedSinceTheRequestReadTheSite() throws Exception {
+    SiteKey siteKey = SiteKey.portal("staleSiteRemove");
+    createSite(SiteType.PORTAL, siteKey.getName());
+    restartTransaction();
+    getComponent(SiteDAO.class).findByKey(siteKey);
+    String savedContainerId = addSiteContainerInAnotherRequest(siteKey);
+
+    modelStorage.remove(siteKey);
+    restartTransaction();
+
+    assertNull(modelStorage.getPortalConfig(siteKey));
+    assertNull("The container saved since the request read the site is removed with the site",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  private String addPageContainerInAnotherRequest(PageKey pageKey) throws Exception {
+    return inAnotherRequest(() -> {
+      Page page = pageService.getPage(pageKey);
+      ArrayList<ModelObject> children = new ArrayList<>(page.getChildren());
+      children.add(new Container());
+      page.setChildren(children);
+      pageService.save(page.build());
+      List<ModelObject> savedChildren = pageService.getPage(pageKey).getChildren();
+      assertEquals("The other request's layout is stored", children.size(), savedChildren.size());
+      return savedChildren.get(savedChildren.size() - 1).getStorageId();
+    });
+  }
+
+  private String addSiteContainerInAnotherRequest(SiteKey siteKey) throws Exception {
+    return inAnotherRequest(() -> {
+      PortalConfig site = new PortalConfig(modelStorage.getPortalConfig(siteKey));
+      ArrayList<ModelObject> children = site.getPortalLayout().getChildren() == null ? new ArrayList<>() :
+                                                                                     new ArrayList<>(site.getPortalLayout()
+                                                                                                         .getChildren());
+      children.add(new Container());
+      site.getPortalLayout().setChildren(children);
+      storage_.save(site);
+      List<ModelObject> savedChildren = new PortalConfig(modelStorage.getPortalConfig(siteKey)).getPortalLayout().getChildren();
+      assertEquals("The other request's layout is stored", children.size(), savedChildren.size());
+      return savedChildren.get(savedChildren.size() - 1).getStorageId();
+    });
+  }
+
+  private <T> T inAnotherRequest(Callable<T> task) throws Exception {
+    PortalContainer container = PortalContainer.getInstance();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      return executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(container);
+        RequestLifeCycle.begin(container);
+        try {
+          return task.call();
+        } finally {
+          RequestLifeCycle.end();
+          ExoContainerContext.setCurrentContainer(null);
+        }
+      }).get(30, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private <T> T getComponent(Class<T> type) {
+    return PortalContainer.getInstance().getComponentInstanceOfType(type);
   }
 
   private PageKey createPageWithWindow(String siteName) throws Exception {

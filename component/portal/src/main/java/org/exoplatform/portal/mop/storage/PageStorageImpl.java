@@ -143,6 +143,11 @@ public class PageStorageImpl implements PageStorage {
     }
 
     PageEntity entity = pageDAO.findByKey(page.getKey());
+    if (entity != null) {
+      // The update writes every column, the page body included: it's read
+      // from the row, not as an earlier read of this request left it
+      entity = pageDAO.refresh(entity);
+    }
     boolean created = false;
     if (entity == null) {
       entity = new PageEntity();
@@ -199,6 +204,9 @@ public class PageStorageImpl implements PageStorage {
     }
 
     PageEntity pageSrc = pageDAO.findByKey(srcPageKey);
+    if (pageSrc != null) {
+      pageSrc = pageDAO.refresh(pageSrc);
+    }
     if (pageSrc == null) {
       throw new PageServiceException(PageError.CLONE_NO_SRC_PAGE,
                                      String.format("Could not clone non existing page %s from site of type %s with id %s",
@@ -332,7 +340,9 @@ public class PageStorageImpl implements PageStorage {
   /**
    * Replaces the page layout in one transaction, so that a concurrent reader
    * never reads a page whose removed windows are deleted while its new layout
-   * isn't committed yet, and a page whose update fails keeps its layout.
+   * isn't committed yet, and a page whose update fails keeps its layout. The
+   * layout replaced is the one of the page row as stored, not as the current
+   * persistence context may hold it since an earlier read of the same request.
    */
   @ContainerTransactional(atomic = true)
   private org.exoplatform.portal.mop.page.PageKey savePageLayout(PageData page) {
@@ -341,6 +351,9 @@ public class PageStorageImpl implements PageStorage {
                                                    new org.exoplatform.portal.mop.page.PageKey(siteKey, page.getKey().getName());
 
     PageEntity dst = pageDAO.findByKey(mopKey);
+    if (dst != null) {
+      dst = pageDAO.refresh(dst);
+    }
     if (dst == null) {
       throw new NoSuchDataException("The page " + page.getKey() + " not found");
     }

@@ -148,13 +148,18 @@ public class SiteStorageImpl implements SiteStorage {
   /**
    * Replaces the site layout and its attributes in one transaction, so that a
    * concurrent reader never reads a site whose layout containers are deleted
-   * while its new ones aren't committed yet.
+   * while its new ones aren't committed yet. The layout replaced is the one of
+   * the site row as stored, not as the current persistence context may hold it
+   * since an earlier read of the same request.
    */
   @Override
   @ContainerTransactional(atomic = true)
   public void save(PortalData config) {
     SiteKey siteKey = new SiteKey(config.getKey().getType(), config.getKey().getId());
     SiteEntity entity = siteDAO.findByKey(siteKey);
+    if (entity != null) {
+      entity = siteDAO.refresh(entity);
+    }
     if (entity == null) {
       throw new IllegalStateException("Cannot update portal " + config.getName() + " that does not exist");
     }
@@ -180,7 +185,9 @@ public class SiteStorageImpl implements SiteStorage {
   /**
    * Removes the site layout, pages, navigation and row in one transaction, so
    * that a concurrent reader never reads a site whose layout containers are
-   * already deleted.
+   * already deleted. The layout removed is the one of the site row as stored,
+   * not as the current persistence context may hold it since an earlier read
+   * of the same request.
    */
   @Override
   @ContainerTransactional(atomic = true)
@@ -188,6 +195,12 @@ public class SiteStorageImpl implements SiteStorage {
     PortalData config = getPortalConfig(siteKey);
     if (config != null && config.isRemovable()) {
       SiteEntity entity = siteDAO.findByKey(siteKey);
+      if (entity != null) {
+        entity = siteDAO.refresh(entity);
+      }
+      if (entity == null) {
+        throw new NoSuchDataException("Could not remove non existing portal " + siteKey);
+      }
       String siteBody = entity.getSiteBody();
       JSONArray children = parseJsonArray(siteBody);
       layoutStorage.deleteChildren(children);
