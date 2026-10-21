@@ -25,24 +25,33 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import org.apache.commons.fileupload2.core.DiskFileItem;
 import org.apache.commons.fileupload2.core.DiskFileItemFactory;
 import org.apache.commons.fileupload2.core.FileUploadException;
+import org.apache.commons.fileupload2.core.FileUploadSizeException;
 import org.apache.commons.fileupload2.core.ProgressListener;
 import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletDiskFileUpload;
 
+import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.PortalContainerInfo;
+import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
@@ -50,8 +59,29 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 public class UploadService {
+  /**
+   * Bytes a token upload's request body may carry above the file size the token
+   * declares: the multipart boundaries and part headers.
+   */
+  public static final long            UPLOAD_TOKEN_MULTIPART_ALLOWANCE      = 16L * 1024;
+
+  /** Validity of an upload token when the service configuration sets none. */
+  public static final long            DEFAULT_UPLOAD_TOKEN_VALIDITY_SECONDS = 300;
+
+  /** Message of a refused, expired, already used or mismatched upload token. */
+  public static final String          UPLOAD_TOKEN_INVALID                  = "upload.token.invalid";
+
+  /** Message of an upload id that is already registered. */
+  public static final String          UPLOAD_ID_ALREADY_IN_USE              = "upload.id.alreadyInUse";
+
   /** . */
   private static final Log            log                    = ExoLogger.getLogger(UploadService.class);
+
+  private static final String         UPLOAD_TOKEN_VALIDITY_PARAM           = "upload.token.validity.seconds";
+
+  private static final String         UPLOAD_LOCATION_PARAM                 = "upload.location";
+
+  private static final int            UPLOAD_TOKEN_BYTE_LENGTH              = 32;
 
   /**
    * These are list ascii-codes of special characters. We should not enable
@@ -69,13 +99,35 @@ public class UploadService {
 
   private List<UploadFileValidator>   uploadFileValidators;
 
-  private Map<String, UploadResource> uploadResources        = new LinkedHashMap<>();
+  /**
+   * Upload resources by upload id. Synchronized because request threads write
+   * it concurrently; it keeps the null-key and insertion-order behaviour of a
+   * {@link LinkedHashMap}. Iterating over it requires holding its monitor.
+   */
+  private Map<String, UploadResource> uploadResources        = Collections.synchronizedMap(new LinkedHashMap<>());
 
   private String                      uploadLocation_;
 
   private UploadLimit                 defaultUploadLimitMB_;
 
-  private Map<String, UploadLimit>    uploadLimits           = new LinkedHashMap<>();
+  /**
+   * Per-upload limits by upload id, synchronized for the same reason as
+   * {@link #uploadResources}.
+   */
+  private Map<String, UploadLimit>    uploadLimits           = Collections.synchronizedMap(new LinkedHashMap<>());
+
+  /**
+   * Token uploads registered but not yet written and validated: the
+   * owner-checked accessors never hand them out as uploaded.
+   */
+  private final Set<UploadResource>   receivingTokenUploads  = ConcurrentHashMap.newKeySet();
+
+  /** Pending upload tokens, keyed by the SHA-256 digest of the token value. */
+  private final Map<String, UploadToken> uploadTokens       = new ConcurrentHashMap<>();
+
+  private final SecureRandom          secureRandom           = new SecureRandom();
+
+  private long                        uploadTokenValidityMillis = DEFAULT_UPLOAD_TOKEN_VALIDITY_SECONDS * 1000;
 
   public static final String          UPLOAD_RESOURCES_STACK = "uploadResourcesStack";
 
@@ -83,15 +135,62 @@ public class UploadService {
     KB, MB, GB
   };
 
+  /**
+   * Builds the service from its parameters: {@code upload.limit.size} (default
+   * limit in MB, 0 or absent for unlimited), {@code upload.location} (staging
+   * root, see {@link #resolveUploadLocation(InitParams, String)}) and
+   * {@code upload.token.validity.seconds}.
+   *
+   * @param pinfo the portal container, whose name separates the staging folders
+   *          of several containers
+   * @param params the service parameters, may be null
+   * @throws Exception when a numeric parameter is not a number
+   */
   public UploadService(PortalContainerInfo pinfo, InitParams params) throws Exception {
-    String tmpDir = System.getProperty("java.io.tmpdir");
     if (params == null || params.getValueParam("upload.limit.size") == null)
       defaultUploadLimitMB_ = new UploadLimit(0, UploadUnit.MB); // 0 means
                                                                  // unlimited
     else
       defaultUploadLimitMB_ = new UploadLimit(Integer.parseInt(params.getValueParam("upload.limit.size").getValue()),
                                               UploadUnit.MB);
-    uploadLocation_ = tmpDir + "/" + pinfo.getContainerName() + "/eXoUpload";
+    uploadLocation_ = resolveUploadLocation(params, pinfo.getContainerName());
+    if (params != null && params.getValueParam(UPLOAD_TOKEN_VALIDITY_PARAM) != null) {
+      uploadTokenValidityMillis = Long.parseLong(params.getValueParam(UPLOAD_TOKEN_VALIDITY_PARAM).getValue().trim()) * 1000;
+    }
+  }
+
+  /**
+   * Resolves the folder uploads are staged in: {@code <root>/<container
+   * name>/eXoUpload}, where the root is the {@code upload.location} parameter
+   * when it is set and not blank, else {@code java.io.tmpdir}. The container
+   * name and {@code eXoUpload} are kept under a configured root too, so several
+   * portal containers sharing one root, or one volume shared by several nodes,
+   * never mix their files, and the layout is the same whatever the root. The
+   * folder is created at the first upload; a root that exists but is not a
+   * writable folder, or whose nearest existing parent is not writable, is
+   * logged as an error here, and uploads then fail when they write.
+   *
+   * @param params the service parameters, may be null
+   * @param containerName the portal container name
+   * @return the staging folder path
+   */
+  private static String resolveUploadLocation(InitParams params, String containerName) {
+    String root = System.getProperty("java.io.tmpdir");
+    ValueParam locationParam = params == null ? null : params.getValueParam(UPLOAD_LOCATION_PARAM);
+    if (locationParam != null && locationParam.getValue() != null && !locationParam.getValue().isBlank()) {
+      root = locationParam.getValue().trim();
+      File existing = new File(root).getAbsoluteFile();
+      while (existing != null && !existing.exists()) {
+        existing = existing.getParentFile();
+      }
+      if (existing == null || !existing.isDirectory() || !existing.canWrite()) {
+        log.error("Upload staging root '{}' set by '{}' (exo.upload.location) cannot be used: '{}' is not a writable folder. Uploads will fail until it is fixed.",
+                  root,
+                  UPLOAD_LOCATION_PARAM,
+                  existing);
+      }
+    }
+    return root + "/" + containerName + "/eXoUpload";
   }
 
   public void register(MimeTypeUploadPlugin plugin) {
@@ -111,20 +210,199 @@ public class UploadService {
     createUploadResource(uploadId, request);
   }
 
+  /**
+   * Registers a resource built server side, as given: no
+   * {@link UploadFileValidator} runs, and the resource's owner is whatever the
+   * caller set on it ({@link UploadResource#setOwner(String)}).
+   *
+   * @param uploadResource the resource to register under its upload id
+   */
   public void createUploadResource(UploadResource uploadResource) {
     uploadResources.put(uploadResource.getUploadId(), uploadResource);
   }
 
+  /**
+   * Registers the file of a multipart request under the given upload id, owned
+   * by the request's authenticated user ({@link HttpServletRequest#getRemoteUser()},
+   * null for an anonymous request).
+   *
+   * @param uploadId upload id
+   * @param request the request carrying one multipart file
+   * @throws FileUploadException when the id is invalid, the request carries
+   *           other than one file, or a validator refuses the file
+   */
   public void createUploadResource(String uploadId, HttpServletRequest request) throws FileUploadException {
+    createUploadResource(uploadId, request, request.getRemoteUser());
+  }
+
+  /**
+   * Issues a one-time token that lets a request without a user session upload
+   * one file through the upload handler, as the given user. The token is
+   * returned once and never stored: the service keeps its SHA-256 digest with
+   * the user, the upload id, the maximum size and the expiry. It is consumed by
+   * its first presentation, whatever the outcome. The token's size replaces the
+   * platform default upload limit for its upload id, so the caller caps it.
+   *
+   * @param username user the upload is made for, recorded as the resource's
+   *          owner
+   * @param uploadId the only upload id the token can register; the caller
+   *          generates it unguessable (a random UUID)
+   * @param maxSize maximum size of the uploaded file, in bytes
+   * @return the token value, to send as {@code Authorization: Bearer <token>}
+   * @throws IllegalArgumentException when the username is blank, the upload id
+   *           is invalid or already registered, or the size is not positive
+   */
+  public String createUploadToken(String username, String uploadId, long maxSize) {
+    if (username == null || username.isBlank()) {
+      throw new IllegalArgumentException("upload.token.username.mandatory");
+    }
+    if (uploadId == null || uploadId.isBlank() || !UPLOAD_ID_PATTERN.matcher(uploadId).matches()) {
+      throw new IllegalArgumentException("upload.token.uploadId.invalid");
+    }
+    if (maxSize <= 0) {
+      throw new IllegalArgumentException("upload.token.maxSize.invalid");
+    }
+    if (uploadResources.containsKey(uploadId)) {
+      throw new IllegalArgumentException(UPLOAD_ID_ALREADY_IN_USE);
+    }
+    long now = System.currentTimeMillis();
+    uploadTokens.values().removeIf(token -> token.isExpired(now));
+
+    byte[] randomBytes = new byte[UPLOAD_TOKEN_BYTE_LENGTH];
+    secureRandom.nextBytes(randomBytes);
+    String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    uploadTokens.put(digest(token), new UploadToken(username, uploadId, maxSize, now + uploadTokenValidityMillis));
+    return token;
+  }
+
+  /**
+   * Registers the file of a multipart request authorized by a one-time upload
+   * token instead of a user session. The token is consumed first, whatever the
+   * outcome; the request must then name the token's upload id, carry a
+   * {@code Content-Length} within the token's size plus
+   * {@link #UPLOAD_TOKEN_MULTIPART_ALLOWANCE}, and hold a file no larger than
+   * the token's size. The file goes through the same parsing and
+   * {@link UploadFileValidator}s as a browser upload, is owned by the token's
+   * user, and is tied to the request's HTTP session for cleanup. The upload id
+   * is reserved atomically: of two concurrent token uploads of one id, exactly
+   * one registers it and the other gets an {@link ObjectAlreadyExistsException}.
+   * Any refusal after registration removes this upload's resource only.
+   *
+   * @param token the token value, as issued by
+   *          {@link #createUploadToken(String, String, long)}
+   * @param uploadId the upload id the request names
+   * @param request the request carrying one multipart file
+   * @return the registered resource, in {@link UploadResource#UPLOADED_STATUS}
+   * @throws IllegalAccessException when the token is unknown, expired, already
+   *           used, or issued for another upload id
+   * @throws ObjectAlreadyExistsException when the upload id is already
+   *           registered
+   * @throws FileUploadSizeException when the request has no
+   *           {@code Content-Length} (actual size -1) or exceeds the token's
+   *           size
+   * @throws FileUploadException when the request is not one multipart file, is
+   *           incomplete, or a validator refuses the file
+   */
+  public UploadResource createUploadResourceWithToken(String token,
+                                                      String uploadId,
+                                                      HttpServletRequest request) throws IllegalAccessException,
+                                                                                  ObjectAlreadyExistsException,
+                                                                                  FileUploadException {
+    UploadToken uploadToken = consumeUploadToken(token, uploadId);
+    long permittedLength = uploadToken.maxSize() + UPLOAD_TOKEN_MULTIPART_ALLOWANCE;
+    long contentLength = request.getContentLengthLong();
+    if (contentLength < 0) {
+      throw new FileUploadSizeException("Content-Length is required for a token upload", permittedLength, contentLength);
+    }
+    if (contentLength > permittedLength) {
+      throw new FileUploadSizeException("The request exceeds the size declared for this upload token",
+                                        permittedLength,
+                                        contentLength);
+    }
+    UploadResource upResource = newUploadResource(uploadId, uploadToken.username());
+    receivingTokenUploads.add(upResource);
+    if (uploadResources.putIfAbsent(uploadId, upResource) != null) {
+      receivingTokenUploads.remove(upResource);
+      throw new ObjectAlreadyExistsException(uploadId, UPLOAD_ID_ALREADY_IN_USE);
+    }
+
+    addUploadLimit(uploadId, (int) Math.min(Integer.MAX_VALUE, (permittedLength + 1023) / 1024), UploadUnit.KB);
+    boolean registered = false;
+    try {
+      receiveUpload(upResource, request);
+      if (uploadResources.get(uploadId) != upResource || upResource.getStatus() != UploadResource.UPLOADED_STATUS) {
+        throw new FileUploadException("The upload did not complete");
+      }
+      long fileSize = new File(upResource.getStoreLocation()).length();
+      if (fileSize > uploadToken.maxSize()) {
+        throw new FileUploadSizeException("The file exceeds the size declared for this upload token",
+                                          uploadToken.maxSize(),
+                                          fileSize);
+      }
+      registered = true;
+      return upResource;
+    } finally {
+      // unregister a refused upload before dropping its receiving mark, so an
+      // owner-checked consumer never gets it as uploaded
+      if (!registered && uploadResources.remove(uploadId, upResource)) {
+        deleteStoredFile(upResource);
+      }
+      receivingTokenUploads.remove(upResource);
+      removeUploadLimit(uploadId);
+    }
+  }
+
+  /**
+   * Registers the file of a multipart request under the given upload id, owned
+   * by the given user, replacing any resource already registered under it, and
+   * ties it to the request's HTTP session for cleanup.
+   *
+   * @param uploadId upload id
+   * @param request the request carrying one multipart file
+   * @param owner the user recorded as the resource's owner, null for none
+   * @throws FileUploadException when the id is invalid, the request carries
+   *           other than one file, or a validator refuses the file
+   */
+  private void createUploadResource(String uploadId, HttpServletRequest request, String owner) throws FileUploadException {
+    UploadResource upResource = newUploadResource(uploadId, owner);
+    uploadResources.put(upResource.getUploadId(), upResource);
+    receiveUpload(upResource, request);
+  }
+
+  /**
+   * Builds the resource a multipart request is stored in, before it is
+   * registered.
+   *
+   * @param uploadId upload id
+   * @param owner the user recorded as the resource's owner, null for none
+   * @return the resource, in {@link UploadResource#UPLOADING_STATUS}
+   * @throws FileUploadException when the id is null or contains '.', '/' or
+   *           '\\'
+   */
+  private UploadResource newUploadResource(String uploadId, String owner) throws FileUploadException {
     if (uploadId == null || !UPLOAD_ID_PATTERN.matcher(uploadId).matches()) {
       throw new FileUploadException("Upload id " + uploadId + " is not valid, it cannot be null or contain '.' , '/' or '\\'");
     }
 
     UploadResource upResource = new UploadResource(uploadId);
     upResource.setFileName("");// Avoid NPE in UploadHandler
+    upResource.setOwner(owner);
     upResource.setStoreLocation(uploadLocation_ + File.separator + uploadId);
-    uploadResources.put(upResource.getUploadId(), upResource);
+    return upResource;
+  }
 
+  /**
+   * Receives the file of a multipart request into a registered resource: ties
+   * the upload id to the request's HTTP session for cleanup, applies the size
+   * limit, streams the file to disk and runs the {@link UploadFileValidator}s.
+   *
+   * @param upResource the registered resource
+   * @param request the request carrying one multipart file
+   * @throws FileUploadException when the request carries other than one file,
+   *           or a validator refuses the file
+   */
+  private void receiveUpload(UploadResource upResource, HttpServletRequest request) throws FileUploadException {
+    String uploadId = upResource.getUploadId();
     putToStackInSession(request.getSession(true), uploadId);
 
     double requestContentLength = request.getContentLength();
@@ -206,6 +484,66 @@ public class UploadService {
     fileStore.delete();
   }
 
+  /**
+   * Consumes a one-time upload token: removes it from the pending tokens on its
+   * first presentation, then checks its expiry and upload id. The lookup is by
+   * the token's digest and the upload id comparison runs in constant time.
+   *
+   * @param token the token value presented
+   * @param uploadId the upload id the request names
+   * @return what the token authorizes
+   * @throws IllegalAccessException when the token is blank, unknown, expired,
+   *           already used, or issued for another upload id
+   */
+  private UploadToken consumeUploadToken(String token, String uploadId) throws IllegalAccessException {
+    if (token == null || token.isBlank()) {
+      throw new IllegalAccessException(UPLOAD_TOKEN_INVALID);
+    }
+    UploadToken uploadToken = uploadTokens.remove(digest(token));
+    if (uploadToken == null
+        || uploadToken.isExpired(System.currentTimeMillis())
+        || uploadId == null
+        || !MessageDigest.isEqual(uploadToken.uploadId().getBytes(StandardCharsets.UTF_8),
+                                  uploadId.getBytes(StandardCharsets.UTF_8))) {
+      throw new IllegalAccessException(UPLOAD_TOKEN_INVALID);
+    }
+    return uploadToken;
+  }
+
+  /**
+   * Computes the key an upload token is stored under.
+   *
+   * @param token the token value
+   * @return the hexadecimal SHA-256 digest of the token
+   */
+  private static String digest(String token) {
+    try {
+      byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+      StringBuilder hex = new StringBuilder(hash.length * 2);
+      for (byte b : hash) {
+        hex.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+      }
+      return hex.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is not available", e);
+    }
+  }
+
+  /**
+   * Deletes the temporary file of a removed resource, or schedules its deletion
+   * at JVM exit when it cannot be deleted now.
+   *
+   * @param upResource the removed resource
+   */
+  private void deleteStoredFile(UploadResource upResource) {
+    if (upResource.getStoreLocation() != null) {
+      File file = new File(upResource.getStoreLocation());
+      if (!file.delete()) {
+        file.deleteOnExit();
+      }
+    }
+  }
+
   private void applyMimeTypeUploadPlugins(UploadResource upResource, String fileName) {
     if (plugins == null) {
       return;
@@ -253,13 +591,58 @@ public class UploadService {
   }
 
   /**
-   * Get UploadResource by uploadId
+   * Get UploadResource by uploadId. Answers any caller, whoever uploaded the
+   * resource: a consumer acting for a user prefers
+   * {@link #getUploadResource(String, String)}.
    *
    * @param uploadId uploadId of UploadResource
    * @return org.exoplatform.upload.UploadResource of uploadId
    */
   public UploadResource getUploadResource(String uploadId) {
     return uploadResources.get(uploadId);
+  }
+
+  /**
+   * Returns the resource registered under the upload id only when the given
+   * user owns it. A token upload still being written or validated is returned
+   * as a detached copy in {@link UploadResource#UPLOADING_STATUS}, without its
+   * store location: the parser marks it uploaded before its file is written and
+   * validated, and the copy cannot be removed through
+   * {@link #removeUploadResource(String, String)}.
+   *
+   * @param uploadId upload id
+   * @param username the user the caller acts for
+   * @return the resource, or null when the id is unknown, the resource has no
+   *         owner, or another user owns it
+   */
+  public UploadResource getUploadResource(String uploadId, String username) {
+    if (uploadId == null || username == null) {
+      return null;
+    }
+    UploadResource upResource = uploadResources.get(uploadId);
+    if (upResource == null || !username.equals(upResource.getOwner())) {
+      return null;
+    }
+    return receivingTokenUploads.contains(upResource) ? receivingView(upResource) : upResource;
+  }
+
+  /**
+   * Builds what a consumer sees of a token upload still being received.
+   *
+   * @param upResource the registered resource
+   * @return a copy in {@link UploadResource#UPLOADING_STATUS}, with no store
+   *         location
+   */
+  private static UploadResource receivingView(UploadResource upResource) {
+    UploadResource view = new UploadResource(upResource.getUploadId(),
+                                             upResource.getFileName(),
+                                             upResource.getMimeType(),
+                                             null,
+                                             upResource.getUploadedSize(),
+                                             upResource.getEstimatedSize(),
+                                             UploadResource.UPLOADING_STATUS);
+    view.setOwner(upResource.getOwner());
+    return view;
   }
 
   /**
@@ -292,24 +675,37 @@ public class UploadService {
   /**
    * Remove the UploadResource and its temporary file that associated with given
    * <code>uploadId</code>. <br>
-   * If <code>uploadId</code> is null or UploadResource is null, do nothing
+   * If <code>uploadId</code> is null or UploadResource is null, do nothing.
+   * Removes for any caller, whoever uploaded the resource: a consumer acting for
+   * a user prefers {@link #removeUploadResource(String, String)}.
    *
    * @param uploadId uploadId of UploadResource will be removed
    */
   public void removeUploadResource(String uploadId) {
     if (uploadId == null)
       return;
-    UploadResource upResource = uploadResources.get(uploadId);
+    UploadResource upResource = uploadResources.remove(uploadId);
     if (upResource != null) {
-      uploadResources.remove(uploadId);
-
-      if (upResource.getStoreLocation() != null) {
-        File file = new File(upResource.getStoreLocation());
-        if (!file.delete()) {
-          file.deleteOnExit();
-        }
-      }
+      deleteStoredFile(upResource);
     }
+  }
+
+  /**
+   * Removes the resource registered under the upload id, and its temporary
+   * file, only when the given user owns it.
+   *
+   * @param uploadId upload id
+   * @param username the user the caller acts for
+   * @return true when the resource was removed; false when the id is unknown,
+   *         the resource has no owner, or another user owns it
+   */
+  public boolean removeUploadResource(String uploadId, String username) {
+    UploadResource upResource = getUploadResource(uploadId, username);
+    if (upResource == null || !uploadResources.remove(uploadId, upResource)) {
+      return false;
+    }
+    deleteStoredFile(upResource);
+    return true;
   }
 
   /**
@@ -338,7 +734,8 @@ public class UploadService {
   }
 
   /**
-   * Get all upload limit sizes
+   * Get all upload limit sizes. The map is synchronized: a caller iterating over
+   * it holds its monitor ({@code synchronized (map)}).
    *
    * @return all upload limit sizes
    */
@@ -360,13 +757,20 @@ public class UploadService {
     return new String(chars);
   }
 
+  /**
+   * Tells whether a request of the given length exceeds the limit of the
+   * resource's upload: its own limit when one was set, else the service's
+   * default; a limit of 0 means unlimited.
+   *
+   * @param upResource the resource being uploaded
+   * @param contentLength the request's length in bytes
+   * @return true when the length exceeds the limit
+   */
   public boolean isLimited(UploadResource upResource, double contentLength) {
-    // by default, use the limit set in the service
-    UploadLimit limit = defaultUploadLimitMB_;
-    // if the limit is set in the request (specific for this upload) then use
-    // this value instead of the default one
-    if (uploadLimits.containsKey(upResource.getUploadId())) {
-      limit = uploadLimits.get(upResource.getUploadId());
+    // the limit set for this upload, read in one step, else the service's one
+    UploadLimit limit = uploadLimits.get(upResource.getUploadId());
+    if (limit == null) {
+      limit = defaultUploadLimitMB_;
     }
 
     double estimatedSize = contentLength / limit.division;
@@ -383,13 +787,18 @@ public class UploadService {
     return false;
   }
 
+  /**
+   * Returns the limit that applies to the resource's upload: its own limit when
+   * one was set, else the service's default.
+   *
+   * @param upResource the resource
+   * @return the applicable limit
+   */
   public UploadLimit getLimitForResource(UploadResource upResource) {
-    // by default, use the limit set in the service
-    UploadLimit limit = defaultUploadLimitMB_;
-    // if the limit is set in the request (specific for this upload) then use
-    // this value instead of the default one
-    if (uploadLimits.containsKey(upResource.getUploadId())) {
-      limit = uploadLimits.get(upResource.getUploadId());
+    // the limit set for this upload, read in one step, else the service's one
+    UploadLimit limit = uploadLimits.get(upResource.getUploadId());
+    if (limit == null) {
+      limit = defaultUploadLimitMB_;
     }
     return limit;
   }
