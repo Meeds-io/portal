@@ -23,6 +23,7 @@ import java.util.Date;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.portal.config.UserACL;
@@ -168,8 +170,12 @@ public class MembershipTypeRestResourcesV1 implements ResourceContainer {
           @ApiResponse(responseCode = "500", description = "Internal server error")
       }
   )
-  public Response deleteMembershipType(@Parameter(description = "Membership type name", required = true)
+  public Response deleteMembershipType(@Context HttpServletRequest request,
+                                       @Parameter(description = "Membership type name", required = true)
                                        @PathParam("membershipType") String membershipType) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (StringUtils.isBlank(membershipType)) {
       return Response.status(Response.Status.BAD_REQUEST).entity("NAME:MANDATORY").build();
     }

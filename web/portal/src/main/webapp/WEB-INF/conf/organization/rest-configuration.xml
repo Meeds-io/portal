@@ -22,6 +22,27 @@
                xmlns="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd">
 
   <component>
+    <type>org.exoplatform.portal.rest.UserAccountConfirmationSettings</type>
+    <init-params>
+      <value-param>
+        <name>enabled</name>
+        <description>Whether the administrator actions on user accounts require a one-time-password confirmation. Switch it off, through this property or through JMX at runtime, for an emergency or a malfunction only.</description>
+        <value>${meeds.users.confirmation.enabled:true}</value>
+      </value-param>
+      <value-param>
+        <name>exemptedUsers</name>
+        <description>Comma-separated logins of the technical accounts exempted from the confirmation: integrations only, never a person signing in, never the super user</description>
+        <value>${meeds.users.confirmation.exemptedUsers:}</value>
+      </value-param>
+      <value-param>
+        <name>caseInsensitive</name>
+        <description>Case rule of the organization store, used to match the exempted logins</description>
+        <value>${exo.idm.search.notCaseSensitive:true}</value>
+      </value-param>
+    </init-params>
+  </component>
+
+  <component>
     <type>org.exoplatform.portal.rest.UserRestResourcesV1</type>
   </component>
 
