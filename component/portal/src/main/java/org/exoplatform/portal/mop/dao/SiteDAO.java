@@ -30,6 +30,16 @@ public interface SiteDAO extends GenericDAO<SiteEntity, Long> {
 
   SiteEntity findByKey(SiteKey siteKey);
 
+  /**
+   * Reads the site row again from the database, bypassing the state already
+   * loaded in the current persistence context
+   *
+   * @param entity a site entity loaded by this DAO, detached from the
+   *          persistence context by this call
+   * @return the entity read again, null when the site was removed meanwhile
+   */
+  SiteEntity refresh(SiteEntity entity);
+
   List<SiteEntity> findByType(SiteType siteType);
 
   List<SiteKey> findSiteKey(SiteType siteType);

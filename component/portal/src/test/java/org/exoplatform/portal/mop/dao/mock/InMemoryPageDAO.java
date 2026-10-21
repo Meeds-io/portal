@@ -45,6 +45,12 @@ public class InMemoryPageDAO extends AbstractInMemoryDAO<PageEntity> implements 
   }
 
   @Override
+  public PageEntity refresh(PageEntity entity) {
+    // No persistence context in memory: the stored entity is the current one
+    return find(entity.getId());
+  }
+
+  @Override
   public InMemoryListAccess<PageKey> findByQuery(SiteType siteType,
                                                  String siteName,
                                                  String name,

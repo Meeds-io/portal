@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -53,9 +54,11 @@ import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.importer.ImportMode;
 import org.exoplatform.portal.mop.importer.NavigationImporter;
+import org.exoplatform.portal.mop.importer.NavigationOrphanRemover;
 import org.exoplatform.portal.mop.importer.PageImporter;
 import org.exoplatform.portal.mop.importer.PortalConfigImporter;
 import org.exoplatform.portal.mop.importer.Status;
+import org.exoplatform.portal.mop.page.PageContext;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
 import org.exoplatform.portal.mop.storage.DescriptionStorage;
@@ -227,15 +230,62 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     for (NewPortalConfig ele : configs) {
       initPortalConfigDB(ele, prepareImport);
     }
+    // A site that one of its configurations overwrites is imported from all
+    // its configurations, as an overwrite restore of the site does, so that a
+    // configuration doesn't remove the pages and nodes of the others
+    Set<SiteKey> overwrittenSites = getOverwrittenSites(prepareImport);
     for (NewPortalConfig ele : configs) {
-      initPageDB(ele, prepareImport);
+      initPageDB(withoutSites(ele, overwrittenSites), prepareImport);
+    }
+    for (SiteKey site : overwrittenSites) {
+      importSitePages(getPortalConfigs(site.getTypeName(), site.getName()), site.getName(), ImportMode.OVERWRITE);
     }
     for (NewPortalConfig ele : configs) {
-      initPageNavigationDB(ele, prepareImport);
+      initPageNavigationDB(withoutSites(ele, overwrittenSites), prepareImport);
+    }
+    for (SiteKey site : overwrittenSites) {
+      importSiteNavigation(getPortalConfigs(site.getTypeName(), site.getName()), site.getName(), ImportMode.OVERWRITE);
     }
 
     //
     touchImport();
+  }
+
+  private Set<SiteKey> getOverwrittenSites(boolean prepareImport) {
+    Set<SiteKey> sites = new HashSet<>();
+    for (NewPortalConfig config : configs) {
+      try {
+        if ((config.getOverrideMode() || prepareImport) && getRightMode(config.getImportMode()) == ImportMode.OVERWRITE) {
+          for (String owner : config.getPredefinedOwner()) {
+            if (createdOwners.contains(owner)) {
+              sites.add(new SiteKey(config.getOwnerType(), owner));
+            }
+          }
+        }
+      } catch (RuntimeException e) {
+        // The import of the configuration logs its unknown import mode or site
+        // type
+        LOG.debug("The configuration of sites {} is imported on its own: its import mode or site type is unknown",
+                  config.getPredefinedOwner(),
+                  e);
+      }
+    }
+    return sites;
+  }
+
+  /**
+   * @return the configuration without the owners of the given sites
+   */
+  private NewPortalConfig withoutSites(NewPortalConfig config, Set<SiteKey> sites) {
+    HashSet<String> owners = new HashSet<>(config.getPredefinedOwner());
+    if (owners.removeIf(owner -> sites.stream()
+                                      .anyMatch(site -> site.getTypeName().equalsIgnoreCase(config.getOwnerType())
+                                          && site.getName().equals(owner)))) {
+      NewPortalConfig otherSitesConfig = config.clone();
+      otherSitesConfig.setPredefinedOwner(owners);
+      return otherSitesConfig;
+    }
+    return config;
   }
 
   public NewPortalConfig getPortalConfig(String type, String name) {
@@ -307,10 +357,21 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   }
 
   public void initPortalConfigDB(NewPortalConfig ele, boolean prepareImport) {
+    initPortalConfigDB(ele, prepareImport, null);
+  }
+
+  /**
+   * @param ele the sites configuration of an extension
+   * @param prepareImport true to import the sites even when the configuration
+   *          doesn't override them
+   * @param beforeImport applied to each site configuration before it's
+   *          imported, null to import it as is
+   */
+  public void initPortalConfigDB(NewPortalConfig ele, boolean prepareImport, Consumer<PortalConfig> beforeImport) {
     RequestLifeCycle.begin(PortalContainer.getInstance());
     try {
       if (ele.getOverrideMode() || prepareImport) {
-        initPortalConfigDB(ele);
+        initPortalConfigDB(ele, beforeImport);
       }
     } catch (Exception e) {
       log.error("NewPortalConfig error: " + e.getMessage(), e);
@@ -320,8 +381,12 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
   }
 
   public void initPortalConfigDB(NewPortalConfig config) {
+    initPortalConfigDB(config, (Consumer<PortalConfig>) null);
+  }
+
+  private void initPortalConfigDB(NewPortalConfig config, Consumer<PortalConfig> beforeImport) {
     for (String owner : config.getPredefinedOwner()) {
-      if (createPortalConfig(config, owner)) {
+      if (createPortalConfig(config, owner, beforeImport)) {
         LOG.info("Importing Site of type '{}' with name '{}' from location '{}' wth mode '{}'",
                  config.getOwnerType(),
                  owner,
@@ -372,7 +437,162 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
     }
   }
 
+  /**
+   * Imports the site layout of each configuration of a site with the given
+   * import mode.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   * @param importMode the import mode
+   * @param beforeImport applied to each site configuration before it's
+   *          imported, null to import it as is
+   */
+  public void importSiteLayout(List<NewPortalConfig> configs,
+                               String owner,
+                               ImportMode importMode,
+                               Consumer<PortalConfig> beforeImport) {
+    for (NewPortalConfig config : configs) {
+      initPortalConfigDB(getSiteConfig(config, owner, importMode), true, beforeImport);
+    }
+  }
+
+  /**
+   * Imports the pages of each configuration of a site with the given import
+   * mode. An overwrite removes the pages that no configuration defines first,
+   * then the pages of each configuration are imported in place, so that a
+   * configuration doesn't remove the pages of the others, and the pages keep
+   * the navigation nodes of other sites that reference them. The pages are
+   * imported whether or not the site was imported at startup.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   * @param importMode the import mode
+   */
+  public void importSitePages(List<NewPortalConfig> configs, String owner, ImportMode importMode) {
+    boolean overwrite = importMode == ImportMode.OVERWRITE;
+    if (overwrite) {
+      removePageOrphans(configs, owner);
+    }
+    for (NewPortalConfig config : configs) {
+      try {
+        createPage(getSiteConfig(config, owner, overwrite ? ImportMode.MERGE : importMode), owner);
+      } catch (Exception e) {
+        log.error("NewPortalConfig error: " + e.getMessage(), e);
+      }
+    }
+  }
+
+  /**
+   * Imports the navigation of each configuration of a site with the given
+   * import mode. The navigation of each configuration is imported without
+   * removing any node, then the nodes that no configuration defines are
+   * removed as the import mode does, so that a configuration doesn't remove
+   * the nodes of the others.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   * @param importMode the import mode
+   */
+  public void importSiteNavigation(List<NewPortalConfig> configs, String owner, ImportMode importMode) {
+    boolean removeOrphans = NavigationOrphanRemover.removesOrphans(importMode);
+    for (NewPortalConfig config : configs) {
+      initPageNavigationDB(getSiteConfig(config, owner, removeOrphans ? ImportMode.MERGE : importMode), true);
+    }
+    if (removeOrphans) {
+      removeNavigationOrphans(configs, owner, importMode);
+    }
+  }
+
+  private NewPortalConfig getSiteConfig(NewPortalConfig config, String owner, ImportMode importMode) {
+    NewPortalConfig siteConfig = config.clone();
+    siteConfig.setImportMode(importMode.name());
+    siteConfig.setOverrideMode(true);
+    siteConfig.setPredefinedOwner(new HashSet<>(Set.of(owner)));
+    return siteConfig;
+  }
+
+  /**
+   * Removes the navigation nodes of a site that none of its configurations
+   * defines, as the import mode removes orphan nodes. Nothing is removed when
+   * the navigation file of a configuration can't be parsed, since the nodes it
+   * defines can't be told apart from the orphan ones then. A configuration
+   * whose navigation file can't be opened defines no node.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   * @param importMode the import mode requested for the site navigation
+   */
+  private void removeNavigationOrphans(List<NewPortalConfig> configs, String owner, ImportMode importMode) {
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      List<PageNavigation> navigations = new ArrayList<>();
+      for (NewPortalConfig config : configs) {
+        UnmarshalledObject<PageNavigation> navigation = getConfig(config, owner, "navigation", PageNavigation.class);
+        if (navigation != null) {
+          navigations.add(navigation.getObject());
+        }
+      }
+      new NavigationOrphanRemover(navigationService, navigations, importMode).perform();
+    } catch (Exception e) {
+      log.error("Error while removing the orphan navigation nodes of site {}, no node is removed", owner, e);
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
+  /**
+   * Removes the pages of a site that none of its configurations defines.
+   * Nothing is removed when the pages file of a configuration can't be parsed,
+   * since the pages it defines can't be told apart from the orphan ones then,
+   * nor from a user site, whose pages an import doesn't remove. A
+   * configuration whose pages file can't be opened defines no page. The
+   * orphans are selected once, then removed one by one, each page row read
+   * again at its removal: a page removed since the selection is skipped, and a
+   * page created since then is kept, unless it is named after an orphan.
+   *
+   * @param configs the configurations of the site
+   * @param owner the site name
+   */
+  private void removePageOrphans(List<NewPortalConfig> configs, String owner) {
+    if (configs.isEmpty()) {
+      return;
+    }
+    SiteKey siteKey = new SiteKey(configs.get(0).getOwnerType(), owner);
+    if (siteKey.getType().equals(SiteType.USER)) {
+      return;
+    }
+    RequestLifeCycle.begin(PortalContainer.getInstance());
+    try {
+      Set<String> pageNames = new HashSet<>();
+      for (NewPortalConfig config : configs) {
+        UnmarshalledObject<PageSet> pageSet = getConfig(config, owner, "pages", PageSet.class);
+        if (pageSet != null) {
+          pageSet.getObject().getPages().forEach(page -> pageNames.add(page.getName()));
+        }
+      }
+      for (PageContext page : layoutService.findPages(siteKey)) {
+        if (!pageNames.contains(page.getKey().getName())) {
+          try {
+            layoutService.remove(page.getKey());
+          } catch (RuntimeException e) {
+            // A page removed since the orphans were selected, for instance,
+            // doesn't stop the removal of the others
+            log.warn("Error while removing the orphan page {}", page.getKey(), e);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.error("Error while removing the orphan pages of site {}", owner, e);
+    } finally {
+      RequestLifeCycle.end();
+    }
+  }
+
   public boolean createPortalConfig(NewPortalConfig config, String owner) {
+    return createPortalConfig(config, owner, null);
+  }
+
+  private boolean createPortalConfig(NewPortalConfig config, String owner, Consumer<PortalConfig> beforeImport) {
     String type = config.getOwnerType();
     String fixedOwnerName = fixOwnerName(type, owner);
 
@@ -416,6 +636,9 @@ public class NewPortalConfigListener extends BaseComponentPlugin {
 
     // If XML configuration of PortalConfig exists or PortalConfig doesn't exist
     // in storage, import PortalConfig switch default ImportMode
+    if (beforeImport != null) {
+      beforeImport.accept(pConfig);
+    }
     ImportMode importMode = getRightMode(config.getImportMode());
     PortalConfigImporter portalImporter = new PortalConfigImporter(importMode, pConfig, layoutService);
     try {

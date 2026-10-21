@@ -92,8 +92,9 @@ public abstract class FutureCache<K, V, C> {
    * {@link #removeFuture(Object)} applied to a whole-cache clear.
    */
   public void clearFutures() {
-    futureEntries.values().forEach(Retrieval::invalidate);
-    futureEntries.clear();
+    // Each load leaves the map with its invalidation, so that a load
+    // registered meanwhile is never dropped from the map without it
+    futureEntries.keySet().forEach(this::removeFuture);
   }
 
   /**

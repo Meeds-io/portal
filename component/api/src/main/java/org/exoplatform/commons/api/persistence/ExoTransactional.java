@@ -28,6 +28,13 @@ import java.lang.annotation.Target;
  * REQUIRED. Support a current transaction, create a new one if none exists.
  * Analogous to EJB or Spring transaction attribute of the same name.
  *
+ * When a call that failed marked the transaction that the method began
+ * rollback-only, the transaction is rolled back: a method that returned then
+ * throws a jakarta.persistence.RollbackException, and a method that threw
+ * keeps its exception, unless ending the transaction fails. A method that
+ * joined an active transaction never throws it: the method that began the
+ * transaction does.
+ *
  * This annotation is handled in org.exoplatform.commons.persistence.impl.ExoTransactionalAspect.
  *
  */

@@ -20,17 +20,38 @@ package org.exoplatform.portal.mop.storage;
 
 import static org.junit.Assert.assertThrows;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.commons.file.services.FileService;
+import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
+import org.exoplatform.container.component.RequestLifeCycle;
+import org.exoplatform.container.configuration.ConfigurationManager;
+import org.exoplatform.portal.config.StaleModelException;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationState;
@@ -40,13 +61,19 @@ import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PersistentApplicationState;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.config.model.TransientApplicationState;
+import org.exoplatform.portal.jdbc.entity.PageEntity;
+import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.mop.EventType;
 import org.exoplatform.portal.mop.QueryResult;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.dao.ContainerDAO;
+import org.exoplatform.portal.mop.dao.PageDAO;
+import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.navigation.NavigationContext;
 import org.exoplatform.portal.mop.navigation.NavigationState;
 import org.exoplatform.portal.mop.navigation.NodeContext;
+import org.exoplatform.portal.mop.navigation.NodeData;
 import org.exoplatform.portal.mop.navigation.NodeModel;
 import org.exoplatform.portal.mop.navigation.Scope;
 import org.exoplatform.portal.mop.page.PageContext;
@@ -54,16 +81,27 @@ import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.page.PageState;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.service.NavigationService;
+import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
+import org.exoplatform.portal.mop.storage.cache.CacheNavigationStorage;
+import org.exoplatform.portal.mop.storage.cache.CachePageStorage;
+import org.exoplatform.portal.mop.storage.cache.CacheSiteStorage;
+import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.ContainerData;
 import org.exoplatform.portal.pom.data.PortalData;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.portal.pom.spi.portlet.PortletBuilder;
+import org.exoplatform.services.cache.CacheService;
+import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
 import org.exoplatform.services.organization.OrganizationService;
+import org.exoplatform.upload.UploadService;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 
 /**
  * Created by The eXo Platform SARL Author : Tung Pham thanhtungty@gmail.com Nov
@@ -75,6 +113,8 @@ import org.exoplatform.services.organization.OrganizationService;
   @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "org/exoplatform/portal/mop/navigation/configuration.xml"),
 })
 public class TestDataStorage extends AbstractKernelTest {
+
+  private static final String MISSING_ROOT_CONTAINER_BODY = "[{\"type\":\"CONTAINER\",\"id\":" + Long.MAX_VALUE + "}]";
 
   /** . */
   private LayoutService                        storage_;
@@ -780,6 +820,657 @@ public class TestDataStorage extends AbstractKernelTest {
     groupHandler.removeGroup(group, false);
     group = groupHandler.findGroupById("/groupSite");
     assertNull(group);
+  }
+
+  public void testSaveSiteKeepsTheStoredLayoutWhenTheNewLayoutFails() throws Exception {
+    String siteName = "failingLayoutSave";
+    createSite(SiteType.PORTAL, siteName);
+    PortalData site = modelStorage.getPortalConfig(SiteKey.portal(siteName));
+    String rootContainerId = site.getPortalLayout().getStorageId();
+
+    PortalData failingSite = new PortalData(site.getStorageId(),
+                                            siteName,
+                                            site.getType(),
+                                            site.getLocale(),
+                                            "Changed label",
+                                            site.getDescription(),
+                                            site.getAccessPermissions(),
+                                            site.getEditPermission(),
+                                            site.getProperties(),
+                                            site.getSkin(),
+                                            newContainer(siteName, List.of(new UnsupportedComponentData())),
+                                            site.isDisplayed(),
+                                            site.getDisplayOrder(),
+                                            site.getBannerFileId());
+    assertThrows(StaleModelException.class, () -> modelStorage.save(failingSite));
+    restartTransaction();
+
+    PortalData storedSite = modelStorage.getPortalConfig(SiteKey.portal(siteName));
+    assertFalse(storedSite.isLayoutUnresolved());
+    assertEquals(rootContainerId, storedSite.getPortalLayout().getStorageId());
+    assertEquals(site.getLabel(), storedSite.getLabel());
+  }
+
+  public void testCreateSiteStoresNothingWhenTheLayoutFails() throws Exception {
+    String siteName = "failingLayoutCreate";
+    ContainerDAO containerDAO = PortalContainer.getInstance().getComponentInstanceOfType(ContainerDAO.class);
+    long containersCount = containerDAO.count();
+
+    PortalData failingSite = new PortalData(null,
+                                            siteName,
+                                            SiteType.PORTAL.getName(),
+                                            null,
+                                            null,
+                                            null,
+                                            new ArrayList<>(),
+                                            null,
+                                            null,
+                                            null,
+                                            newContainer(siteName, List.of(new UnsupportedComponentData())),
+                                            true,
+                                            5,
+                                            0);
+    assertThrows(StaleModelException.class, () -> modelStorage.create(failingSite));
+    restartTransaction();
+
+    assertNull(modelStorage.getPortalConfig(SiteKey.portal(siteName)));
+    assertEquals(containersCount, containerDAO.count().longValue());
+  }
+
+  public void testSaveSiteReadWithAMissingRootContainerKeepsTheStoredLayout() throws Exception {
+    String siteName = "unresolvedLayout";
+    createSite(SiteType.PORTAL, siteName);
+    SiteDAO siteDAO = PortalContainer.getInstance().getComponentInstanceOfType(SiteDAO.class);
+    SiteEntity siteEntity = siteDAO.findByKey(SiteKey.portal(siteName));
+    String siteBody = siteEntity.getSiteBody();
+    String rootContainerId = getRootContainerId(siteBody);
+
+    // The site row references a root container that a concurrent save deleted
+    // and replaced without having committed yet
+    siteEntity.setSiteBody(MISSING_ROOT_CONTAINER_BODY);
+    siteDAO.update(siteEntity);
+    restartTransaction();
+
+    PortalData unresolvedSite = modelStorage.getPortalConfig(SiteKey.portal(siteName));
+    assertTrue(unresolvedSite.isLayoutUnresolved());
+
+    // The concurrent save commits the site row
+    siteEntity = siteDAO.findByKey(SiteKey.portal(siteName));
+    siteEntity.setSiteBody(siteBody);
+    siteDAO.update(siteEntity);
+    restartTransaction();
+
+    PortalConfig unresolvedConfig = new PortalConfig(unresolvedSite);
+    unresolvedConfig.setLabel("Changed label");
+    storage_.save(unresolvedConfig);
+    restartTransaction();
+
+    PortalData savedSite = modelStorage.getPortalConfig(SiteKey.portal(siteName));
+    assertEquals("Changed label", savedSite.getLabel());
+    assertFalse(savedSite.isLayoutUnresolved());
+    assertEquals(rootContainerId, savedSite.getPortalLayout().getStorageId());
+  }
+
+  public void testReadSiteAgainWhenItsRootContainerIsMissing() throws Exception {
+    String siteName = "reReadLayout";
+    createSite(SiteType.PORTAL, siteName);
+    PortalContainer container = PortalContainer.getInstance();
+    SiteDAO siteDAO = container.getComponentInstanceOfType(SiteDAO.class);
+    SiteEntity siteEntity = siteDAO.findByKey(SiteKey.portal(siteName));
+    String siteBody = siteEntity.getSiteBody();
+    String rootContainerId = getRootContainerId(siteBody);
+    siteEntity.setSiteBody(MISSING_ROOT_CONTAINER_BODY);
+    siteDAO.update(siteEntity);
+    restartTransaction();
+
+    // The concurrent save commits the site row right after this thread read it
+    SiteDAO concurrentlySavedSiteDAO = (SiteDAO) Proxy.newProxyInstance(SiteDAO.class.getClassLoader(),
+                                                                        new Class<?>[] { SiteDAO.class },
+                                                                        (proxy, method, args) -> {
+                                                                          Object result = invoke(siteDAO, method, args);
+                                                                          if ("findByKey".equals(method.getName())) {
+                                                                            executeInTransaction("UPDATE GateInSite s SET s.siteBody = '"
+                                                                                + siteBody + "' WHERE s.id = "
+                                                                                + ((SiteEntity) result).getId());
+                                                                          }
+                                                                          return result;
+                                                                        });
+    SiteStorageImpl siteStorage = newSiteStorage(pageService, concurrentlySavedSiteDAO);
+
+    PortalData site = siteStorage.getPortalConfig(SiteKey.portal(siteName));
+    assertFalse(site.isLayoutUnresolved());
+    assertEquals(rootContainerId, site.getPortalLayout().getStorageId());
+  }
+
+  public void testRemoveSiteKeepsTheSiteWhenTheRemovalFails() throws Exception {
+    String siteName = "failingRemoval";
+    createSite(SiteType.PORTAL, siteName);
+    String rootContainerId = modelStorage.getPortalConfig(SiteKey.portal(siteName)).getPortalLayout().getStorageId();
+
+    PageStorage failingPageStorage = (PageStorage) Proxy.newProxyInstance(PageStorage.class.getClassLoader(),
+                                                                          new Class<?>[] { PageStorage.class },
+                                                                          (proxy, method, args) -> {
+                                                                            if ("destroyPages".equals(method.getName())) {
+                                                                              throw new IllegalStateException("Pages removal failure");
+                                                                            }
+                                                                            return invoke(pageService, method, args);
+                                                                          });
+    SiteStorageImpl siteStorage = newSiteStorage(failingPageStorage,
+                                                 PortalContainer.getInstance().getComponentInstanceOfType(SiteDAO.class));
+    assertThrows(IllegalStateException.class, () -> siteStorage.remove(SiteKey.portal(siteName)));
+    restartTransaction();
+
+    PortalData storedSite = siteStorage.getPortalConfig(SiteKey.portal(siteName));
+    assertNotNull(storedSite);
+    assertFalse(storedSite.isLayoutUnresolved());
+    assertEquals(rootContainerId, storedSite.getPortalLayout().getStorageId());
+    assertNotNull(navService.loadNavigation(SiteKey.portal(siteName)));
+  }
+
+  public void testDestroyPageKeepsThePageLayoutWhenThePageRemovalFails() throws Exception {
+    PageKey pageKey = createPageWithWindow("failingPageRemoval");
+    PageStorageImpl pageStorage = newPageStorageFailingOn("delete");
+
+    assertThrows(IllegalStateException.class, () -> pageStorage.destroyPage(pageKey));
+    restartTransaction();
+
+    Page storedPage = pageStorage.getPage(pageKey);
+    assertNotNull(storedPage);
+    assertEquals(1, storedPage.getChildren().size());
+    assertEquals(1, ((Container) storedPage.getChildren().get(0)).getChildren().size());
+  }
+
+  public void testSavePageKeepsThePageLayoutWhenThePageUpdateFails() throws Exception {
+    PageKey pageKey = createPageWithWindow("failingPageUpdate");
+    PageStorageImpl pageStorage = newPageStorageFailingOn("update");
+    Page page = pageStorage.getPage(pageKey);
+    ((Container) page.getChildren().get(0)).setChildren(new ArrayList<>());
+
+    assertThrows(IllegalStateException.class, () -> pageStorage.save(page.build()));
+    restartTransaction();
+
+    Page storedPage = pageStorage.getPage(pageKey);
+    assertEquals(1, storedPage.getChildren().size());
+    assertEquals(1, ((Container) storedPage.getChildren().get(0)).getChildren().size());
+  }
+
+  public void testCachesAreClearedAgainOnceTheTransactionCompletes() throws Exception {
+    PortalContainer container = PortalContainer.getInstance();
+    CacheService cacheService = container.getComponentInstanceOfType(CacheService.class);
+    ExoCache<Long, Object> windowCache = cacheService.getCacheInstance(CacheLayoutStorage.PORTLET_PREFERENCES_CACHE_NAME);
+    ExoCache<SiteKey, Object> siteCache = cacheService.getCacheInstance(CacheSiteStorage.SITE_CACHE_NAME);
+    SiteKey siteKey = SiteKey.portal("evictedCaches");
+    PortalConfig newSite = new PortalConfig(siteKey.getTypeName(), siteKey.getName());
+    newSite.setAccessPermissions(new String[] { UserACL.EVERYONE });
+    Application newWindow = new Application();
+    newWindow.setState(new TransientApplicationState("test/test", null));
+    Container layout = new Container();
+    layout.getChildren().add(newWindow);
+    newSite.setPortalLayout(layout);
+    storage_.create(newSite);
+    restartTransaction();
+
+    PortalConfig site = storage_.getPortalConfig(siteKey.getTypeName(), siteKey.getName());
+    Application window = getFirstApplication(site.getPortalLayout());
+    assertNotNull(window);
+    Long windowId = Long.valueOf(window.getStorageId());
+    container.getComponentInstanceOfType(LayoutStorage.class).findWindow(windowId);
+    Object cachedWindow = windowCache.get(windowId);
+    Object cachedSite = siteCache.get(siteKey);
+    assertNotNull(cachedWindow);
+    assertNotNull(cachedSite);
+
+    EntityTransaction transaction = beginTransaction();
+    try {
+      storage_.save(site);
+      // Reads made by other threads before the commit cache the previous
+      // states again
+      windowCache.put(windowId, cachedWindow);
+      siteCache.put(siteKey, cachedSite);
+      transaction.commit();
+    } finally {
+      if (transaction.isActive()) {
+        transaction.rollback();
+      }
+    }
+
+    assertNull(windowCache.get(windowId));
+    assertNull(siteCache.get(siteKey));
+  }
+
+  public void testRemovedSiteCachesAreClearedAgainOnceTheTransactionCompletes() throws Exception {
+    String siteName = "removedSiteCaches";
+    createSite(SiteType.PORTAL, siteName);
+    SiteKey siteKey = SiteKey.portal(siteName);
+    PageKey pageKey = siteKey.page("removedPage");
+    pageService.savePage(new PageContext(pageKey, null));
+    restartTransaction();
+
+    PortalContainer container = PortalContainer.getInstance();
+    CacheService cacheService = container.getComponentInstanceOfType(CacheService.class);
+    ExoCache<PageKey, Object> pageCache = cacheService.getCacheInstance(CachePageStorage.PAGE_CACHE_NAME);
+    ExoCache<SiteKey, Object> navigationCache = cacheService.getCacheInstance(CacheNavigationStorage.NAVIGATION_CACHE_NAME);
+    ExoCache<SiteKey, Object> siteCache = cacheService.getCacheInstance(CacheSiteStorage.SITE_CACHE_NAME);
+    assertNotNull(pageService.loadPage(pageKey));
+    assertNotNull(navService.loadNavigation(siteKey));
+    assertNotNull(modelStorage.getPortalConfig(siteKey));
+    Object cachedPage = pageCache.get(pageKey);
+    Object cachedNavigation = navigationCache.get(siteKey);
+    Object cachedSite = siteCache.get(siteKey);
+    assertNotNull(cachedPage);
+    assertNotNull(cachedNavigation);
+    assertNotNull(cachedSite);
+
+    EntityTransaction transaction = beginTransaction();
+    try {
+      modelStorage.remove(siteKey);
+      // Reads made by other threads before the commit cache the removed site,
+      // page and navigation again
+      pageCache.put(pageKey, cachedPage);
+      navigationCache.put(siteKey, cachedNavigation);
+      siteCache.put(siteKey, cachedSite);
+      transaction.commit();
+    } finally {
+      if (transaction.isActive()) {
+        transaction.rollback();
+      }
+    }
+
+    assertNull(pageCache.get(pageKey));
+    assertNull(navigationCache.get(siteKey));
+    assertNull(siteCache.get(siteKey));
+  }
+
+  public void testUpdatedNodeCacheIsClearedAgainOnceTheTransactionCompletes() throws Exception {
+    String siteName = "updatedNodeCache";
+    createSite(SiteType.PORTAL, siteName);
+    NavigationContext navigation = navService.loadNavigation(SiteKey.portal(siteName));
+    NodeContext<?> rootNode = navService.loadNode(NodeModel.SELF_MODEL, navigation, Scope.CHILDREN, null);
+    rootNode.add(null, "updatedNode");
+    navService.saveNode(rootNode, null);
+    restartTransaction();
+
+    PortalContainer container = PortalContainer.getInstance();
+    NavigationStorage navigationStorage = container.getComponentInstanceOfType(NavigationStorage.class);
+    ExoCache<Long, Object> nodeCache = container.getComponentInstanceOfType(CacheService.class)
+                                                .getCacheInstance(CacheNavigationStorage.NODE_CACHE_NAME);
+    Long nodeId = Long.valueOf(rootNode.get("updatedNode").getId());
+    NodeData nodeData = navigationStorage.loadNode(nodeId);
+    Object cachedNode = nodeCache.get(nodeId);
+    assertNotNull(cachedNode);
+
+    EntityTransaction transaction = beginTransaction();
+    try {
+      navigationStorage.updateNode(nodeId, nodeData.getState().builder().label("Updated").build());
+      // A read made by another thread before the commit caches the node again
+      nodeCache.put(nodeId, cachedNode);
+      transaction.commit();
+    } finally {
+      if (transaction.isActive()) {
+        transaction.rollback();
+      }
+    }
+
+    assertNull(nodeCache.get(nodeId));
+  }
+
+  public void testSiteLoadInFlightDuringASaveIsNotCached() throws Exception {
+    String siteName = "loadInFlight";
+    createSite(SiteType.PORTAL, siteName);
+    SiteKey siteKey = SiteKey.portal(siteName);
+    PortalContainer container = PortalContainer.getInstance();
+    CacheService cacheService = container.getComponentInstanceOfType(CacheService.class);
+    ExoCache<SiteKey, Object> siteCache = cacheService.getCacheInstance(CacheSiteStorage.SITE_CACHE_NAME);
+    PortalConfig savedSite = new PortalConfig(modelStorage.getPortalConfig(siteKey));
+    siteCache.remove(siteKey);
+
+    // The reader thread reads the site row, then waits until the save commits
+    // before building and caching the site
+    SiteDAO siteDAO = container.getComponentInstanceOfType(SiteDAO.class);
+    Thread testThread = Thread.currentThread();
+    CountDownLatch siteRowRead = new CountDownLatch(1);
+    CountDownLatch siteSaved = new CountDownLatch(1);
+    SiteDAO slowReaderSiteDAO = (SiteDAO) Proxy.newProxyInstance(SiteDAO.class.getClassLoader(),
+                                                                 new Class<?>[] { SiteDAO.class },
+                                                                 (proxy, method, args) -> {
+                                                                   Object result = invoke(siteDAO, method, args);
+                                                                   if ("findByKey".equals(method.getName())
+                                                                       && Thread.currentThread() != testThread) {
+                                                                     siteRowRead.countDown();
+                                                                     siteSaved.await(10, TimeUnit.SECONDS);
+                                                                   }
+                                                                   return result;
+                                                                 });
+    CacheSiteStorage siteStorage = new CacheSiteStorage(cacheService,
+                                                        container.getComponentInstanceOfType(SettingService.class),
+                                                        container.getComponentInstanceOfType(ConfigurationManager.class),
+                                                        container.getComponentInstanceOfType(NavigationStorage.class),
+                                                        pageService,
+                                                        container.getComponentInstanceOfType(LayoutStorage.class),
+                                                        slowReaderSiteDAO,
+                                                        container.getComponentInstanceOfType(UploadService.class),
+                                                        container.getComponentInstanceOfType(FileService.class));
+    AtomicReference<PortalData> readSite = new AtomicReference<>();
+    Thread reader = new Thread(() -> {
+      ExoContainerContext.setCurrentContainer(container);
+      RequestLifeCycle.begin(container);
+      try {
+        readSite.set(siteStorage.getPortalConfig(siteKey));
+      } finally {
+        RequestLifeCycle.end();
+      }
+    });
+    reader.start();
+    try {
+      assertTrue(siteRowRead.await(10, TimeUnit.SECONDS));
+      savedSite.setLabel("Saved label");
+      siteStorage.save(savedSite);
+    } finally {
+      siteSaved.countDown();
+      reader.join(10000);
+    }
+
+    assertNotNull(readSite.get());
+    assertNull("The site read before the save is cached", siteCache.get(siteKey));
+    assertEquals("Saved label", siteStorage.getPortalConfig(siteKey).getLabel());
+  }
+
+  public void testSavePageLayoutRemovesTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("staleLayoutSave");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    Page page = new Page();
+    page.setOwnerType(PortalConfig.PORTAL_TYPE);
+    page.setOwnerId(pageKey.getSite().getName());
+    page.setName(pageKey.getName());
+    page.setChildren(new ArrayList<>(List.of(new Container())));
+    pageService.save(page.build());
+    restartTransaction();
+
+    assertNull("The container saved since the request read the page is replaced with the rest of its layout",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  public void testSavePagePropertiesKeepsTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("stalePropertiesSave");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    PageContext pageContext = pageService.loadPage(pageKey);
+    pageService.savePage(new PageContext(pageKey, pageContext.getState().builder().displayName("Changed").build()));
+    restartTransaction();
+
+    Page savedPage = pageService.getPage(pageKey);
+    assertEquals("Changed", pageService.loadPage(pageKey).getState().getDisplayName());
+    assertEquals("The properties save keeps the layout saved since the request read the page",
+                 savedContainerId,
+                 savedPage.getChildren().get(savedPage.getChildren().size() - 1).getStorageId());
+  }
+
+  public void testSavePagePropertiesWritesBackAPropertyChangedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("stalePropertyValue");
+    PageState originalState = pageService.loadPage(pageKey).getState().builder().displayName("Original").build();
+    pageService.savePage(new PageContext(pageKey, originalState));
+    restartTransaction();
+    PageDAO pageDAO = getComponent(PageDAO.class);
+    pageDAO.findByKey(pageKey);
+    inAnotherRequest(() -> {
+      PageState state = pageService.loadPage(pageKey).getState();
+      pageService.savePage(new PageContext(pageKey, state.builder().displayName("Other").build()));
+      assertEquals("The other request's property is stored", "Other", pageDAO.findByKey(pageKey).getDisplayName());
+      return null;
+    });
+
+    pageService.savePage(new PageContext(pageKey, originalState));
+    restartTransaction();
+
+    assertEquals("A property saved back to the value the request first read is written",
+                 "Original",
+                 pageDAO.findByKey(pageKey).getDisplayName());
+  }
+
+  public void testPageRowUpdateWritesOnlyTheColumnsItChanged() throws Exception {
+    PageKey pageKey = createPageWithWindow("dynamicUpdate");
+    PageDAO pageDAO = getComponent(PageDAO.class);
+    PageEntity page = pageDAO.findByKey(pageKey);
+    String savedContainerId = addPageContainerInAnotherRequest(pageKey);
+
+    page.setDisplayName("Changed");
+    pageDAO.update(page);
+    restartTransaction();
+
+    PageEntity storedPage = pageDAO.findByKey(pageKey);
+    assertEquals("Changed", storedPage.getDisplayName());
+    JSONArray storedBody = (JSONArray) new JSONParser().parse(storedPage.getPageBody());
+    assertEquals("An update of the page properties writes no layout column",
+                 savedContainerId,
+                 String.valueOf(((JSONObject) storedBody.get(storedBody.size() - 1)).get("id")));
+  }
+
+  public void testClonePageCopiesTheLayoutSavedSinceTheRequestReadThePage() throws Exception {
+    PageKey pageKey = createPageWithWindow("staleClone");
+    getComponent(PageDAO.class).findByKey(pageKey);
+    addPageContainerInAnotherRequest(pageKey);
+
+    PageKey cloneKey = new PageKey(pageKey.getSite(), "fooClone");
+    pageService.clone(pageKey, cloneKey);
+    restartTransaction();
+
+    assertEquals("The clone copies the layout saved since the request read the page",
+                 2,
+                 pageService.getPage(cloneKey).getChildren().size());
+  }
+
+  public void testSaveSiteRemovesTheLayoutSavedSinceTheRequestReadTheSite() throws Exception {
+    SiteKey siteKey = SiteKey.portal("staleSiteSave");
+    createSite(SiteType.PORTAL, siteKey.getName());
+    restartTransaction();
+    getComponent(SiteDAO.class).findByKey(siteKey);
+    String savedContainerId = addSiteContainerInAnotherRequest(siteKey);
+
+    PortalConfig site = new PortalConfig(modelStorage.getPortalConfig(siteKey));
+    site.getPortalLayout().setChildren(new ArrayList<>());
+    storage_.save(site);
+    restartTransaction();
+
+    assertNull("The container saved since the request read the site is replaced with the rest of its layout",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  public void testRemoveSiteRemovesTheLayoutSavedSinceTheRequestReadTheSite() throws Exception {
+    SiteKey siteKey = SiteKey.portal("staleSiteRemove");
+    createSite(SiteType.PORTAL, siteKey.getName());
+    restartTransaction();
+    getComponent(SiteDAO.class).findByKey(siteKey);
+    String savedContainerId = addSiteContainerInAnotherRequest(siteKey);
+
+    modelStorage.remove(siteKey);
+    restartTransaction();
+
+    assertNull(modelStorage.getPortalConfig(siteKey));
+    assertNull("The container saved since the request read the site is removed with the site",
+               getComponent(ContainerDAO.class).find(Long.parseLong(savedContainerId)));
+  }
+
+  private String addPageContainerInAnotherRequest(PageKey pageKey) throws Exception {
+    return inAnotherRequest(() -> {
+      Page page = pageService.getPage(pageKey);
+      ArrayList<ModelObject> children = new ArrayList<>(page.getChildren());
+      children.add(new Container());
+      page.setChildren(children);
+      pageService.save(page.build());
+      List<ModelObject> savedChildren = pageService.getPage(pageKey).getChildren();
+      assertEquals("The other request's layout is stored", children.size(), savedChildren.size());
+      return savedChildren.get(savedChildren.size() - 1).getStorageId();
+    });
+  }
+
+  private String addSiteContainerInAnotherRequest(SiteKey siteKey) throws Exception {
+    return inAnotherRequest(() -> {
+      PortalConfig site = new PortalConfig(modelStorage.getPortalConfig(siteKey));
+      ArrayList<ModelObject> children = site.getPortalLayout().getChildren() == null ? new ArrayList<>() :
+                                                                                     new ArrayList<>(site.getPortalLayout()
+                                                                                                         .getChildren());
+      children.add(new Container());
+      site.getPortalLayout().setChildren(children);
+      storage_.save(site);
+      List<ModelObject> savedChildren = new PortalConfig(modelStorage.getPortalConfig(siteKey)).getPortalLayout().getChildren();
+      assertEquals("The other request's layout is stored", children.size(), savedChildren.size());
+      return savedChildren.get(savedChildren.size() - 1).getStorageId();
+    });
+  }
+
+  private <T> T inAnotherRequest(Callable<T> task) throws Exception {
+    PortalContainer container = PortalContainer.getInstance();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      return executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(container);
+        RequestLifeCycle.begin(container);
+        try {
+          return task.call();
+        } finally {
+          RequestLifeCycle.end();
+          ExoContainerContext.setCurrentContainer(null);
+        }
+      }).get(30, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private <T> T getComponent(Class<T> type) {
+    return PortalContainer.getInstance().getComponentInstanceOfType(type);
+  }
+
+  private PageKey createPageWithWindow(String siteName) throws Exception {
+    createSite(SiteType.PORTAL, siteName);
+    Application application = new Application();
+    application.setState(new TransientApplicationState("test/test", null));
+    Container container = new Container();
+    container.setTemplate("test");
+    container.setChildren(new ArrayList<>(Collections.singletonList(application)));
+    Page page = new Page();
+    page.setOwnerType(PortalConfig.PORTAL_TYPE);
+    page.setOwnerId(siteName);
+    page.setName("foo");
+    page.setChildren(new ArrayList<>(Collections.singletonList(container)));
+    pageService.savePage(new PageContext(page.getPageKey(), null));
+    pageService.save(page.build());
+    restartTransaction();
+    return page.getPageKey();
+  }
+
+  private PageStorageImpl newPageStorageFailingOn(String pageDAOMethodName) {
+    PortalContainer container = PortalContainer.getInstance();
+    PageDAO pageDAO = container.getComponentInstanceOfType(PageDAO.class);
+    PageDAO failingPageDAO = (PageDAO) Proxy.newProxyInstance(PageDAO.class.getClassLoader(),
+                                                              new Class<?>[] { PageDAO.class },
+                                                              (proxy, method, args) -> {
+                                                                if (pageDAOMethodName.equals(method.getName())) {
+                                                                  throw new IllegalStateException("Page DAO failure");
+                                                                }
+                                                                return invoke(pageDAO, method, args);
+                                                              });
+    return new PageStorageImpl(listenerService,
+                               container.getComponentInstanceOfType(LayoutStorage.class),
+                               container.getComponentInstanceOfType(SiteDAO.class),
+                               failingPageDAO);
+  }
+
+  private SiteStorageImpl newSiteStorage(PageStorage pageStorage, SiteDAO siteDAO) {
+    PortalContainer container = PortalContainer.getInstance();
+    return new SiteStorageImpl(container.getComponentInstanceOfType(SettingService.class),
+                               container.getComponentInstanceOfType(ConfigurationManager.class),
+                               container.getComponentInstanceOfType(NavigationStorage.class),
+                               pageStorage,
+                               container.getComponentInstanceOfType(LayoutStorage.class),
+                               siteDAO,
+                               container.getComponentInstanceOfType(UploadService.class),
+                               container.getComponentInstanceOfType(FileService.class));
+  }
+
+  private Application getFirstApplication(Container container) {
+    for (ModelObject child : container.getChildren()) {
+      if (child instanceof Application application) {
+        return application;
+      } else if (child instanceof Container childContainer) {
+        Application application = getFirstApplication(childContainer);
+        if (application != null) {
+          return application;
+        }
+      }
+    }
+    return null;
+  }
+
+  private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
+    try {
+      return method.invoke(target, args);
+    } catch (InvocationTargetException e) {
+      throw e.getCause();
+    }
+  }
+
+  private void executeInTransaction(String statement) {
+    EntityManager entityManager = getEntityManager();
+    EntityTransaction transaction = entityManager.getTransaction();
+    boolean begun = !transaction.isActive();
+    if (begun) {
+      transaction.begin();
+    }
+    entityManager.createQuery(statement).executeUpdate();
+    if (begun) {
+      transaction.commit();
+    }
+  }
+
+  /**
+   * The test drives the transaction boundary: the transaction that the test
+   * class may have begun is committed first
+   */
+  private EntityTransaction beginTransaction() {
+    EntityTransaction transaction = getEntityManager().getTransaction();
+    if (transaction.isActive()) {
+      transaction.commit();
+    }
+    transaction.begin();
+    return transaction;
+  }
+
+  private EntityManager getEntityManager() {
+    return PortalContainer.getInstance().getComponentInstanceOfType(EntityManagerService.class).getEntityManager();
+  }
+
+  private String getRootContainerId(String siteBody) throws Exception {
+    JSONArray children = (JSONArray) new JSONParser().parse(siteBody);
+    return String.valueOf(((JSONObject) children.get(0)).get("id"));
+  }
+
+  private ContainerData newContainer(String siteName, List<ComponentData> children) {
+    return new ContainerData(null,
+                             "testcontainer_" + siteName,
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             "",
+                             null,
+                             null,
+                             Collections.emptyList(),
+                             children);
+  }
+
+  private static class UnsupportedComponentData extends ComponentData {
+
+    private static final long serialVersionUID = 1L;
+
   }
 
   protected void createSite(SiteType type, String siteName) throws Exception {
