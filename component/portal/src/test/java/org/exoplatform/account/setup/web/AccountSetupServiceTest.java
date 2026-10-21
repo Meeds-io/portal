@@ -18,11 +18,15 @@
  */
 package org.exoplatform.account.setup.web;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,7 +38,16 @@ import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
 import org.exoplatform.commons.utils.PropertyManager;
+import org.exoplatform.container.component.ComponentRequestLifecycle;
+import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.GroupHandler;
+import org.exoplatform.services.organization.MembershipHandler;
+import org.exoplatform.services.organization.MembershipType;
+import org.exoplatform.services.organization.MembershipTypeHandler;
 import org.exoplatform.services.organization.OrganizationService;
+import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.services.organization.idm.UserImpl;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AccountSetupServiceTest {
@@ -122,5 +135,40 @@ public class AccountSetupServiceTest {
     // Then
     assertFalse(mustSkipBefore);
     assertTrue(mustSkipAfter);
+  }
+
+  /**
+   * The first-start setup creates the first administrator through the
+   * organization service directly, outside every REST endpoint guarded by
+   * the one-time-password confirmation: a new platform always gets an
+   * administrator with a real mailbox, without any code.
+   */
+  @Test
+  public void shouldCreateFirstAdministratorOutsideTheConfirmationGuard() throws Exception {
+    OrganizationService orgService = mock(OrganizationService.class,
+                                          withSettings().extraInterfaces(ComponentRequestLifecycle.class));
+    UserHandler userHandler = mock(UserHandler.class);
+    GroupHandler groupHandler = mock(GroupHandler.class);
+    MembershipHandler membershipHandler = mock(MembershipHandler.class);
+    MembershipTypeHandler membershipTypeHandler = mock(MembershipTypeHandler.class);
+    when(orgService.getUserHandler()).thenReturn(userHandler);
+    when(orgService.getGroupHandler()).thenReturn(groupHandler);
+    when(orgService.getMembershipHandler()).thenReturn(membershipHandler);
+    when(orgService.getMembershipTypeHandler()).thenReturn(membershipTypeHandler);
+    when(userHandler.findUserByName("root")).thenReturn(new UserImpl("root"));
+    UserImpl admin = new UserImpl("admin");
+    when(userHandler.createUserInstance("admin")).thenReturn(admin);
+    Group administrators = mock(Group.class);
+    when(groupHandler.findGroupById("/platform/administrators")).thenReturn(administrators);
+    MembershipType anyType = mock(MembershipType.class);
+    when(membershipTypeHandler.findMembershipType("*")).thenReturn(anyType);
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, orgService);
+    accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword");
+
+    verify(userHandler).createUser(admin, true);
+    verify(membershipHandler).linkMembership(admin, administrators, anyType, true);
+    assertEquals("admin@example.com", ((User) admin).getEmail());
+    assertTrue(accountSetupService.mustSkipAccountSetup());
   }
 }
