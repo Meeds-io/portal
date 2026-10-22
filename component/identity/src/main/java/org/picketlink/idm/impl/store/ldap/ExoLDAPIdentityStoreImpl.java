@@ -54,6 +54,7 @@ import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -65,6 +66,13 @@ import java.util.regex.Pattern;
 public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
 
   public static final String MODIFICATION_DATE_SINCE = "modificationDateSince";
+  private static final Pattern MEMBER_OF_CLAUSE = Pattern.compile("\\((?:is)?memberOf(?::[0-9.]+:)?=([^)]+)\\)", Pattern.CASE_INSENSITIVE);
+  /**
+   * Opt-in for directories where the users base contains every user and the
+   * users filter selects them through <code>memberOf=&lt;group DN&gt;</code>.
+   * Defaults to {@code false}: the "modified since" search is then unchanged.
+   */
+  public static final String MEMBER_OF_GROUP_CHANGE_CHECK_PROP = "exo.ldap.users.memberOfGroupChangeCheck.enabled";
   public static final String FAILED_TO_CLOSE_LDAP_CONNECTION_MESSAGE = "Failed to close LDAP connection";
 
   /**
@@ -439,7 +447,10 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
         for (Map.Entry<String, String[]> stringEntry : criteria.getValues().entrySet()) {
           /* Begin changes */
           if (MODIFICATION_DATE_SINCE.equals(stringEntry.getKey())) {
-            if (stringEntry.getValue() != null && stringEntry.getValue().length == 1) {
+            if (stringEntry.getValue() != null && stringEntry.getValue().length == 1
+                && !isMemberOfGroupChangedSince(invocationCtx,
+                                                getTypeConfiguration(invocationCtx, type).getEntrySearchFilter(),
+                                                stringEntry.getValue()[0])) {
               String value = stringEntry.getValue()[0];
               af.append("(|")
                 .append("(createTimestamp>=")
@@ -540,6 +551,45 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
     }
 
     return objects;
+  }
+
+  /**
+   * Adding a user to a group an entry filter relies on through
+   * <code>memberOf=&lt;group DN&gt;</code> modifies the group entry only: the
+   * user entry keeps its stale <code>whenChanged</code>/<code>modifyTimestamp</code>
+   * and would never be returned by a "modified since" search. When one of those
+   * groups changed since the given date, the date criteria is dropped so that
+   * every user matching the filter is listed (and imported if missing).
+   *
+   * Only active when {@value #MEMBER_OF_GROUP_CHANGE_CHECK_PROP} is true.
+   *
+   * @return true if at least one group referenced by a memberOf clause of the
+   *         filter has been created or modified since
+   */
+  boolean isMemberOfGroupChangedSince(IdentityStoreInvocationContext ctx, String entryFilter, String since) {
+    if (StringUtils.isBlank(entryFilter) || !Boolean.parseBoolean(PropertyManager.getProperty(MEMBER_OF_GROUP_CHANGE_CHECK_PROP))) {
+      return false;
+    }
+    Matcher matcher = MEMBER_OF_CLAUSE.matcher(entryFilter);
+    String groupFilter = "(|(createTimestamp>=" + since + "Z)(modifyTimestamp>=" + since + "Z)(whenCreated>=" + since
+        + ".0Z)(whenChanged>=" + since + ".0Z))";
+    while (matcher.find()) {
+      String groupDn = matcher.group(1).trim();
+      try {
+        List<SerializableSearchResult> changedGroups =
+            searchIdentityObjects(ctx, new String[] { groupDn }, groupFilter, null, new String[] { "cn" }, "object", null);
+        if (!changedGroups.isEmpty()) {
+          log.info("Group '" + groupDn + "' used by the users filter changed since " + since
+              + ", all matching users are listed instead of the modified ones only");
+          return true;
+        }
+      } catch (Exception e) {
+        // Unable to tell: listing everybody is safer than missing members
+        log.log(Level.WARNING, "Unable to check the modification date of group '" + groupDn + "', falling back to a full listing", e);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
