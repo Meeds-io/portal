@@ -18,10 +18,12 @@
                                 <td align="left" style="line-height: 18px;font-size: 14px;color:#333;font-family: 'Helvetica', 'Arial', sans-serif;">
                                     <p style="margin: 0 0 10px 0;line-height: 40px;font-size: 17px;text-transform: capitalize">&{onboarding.email.hello} ${USER_DISPLAY_NAME},</p>
                                     <p style="margin: 0 0 10px 0;line-height:22px">&{onboarding.email.welcome} ${COMPANY_NAME}</p>
+${ONBOARDING_MESSAGE}
                                     <table width="100%" cellpadding="0" cellspacing="0" style="font-size: inherit;color: #333333;">
                                         <tr>
                                             <td>
                                                 <p>&{onboarding.email.accessLink}: <a href="${RESET_PASSWORD_LINK}" style="text-decoration: none;color: #fff;border-radius: 3px;padding: 4px 14px;background-color: #476A9C;display: inline-table;">&{onboarding.email.join}</a></p>
+                                                <p style="margin: 0 0 10px 0;line-height:22px;font-style: italic;">&{onboarding.email.linkValidity} ${LINK_VALIDITY}</p>
                                             </td>
                                         </tr>
                                     </table>

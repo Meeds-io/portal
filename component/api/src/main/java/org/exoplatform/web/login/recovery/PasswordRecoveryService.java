@@ -37,6 +37,28 @@ public interface PasswordRecoveryService {
 
   public boolean sendOnboardingEmail(User user, Locale defaultLocale, StringBuilder url);
 
+  /**
+   * Sends the onboarding email with a message written by the administrator,
+   * shown above the link, and the validity of that link
+   *
+   * @param user the invited user
+   * @param locale the locale of the email
+   * @param url the base URL of the platform
+   * @param message the administrator's message, plain text, blank for none
+   * @return true when the email was sent
+   */
+  default boolean sendOnboardingEmail(User user, Locale locale, StringBuilder url, String message) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @return the validity of an onboarding link, in milliseconds, as
+   *         configured on the platform
+   */
+  default long getOnboardingTokenValidity() {
+    throw new UnsupportedOperationException();
+  }
+
   public String sendExternalRegisterEmail(String sender,
                                           String email,
                                           Locale locale,

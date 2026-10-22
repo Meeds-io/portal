@@ -35,6 +35,18 @@ public class UserRestEntity {
 
   private boolean platformAdministrator;
 
+  /**
+   * The preferred language of the account, a supported locale name
+   */
+  private String  language;
+
+  /**
+   * The role given at creation, see
+   * {@link org.exoplatform.portal.rest.UserAccountRole}; carried as text so
+   * that an unknown value reaches the resource and is answered as invalid
+   */
+  private String  role;
+
   public UserRestEntity() {
   }
 
@@ -110,5 +122,21 @@ public class UserRestEntity {
 
   public void setPlatformAdministrator(boolean platformAdministrator) {
     this.platformAdministrator = platformAdministrator;
+  }
+
+  public String getLanguage() {
+    return language;
+  }
+
+  public void setLanguage(String language) {
+    this.language = language;
+  }
+
+  public String getRole() {
+    return role;
+  }
+
+  public void setRole(String role) {
+    this.role = role;
   }
 }
