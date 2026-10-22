@@ -22,6 +22,9 @@ import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.*;
 
 import java.io.ByteArrayInputStream;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MultivaluedMap;
@@ -30,6 +33,7 @@ import org.exoplatform.portal.config.DefaultGroupVisibilityPlugin;
 import org.exoplatform.web.login.recovery.ChangePasswordConnector;
 import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 import org.json.JSONObject;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 
@@ -57,6 +61,8 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
 
   private UserACL             userACL;
 
+  private UserAccountService  userAccountService;
+
   protected Class<?> getComponentClass() {
     return UserRestResourcesV1.class;
   }
@@ -83,6 +89,10 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     UserImpl user = new UserImpl(USER_1);
     when(userHandler.findUserByName(eq(USER_1), any(UserStatus.class))).thenReturn(user);
 
+    userAccountService = mock(UserAccountService.class);
+    getContainer().unregisterComponent(UserAccountService.class);
+    getContainer().registerComponentInstance(UserAccountService.class, userAccountService);
+
     getContainer().unregisterComponent(OrganizationService.class);
     getContainer().unregisterComponent(UserACL.class);
 
@@ -100,6 +110,7 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
   public void tearDown() throws Exception {
     getContainer().unregisterComponent("org.exoplatform.services.organization.OrganizationService");
     getContainer().unregisterComponent("org.exoplatform.portal.config.UserACL");
+    getContainer().unregisterComponent(UserAccountService.class);
     super.tearDown();
   }
 
@@ -281,118 +292,105 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     assertTrue(String.valueOf(resp.getEntity()).contains("true"));
   }
 
+  /**
+   * The resource hands the body to the service and answers 201 with the
+   * login the service returns, generated or given
+   */
   public void testCreateUser() throws Exception {
-    when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(null);
-    @SuppressWarnings("unchecked")
-    ListAccess<User> listAccess = mock(ListAccess.class);
-    when(userHandler.findUsersByQuery(any(), any())).thenReturn(listAccess);
-    when(listAccess.getSize()).thenReturn(0);
-    UserImpl user = new UserImpl(USER_2);
-    when(userHandler.createUserInstance(eq(USER_2))).thenReturn(user);
-
     startUserSession(USER_1);
 
+    ContainerResponse response = getResponse("POST", "/v1/users", "", confirmedContext(USER_1));
+    assertEquals(400, response.getStatus());
+    verify(userAccountService, never()).createUser(any(), any());
+
+    when(userAccountService.createUser(any(), any())).thenReturn("ugenerated01");
     JSONObject data = new JSONObject();
-
-    ContainerResponse response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", "");
     data.put("lastName", USER_2);
     data.put("firstName", USER_2);
-    data.put("password", "password");
     data.put("email", USER_2 + "@example.com");
+    data.put("language", "fr");
+    data.put("role", "administrator");
+    data.put("enabled", true);
     response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
+    assertEquals(String.valueOf(response.getEntity()), 201, response.getStatus());
+    assertEquals(Collections.singletonMap("userName", "ugenerated01"), response.getEntity());
+
+    ArgumentCaptor<UserAccount> account = ArgumentCaptor.forClass(UserAccount.class);
+    verify(userAccountService).createUser(account.capture(), any());
+    assertNull(account.getValue().getUserName());
+    assertNull(account.getValue().getPassword());
+    assertEquals(USER_2, account.getValue().getFirstName());
+    assertEquals(USER_2, account.getValue().getLastName());
+    assertEquals(USER_2 + "@example.com", account.getValue().getEmail());
+    assertEquals("fr", account.getValue().getLanguage());
+    assertEquals("administrator", account.getValue().getRole());
+    assertTrue(account.getValue().isEnabled());
 
     data.put("userName", USER_2);
-    data.put("lastName", "");
-    data.put("firstName", USER_2);
-    data.put("password", "password");
-    data.put("email", USER_2 + "@example.com");
-    response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", "");
-    data.put("password", "password");
-    data.put("email", USER_2 + "@example.com");
-    response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
-    data.put("email", USER_2 + "@example.com");
-    response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "password");
-    data.put("email", "");
-    response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    verify(userHandler, atMost(0)).createUser(any(User.class), anyBoolean());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
     data.put("password", "newPassword1");
-    data.put("email", USER_2 + "@example.com");
+    data.put("enabled", false);
     response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNull(response.getEntity());
-    assertEquals(204, response.getStatus());
-
-    verify(userHandler, atLeast(1)).createUser(eq(user), eq(true));
+    assertEquals(201, response.getStatus());
+    verify(userAccountService, times(2)).createUser(account.capture(), any());
+    assertEquals(USER_2, account.getValue().getUserName());
+    assertEquals("newPassword1", account.getValue().getPassword());
+    assertFalse(account.getValue().isEnabled());
   }
 
-  public void testCreateUserWithUsernameOfDeletedAccount() throws Exception {
-    when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(null);
-    @SuppressWarnings("unchecked")
-    ListAccess<User> listAccess = mock(ListAccess.class);
-    when(userHandler.findUsersByQuery(any(), any())).thenReturn(listAccess);
-    when(listAccess.getSize()).thenReturn(0);
-    UserImpl user = new UserImpl(USER_2);
-    when(userHandler.createUserInstance(eq(USER_2))).thenReturn(user);
-    // the IDM wraps the veto raised by a listener for a previously deleted
-    // account into an IllegalStateException
-    doThrow(new IllegalStateException("Error executing preSave on listener",
-                                      new ObjectAlreadyExistsException(user,
-                                                                       "Unable to create a previously deleted user : "
-                                                                           + USER_2)))
-                                                                                     .when(userHandler)
-                                                                                     .createUser(eq(user), eq(true));
-
+  /**
+   * A refused field is a 400 whose body is the code; a creation the store
+   * did not complete is a 500 whose body is the code, the login and the
+   * missing parts included
+   */
+  public void testCreateUserAnswersTheServiceRefusals() throws Exception {
     startUserSession(USER_1);
-
     JSONObject data = new JSONObject();
     data.put("userName", USER_2);
     data.put("lastName", USER_2);
     data.put("firstName", USER_2);
-    data.put("password", "newPassword1");
     data.put("email", USER_2 + "@example.com");
+
+    when(userAccountService.createUser(any(), any())).thenThrow(new IllegalArgumentException("USERNAME:ALREADY_EXISTS_AS_DELETED"));
     ContainerResponse response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
     assertEquals(400, response.getStatus());
     assertEquals("USERNAME:ALREADY_EXISTS_AS_DELETED", response.getEntity());
+
+    reset(userAccountService);
+    when(userAccountService.createUser(any(), any())).thenThrow(new UserAccountCreationException("USER:CREATED_INCOMPLETE:" + USER_2
+        + ":MEMBERSHIPS"));
+    response = getResponse("POST", "/v1/users", data.toString(), confirmedContext(USER_1));
+    assertEquals(500, response.getStatus());
+    assertEquals("USER:CREATED_INCOMPLETE:" + USER_2 + ":MEMBERSHIPS", response.getEntity());
+  }
+
+  public void testGetOnboardingSettings() throws Exception {
+    PasswordRecoveryService passwordRecoveryService = getContainer().getComponentInstanceOfType(PasswordRecoveryService.class);
+    when(passwordRecoveryService.getOnboardingTokenValidity()).thenReturn(TimeUnit.DAYS.toMillis(7));
+    startUserSession(USER_1);
+
+    ContainerResponse response = getResponse("GET", "/v1/users/onboardingSettings", "");
+    assertEquals(200, response.getStatus());
+    assertEquals(Map.of("linkValidityDays", 7L, "linkValidityHours", 168L, "linkValidityWholeDays", true), response.getEntity());
+    assertEquals("private, no-store", String.valueOf(response.getHttpHeaders().getFirst("Cache-Control")));
+
+    when(passwordRecoveryService.getOnboardingTokenValidity()).thenReturn(TimeUnit.HOURS.toMillis(36));
+    response = getResponse("GET", "/v1/users/onboardingSettings", "");
+    assertEquals(Map.of("linkValidityDays", 1L, "linkValidityHours", 36L, "linkValidityWholeDays", false), response.getEntity());
+
+    // Two whole days are the lower bound of the days wording
+    when(passwordRecoveryService.getOnboardingTokenValidity()).thenReturn(TimeUnit.HOURS.toMillis(48));
+    response = getResponse("GET", "/v1/users/onboardingSettings", "");
+    assertEquals(Map.of("linkValidityDays", 2L, "linkValidityHours", 48L, "linkValidityWholeDays", true), response.getEntity());
+
+    // One day reads as 24 hours, as the email states it
+    when(passwordRecoveryService.getOnboardingTokenValidity()).thenReturn(TimeUnit.DAYS.toMillis(1));
+    response = getResponse("GET", "/v1/users/onboardingSettings", "");
+    assertEquals(Map.of("linkValidityDays", 1L, "linkValidityHours", 24L, "linkValidityWholeDays", false), response.getEntity());
+
+    // Not a whole number of hours: the email states whole hours, so does the flag
+    when(passwordRecoveryService.getOnboardingTokenValidity()).thenReturn(TimeUnit.MINUTES.toMillis(24 * 60 + 30));
+    response = getResponse("GET", "/v1/users/onboardingSettings", "");
+    assertEquals(Map.of("linkValidityDays", 1L, "linkValidityHours", 24L, "linkValidityWholeDays", false), response.getEntity());
   }
 
   public void testUpdateUser() throws Exception {
@@ -741,35 +739,29 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
   }
 
   public void testConfirmSession() throws Exception {
-    UserAccountService userAccountService = mock(UserAccountService.class);
-    getContainer().registerComponentInstance(UserAccountService.class, userAccountService);
-    try {
-      startUserSession(USER_1);
-      doThrow(new IllegalAccessException()).when(userAccountService).confirmSession(USER_1, "00000");
+    startUserSession(USER_1);
+    doThrow(new IllegalAccessException()).when(userAccountService).confirmSession(USER_1, "00000");
 
-      HttpServletRequest request = unconfirmedRequest(USER_1);
-      ContainerResponse resp = launcher.service("POST",
-                                                "/v1/users/confirmation",
-                                                "",
-                                                getChangePasswordHeaders(),
-                                                "otpCode=00000".getBytes(),
-                                                requestContext(request));
-      assertEquals(401, resp.getStatus());
-      assertEquals(UserRestResourcesV1.OTP_CODE_INVALID, resp.getEntity());
-      verify(request.getSession(true), never()).setAttribute(anyString(), any());
+    HttpServletRequest request = unconfirmedRequest(USER_1);
+    ContainerResponse resp = launcher.service("POST",
+                                              "/v1/users/confirmation",
+                                              "",
+                                              getChangePasswordHeaders(),
+                                              "otpCode=00000".getBytes(),
+                                              requestContext(request));
+    assertEquals(401, resp.getStatus());
+    assertEquals(UserRestResourcesV1.OTP_CODE_INVALID, resp.getEntity());
+    verify(request.getSession(true), never()).setAttribute(anyString(), any());
 
-      resp = launcher.service("POST",
-                              "/v1/users/confirmation",
-                              "",
-                              getChangePasswordHeaders(),
-                              "otpCode=12345".getBytes(),
-                              requestContext(request));
-      assertEquals(204, resp.getStatus());
-      verify(userAccountService).confirmSession(USER_1, "12345");
-      verify(request.getSession(true)).setAttribute(UserAccountConfirmation.SESSION_ATTRIBUTE, USER_1);
-    } finally {
-      getContainer().unregisterComponent(UserAccountService.class);
-    }
+    resp = launcher.service("POST",
+                            "/v1/users/confirmation",
+                            "",
+                            getChangePasswordHeaders(),
+                            "otpCode=12345".getBytes(),
+                            requestContext(request));
+    assertEquals(204, resp.getStatus());
+    verify(userAccountService).confirmSession(USER_1, "12345");
+    verify(request.getSession(true)).setAttribute(UserAccountConfirmation.SESSION_ATTRIBUTE, USER_1);
   }
 
   private MockHttpServletRequest getChangePasswordRequest(String path, String currentPassword, String newPassword) {
