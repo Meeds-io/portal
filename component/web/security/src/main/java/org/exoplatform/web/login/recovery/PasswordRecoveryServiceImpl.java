@@ -41,7 +41,6 @@ import java.util.regex.Pattern;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.text.StringEscapeUtils;
 
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.commons.utils.MailUtils;
@@ -313,15 +312,17 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   }
 
   /**
-   * The message block of the onboarding email: the text escaped, its line
-   * breaks kept, nothing when the message is blank
+   * The message block of the onboarding email: the administrator's message
+   * as its caller hands it, HTML the caller has sanitized (the editor's
+   * markup, scripts and attributes removed), nothing when it is blank. The
+   * block is inserted by the one-pass fill, so a placeholder form inside
+   * the message stays text.
    */
   protected static String buildOnboardingMessageBlock(String message) {
     if (StringUtils.isBlank(message)) {
       return "";
     }
-    String escaped = StringEscapeUtils.escapeHtml4(message.trim()).replace("\r\n", "\n").replace("\n", "<br>");
-    return "<p style=\"margin: 0 0 10px 0;line-height:22px;white-space: pre-wrap;\">" + escaped + "</p>";
+    return "<div style=\"margin: 0 0 10px 0;line-height:22px;\">" + message.trim() + "</div>";
   }
 
   /**

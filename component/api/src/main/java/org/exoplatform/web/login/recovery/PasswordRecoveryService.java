@@ -44,7 +44,8 @@ public interface PasswordRecoveryService {
    * @param user the invited user
    * @param locale the locale of the email
    * @param url the base URL of the platform
-   * @param message the administrator's message, plain text, blank for none
+   * @param message the administrator's message, HTML the caller has
+   *          sanitized, blank for none
    * @return true when the email was sent
    */
   default boolean sendOnboardingEmail(User user, Locale locale, StringBuilder url, String message) {
