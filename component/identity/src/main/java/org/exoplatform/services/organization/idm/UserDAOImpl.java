@@ -161,10 +161,16 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     org.picketlink.idm.api.User plIDMUser = null;
     try {
       plIDMUser = session.getPersistenceManager().createUser(user.getUserName());
+      // The insert reaches the store here, through the session's own save and
+      // not through the service's flush, which swallows a failure: a login
+      // the store refuses at the insert (a concurrent creation of the same
+      // login, deferred to the flush on a sequence engine) fails this call
+      // before anything is written on the account that won
+      if (session.getTransaction().isActive()) {
+        session.save();
+      }
     } catch (Exception e) {
       handleException("Identity operation error: ", e);
-    } finally {
-      orgService.flush();
     }
 
     Date date = new Date();

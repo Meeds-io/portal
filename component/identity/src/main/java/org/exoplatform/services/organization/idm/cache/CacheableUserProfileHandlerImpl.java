@@ -159,6 +159,18 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
     userProfileCache.clearCache();
   }
 
+  /**
+   * Evicts one profile, by its login, so that the next read reaches the
+   * store
+   *
+   * @param userName the stored login
+   */
+  public void clearCache(String userName) {
+    if (userName != null && !userName.isBlank()) {
+      userProfileCache.remove(userName);
+    }
+  }
+
   public void disableCache() {
     disableCacheInThread.set(true);
   }

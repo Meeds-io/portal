@@ -140,6 +140,20 @@
   </component>
 
   <component>
+    <key>org.exoplatform.web.security.security.OnboardingTokenService</key>
+    <type>org.exoplatform.web.security.security.OnboardingTokenService</type>
+    <init-params>
+      <values-param>
+        <name>service.configuration</name>
+        <value>onboarding-token</value>
+        <value>${gatein.portal.onboarding.expiretime:7}</value>
+        <value>DAY</value>
+        <value>onboard</value>
+      </values-param>
+    </init-params>
+  </component>
+
+  <component>
     <key>org.exoplatform.commons.api.event.EventManager</key>
     <type>org.exoplatform.commons.event.impl.EventManagerImpl</type>
   </component>
