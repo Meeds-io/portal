@@ -140,17 +140,18 @@ public class PasswordRecoveryServiceImplTest {
   }
 
   /**
-   * The message is text: a message holding a placeholder's form, or a tag,
-   * is rendered literally, never as the link or as markup
+   * The message is the caller's sanitized HTML, inserted as given: its
+   * markup stays, and a placeholder's form inside it stays text, never the
+   * link
    */
   @Test
-  public void testOnboardingMessageIsEscapedAndRenderedAsText() {
+  public void testOnboardingMessageIsInsertedAsGivenWithPlaceholdersAsText() {
     String body = passwordRecoveryService.buildOnboardingEmailBody(user(),
                                                                    bundle,
                                                                    "https://acme.example/on-boarding?token=tok.en",
-                                                                   "Welcome ${RESET_PASSWORD_LINK} <b>Jane</b>\nSee you",
+                                                                   "<p>Welcome ${RESET_PASSWORD_LINK} <b>Jane</b></p>",
                                                                    SEVEN_DAYS);
-    assertTrue(body, body.contains("Welcome ${RESET_PASSWORD_LINK} &lt;b&gt;Jane&lt;/b&gt;<br>See you"));
+    assertTrue(body, body.contains("<p>Welcome ${RESET_PASSWORD_LINK} <b>Jane</b></p>"));
     assertTrue(body, body.contains("href=\"https://acme.example/on-boarding?token=tok.en\""));
     assertEquals(body, 1, countOf(body, "https://acme.example/on-boarding?token=tok.en"));
     // The only placeholder form left is the message's own text
@@ -160,7 +161,7 @@ public class PasswordRecoveryServiceImplTest {
   @Test
   public void testOnboardingMessageBlockIsAbsentWhenBlank() {
     String body = passwordRecoveryService.buildOnboardingEmailBody(user(), bundle, "https://acme.example/x", "  ", SEVEN_DAYS);
-    assertFalse(body, body.contains("white-space: pre-wrap"));
+    assertFalse(body, body.contains("line-height:22px;\">"));
     assertFalse(body, body.contains("${"));
     assertTrue(body, body.contains("Jane Doe"));
     assertTrue(body, body.contains("Acme"));
@@ -220,7 +221,7 @@ public class PasswordRecoveryServiceImplTest {
       assertTrue(passwordRecoveryService.sendOnboardingEmail(user(), Locale.FRENCH, new StringBuilder("https://acme.example/portal")));
       ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
       verify(mailService).sendMessage(sent.capture());
-      assertFalse(sent.getValue().getBody(), sent.getValue().getBody().contains("white-space: pre-wrap"));
+      assertFalse(sent.getValue().getBody(), sent.getValue().getBody().contains("line-height:22px;\">"));
       assertTrue(sent.getValue().getBody(), sent.getValue().getBody().contains("lang=fr"));
     }
   }
