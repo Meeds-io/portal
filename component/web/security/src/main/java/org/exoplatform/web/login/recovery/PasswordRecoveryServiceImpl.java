@@ -34,10 +34,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.commons.utils.MailUtils;
@@ -60,6 +64,7 @@ import org.exoplatform.web.controller.QualifiedName;
 import org.exoplatform.web.controller.router.Router;
 import org.exoplatform.web.security.Token;
 import org.exoplatform.web.security.security.CookieTokenService;
+import org.exoplatform.web.security.security.OnboardingTokenService;
 import org.exoplatform.web.security.security.RemindPasswordTokenService;
 
 public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
@@ -86,6 +91,16 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   private static final String                  COMPANY_NAME_PARAM               = "${COMPANY_NAME}";
 
+  private static final String                  ONBOARDING_MESSAGE_PARAM         = "ONBOARDING_MESSAGE";
+
+  private static final String                  LINK_VALIDITY_PARAM              = "LINK_VALIDITY";
+
+  /**
+   * Every placeholder of a template, filled in one pass so that a value
+   * holding a placeholder's form is rendered as text
+   */
+  private static final Pattern                 PLACEHOLDER_PATTERN              = Pattern.compile("\\$\\{(\\w+)\\}");
+
   public static final String                   AUTHENTICATION_ATTEMPTS          = "authenticationAttempts";
 
   public static final QualifiedName            TOKEN                            = QualifiedName.create("gtn", "token");
@@ -105,6 +120,8 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   private final RemindPasswordTokenService     remindPasswordTokenService;
 
+  private final OnboardingTokenService         onboardingTokenService;
+
   private final CookieTokenService             cookieTokenService;
 
   private final BrandingService                brandingService;
@@ -122,6 +139,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
                                      MailService mailService,
                                      ResourceBundleService bundleService,
                                      RemindPasswordTokenService remindPasswordTokenService,
+                                     OnboardingTokenService onboardingTokenService,
                                      CookieTokenService cookieTokenService,
                                      WebAppController controller,
                                      BrandingService brandingService) {
@@ -129,6 +147,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     this.mailService = mailService;
     this.bundleService = bundleService;
     this.remindPasswordTokenService = remindPasswordTokenService;
+    this.onboardingTokenService = onboardingTokenService;
     this.cookieTokenService = cookieTokenService;
     this.webController = controller;
     this.brandingService = brandingService;
@@ -146,7 +165,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   @Override
   public String verifyToken(String tokenId, String type) {
-    Token token = remindPasswordTokenService.getToken(tokenId, type);
+    Token token = tokenService(type).getToken(tokenId, type);
     if (token == null || token.isExpired()) {
       return null;
     }
@@ -155,7 +174,12 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   @Override
   public void deleteToken(String tokenId, String type) {
-    remindPasswordTokenService.deleteToken(tokenId, type);
+    tokenService(type).deleteToken(tokenId, type);
+  }
+
+  @Override
+  public long getOnboardingTokenValidity() {
+    return onboardingTokenService.getValidityMillis();
   }
 
   @Override
@@ -185,8 +209,8 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     try {
       this.changePasswordConnectorMap.get(this.changePasswordConnectorName).changePassword(username, password);
       try {
-        remindPasswordTokenService.deleteToken(tokenId, tokenType);
-        remindPasswordTokenService.deleteTokensByUsernameAndType(username, tokenType);
+        tokenService(tokenType).deleteToken(tokenId, tokenType);
+        tokenService(tokenType).deleteTokensByUsernameAndType(username, tokenType);
 
         // delete all token which have no type
         // this is rememberMe token
@@ -215,19 +239,28 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   @Override
   public boolean sendOnboardingEmail(User user, Locale locale, StringBuilder url) {
+    return sendOnboardingEmail(user, locale, url, null);
+  }
+
+  @Override
+  public boolean sendOnboardingEmail(User user, Locale locale, StringBuilder url, String message) {
     if (user == null) {
       throw new IllegalArgumentException("User or Locale must not be null");
     }
 
     ResourceBundle bundle = bundleService.getResourceBundle(bundleService.getSharedResourceBundleNames(), locale);
 
-    String tokenId = remindPasswordTokenService.createToken(user.getUserName(), ONBOARD_TOKEN);
+    String tokenId = onboardingTokenService.createToken(user.getUserName(), ONBOARD_TOKEN);
     StringBuilder redirectUrl = new StringBuilder();
     redirectUrl.append(url);
     redirectUrl.append("/on-boarding");
     redirectUrl.append("?lang=" + I18N.toTagIdentifier(locale));
     redirectUrl.append("&token=" + tokenId);
-    String emailBody = buildOnboardingEmailBody(user, bundle, redirectUrl.toString());
+    String emailBody = buildOnboardingEmailBody(user,
+                                                bundle,
+                                                redirectUrl.toString(),
+                                                message,
+                                                onboardingTokenService.getValidityMillis());
     String emailSubject = bundle.getString("onboarding.email.header") + " " + brandingService.getCompanyName();
     String senderName = MailUtils.getSenderName();
     String from = MailUtils.getSenderEmail();
@@ -235,15 +268,15 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       from = senderName + " <" + from + ">";
     }
 
-    Message message = new Message();
-    message.setFrom(from);
-    message.setTo(user.getEmail());
-    message.setSubject(emailSubject);
-    message.setBody(emailBody);
-    message.setMimeType("text/html");
+    Message mail = new Message();
+    mail.setFrom(from);
+    mail.setTo(user.getEmail());
+    mail.setSubject(emailSubject);
+    mail.setBody(emailBody);
+    mail.setMimeType("text/html");
 
     try {
-      mailService.sendMessage(message);
+      mailService.sendMessage(mail);
     } catch (Exception ex) {
       log.error("Failure to send onboarding email", ex);
       return false;
@@ -252,7 +285,16 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     return true;
   }
 
-  private String buildOnboardingEmailBody(User user, ResourceBundle bundle, String link) {
+  /**
+   * Builds the onboarding email from its template: the administrator's
+   * message, plain text, is HTML-escaped and shown above the link, and the
+   * link's validity is written as whole days, or as whole hours under a day
+   */
+  protected String buildOnboardingEmailBody(User user,
+                                            ResourceBundle bundle,
+                                            String link,
+                                            String message,
+                                            long validityMillis) {
     String content;
     InputStream input = this.getClass().getClassLoader().getResourceAsStream("conf/onBoarding_email_template.html");
     if (input == null) {
@@ -261,11 +303,82 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       content = resolveLanguage(input, bundle);
     }
 
-    content = content.replace(USER_DISPLAY_NAME_PARAM, user == null || user.getDisplayName() == null ? "" : user.getDisplayName());
-    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
-    content = content.replace(RESET_PASSWORD_LINK_PARAM, link);
+    Map<String, String> values = new HashMap<>();
+    values.put(unwrap(USER_DISPLAY_NAME_PARAM), user == null || user.getDisplayName() == null ? "" : user.getDisplayName());
+    values.put(unwrap(COMPANY_NAME_PARAM), brandingService.getCompanyName());
+    values.put(unwrap(RESET_PASSWORD_LINK_PARAM), link);
+    values.put(ONBOARDING_MESSAGE_PARAM, buildOnboardingMessageBlock(message));
+    values.put(LINK_VALIDITY_PARAM, buildValidityLabel(bundle, validityMillis));
+    return fillTemplate(content, values);
+  }
 
-    return content;
+  /**
+   * The message block of the onboarding email: the text escaped, its line
+   * breaks kept, nothing when the message is blank
+   */
+  protected static String buildOnboardingMessageBlock(String message) {
+    if (StringUtils.isBlank(message)) {
+      return "";
+    }
+    String escaped = StringEscapeUtils.escapeHtml4(message.trim()).replace("\r\n", "\n").replace("\n", "<br>");
+    return "<p style=\"margin: 0 0 10px 0;line-height:22px;white-space: pre-wrap;\">" + escaped + "</p>";
+  }
+
+  /**
+   * The validity of a link as the email states it: in days when it is a
+   * whole number of days from two up, in whole hours otherwise (a day reads
+   * "24 hours")
+   */
+  protected static String buildValidityLabel(ResourceBundle bundle, long validityMillis) {
+    if (isWholeDays(validityMillis)) {
+      long days = TimeUnit.MILLISECONDS.toDays(validityMillis);
+      return label(bundle, "onboarding.email.validity.days", days);
+    }
+    return label(bundle, "onboarding.email.validity.hours", TimeUnit.MILLISECONDS.toHours(validityMillis));
+  }
+
+  /**
+   * @param validityMillis a validity in milliseconds
+   * @return true when the validity is stated in days: a whole number of days,
+   *         from two up
+   */
+  protected static boolean isWholeDays(long validityMillis) {
+    long days = TimeUnit.MILLISECONDS.toDays(validityMillis);
+    return days >= 2 && validityMillis == TimeUnit.DAYS.toMillis(days);
+  }
+
+  private static String label(ResourceBundle bundle, String key, long value) {
+    String pattern;
+    try {
+      pattern = bundle.getString(key);
+    } catch (MissingResourceException e) {
+      pattern = "{0}";
+    }
+    return pattern.replace("{0}", String.valueOf(value));
+  }
+
+  /**
+   * Fills every placeholder of the template in one pass: a value holding a
+   * placeholder's form stays text, and a placeholder with no value is
+   * removed
+   */
+  protected static String fillTemplate(String template, Map<String, String> values) {
+    Matcher matcher = PLACEHOLDER_PATTERN.matcher(template);
+    StringBuilder filled = new StringBuilder();
+    while (matcher.find()) {
+      String value = values.getOrDefault(matcher.group(1), "");
+      matcher.appendReplacement(filled, Matcher.quoteReplacement(value));
+    }
+    matcher.appendTail(filled);
+    return filled.toString();
+  }
+
+  private static String unwrap(String placeholder) {
+    return placeholder.substring(2, placeholder.length() - 1);
+  }
+
+  private CookieTokenService tokenService(String type) {
+    return ONBOARD_TOKEN.equals(type) ? onboardingTokenService : remindPasswordTokenService;
   }
 
   @Override
@@ -322,7 +435,11 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       emailSubject = bundle.getString("external.email.subject") + " " + (space != null ? space : "")
           + " " + bundle.getString("external.email.on") + " " + brandingService.getCompanyName();
     } else {
-      emailBody = buildOnboardingEmailBody(null, bundle, redirectUrl.toString());
+      emailBody = buildOnboardingEmailBody(null,
+                                           bundle,
+                                           redirectUrl.toString(),
+                                           null,
+                                           TimeUnit.SECONDS.toMillis(remindPasswordTokenService.getValidityTime()));
       emailSubject = bundle.getString("onboarding.email.header") + " " + brandingService.getCompanyName();
     }
 

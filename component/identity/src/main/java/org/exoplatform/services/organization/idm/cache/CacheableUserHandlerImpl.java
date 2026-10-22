@@ -175,6 +175,19 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     userCache.clearCache();
   }
 
+  /**
+   * Evicts one account, by its stored login, so that the next read reaches
+   * the store: the entries are keyed by the login as it was requested, and a
+   * writer that bypassed this handler left the cached copy behind
+   *
+   * @param userName the stored login
+   */
+  public void clearCache(String userName) {
+    if (StringUtils.isNotBlank(userName)) {
+      userCache.remove(userName);
+    }
+  }
+
   public void disableCache() {
     disableCacheInThread.set(true);
   }
