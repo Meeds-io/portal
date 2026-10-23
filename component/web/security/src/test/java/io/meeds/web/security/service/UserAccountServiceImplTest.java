@@ -28,6 +28,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -55,6 +57,7 @@ import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.rest.UserAccount;
 import org.exoplatform.portal.rest.UserAccountCreationException;
 import org.exoplatform.portal.rest.UserAccountService;
+import org.exoplatform.portal.rest.UserAccountUpdateException;
 import org.exoplatform.portal.rest.UserFieldValidator;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
@@ -73,6 +76,9 @@ import org.exoplatform.services.organization.idm.cache.CacheableUserProfileHandl
 import org.exoplatform.services.organization.impl.UserProfileImpl;
 import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.LocaleConfigService;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.web.login.recovery.ChangePasswordConnector;
+import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 
 @RunWith(MockitoJUnitRunner.class)
 public class UserAccountServiceImplTest {
@@ -110,6 +116,12 @@ public class UserAccountServiceImplTest {
 
   @Mock
   private ListAccess<User>                  usersByEmail;
+
+  @Mock
+  private PasswordRecoveryService           passwordRecoveryService;
+
+  @Mock
+  private ChangePasswordConnector           changePasswordConnector;
 
   @InjectMocks
   private RestartCountingUserAccountService userAccountService;
@@ -440,6 +452,58 @@ public class UserAccountServiceImplTest {
     assertEquals("jdoe", storedProfile.getUserName());
   }
 
+  /**
+   * The edit stores a supported language, refuses an unknown one before any
+   * write, leaves the stored one on a blank or absent value, and accepts the
+   * stored one even when it is no longer a supported locale
+   */
+  @Test
+  public void testUpdateUserLanguage() throws Exception {
+    storedAccount(true);
+    assertNull(userAccountService.getLanguage("jdoe"));
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, " ", true, null), Locale.ENGLISH, "admin");
+    assertNull(storedProfile);
+
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "fr", true, null), Locale.ENGLISH, "admin");
+    assertEquals("fr", storedProfile.getAttribute("user.language"));
+    assertEquals("fr", userAccountService.getLanguage("jdoe"));
+    // The language already stored is not written again
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "fr", true, null), Locale.ENGLISH, "admin");
+    verify(userProfileHandler, times(1)).saveUserProfile(any(), eq(true));
+
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> userAccountService.updateUser(edit("Janet", "Doe", EMAIL, "xx", true, null),
+                                                                                  Locale.ENGLISH,
+                                                                                  "admin"));
+    assertEquals(UserAccountService.LANGUAGE_INVALID, e.getMessage());
+    assertEquals("fr", storedProfile.getAttribute("user.language"));
+    assertEquals("Jane", createdUser.getFirstName());
+
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, " ", true, null), Locale.ENGLISH, "admin");
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, null, true, null), Locale.ENGLISH, "admin");
+    assertEquals("fr", storedProfile.getAttribute("user.language"));
+
+    storedProfile.setAttribute("user.language", "de");
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "de", true, null), Locale.ENGLISH, "admin");
+    assertEquals("de", storedProfile.getAttribute("user.language"));
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "en", true, null), Locale.ENGLISH, "admin");
+    assertEquals("en", storedProfile.getAttribute("user.language"));
+
+    // A stored language that cannot be read: the one asked is checked as new,
+    // refused before any write when unsupported, read back as missing otherwise
+    when(userProfileHandler.findUserProfileByName("jdoe")).thenThrow(new RuntimeException("unreadable"));
+    IllegalArgumentException unreadable = assertThrows(IllegalArgumentException.class,
+                                                       () -> userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "xx", true, null),
+                                                                                           Locale.ENGLISH,
+                                                                                           "admin"));
+    assertEquals(UserAccountService.LANGUAGE_INVALID, unreadable.getMessage());
+    UserAccountUpdateException incomplete = assertThrows(UserAccountUpdateException.class,
+                                                         () -> userAccountService.updateUser(edit("Jane", "Doe", EMAIL, "fr", true, null),
+                                                                                             Locale.ENGLISH,
+                                                                                             "admin"));
+    assertEquals(UserAccountService.USER_UPDATE_INCOMPLETE, incomplete.getMessage());
+  }
+
   @Test
   public void testCreateUserValidatesAGivenPassword() throws Exception {
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
@@ -582,6 +646,178 @@ public class UserAccountServiceImplTest {
 
   private static Membership membership(String type, String username, String groupId) {
     return new MembershipImpl(type, username, groupId, false);
+  }
+
+  /**
+   * The edit writes the names, the email and the language, then reads them
+   * back in a new transaction
+   */
+  @Test
+  public void testUpdateUserWritesThenReadsBack() throws Exception {
+    storedAccount(true);
+    userAccountService.updateUser(edit("Janet", "Smith", "janet.smith@example.com", "fr", true, null), Locale.ENGLISH, "admin");
+
+    assertEquals("Janet", createdUser.getFirstName());
+    assertEquals("Smith", createdUser.getLastName());
+    assertEquals("janet.smith@example.com", createdUser.getEmail());
+    assertEquals("fr", storedProfile.getAttribute("user.language"));
+    verify(userHandler, never()).setEnabled(anyString(), any(Boolean.class), any(Boolean.class));
+    verify(changePasswordConnector, never()).changePassword(any(), any());
+    assertEquals(1, userAccountService.restarts);
+  }
+
+  /**
+   * Every refusal comes before the first write: a deactivation of oneself or
+   * of the super user, an email held by another account, an unknown language
+   */
+  @Test
+  public void testUpdateUserRefusesBeforeAnyWrite() throws Exception {
+    storedAccount(true);
+    assertRefused(UserAccountService.SELF_DISABLE, edit("Jane", "Doe", EMAIL, null, false, "LongEnough1"), "jdoe");
+    lenient().when(userACL.getSuperUser()).thenReturn("jdoe");
+    assertRefused(UserAccountService.DISABLE_SUPER_USER, edit("Jane", "Doe", EMAIL, null, false, "LongEnough1"), "admin");
+    when(usersByEmail.getSize()).thenReturn(1);
+    assertRefused(UserAccountService.EMAIL_ALREADY_EXISTS, edit("Jane", "Doe", "taken@example.com", null, true, null), "admin");
+    when(usersByEmail.getSize()).thenReturn(0);
+    assertRefused(UserAccountService.LANGUAGE_INVALID, edit("Jane", "Doe", EMAIL, "xx", true, "LongEnough1"), "admin");
+    // The super user's email stays editable while its account stays active
+    userAccountService.updateUser(edit("Jane", "Doe", "root@example.com", null, true, null), Locale.ENGLISH, "admin");
+    assertEquals("root@example.com", createdUser.getEmail());
+  }
+
+  /**
+   * The password is changed first and proven to authenticate; when it does
+   * not, nothing else is written
+   */
+  @Test
+  public void testUpdateUserChangesThePasswordFirstAndProvesIt() throws Exception {
+    storedAccount(true);
+    when(userHandler.authenticate("jdoe", "LongEnough1")).thenReturn(false);
+    UserAccountUpdateException e = assertThrows(UserAccountUpdateException.class,
+                                                () -> userAccountService.updateUser(edit("Janet", "Doe", EMAIL, null, true, "LongEnough1"),
+                                                                                    Locale.ENGLISH,
+                                                                                    "admin"));
+    assertEquals(UserAccountService.USER_PASSWORD_NOT_STORED, e.getMessage());
+    verify(changePasswordConnector).changePassword("jdoe", "LongEnough1");
+    verify(userHandler, never()).saveUser(any(), any(Boolean.class));
+    assertEquals("Jane", createdUser.getFirstName());
+
+    when(userHandler.authenticate("jdoe", "LongEnough1")).thenReturn(true);
+    userAccountService.updateUser(edit("Janet", "Doe", EMAIL, null, true, "LongEnough1"), Locale.ENGLISH, "admin");
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(changePasswordConnector, userHandler);
+    order.verify(changePasswordConnector).changePassword("jdoe", "LongEnough1");
+    order.verify(userHandler).saveUser(any(), eq(true));
+    assertEquals("Janet", createdUser.getFirstName());
+  }
+
+  /**
+   * A connector that refuses the password stops the edit before any other
+   * write
+   */
+  @Test
+  public void testUpdateUserStopsOnAPasswordTheConnectorRefuses() throws Exception {
+    storedAccount(true);
+    doThrow(new IllegalStateException("refused")).when(changePasswordConnector).changePassword("jdoe", "LongEnough1");
+    assertThrows(IllegalStateException.class,
+                 () -> userAccountService.updateUser(edit("Janet", "Doe", EMAIL, "fr", true, "LongEnough1"), Locale.ENGLISH, "admin"));
+    verify(userHandler, never()).saveUser(any(), any(Boolean.class));
+    assertNull(storedProfile);
+  }
+
+  /**
+   * A deactivated account cannot sign in: its new password is checked
+   * against the store directly, and a handler that cannot do it is reported
+   */
+  @Test
+  public void testUpdateUserProvesTheNewPasswordOfADeactivatedAccount() throws Exception {
+    storedAccount(false);
+    when(userHandler.authenticateDB(any(), eq("LongEnough1"))).thenReturn(true);
+    userAccountService.updateUser(edit("Jane", "Doe", EMAIL, null, false, "LongEnough1"), Locale.ENGLISH, "admin");
+    verify(userHandler, never()).authenticate(anyString(), anyString());
+
+    when(userHandler.authenticateDB(any(), eq("LongEnough1"))).thenReturn(false);
+    UserAccountUpdateException e = assertThrows(UserAccountUpdateException.class,
+                                                () -> userAccountService.updateUser(edit("Jane", "Doe", EMAIL, null, false, "LongEnough1"),
+                                                                                    Locale.ENGLISH,
+                                                                                    "admin"));
+    assertEquals(UserAccountService.USER_PASSWORD_NOT_STORED, e.getMessage());
+
+    UserHandler otherHandler = mock(UserHandler.class);
+    when(organizationService.getUserHandler()).thenReturn(otherHandler);
+    when(otherHandler.findUserByName(eq("jdoe"), eq(UserStatus.ANY))).thenAnswer(invocation -> copy(createdUser));
+    e = assertThrows(UserAccountUpdateException.class,
+                     () -> userAccountService.updateUser(edit("Jane", "Doe", EMAIL, null, false, "LongEnough1"), Locale.ENGLISH, "admin"));
+    assertEquals(UserAccountService.USER_PASSWORD_NOT_VERIFIABLE, e.getMessage());
+    verify(otherHandler, never()).saveUser(any(), any(Boolean.class));
+  }
+
+  /**
+   * A write the store swallowed is reported: the names, the status (a
+   * deactivation the store ignores, as with disableUserActived false) and
+   * the language each read back other than requested
+   */
+  @Test
+  public void testUpdateUserReportsAWriteTheStoreSwallowed() throws Exception {
+    storedAccount(true);
+    doNothing().when(userHandler).saveUser(any(), eq(true));
+    assertIncomplete(edit("Janet", "Doe", EMAIL, null, true, null));
+
+    storedAccount(true);
+    doReturn(null).when(userHandler).setEnabled(anyString(), any(Boolean.class), eq(true));
+    assertIncomplete(edit("Jane", "Doe", EMAIL, null, false, null));
+
+    storedAccount(true);
+    doNothing().when(userProfileHandler).saveUserProfile(any(), eq(true));
+    assertIncomplete(edit("Jane", "Doe", EMAIL, "fr", true, null));
+  }
+
+  private void assertIncomplete(UserAccount account) {
+    UserAccountUpdateException e = assertThrows(UserAccountUpdateException.class,
+                                                () -> userAccountService.updateUser(account, Locale.ENGLISH, "admin"));
+    assertEquals(UserAccountService.USER_UPDATE_INCOMPLETE, e.getMessage());
+  }
+
+  private void assertRefused(String code, UserAccount account, String modifier) throws Exception {
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> userAccountService.updateUser(account, Locale.ENGLISH, modifier));
+    assertEquals(code, e.getMessage());
+    verify(changePasswordConnector, never()).changePassword(any(), any());
+    verify(userHandler, never()).saveUser(any(), any(Boolean.class));
+    verify(userHandler, never()).setEnabled(anyString(), any(Boolean.class), any(Boolean.class));
+    assertNull(storedProfile);
+  }
+
+  /**
+   * The account the edit tests change: the store keeps what saveUser writes
+   */
+  private void storedAccount(boolean enabled) throws Exception {
+    createdUser = new UserImpl("jdoe");
+    createdUser.setCreatedDate(new java.util.Date());
+    createdUser.setFirstName("Jane");
+    createdUser.setLastName("Doe");
+    createdUser.setEmail(EMAIL);
+    createdUser.setEnabled(enabled);
+    storedProfile = null;
+    lenient().when(passwordRecoveryService.getActiveChangePasswordConnector()).thenReturn(changePasswordConnector);
+    lenient().doAnswer(invocation -> {
+      User saved = invocation.getArgument(0);
+      createdUser.setFirstName(saved.getFirstName());
+      createdUser.setLastName(saved.getLastName());
+      createdUser.setEmail(saved.getEmail());
+      return null;
+    }).when(userHandler).saveUser(any(), eq(true));
+  }
+
+  private static UserAccount edit(String firstName, String lastName, String email, String language, boolean enabled, String password) {
+    UserAccount account = new UserAccount();
+    account.setUserName("jdoe");
+    account.setFirstName(firstName);
+    account.setLastName(lastName);
+    account.setEmail(email);
+    account.setLanguage(language);
+    account.setEnabled(enabled);
+    account.setPassword(password);
+    return account;
   }
 
   private static UserImpl copy(UserImpl user) {
