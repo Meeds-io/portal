@@ -39,6 +39,7 @@ import org.mockito.Mockito;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.portal.rest.model.UserRestEntity;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.rest.services.BaseRestServicesTestCase;
 import org.exoplatform.services.organization.*;
@@ -393,150 +394,84 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals(Map.of("linkValidityDays", 1L, "linkValidityHours", 24L, "linkValidityWholeDays", false), response.getEntity());
   }
 
+  /**
+   * The update is the account service's: the resource answers 404 for an
+   * unknown login, hands the edited fields and the administrator over, and
+   * maps a refused field to 400 and an unproven update to 500, the code as
+   * body
+   */
   public void testUpdateUser() throws Exception {
     when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(null);
-    @SuppressWarnings("unchecked")
-    ListAccess<User> listAccess = mock(ListAccess.class);
-    when(userHandler.findUsersByQuery(any(), any())).thenReturn(listAccess);
-    when(listAccess.getSize()).thenReturn(0);
-
-    String email2 = USER_2 + "@example.com";
-    UserImpl user2 = new UserImpl(USER_2);
-    user2.setEmail(email2);
-    user2.setFirstName(USER_2);
-    user2.setLastName(USER_2);
-    user2.setEnabled(false);
-
-    String email1 = USER_1 + "@example.com";
-    UserImpl user1 = new UserImpl(USER_1);
-    user1.setEmail(email1);
-    user1.setFirstName(USER_1);
-    user1.setLastName(USER_1);
-    user1.setEnabled(true);
-
     startUserSession(USER_1);
     when(userACL.isAdministrator(ConversationState.getCurrent().getIdentity())).thenReturn(true);
 
     JSONObject data = new JSONObject();
-
-    ContainerResponse response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertEquals(404, response.getStatus());
-
     data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertEquals(404, response.getStatus());
-
-    when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(user2);
-    data.put("userName", USER_2);
-    data.put("lastName", "");
-    data.put("firstName", USER_2);
-    data.put("password", "password");
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", "");
-    data.put("password", "password");
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(response.getEntity().toString(), 400, response.getStatus());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNull(response.getEntity());
-    assertEquals(204, response.getStatus());
-
-    when(userHandler.findUserByName(eq(USER_1), any())).thenReturn(user1);
-    data.put("userName", USER_1);
-    data.put("lastName", USER_1);
-    data.put("firstName", USER_1);
-    data.put("password", "");
-    data.put("enabled", false);
-    data.put("email", email1);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNotNull(response.getEntity());
-    assertEquals(400, response.getStatus());
-    assertNotNull(response.getEntity());
-    assertEquals("SelfDisable", response.getEntity().toString());
-
-    verify(userHandler, atMost(0)).saveUser(any(User.class), anyBoolean());
-    verify(userHandler, atMost(0)).setEnabled(anyString(), anyBoolean(), anyBoolean());
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
+    data.put("lastName", "Doe");
+    data.put("firstName", "Jane");
+    data.put("email", USER_2 + "@example.com");
     data.put("password", "newPassword1");
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNull(response.getEntity());
-    assertEquals(204, response.getStatus());
-
-    verify(userHandler, times(0)).saveUser(user2, true);
-    verify(changePasswordConnector, times(1)).changePassword(USER_2, "newPassword1");
-    verify(userHandler, atMost(0)).setEnabled(anyString(), anyBoolean(), anyBoolean());
-    
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
-    data.put("email", email2);
-    data.put("enabled", true);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNull(response.getEntity());
-    assertEquals(204, response.getStatus());
-
-    verify(userHandler, atMost(1)).saveUser(eq(user2), eq(true));
-    verify(userHandler, atLeast(1)).setEnabled(anyString(), anyBoolean(), anyBoolean());
-
-    user2.setEnabled(true);
-    when(userACL.getSuperUser()).thenReturn(USER_2);
-
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
+    data.put("language", "fr");
     data.put("enabled", false);
-    data.put("email", email2);
-    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertEquals(400, response.getStatus());
-    assertNotNull(response.getEntity());
-    assertEquals("DisableSuperUser", response.getEntity().toString());
+    ContainerResponse response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
+    assertEquals(404, response.getStatus());
+    verify(userAccountService, never()).updateUser(any(), any(), any());
 
-    data.put("userName", USER_2);
-    data.put("lastName", USER_2);
-    data.put("firstName", USER_2);
-    data.put("password", "");
-    data.put("enabled", true);
-    data.put("email", email2);
+    when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(new UserImpl(USER_2));
     response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
-    assertNotNull(response);
-    assertNull(response.getEntity());
     assertEquals(204, response.getStatus());
-    user2.setDisplayName(USER_2+" "+USER_2);
-    verify(userHandler, atMost(1)).saveUser(eq(user2), eq(true));
+    ArgumentCaptor<UserAccount> account = ArgumentCaptor.forClass(UserAccount.class);
+    verify(userAccountService).updateUser(account.capture(), any(), eq(USER_1));
+    assertEquals(USER_2, account.getValue().getUserName());
+    assertEquals("Jane", account.getValue().getFirstName());
+    assertEquals("Doe", account.getValue().getLastName());
+    assertEquals(USER_2 + "@example.com", account.getValue().getEmail());
+    assertEquals("newPassword1", account.getValue().getPassword());
+    assertEquals("fr", account.getValue().getLanguage());
+    assertFalse(account.getValue().isEnabled());
 
+    doThrow(new IllegalArgumentException(UserAccountService.SELF_DISABLE)).when(userAccountService).updateUser(any(), any(), any());
+    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
+    assertEquals(400, response.getStatus());
+    assertEquals(UserAccountService.SELF_DISABLE, response.getEntity());
+
+    doThrow(new UserAccountUpdateException(UserAccountService.USER_UPDATE_INCOMPLETE)).when(userAccountService)
+                                                                                     .updateUser(any(), any(), any());
+    response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
+    assertEquals(500, response.getStatus());
+    assertEquals(UserAccountService.USER_UPDATE_INCOMPLETE, response.getEntity());
+    verify(userHandler, never()).saveUser(any(), anyBoolean());
+    verify(changePasswordConnector, never()).changePassword(any(), any());
   }
+
+
+  /**
+   * The account read returns the stored language, null when it cannot be
+   * read, and whether the account is in the internal store
+   */
+  public void testGetUserLanguage() throws Exception {
+    UserImpl user2 = new UserImpl(USER_2);
+    user2.setEnabled(true);
+    when(userHandler.findUserByName(eq(USER_2), any())).thenReturn(user2);
+    startUserSession(USER_1);
+    when(userACL.isAdministrator(any())).thenReturn(true);
+    OrganizationService organizationService = getContainer().getComponentInstanceOfType(OrganizationService.class);
+    MembershipHandler membershipHandler = mock(MembershipHandler.class);
+    when(organizationService.getMembershipHandler()).thenReturn(membershipHandler);
+
+    when(userAccountService.getLanguage(USER_2)).thenReturn("fr");
+    ContainerResponse response = getResponse("GET", "/v1/users/" + USER_2, "", confirmedContext(USER_1));
+    assertEquals(200, response.getStatus());
+    UserRestEntity account = (UserRestEntity) response.getEntity();
+    assertEquals("fr", account.getLanguage());
+    assertEquals(Boolean.TRUE, account.getIsInternal());
+
+    when(userAccountService.getLanguage(USER_2)).thenThrow(new IllegalStateException("unreadable"));
+    response = getResponse("GET", "/v1/users/" + USER_2, "", confirmedContext(USER_1));
+    assertEquals(200, response.getStatus());
+    assertNull(((UserRestEntity) response.getEntity()).getLanguage());
+  }
+
 
   public void testDeleteUser() throws Exception {
     String email2 = USER_2 + "@example.com";
@@ -654,16 +589,8 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
 
   public void testAdministratorChangesSuperUserEmailFromConfirmedSession() throws Exception {
     UserImpl root = new UserImpl("root");
-    root.setEmail("root@gatein.com");
-    root.setFirstName("Root");
-    root.setLastName("Root");
     root.setEnabled(true);
     when(userHandler.findUserByName(eq("root"), any())).thenReturn(root);
-    @SuppressWarnings("unchecked")
-    ListAccess<User> listAccess = mock(ListAccess.class);
-    when(userHandler.findUsersByQuery(any(), any())).thenReturn(listAccess);
-    when(listAccess.getSize()).thenReturn(0);
-    when(userACL.getSuperUser()).thenReturn("root");
 
     startUserSession(USER_1);
     when(userACL.isAdministrator(ConversationState.getCurrent().getIdentity())).thenReturn(true);
@@ -676,8 +603,9 @@ public class UserRestResourcesTest extends BaseRestServicesTestCase {
     data.put("enabled", true);
     ContainerResponse response = getResponse("PUT", "/v1/users", data.toString(), confirmedContext(USER_1));
     assertEquals(204, response.getStatus());
-    verify(userHandler).saveUser(argThat(user -> "admin@example.com".equals(user.getEmail())), eq(true));
+    verify(userAccountService).updateUser(argThat(account -> "admin@example.com".equals(account.getEmail())), any(), eq(USER_1));
   }
+
 
   public void testDeleteUserRequiresConfirmedSession() throws Exception {
     UserImpl user2 = new UserImpl(USER_2);
