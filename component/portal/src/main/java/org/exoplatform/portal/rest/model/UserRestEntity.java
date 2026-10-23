@@ -41,6 +41,12 @@ public class UserRestEntity {
   private String  language;
 
   /**
+   * Whether the account belongs to the internal store, whose password the
+   * platform can set; read only
+   */
+  private Boolean isInternal;
+
+  /**
    * The role given at creation, see
    * {@link org.exoplatform.portal.rest.UserAccountRole}; carried as text so
    * that an unknown value reaches the resource and is answered as invalid
@@ -130,6 +136,21 @@ public class UserRestEntity {
 
   public void setLanguage(String language) {
     this.language = language;
+  }
+
+  /**
+   * Named so that the JSON writer keys it as {@code isInternal}, the key the
+   * users list of the administration already reads
+   *
+   * @return whether the account belongs to the internal store, null when
+   *         unknown
+   */
+  public Boolean getIsInternal() {
+    return isInternal;
+  }
+
+  public void setIsInternal(Boolean isInternal) {
+    this.isInternal = isInternal;
   }
 
   public String getRole() {
