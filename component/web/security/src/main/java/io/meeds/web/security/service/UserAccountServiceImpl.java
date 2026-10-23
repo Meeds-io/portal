@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.portal.Constants;
 import org.exoplatform.portal.config.UserACL;
@@ -39,6 +40,7 @@ import org.exoplatform.portal.rest.UserAccount;
 import org.exoplatform.portal.rest.UserAccountCreationException;
 import org.exoplatform.portal.rest.UserAccountRole;
 import org.exoplatform.portal.rest.UserAccountService;
+import org.exoplatform.portal.rest.UserAccountUpdateException;
 import org.exoplatform.portal.rest.UserFieldValidator;
 import org.exoplatform.portal.rest.UserRestResourcesV1;
 import org.exoplatform.services.log.ExoLogger;
@@ -54,11 +56,13 @@ import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.UserProfile;
 import org.exoplatform.services.organization.UserProfileHandler;
 import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.idm.UserDAOImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableMembershipHandlerImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserHandlerImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserProfileHandlerImpl;
 import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.LocaleConfigService;
+import org.exoplatform.web.login.recovery.PasswordRecoveryService;
 
 @Service
 public class UserAccountServiceImpl implements UserAccountService {
@@ -121,6 +125,12 @@ public class UserAccountServiceImpl implements UserAccountService {
   @Autowired
   private LocaleConfigService   localeConfigService;
 
+  /**
+   * Looked up when first needed: a Kernel service, read through the
+   * container rather than injected at boot
+   */
+  private PasswordRecoveryService passwordRecoveryService;
+
   @Override
   public void confirmSession(String username, String otpCode) throws IllegalAccessException {
     otpService.validateAndConsumeOtp(username, OTP_METHOD, otpCode);
@@ -168,6 +178,59 @@ public class UserAccountServiceImpl implements UserAccountService {
     applyEnabled(username, account.isEnabled());
     readBack(user, role, language, account.isEnabled());
     return username;
+  }
+
+  @Override
+  public void updateUser(UserAccount account, Locale locale, String modifier) throws UserAccountUpdateException {
+    if (account == null || StringUtils.isBlank(account.getUserName())) {
+      throw new IllegalArgumentException("USER:EMPTY");
+    }
+    Locale validationLocale = locale == null ? Locale.ENGLISH : locale;
+    String username = account.getUserName();
+    String password = StringUtils.isEmpty(account.getPassword()) ? null : account.getPassword();
+    if (password != null) {
+      validate(UserRestResourcesV1.PASSWORD_VALIDATOR, PASSWORD_PREFIX, validationLocale, password);
+    }
+    validate(UserRestResourcesV1.LASTNAME_VALIDATOR, LASTNAME_PREFIX, validationLocale, account.getLastName());
+    validate(UserRestResourcesV1.FIRSTNAME_VALIDATOR, FIRSTNAME_PREFIX, validationLocale, account.getFirstName());
+    validate(UserRestResourcesV1.EMAIL_VALIDATOR, EMAIL_PREFIX, validationLocale, account.getEmail());
+    User user = readUser(username);
+    if (user == null) {
+      throw new IllegalArgumentException("USER:NOT_FOUND");
+    }
+    if (!StringUtils.equals(user.getEmail(), account.getEmail()) && isEmailUsedQuietly(account.getEmail())) {
+      throw new IllegalArgumentException(EMAIL_ALREADY_EXISTS);
+    }
+    String language = checkLanguage(username, account.getLanguage());
+    boolean enabled = account.isEnabled();
+    if (user.isEnabled() && !enabled) {
+      if (StringUtils.equals(modifier, username)) {
+        throw new IllegalArgumentException(SELF_DISABLE);
+      }
+      if (StringUtils.equals(userACL.getSuperUser(), username)) {
+        throw new IllegalArgumentException(DISABLE_SUPER_USER);
+      }
+    }
+    // The password first: a connector refusal throws and nothing else is
+    // written; a stored one is proven before the other writes
+    if (password != null) {
+      try {
+        passwordRecoveryService().getActiveChangePasswordConnector().changePassword(username, password);
+      } catch (Exception e) {
+        throw new IllegalStateException("The password of " + username + " could not be changed", e);
+      }
+      verifyPassword(username, password);
+    }
+    writeFields(username, account);
+    writeEnabled(username, user.isEnabled(), enabled);
+    if (language != null) {
+      try {
+        storeLanguage(username, language);
+      } catch (IllegalStateException e) {
+        LOG.warn("The language {} of the updated account {} could not be stored", language, username, e);
+      }
+    }
+    readBackUpdate(account, language);
   }
 
   @Override
@@ -258,6 +321,66 @@ public class UserAccountServiceImpl implements UserAccountService {
     }
   }
 
+  @Override
+  public String getLanguage(String username) {
+    try {
+      UserProfile profile = organizationService.getUserProfileHandler().findUserProfileByName(username);
+      return profile == null ? null : StringUtils.trimToNull(profile.getAttribute(Constants.USER_LANGUAGE));
+    } catch (Exception e) {
+      throw new IllegalStateException("The preferred language of " + username + " could not be read", e);
+    }
+  }
+
+  /**
+   * Checks the preferred language an edit asks for, writing nothing
+   *
+   * @return the language to store, null when the edit leaves the stored one
+   *         unchanged: a blank language, or the one already stored, accepted
+   *         even when it is no longer a supported locale
+   * @throws IllegalArgumentException with {@link #LANGUAGE_INVALID} as
+   *           message when the language is not a supported locale
+   */
+  private String checkLanguage(String username, String language) {
+    String value = StringUtils.trimToNull(language);
+    if (value == null || StringUtils.equals(value, readableLanguage(username))) {
+      return null;
+    }
+    return validateLanguage(value);
+  }
+
+  /**
+   * The stored language, null when it cannot be read: a language then
+   * stands as asked, checked against the supported locales
+   */
+  private String readableLanguage(String username) {
+    try {
+      return getLanguage(username);
+    } catch (IllegalStateException e) {
+      LOG.warn("The preferred language of {} could not be read, the one asked is checked as new", username, e);
+      return null;
+    }
+  }
+
+  /**
+   * Stores the preferred language of an existing account, as checked by
+   * {@link #checkLanguage(String, String)} before any write of the edit
+   *
+   * @throws IllegalStateException when the store refuses it
+   */
+  private void storeLanguage(String username, String language) {
+    try {
+      UserProfileHandler profileHandler = organizationService.getUserProfileHandler();
+      UserProfile profile = profileHandler.findUserProfileByName(username);
+      if (profile == null) {
+        profile = profileHandler.createUserProfileInstance(username);
+      }
+      profile.setAttribute(Constants.USER_LANGUAGE, language);
+      profileHandler.saveUserProfile(profile, true);
+    } catch (Exception e) {
+      throw new IllegalStateException("The preferred language of " + username + " could not be stored", e);
+    }
+  }
+
   private void applyLanguage(String username, String language) {
     if (language == null) {
       return;
@@ -343,13 +466,17 @@ public class UserAccountServiceImpl implements UserAccountService {
   }
 
   private User reload(String username) throws UserAccountCreationException {
-    restartTransaction();
-    evict(username);
     try {
-      return findUser(username);
+      return reloadUser(username);
     } catch (Exception e) {
       throw new UserAccountCreationException(USER_CREATION_FAILED, e);
     }
+  }
+
+  private User reloadUser(String username) throws Exception {
+    restartTransaction();
+    evict(username);
+    return findUser(username);
   }
 
   private List<String> missingParts(User stored, UserAccountRole role, String language, boolean enabled) {
@@ -387,6 +514,139 @@ public class UserAccountServiceImpl implements UserAccountService {
   }
 
   /**
+   * Proves that the new password of an internal-store account authenticates,
+   * read in a new transaction: the internal connector saves through the
+   * store's swallowing flush. A deactivated account cannot sign in, so its
+   * password is checked against the store directly, which the store's own
+   * handler class alone offers
+   */
+  private void verifyPassword(String username, String password) throws UserAccountUpdateException {
+    restartTransaction();
+    evict(username);
+    try {
+      User stored = findUser(username);
+      if (stored == null || !stored.isInternalStore()) {
+        return;
+      }
+      UserHandler userHandler = organizationService.getUserHandler();
+      boolean authenticated;
+      if (stored.isEnabled()) {
+        authenticated = userHandler.authenticate(username, password);
+      } else if (userHandler instanceof UserDAOImpl userDAO) {
+        authenticated = userDAO.authenticateDB(stored, password);
+      } else {
+        LOG.error("The new password of the deactivated account {} cannot be checked by {}",
+                  username,
+                  userHandler.getClass().getName());
+        throw new UserAccountUpdateException(USER_PASSWORD_NOT_VERIFIABLE);
+      }
+      if (!authenticated) {
+        LOG.error("The new password of the account {} does not authenticate after its change", username);
+        throw new UserAccountUpdateException(USER_PASSWORD_NOT_STORED);
+      }
+    } catch (UserAccountUpdateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new UserAccountUpdateException(USER_PASSWORD_NOT_STORED, e);
+    }
+  }
+
+  private void writeFields(String username, UserAccount account) {
+    try {
+      User user = findUser(username);
+      if (user == null || (StringUtils.equals(account.getEmail(), user.getEmail())
+                           && StringUtils.equals(account.getLastName(), user.getLastName())
+                           && StringUtils.equals(account.getFirstName(), user.getFirstName()))) {
+        return;
+      }
+      user.setEmail(account.getEmail());
+      user.setFirstName(account.getFirstName());
+      user.setLastName(account.getLastName());
+      user.setDisplayName(account.getFirstName() + " " + account.getLastName());
+      organizationService.getUserHandler().saveUser(user, true);
+    } catch (Exception e) {
+      LOG.warn("The names and email of the account {} could not be stored", username, e);
+    }
+  }
+
+  private void writeEnabled(String username, boolean storedEnabled, boolean enabled) {
+    if (storedEnabled == enabled) {
+      return;
+    }
+    try {
+      organizationService.getUserHandler().setEnabled(username, enabled, true);
+    } catch (Exception e) {
+      LOG.warn("The account {} could not be {}", username, enabled ? "enabled" : "deactivated", e);
+    }
+  }
+
+  /**
+   * Reads the edited fields back in a new transaction, the language only when
+   * the update carried one: the store commits around every listener and
+   * swallows a failed flush, so only a new read tells what it holds
+   */
+  private void readBackUpdate(UserAccount account, String language) throws UserAccountUpdateException {
+    String username = account.getUserName();
+    User stored;
+    try {
+      stored = reloadUser(username);
+    } catch (Exception e) {
+      throw new UserAccountUpdateException(USER_UPDATE_INCOMPLETE, e);
+    }
+    List<String> mismatches = new ArrayList<>();
+    if (stored == null) {
+      mismatches.add("account");
+    } else {
+      if (!StringUtils.equals(stored.getFirstName(), account.getFirstName())) {
+        mismatches.add("firstName");
+      }
+      if (!StringUtils.equals(stored.getLastName(), account.getLastName())) {
+        mismatches.add("lastName");
+      }
+      if (!StringUtils.equals(stored.getEmail(), account.getEmail())) {
+        mismatches.add("email");
+      }
+      if (stored.isEnabled() != account.isEnabled()) {
+        mismatches.add("enabled");
+      }
+      if (language != null && !StringUtils.equals(language, storedLanguage(username))) {
+        mismatches.add("language");
+      }
+    }
+    if (!mismatches.isEmpty()) {
+      LOG.error("The account {} read back after its update differs from the request: {}", username, mismatches);
+      throw new UserAccountUpdateException(USER_UPDATE_INCOMPLETE);
+    }
+  }
+
+  /**
+   * A read before any write: its failure is the store's, nothing was
+   * written or read back
+   */
+  private User readUser(String username) {
+    try {
+      return findUser(username);
+    } catch (Exception e) {
+      throw new IllegalStateException("The account " + username + " could not be read", e);
+    }
+  }
+
+  private boolean isEmailUsedQuietly(String email) {
+    try {
+      return isEmailUsed(email);
+    } catch (Exception e) {
+      throw new IllegalStateException("The accounts holding an email could not be read", e);
+    }
+  }
+
+  private PasswordRecoveryService passwordRecoveryService() {
+    if (passwordRecoveryService == null) {
+      passwordRecoveryService = ExoContainerContext.getService(PasswordRecoveryService.class);
+    }
+    return passwordRecoveryService;
+  }
+
+  /**
    * Ends the current transactions and opens new ones, so that the next read
    * sees what the store committed; the seam a unit test replaces, since the
    * real one needs a container
@@ -410,7 +670,7 @@ public class UserAccountServiceImpl implements UserAccountService {
       UserProfile profile = organizationService.getUserProfileHandler().findUserProfileByName(username);
       return profile == null ? null : profile.getAttribute(Constants.USER_LANGUAGE);
     } catch (Exception e) {
-      LOG.warn("The language of the created account {} could not be read back", username, e);
+      LOG.warn("The language of the account {} could not be read back", username, e);
       return null;
     }
   }
