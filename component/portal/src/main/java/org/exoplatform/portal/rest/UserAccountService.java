@@ -101,6 +101,36 @@ public interface UserAccountService {
   String USER_CREATED_INCOMPLETE_ENABLED    = "USER:CREATED_INCOMPLETE_ENABLED";
 
   /**
+   * Code answered as 500 when the read-back after an update found a field
+   * other than requested: the names, the email, the enabled flag, or the
+   * language when the update carried one
+   */
+  String USER_UPDATE_INCOMPLETE             = "USER:UPDATE_INCOMPLETE";
+
+  /**
+   * Code answered as 500 when the new password of an internal-store account
+   * does not authenticate after its change; nothing else is written
+   */
+  String USER_PASSWORD_NOT_STORED           = "USER:PASSWORD_NOT_STORED";
+
+  /**
+   * Code answered as 500 when the new password of a deactivated internal-store
+   * account cannot be checked by the user handler in place; nothing else is
+   * written
+   */
+  String USER_PASSWORD_NOT_VERIFIABLE       = "USER:PASSWORD_NOT_VERIFIABLE";
+
+  /**
+   * Code answered as 400 when an administrator deactivates their own account
+   */
+  String SELF_DISABLE                       = "SelfDisable";
+
+  /**
+   * Code answered as 400 when the super user's account is deactivated
+   */
+  String DISABLE_SUPER_USER                 = "DisableSuperUser";
+
+  /**
    * The parts a read-back reports missing, in this order
    */
   String PART_MEMBERSHIPS                   = "MEMBERSHIPS";
@@ -147,6 +177,41 @@ public interface UserAccountService {
    *           creation as requested, with the code as message
    */
   String createUser(UserAccount account, Locale locale) throws UserAccountCreationException;
+
+  /**
+   * Updates an existing account as an administrator edited it: names, email,
+   * enabled flag, a password when given and a language when given. Every
+   * refusal is checked before the first write. The password is changed
+   * first, through the active change-password connector, and an
+   * internal-store account's new password is then proven to authenticate.
+   * The other writes follow; they are then read back in a new transaction.
+   *
+   * @param account the account as edited, identified by its login
+   * @param locale the locale of the validation messages
+   * @param modifier the login of the administrator who edits it
+   * @throws IllegalArgumentException with the code of the refused field as
+   *           message: {@code PASSWORD:}, {@code FIRSTNAME:},
+   *           {@code LASTNAME:} or {@code EMAIL:} followed by the validation
+   *           message, or one of {@link #EMAIL_ALREADY_EXISTS},
+   *           {@link #LANGUAGE_INVALID}, {@link #SELF_DISABLE},
+   *           {@link #DISABLE_SUPER_USER}, {@code USER:EMPTY} or
+   *           {@code USER:NOT_FOUND}; nothing is written then
+   * @throws UserAccountUpdateException when the store did not complete the
+   *           update as requested, with the code as message
+   * @throws IllegalStateException with no code when the connector refuses the
+   *           password (an external store's account) or a store read before
+   *           any write fails; nothing is written then
+   */
+  void updateUser(UserAccount account, Locale locale, String modifier) throws UserAccountUpdateException;
+
+  /**
+   * Reads the preferred language stored for an account
+   *
+   * @param username the login of the account
+   * @return the supported locale name stored as its preferred language, null
+   *         when none is stored
+   */
+  String getLanguage(String username);
 
   /**
    * @return a candidate login that is not guessable from the user's name,
