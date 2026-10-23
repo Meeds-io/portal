@@ -61,7 +61,6 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.Query;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.UserStatus;
@@ -304,14 +303,19 @@ public class UserRestResourcesV1 implements ResourceContainer {
   @RolesAllowed("users")
   @Operation(
       summary = "Update an existing user",
-      description = "Update an existing user",
-      method = "GET")
+      description = "Update an existing user: names, email, password when given, enabled flag, and the preferred"
+          + " language when given, a blank one leaving the stored one unchanged",
+      method = "PUT")
   @ApiResponses(
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
-          @ApiResponse(responseCode = "400", description = "Invalid query input"),
+          @ApiResponse(responseCode = "400", description = "Invalid query input, or a language that is not a supported"
+              + " locale: LANGUAGE:INVALID"),
+          @ApiResponse(responseCode = "404", description = "Unknown user"),
           @ApiResponse(responseCode = "403", description = "User not administrator, or the session has not been confirmed with a one-time password: OTP_REQUIRED"),
-          @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
+          @ApiResponse(responseCode = "500", description = "The update could not be proven: USER:PASSWORD_NOT_STORED or"
+              + " USER:PASSWORD_NOT_VERIFIABLE, nothing written after the password; USER:UPDATE_INCOMPLETE, a field read back"
+              + " other than requested"),
       }
   )
   public Response updateUser(@Context HttpServletRequest request,
@@ -327,81 +331,25 @@ public class UserRestResourcesV1 implements ResourceContainer {
       return Response.status(Response.Status.BAD_REQUEST).entity("empty user object").build();
     }
 
-    String userName = userEntity.getUserName();
-    String email = userEntity.getEmail();
-    String firstName = userEntity.getFirstName();
-    String lastName = userEntity.getLastName();
-    String password = userEntity.getPassword();
-    boolean enabled = userEntity.isEnabled();
-
-    Locale locale = request == null ? Locale.ENGLISH : request.getLocale();
-
-    if (StringUtils.isNotBlank(password)) {
-      String errorMessage = PASSWORD_VALIDATOR.validate(locale, password);
-      if (StringUtils.isNotBlank(errorMessage)) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("PASSWORD:" + errorMessage).build();
-      }
-    }
-
-    User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    User user = organizationService.getUserHandler().findUserByName(userEntity.getUserName(), UserStatus.ANY);
     if (user == null) {
       return Response.status(Response.Status.NOT_FOUND).build();
     }
-
-    String errorMessage = LASTNAME_VALIDATOR.validate(locale, lastName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("LASTNAME:" + errorMessage).build();
+    UserAccount account = new UserAccount();
+    account.setUserName(userEntity.getUserName());
+    account.setFirstName(userEntity.getFirstName());
+    account.setLastName(userEntity.getLastName());
+    account.setEmail(userEntity.getEmail());
+    account.setPassword(userEntity.getPassword());
+    account.setLanguage(userEntity.getLanguage());
+    account.setEnabled(userEntity.isEnabled());
+    try {
+      getUserAccountService().updateUser(account, request == null ? Locale.ENGLISH : request.getLocale(), getCurrentUsername());
+    } catch (IllegalArgumentException e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+    } catch (UserAccountUpdateException e) {
+      return Response.serverError().entity(e.getMessage()).build();
     }
-
-    errorMessage = FIRSTNAME_VALIDATOR.validate(locale, firstName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("FIRSTNAME:" + errorMessage).build();
-    }
-
-    errorMessage = EMAIL_VALIDATOR.validate(locale, email);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:" + errorMessage).build();
-    }
-
-    // Check if mail address is already used
-    Query query = new Query();
-    query.setEmail(email);
-    if (!StringUtils.equals(user.getEmail(), email)
-        && organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY).getSize() > 0) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:ALREADY_EXISTS").build();
-    }
-
-    if (!StringUtils.equals(email, user.getEmail())
-        || !StringUtils.equals(lastName, user.getLastName())
-        || !StringUtils.equals(firstName, user.getFirstName())) {
-      user.setEmail(email);
-      user.setFirstName(firstName);
-      user.setLastName(lastName);
-      user.setPassword(password);
-      user.setDisplayName(firstName+" "+lastName);
-      organizationService.getUserHandler().saveUser(user, true);
-    }
-
-    if (StringUtils.isNotBlank(password)) {
-      // we save the password separatly from saving the user, because when changing
-      // password, we need to remove rememberme token
-      // related to this password as they are no more valid
-      passwordRecoveryService.getActiveChangePasswordConnector().changePassword(userName, password);
-    }
-
-    if (user.isEnabled() != enabled) {
-      if (!enabled) {
-        String currentUsername = getCurrentUsername();
-        if (StringUtils.equals(currentUsername, user.getUserName())) {
-          return Response.status(Response.Status.BAD_REQUEST).entity("SelfDisable").build();
-        }
-        if (StringUtils.equals(userACL.getSuperUser(), user.getUserName())) {
-          return Response.status(Response.Status.BAD_REQUEST).entity("DisableSuperUser").build();
-        }
-      }
-      organizationService.getUserHandler().setEnabled(userName, enabled, true);
-    }
-
     return Response.noContent().build();
   }
 
@@ -474,6 +422,14 @@ public class UserRestResourcesV1 implements ResourceContainer {
     }
 
     UserRestEntity userRestEntity = toEntity(user);
+    try {
+      userRestEntity.setLanguage(getUserAccountService().getLanguage(id));
+    } catch (IllegalStateException e) {
+      // The account is read without its language, which an edit then
+      // leaves unchanged
+      LOG.warn("The preferred language of {} could not be read", id, e);
+    }
+    userRestEntity.setIsInternal(user.isInternalStore());
 
     Collection<Membership> memberships = organizationService.getMembershipHandler().findMembershipsByUser(id);
     if (memberships != null) {
