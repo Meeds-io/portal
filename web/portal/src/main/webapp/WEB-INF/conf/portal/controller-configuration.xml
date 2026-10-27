@@ -45,6 +45,11 @@
         <description>Maximum size of the file to upload in MB</description>
         <value>${exo.uploadLimit:10}</value>
       </value-param>
+      <value-param>
+        <name>upload.location</name>
+        <description>Root folder uploads are staged in before their consumer stores them (exo.upload.location). Files go to &lt;root&gt;/&lt;container name&gt;/eXoUpload. Empty: java.io.tmpdir. Set it to a large disk-backed folder when java.io.tmpdir is small or RAM-backed (tmpfs).</description>
+        <value>${exo.upload.location:}</value>
+      </value-param>
     </init-params>
   </component>
 
