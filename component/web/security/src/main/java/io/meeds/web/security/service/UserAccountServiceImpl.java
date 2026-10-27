@@ -32,7 +32,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.exoplatform.commons.ObjectAlreadyExistsException;
-import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.portal.Constants;
 import org.exoplatform.portal.config.UserACL;
@@ -125,10 +124,7 @@ public class UserAccountServiceImpl implements UserAccountService {
   @Autowired
   private LocaleConfigService   localeConfigService;
 
-  /**
-   * Looked up when first needed: a Kernel service, read through the
-   * container rather than injected at boot
-   */
+  @Autowired
   private PasswordRecoveryService passwordRecoveryService;
 
   @Override
@@ -215,7 +211,7 @@ public class UserAccountServiceImpl implements UserAccountService {
     // written; a stored one is proven before the other writes
     if (password != null) {
       try {
-        passwordRecoveryService().getActiveChangePasswordConnector().changePassword(username, password);
+        passwordRecoveryService.getActiveChangePasswordConnector().changePassword(username, password);
       } catch (Exception e) {
         throw new IllegalStateException("The password of " + username + " could not be changed", e);
       }
@@ -231,6 +227,16 @@ public class UserAccountServiceImpl implements UserAccountService {
       }
     }
     readBackUpdate(account, language);
+  }
+
+  @Override
+  public String getLanguage(String username) {
+    try {
+      UserProfile profile = organizationService.getUserProfileHandler().findUserProfileByName(username);
+      return profile == null ? null : StringUtils.trimToNull(profile.getAttribute(Constants.USER_LANGUAGE));
+    } catch (Exception e) {
+      throw new IllegalStateException("The preferred language of " + username + " could not be read", e);
+    }
   }
 
   @Override
@@ -318,16 +324,6 @@ public class UserAccountServiceImpl implements UserAccountService {
         throw new UsernameRefusedException(username, e);
       }
       throw new UserAccountCreationException(USER_CREATION_FAILED, e);
-    }
-  }
-
-  @Override
-  public String getLanguage(String username) {
-    try {
-      UserProfile profile = organizationService.getUserProfileHandler().findUserProfileByName(username);
-      return profile == null ? null : StringUtils.trimToNull(profile.getAttribute(Constants.USER_LANGUAGE));
-    } catch (Exception e) {
-      throw new IllegalStateException("The preferred language of " + username + " could not be read", e);
     }
   }
 
@@ -637,13 +633,6 @@ public class UserAccountServiceImpl implements UserAccountService {
     } catch (Exception e) {
       throw new IllegalStateException("The accounts holding an email could not be read", e);
     }
-  }
-
-  private PasswordRecoveryService passwordRecoveryService() {
-    if (passwordRecoveryService == null) {
-      passwordRecoveryService = ExoContainerContext.getService(PasswordRecoveryService.class);
-    }
-    return passwordRecoveryService;
   }
 
   /**
