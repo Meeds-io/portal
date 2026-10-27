@@ -47,6 +47,7 @@ import org.exoplatform.portal.mop.dao.PageDAOTest;
 import org.exoplatform.portal.mop.dao.PermissionDAOTest;
 import org.exoplatform.portal.mop.dao.SiteDAOTest;
 import org.exoplatform.portal.mop.dao.WindowDAOTest;
+import org.exoplatform.portal.mop.importer.TestNavigationFragmentImporterRestoreDefaults;
 import org.exoplatform.portal.mop.rest.NavigationRestTest;
 import org.exoplatform.portal.mop.storage.LayoutStorageTest;
 import org.exoplatform.portal.mop.storage.TestDescriptionService;
@@ -100,6 +101,7 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     TestDescriptionService.class,
     TestNavigationServiceRebase.class,
     TestNavigationService.class,
+    TestNavigationFragmentImporterRestoreDefaults.class,
     TestNavigationInsertAtIndex.class,
     TestNavigationServiceSave.class,
     TestNavigationServiceUpdate.class,

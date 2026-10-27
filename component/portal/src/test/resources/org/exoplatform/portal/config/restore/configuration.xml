@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ This file is part of the Meeds project (https://meeds.io/).
+
+ Copyright (C) 2026 Meeds Association contact@meeds.io
+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 3 of the License, or (at your option) any later version.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program; if not, write to the Free Software Foundation,
+ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+-->
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd http://www.exoplatform.org/xml/ns/kernel_1_2.xsd"
+               xmlns="http://www.exoplatform.org/xml/ns/kernel_1_2.xsd">
+  <external-component-plugins>
+    <target-component>org.exoplatform.portal.config.UserPortalConfigService</target-component>
+    <component-plugin>
+      <name>new.portal.config.user.listener.contributed</name>
+      <set-method>initListener</set-method>
+      <type>org.exoplatform.portal.config.NewPortalConfigListener</type>
+      <init-params>
+        <object-param>
+          <name>contribution1</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>contributed</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution1</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution2</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>contributed</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution2</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution3</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>contributed</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution3</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution4</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>partial</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution4</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution5</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>partial</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution5</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution6</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>attached</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution6</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution7</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>startup</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="importMode">
+              <string>insert</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution7</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution8</name>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>startup</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>portal</string>
+            </field>
+            <field name="importMode">
+              <string>overwrite</string>
+            </field>
+            <field name="override">
+              <string>true</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution8</string>
+            </field>
+          </object>
+        </object-param>
+        <object-param>
+          <name>contribution9</name>
+          <description>A site type that doesn't exist, overwriting a site of the same name: the other sites are imported all the same</description>
+          <object type="org.exoplatform.portal.config.NewPortalConfig">
+            <field name="predefinedOwner">
+              <collection type="java.util.HashSet">
+                <value>
+                  <string>startup</string>
+                </value>
+              </collection>
+            </field>
+            <field name="ownerType">
+              <string>unknown</string>
+            </field>
+            <field name="importMode">
+              <string>overwrite</string>
+            </field>
+            <field name="location">
+              <string>classpath:/org/exoplatform/portal/config/restore/contribution4</string>
+            </field>
+          </object>
+        </object-param>
+      </init-params>
+    </component-plugin>
+  </external-component-plugins>
+</configuration>

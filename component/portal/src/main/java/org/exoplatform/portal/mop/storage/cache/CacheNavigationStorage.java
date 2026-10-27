@@ -38,6 +38,8 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
+import io.meeds.common.TransactionCallbacks;
+
 public class CacheNavigationStorage extends NavigationStorageImpl {
 
   private static final Log                                      LOG                   =
@@ -85,7 +87,7 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.createNode(parentId, previousId, name, state, index);
     } finally {
-      this.nodeFutureCache.remove(parentId);
+      evict(() -> this.nodeFutureCache.remove(parentId));
     }
   }
 
@@ -95,7 +97,7 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.destroyNode(targetId);
     } finally {
-      clearNodeCache(nodeData);
+      evict(() -> clearNodeCache(nodeData));
     }
   }
 
@@ -112,9 +114,11 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.moveNode(targetId, fromId, toId, previousId);
     } finally {
-      clearNodeCache(nodeData);
-      clearNodeCache(fromNodeData);
-      clearNodeCache(toNodeData);
+      evict(() -> {
+        clearNodeCache(nodeData);
+        clearNodeCache(fromNodeData);
+        clearNodeCache(toNodeData);
+      });
     }
   }
 
@@ -125,8 +129,10 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.renameNode(targetId, parentId, name);
     } finally {
-      clearNodeCache(nodeData);
-      clearNodeCache(parentNodeData);
+      evict(() -> {
+        clearNodeCache(nodeData);
+        clearNodeCache(parentNodeData);
+      });
     }
   }
 
@@ -136,7 +142,7 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.updateNode(targetId, state);
     } finally {
-      clearNodeCache(nodeData);
+      evict(() -> clearNodeCache(nodeData));
     }
   }
 
@@ -151,8 +157,10 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       super.saveNavigation(key, state);
     } finally {
-      clearNavigationByKey(key);
-      clearNodeCache(key);
+      evict(() -> {
+        clearNavigationByKey(key);
+        clearNodeCache(key);
+      });
     }
   }
 
@@ -161,8 +169,10 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.destroyNavigation(siteKey);
     } finally {
-      clearNavigationByKey(siteKey);
-      clearNodeCache(siteKey);
+      evict(() -> {
+        clearNavigationByKey(siteKey);
+        clearNodeCache(siteKey);
+      });
     }
   }
 
@@ -171,14 +181,16 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     try {
       return super.destroyNavigation(data);
     } finally {
-      if (data != null && data.getSiteKey() != null) {
-        SiteKey siteKey = data.getSiteKey();
-        clearNavigationByKey(siteKey);
-        clearNodeCache(siteKey);
-        if (data.getRootId() != null) {
-          clearNodeCache(Long.parseLong(data.getRootId()));
+      evict(() -> {
+        if (data != null && data.getSiteKey() != null) {
+          SiteKey siteKey = data.getSiteKey();
+          clearNavigationByKey(siteKey);
+          clearNodeCache(siteKey);
+          if (data.getRootId() != null) {
+            clearNodeCache(Long.parseLong(data.getRootId()));
+          }
         }
-      }
+      });
     }
   }
 
@@ -226,4 +238,20 @@ public class CacheNavigationStorage extends NavigationStorageImpl {
     }
   }
 
+  /**
+   * Inside a transaction, the eviction is run again once the transaction
+   * completes: a concurrent read made before the commit caches the previous
+   * navigation state again. The loads in flight are invalidated first so that
+   * they don't cache it either, unless one is already writing its result: the
+   * cache expiry is then the backstop.
+   */
+  private void evict(Runnable eviction) {
+    Runnable invalidatingEviction = () -> {
+      navigationFutureCache.clearFutures();
+      nodeFutureCache.clearFutures();
+      eviction.run();
+    };
+    invalidatingEviction.run();
+    TransactionCallbacks.afterCompletion(invalidatingEviction);
+  }
 }
