@@ -120,7 +120,7 @@ public class UserFieldValidator {
         return getLabel(locale, "ExpressionValidator.msg.value-invalid", label, pattern);
       }
     } else if (personalNameValidation) {
-      for (int i = 0; i < buff.length - 1; i++) {
+      for (int i = 0; i < buff.length; i++) {
         char c = buff[i];
         if (Character.isLetter(c) || Character.isSpaceChar(c) || c == '\'' || c == '-') {
           continue;

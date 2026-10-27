@@ -208,8 +208,8 @@ public interface UserAccountService {
    * Reads the preferred language stored for an account
    *
    * @param username the login of the account
-   * @return the supported locale name stored as its preferred language, null
-   *         when none is stored
+   * @return the preferred language stored for the account, which may no
+   *         longer be a supported locale; null when none is stored
    */
   String getLanguage(String username);
 

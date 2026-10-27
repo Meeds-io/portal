@@ -73,6 +73,10 @@ public class UserFieldValidatorTest {
     assertNotNull(fieldValidator.validate(Locale.ENGLISH, "1aa"));
     assertNotNull(fieldValidator.validate(Locale.ENGLISH, "&aa"));
     assertNotNull(fieldValidator.validate(Locale.ENGLISH, "a@a"));
+    // The only invalid character is the last one
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "aa3"));
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "Ann!"));
+    assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa"));
     assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa bb"));
     assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa-bb"));
     assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa'bb"));
