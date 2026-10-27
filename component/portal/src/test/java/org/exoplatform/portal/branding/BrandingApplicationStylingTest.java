@@ -381,6 +381,59 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
+  public void shouldEmitCommentBackgroundOnlyForAColouredApplicationOrDrawerBackground() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    brandingService.start();
+
+    // template defaults: white application and drawer backgrounds keep the skin's default bubble colour
+    String css = brandingService.getThemeCSSContent();
+    assertFalse(css, css.contains("--allPagesCommentBackgroundColor"));
+    assertFalse(css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+
+    long time = 1;
+    stub(settingService, "appBackgroundColor", "#EBADCBFF");
+    stub(settingService, "drawerBackgroundColor", "#3F8487");
+    brandingService.updateLastUpdatedTime(time++);
+    css = brandingService.getThemeCSSContent();
+    assertTrue(css, css.contains("--allPagesCommentBackgroundColor: color-mix(in srgb, #EBADCBFF 60%, white);"));
+    assertTrue(css, css.contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, #3F8487 60%, white);"));
+    int supports = css.indexOf("@supports (color: color-mix(");
+    assertTrue("the derived values are emitted only where color-mix is supported: " + css,
+               supports >= 0 && supports < css.indexOf("--allPagesCommentBackgroundColor"));
+
+    // every spelling of white the colour grammar accepts, transparent (the keyword and a zero alpha), the unset value,
+    // and the grammar's lengths that are not CSS colours (color-mix() would be invalid and the bubble transparent)
+    // emit nothing
+    for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFF", "#ffff", "#FFFFFFFF", "#ffffffff",
+        "#FfFfFfFf", "transparent", "#00000000", "#AABBCC00", "#ABC0", "initial", "#AABBC", "#AABBCCD" }) {
+      stub(settingService, "appBackgroundColor", white);
+      stub(settingService, "drawerBackgroundColor", white);
+      brandingService.updateLastUpdatedTime(time++);
+      css = brandingService.getThemeCSSContent();
+      assertFalse(white + ": " + css, css.contains("--allPagesCommentBackgroundColor"));
+      assertFalse(white + ": " + css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+    }
+
+    // any other colour compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
+    for (String[] colour : new String[][] { { "#ABC", "#aabbcc" }, { "#ABCD", "#ABCD" }, { "#AABBCC80", "#AABBCC80" },
+        { "#AABBCC01", "#AABBCC01" }, { "#FFFFFE", "#FFFFFE" }, { "#FFFFFFFE", "#FFFFFFFE" } }) {
+      stub(settingService, "appBackgroundColor", colour[0]);
+      stub(settingService, "drawerBackgroundColor", colour[0]);
+      brandingService.updateLastUpdatedTime(time++);
+      css = brandingService.getThemeCSSContent();
+      assertTrue(colour[0] + ": " + css,
+                 css.contains("--allPagesCommentBackgroundColor: color-mix(in srgb, " + colour[1] + " 60%, white);"));
+      assertTrue(colour[0] + ": " + css,
+                 css.contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, " + colour[1] + " 60%, white);"));
+    }
+  }
+
+  @Test
   public void shouldKeepLastCompiledStylesheetWhenAValueDoesNotCompile() throws Exception {
     File lessFile = new File(BRANDING_LESS_PATH);
     assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
@@ -596,8 +649,10 @@ public class BrandingApplicationStylingTest {
                                            "appBorderSize=",
                                            "appBoxShadow=",
                                            "appBorderRadiusTopLeft=8px; }", // malformed configured value
+                                           "appBackgroundColor=",
                                            "appBackgroundImage=",
                                            "appBackgroundRepeat=",
+                                           "drawerBackgroundColor=",
                                            "appTextTitleColor=",
                                            "appTextHeaderColor=",
                                            "appTextTitleFontWeight=",
