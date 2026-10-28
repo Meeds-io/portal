@@ -19,6 +19,7 @@
 package org.exoplatform.portal.mop.dao.mock;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -27,6 +28,31 @@ import org.exoplatform.portal.jdbc.entity.WindowEntity;
 import org.exoplatform.portal.mop.dao.WindowDAO;
 
 public class InMemoryWindowDAO extends AbstractInMemoryDAO<WindowEntity> implements WindowDAO {
+
+  @Override
+  public Optional<byte[]> findCustomization(Long id) {
+    WindowEntity window = find(id);
+    if (window == null) {
+      return Optional.empty();
+    }
+    byte[] customization = window.getCustomization();
+    return Optional.of(customization == null ? new byte[0] : customization);
+  }
+
+  @Override
+  public boolean existsById(Long id) {
+    return find(id) != null;
+  }
+
+  @Override
+  public int updateCustomization(Long id, byte[] customization) {
+    WindowEntity window = find(id);
+    if (window == null) {
+      return 0;
+    }
+    window.setCustomization(customization);
+    return 1;
+  }
 
   @Override
   public List<Long> findIdsByContentIds(List<String> contentIds, int offset, int limit) {

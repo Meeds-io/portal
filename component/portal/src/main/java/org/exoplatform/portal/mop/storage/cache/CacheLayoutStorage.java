@@ -91,6 +91,15 @@ public class CacheLayoutStorage extends LayoutStorage {
   }
 
   @Override
+  protected int updateWindowCustomization(Long id, byte[] customization) {
+    try {
+      return super.updateWindowCustomization(id, customization);
+    } finally {
+      portletPreferencesCache.remove(id);
+    }
+  }
+
+  @Override
   protected WindowEntity findWindow(Long id) {
     WindowData window = portletPreferencesFutureCache.get(null, id);
     return window == null || window.isNull() ? null : toEntity(window);

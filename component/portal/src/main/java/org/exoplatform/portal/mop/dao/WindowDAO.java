@@ -19,6 +19,7 @@
 package org.exoplatform.portal.mop.dao;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.exoplatform.commons.api.persistence.GenericDAO;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
@@ -26,6 +27,34 @@ import org.exoplatform.portal.jdbc.entity.WindowEntity;
 public interface WindowDAO extends GenericDAO<WindowEntity, Long> {
 
   List<WindowEntity> findByIds(List<Long> ids);
+
+  /**
+   * Reads the customization of a window from its row, never from the window
+   * the persistence context holds
+   *
+   * @param id the window's id
+   * @return the window's customization, an empty array when it has none,
+   *         empty when no window has this id
+   */
+  Optional<byte[]> findCustomization(Long id);
+
+  /**
+   * @param id the window's id
+   * @return true when the window's row exists, never read from the window the
+   *         persistence context holds, its customization not read
+   */
+  boolean existsById(Long id);
+
+  /**
+   * Writes the customization of a window to its row, and to that column
+   * alone: the other columns keep what is committed. The window the
+   * persistence context holds, when it holds one, is read again from the row
+   *
+   * @param id the window's id
+   * @param customization the window's customization, null for none
+   * @return the number of windows written, 0 when no window has this id
+   */
+  int updateCustomization(Long id, byte[] customization);
 
   void deleteById(Long id);
 

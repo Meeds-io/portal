@@ -18,8 +18,11 @@
  */
 package org.exoplatform.portal.mop.storage;
 
+import static org.junit.Assert.assertThrows;
+
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.persistence.EntityTransaction;
 
@@ -28,11 +31,21 @@ import org.json.simple.JSONArray;
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.portal.config.model.ApplicationBackgroundStyle;
 import org.exoplatform.portal.config.model.ModelStyle;
+import org.exoplatform.portal.config.model.PersistentApplicationState;
 import org.exoplatform.portal.jdbc.entity.ComponentEntity;
 import org.exoplatform.portal.jdbc.entity.ContainerEntity;
+import org.exoplatform.portal.jdbc.entity.WindowEntity;
+import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
 import org.exoplatform.portal.mop.dao.AbstractDAOTest;
+import org.exoplatform.portal.mop.dao.WindowDAO;
+import org.exoplatform.portal.mop.service.LayoutService;
+import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
+import org.exoplatform.portal.mop.storage.utils.MOPUtils;
 import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.ContainerData;
+import org.exoplatform.portal.pom.spi.portlet.Portlet;
+import org.exoplatform.services.cache.CacheService;
+import org.exoplatform.services.cache.ExoCache;
 
 public class LayoutStorageTest extends AbstractDAOTest {
 
@@ -302,6 +315,185 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertEquals(Integer.valueOf(12), loadedStyle.getMarginRight());
     assertEquals(Integer.valueOf(24), loadedStyle.getMarginBottom());
     assertNull(loadedStyle.getMarginLeft());
+  }
+
+  /**
+   * The preferences cache keeps a window until a write through the storage
+   * empties it: fails the mutant reading the window through it
+   */
+  public void testLoadCommittedReadsTheRowNotThePreferencesCache() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    WindowEntity window = new WindowEntity();
+    window.setAppType(AppType.PORTLET);
+    window.setContentId("app/portlet");
+    window.setCustomization(MOPUtils.serialize(new Portlet().setValue("name", "cached")));
+    window = windowDAO.create(window);
+    restartTransaction();
+    String storageId = String.valueOf(window.getId());
+    PersistentApplicationState state = new PersistentApplicationState(storageId);
+    assertEquals("cached", layoutStorage.load(state).getValue("name"));
+
+    // Written through the DAO, the cache entry is kept
+    WindowEntity committedWindow = windowDAO.find(window.getId());
+    committedWindow.setCustomization(MOPUtils.serialize(new Portlet().setValue("name", "committed")));
+    windowDAO.update(committedWindow);
+    restartTransaction();
+
+    assertEquals("cached", layoutStorage.load(state).getValue("name"));
+    assertEquals("committed", layoutStorage.loadCommitted(storageId).getValue("name"));
+  }
+
+  /**
+   * A request's persistence context returns a window as the request first
+   * loaded it, whatever another request committed since: fails the mutants of
+   * the storage and of the service reading that window
+   */
+  public void testLoadCommittedThroughTheServiceReadsWhatAnotherRequestCommitted() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertNotNull(windowDAO.find(id));
+
+    inAnotherRequest(() -> {
+      WindowEntity window = windowDAO.find(id);
+      window.setCustomization(MOPUtils.serialize(new Portlet().setValue("name", "committed")));
+      windowDAO.update(window);
+    });
+    assertEquals("committed", layoutService.loadCommitted(storageId).getValue("name"));
+
+    inAnotherRequest(() -> windowDAO.delete(windowDAO.find(id)));
+    assertNotNull(windowDAO.find(id));
+    assertNull(layoutService.loadCommitted(storageId));
+  }
+
+  /**
+   * A request's persistence context still holds a window another request
+   * deleted: fails the mutants of the storage and of the service answering
+   * from that window
+   */
+  public void testExistsCommittedThroughTheServiceReadsWhatAnotherRequestCommitted() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertNotNull(windowDAO.find(id));
+    assertTrue(layoutService.existsCommitted(storageId));
+
+    inAnotherRequest(() -> windowDAO.delete(windowDAO.find(id)));
+    assertNotNull(windowDAO.find(id));
+    assertFalse(layoutService.existsCommitted(storageId));
+  }
+
+  /**
+   * The preferences cache keeps a window until a write through the storage
+   * empties it: fails the mutants of the storage and of the service writing
+   * the preferences from that cached window, whose former columns they write
+   * back, and the mutant keeping its cache entry
+   */
+  public void testSaveCommittedThroughTheServiceKeepsTheColumnsAnotherRequestCommitted() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    ExoCache<Long, ?> preferencesCache = getContainer().getComponentInstanceOfType(CacheService.class)
+                                                       .getCacheInstance(CacheLayoutStorage.PORTLET_PREFERENCES_CACHE_NAME);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertEquals("loaded", layoutService.load(new PersistentApplicationState(storageId)).getValue("name"));
+    assertNotNull(preferencesCache.get(id));
+
+    // Written through the DAO, the cache entry is kept
+    inAnotherRequest(() -> {
+      WindowEntity window = windowDAO.find(id);
+      window.setTitle("committed");
+      windowDAO.update(window);
+    });
+    assertTrue(layoutService.saveCommitted(storageId, new Portlet().setValue("name", "written")));
+    assertNull(preferencesCache.get(id));
+
+    AtomicReference<WindowEntity> stored = new AtomicReference<>();
+    inAnotherRequest(() -> stored.set(windowDAO.find(id)));
+    assertEquals("committed", stored.get().getTitle());
+    assertEquals("written", ((Portlet) MOPUtils.unserialize(stored.get().getCustomization())).getValue("name"));
+
+    assertTrue(layoutService.saveCommitted(storageId, null));
+    assertNotNull(layoutService.loadCommitted(storageId));
+    assertFalse(layoutService.loadCommitted(storageId).iterator().hasNext());
+    assertFalse(layoutService.saveCommitted(String.valueOf(Long.MAX_VALUE), new Portlet()));
+    assertFalse(layoutService.saveCommitted("notAnId", new Portlet()));
+  }
+
+  /**
+   * After the write, a read of the request that holds the window fills the
+   * shared cache from that window: fails the mutant leaving it with its former
+   * preferences, which every request would then read
+   */
+  public void testSaveCommittedThroughTheServiceLetsTheHoldingRequestReadTheNewPreferences() throws Exception {
+    LayoutService layoutService = getContainer().getComponentInstanceOfType(LayoutService.class);
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long id = createWindow(windowDAO, new Portlet().setValue("name", "loaded"));
+    String storageId = String.valueOf(id);
+    assertNotNull(windowDAO.find(id));
+
+    assertTrue(layoutService.saveCommitted(storageId, new Portlet().setValue("name", "written")));
+
+    PersistentApplicationState state = new PersistentApplicationState(storageId);
+    assertEquals("written", layoutService.load(state).getValue("name"));
+    AtomicReference<String> otherRequestName = new AtomicReference<>();
+    inAnotherRequest(() -> otherRequestName.set(layoutService.load(state).getValue("name")));
+    assertEquals("written", otherRequestName.get());
+  }
+
+  public void testLoadCommittedOfAWindowWithoutPreferencesIsEmpty() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    WindowEntity window = new WindowEntity();
+    window.setAppType(AppType.PORTLET);
+    window.setContentId("app/portlet");
+    window = windowDAO.create(window);
+    restartTransaction();
+
+    Portlet preferences = layoutStorage.loadCommitted(String.valueOf(window.getId()));
+    assertNotNull(preferences);
+    assertFalse(preferences.iterator().hasNext());
+  }
+
+  /**
+   * Preferences that cannot be deserialized fail their read: fails the mutant
+   * reading them only to test that the window exists
+   */
+  public void testExistsCommittedDoesNotReadThePreferences() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    WindowEntity window = new WindowEntity();
+    window.setAppType(AppType.PORTLET);
+    window.setContentId("app/portlet");
+    window.setCustomization(new byte[] { 1, 2, 3 });
+    window = windowDAO.create(window);
+    restartTransaction();
+    String storageId = String.valueOf(window.getId());
+    assertThrows(IllegalStateException.class, () -> layoutStorage.loadCommitted(storageId));
+
+    assertTrue(layoutStorage.existsCommitted(storageId));
+    assertFalse(layoutStorage.existsCommitted(String.valueOf(Long.MAX_VALUE)));
+    assertFalse(layoutStorage.existsCommitted("notAnId"));
+    assertFalse(layoutStorage.existsCommitted(null));
+  }
+
+  public void testLoadCommittedOfAMissingWindowIsNull() {
+    assertNull(layoutStorage.loadCommitted(String.valueOf(Long.MAX_VALUE)));
+    assertNull(layoutStorage.loadCommitted("notAnId"));
+    assertNull(layoutStorage.loadCommitted(null));
+  }
+
+  /**
+   * @return the id of a window created with the given preferences, committed
+   */
+  private Long createWindow(WindowDAO windowDAO, Portlet preferences) {
+    WindowEntity window = new WindowEntity();
+    window.setAppType(AppType.PORTLET);
+    window.setContentId("app/portlet");
+    window.setCustomization(MOPUtils.serialize(preferences));
+    window = windowDAO.create(window);
+    restartTransaction();
+    return window.getId();
   }
 
 }

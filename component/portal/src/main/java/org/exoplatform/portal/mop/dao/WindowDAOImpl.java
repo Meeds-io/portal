@@ -20,7 +20,9 @@ package org.exoplatform.portal.mop.dao;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 
@@ -33,6 +35,50 @@ public class WindowDAOImpl extends AbstractDAO<WindowEntity> implements WindowDA
   @ExoTransactional
   public WindowEntity find(Long id) {
     return super.find(id);
+  }
+
+  @Override
+  @ExoTransactional
+  public Optional<byte[]> findCustomization(Long id) {
+    // A scalar result is read from the row: the persistence context only
+    // substitutes the entities it holds
+    List<byte[]> customizations = getEntityManager().createQuery("SELECT w.customization FROM GateInWindow w WHERE w.id = :id",
+                                                                 byte[].class)
+                                                    .setParameter("id", id)
+                                                    .getResultList();
+    if (customizations.isEmpty()) {
+      return Optional.empty();
+    }
+    byte[] customization = customizations.get(0);
+    return Optional.of(customization == null ? new byte[0] : customization);
+  }
+
+  @Override
+  @ExoTransactional
+  public boolean existsById(Long id) {
+    return !getEntityManager().createQuery("SELECT w.id FROM GateInWindow w WHERE w.id = :id", Long.class)
+                              .setParameter("id", id)
+                              .getResultList()
+                              .isEmpty();
+  }
+
+  @Override
+  @ExoTransactional
+  public int updateCustomization(Long id, byte[] customization) {
+    EntityManager entityManager = getEntityManager();
+    int updated = entityManager.createQuery("UPDATE GateInWindow w SET w.customization = :customization WHERE w.id = :id")
+                               .setParameter("customization", customization)
+                               .setParameter("id", id)
+                               .executeUpdate();
+    if (updated > 0) {
+      // The update bypasses the window the persistence context holds, which a
+      // later read of this request would otherwise put back in the cache
+      WindowEntity heldWindow = entityManager.getReference(WindowEntity.class, id);
+      if (entityManager.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(heldWindow)) {
+        entityManager.refresh(heldWindow);
+      }
+    }
+    return updated;
   }
 
   @Override
