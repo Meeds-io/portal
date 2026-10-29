@@ -122,7 +122,6 @@
           <useResourcePackagesChildren>true</useResourcePackagesChildren>
           <resourcePackages>
             <locations>org.exoplatform.portal</locations>
-            <locations>org.exoplatform.settings</locations>
           </resourcePackages>
           <swaggerConfig>
             <info>
