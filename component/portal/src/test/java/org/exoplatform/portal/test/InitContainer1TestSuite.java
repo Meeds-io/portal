@@ -65,7 +65,6 @@ import org.exoplatform.portal.rest.UserAccountConfirmationSettingsTest;
 import org.exoplatform.portal.rest.UserAccountConfirmationTest;
 import org.exoplatform.portal.rest.UserRestResourcesTest;
 import org.exoplatform.portal.tree.list.TestListTree;
-import org.exoplatform.settings.rest.SettingResourceTest;
 
 import io.meeds.portal.mop.plugin.SiteAclPluginTest;
 import io.meeds.portal.permlink.service.PermanentLinkServiceTest;
@@ -122,7 +121,6 @@ import io.meeds.portal.security.service.SecuritySettingServiceTest;
     TestJIBXXmlMapping.class,
     TestXSDCorruption.class,
     TestListTree.class,
-    SettingResourceTest.class,
     TestEncoderService.class,
     NewPortalConfigListenerTest.class,
     SiteAclPluginTest.class,
