@@ -47,6 +47,13 @@ public class UploadResource {
     // private int limitMB_ = UploadService.uploadLimitMB_;
     private int status_ = UPLOADING_STATUS;
 
+    /**
+     * The username of the request that registered this resource, null for a
+     * resource registered server side or by an anonymous request: an owner-less
+     * resource, which any caller holding its id may consume or remove
+     */
+    private String owner_;
+
     public UploadResource(String uploadId) {
         uploadId_ = uploadId;
     }
@@ -106,6 +113,14 @@ public class UploadResource {
 
     public void setStatus(int status) {
         status_ = status;
+    }
+
+    public String getOwner() {
+        return owner_;
+    }
+
+    public void setOwner(String owner) {
+        owner_ = owner;
     }
 
     // public int getLimitMB() { return limitMB_; }

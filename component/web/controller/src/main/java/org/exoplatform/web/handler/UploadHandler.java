@@ -18,6 +18,7 @@
  */
 package org.exoplatform.web.handler;
 
+import java.io.IOException;
 import java.io.Writer;
 import java.net.URLEncoder;
 
@@ -122,21 +123,25 @@ public class UploadHandler extends WebRequestHandler {
           try {
             service.createUploadResource(req);
           } catch (FileUploadException e) {
-            if (!res.isCommitted()) {
-              res.resetBuffer();
-              res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-              res.setContentType("text/plain");
-              res.setCharacterEncoding("UTF-8");
-
-              String message = StringUtils.defaultIfBlank(e.getMessage(), "Upload failed");
-              res.getWriter().write(message);
-            }
+            refuse(res, e, "Upload failed");
           }
-        } else if (uploadActionService == UploadServiceAction.DELETE) {
-            service.removeUploadResource(uploadIds[0]);
-        } else if (uploadActionService == UploadServiceAction.ABORT) {
-            service.removeUploadResource(uploadIds[0]);
+        } else if (uploadActionService == UploadServiceAction.DELETE || uploadActionService == UploadServiceAction.ABORT) {
+          try {
+            service.removeUploadResource(uploadIds[0], req);
+          } catch (FileUploadException e) {
+            refuse(res, e, "Upload removal failed");
+          }
         }
+    }
+
+    private void refuse(HttpServletResponse res, FileUploadException e, String defaultMessage) throws IOException {
+      if (!res.isCommitted()) {
+        res.resetBuffer();
+        res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        res.setContentType("text/plain");
+        res.setCharacterEncoding("UTF-8");
+        res.getWriter().write(StringUtils.defaultIfBlank(e.getMessage(), defaultMessage));
+      }
     }
 
     @Override
