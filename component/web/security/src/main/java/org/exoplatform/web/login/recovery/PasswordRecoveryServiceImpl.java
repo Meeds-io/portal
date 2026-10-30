@@ -286,8 +286,9 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   /**
    * Builds the onboarding email from its template: the administrator's
-   * message, plain text, is HTML-escaped and shown above the link, and the
-   * link's validity is written as whole days, or as whole hours under a day
+   * message, HTML its caller has sanitized, is inserted as is above the link,
+   * and the link's validity is written in days when it is a whole number of
+   * days from two up, in whole hours otherwise
    */
   protected String buildOnboardingEmailBody(User user,
                                             ResourceBundle bundle,
