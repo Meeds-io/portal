@@ -29,7 +29,7 @@ public class UploadResource {
 
     public static final int FAILED_STATUS = 2;
 
-    private String uploadId_;
+    private final String uploadId_;
 
     private String fileName_;
 
