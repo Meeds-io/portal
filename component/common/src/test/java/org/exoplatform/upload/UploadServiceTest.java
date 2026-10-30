@@ -19,6 +19,7 @@ package org.exoplatform.upload;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -106,7 +107,7 @@ public class UploadServiceTest {
 
     UploadResource second = uploadService.getUploadResource("id1");
     assertNotNull(second);
-    assertTrue(first != second);
+    assertNotSame(first, second);
     assertEquals("john", second.getOwner());
   }
 

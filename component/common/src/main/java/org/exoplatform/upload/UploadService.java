@@ -75,13 +75,13 @@ public class UploadService {
    * registration decides and writes in one atomic step, so that two requests
    * registering one id leave exactly one, and a null id is never a key
    */
-  private Map<String, UploadResource> uploadResources        = new ConcurrentHashMap<>();
+  private final Map<String, UploadResource> uploadResources  = new ConcurrentHashMap<>();
 
   private String                      uploadLocation_;
 
   private UploadLimit                 defaultUploadLimitMB_;
 
-  private Map<String, UploadLimit>    uploadLimits           = new ConcurrentHashMap<>();
+  private final Map<String, UploadLimit> uploadLimits        = new ConcurrentHashMap<>();
 
   public static final String          UPLOAD_RESOURCES_STACK = "uploadResourcesStack";
 
@@ -388,14 +388,8 @@ public class UploadService {
   }
 
   public void addUploadLimit(String uploadId, Integer limit, UploadUnit unit) {
-    if (uploadId == null) {
-      return;
-    } else if (limit == null) {
-      uploadLimits.put(uploadId, defaultUploadLimitMB_);
-    } else if (unit == null) {
-      uploadLimits.put(uploadId, new UploadLimit(limit, UploadUnit.MB));
-    } else {
-      uploadLimits.put(uploadId, new UploadLimit(limit, unit));
+    if (uploadId != null) {
+      uploadLimits.put(uploadId, limit == null ? defaultUploadLimitMB_ : new UploadLimit(limit, unit == null ? UploadUnit.MB : unit));
     }
   }
 

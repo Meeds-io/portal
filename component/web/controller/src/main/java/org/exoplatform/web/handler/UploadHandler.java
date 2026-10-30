@@ -126,6 +126,9 @@ public class UploadHandler extends WebRequestHandler {
             refuse(res, e, "Upload failed");
           }
         } else if (uploadActionService == UploadServiceAction.DELETE || uploadActionService == UploadServiceAction.ABORT) {
+          if (uploadIds == null || uploadIds.length == 0) {
+            return;
+          }
           try {
             service.removeUploadResource(uploadIds[0], req);
           } catch (FileUploadException e) {
@@ -140,7 +143,10 @@ public class UploadHandler extends WebRequestHandler {
         res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         res.setContentType("text/plain");
         res.setCharacterEncoding("UTF-8");
-        res.getWriter().write(StringUtils.defaultIfBlank(e.getMessage(), defaultMessage));
+        Writer writer = res.getWriter();
+        if (writer != null) {
+          writer.write(StringUtils.defaultIfBlank(e.getMessage(), defaultMessage));
+        }
       }
     }
 

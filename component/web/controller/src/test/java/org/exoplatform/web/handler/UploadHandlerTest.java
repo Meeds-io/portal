@@ -18,6 +18,7 @@
 package org.exoplatform.web.handler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -94,6 +95,17 @@ public class UploadHandlerTest {
 
     verify(uploadService).removeUploadResource("id1", request);
     verify(uploadService, never()).removeUploadResource(anyString());
+  }
+
+  @Test
+  public void aDeleteWithoutAnIdRemovesNothing() throws Exception {
+    when(request.getParameter("action")).thenReturn("delete");
+    when(request.getParameterValues("uploadId")).thenReturn(null);
+
+    new UploadHandler(null).execute(request, response);
+
+    verify(uploadService, never()).removeUploadResource(any(), any());
+    verify(response, never()).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 
   @Test
