@@ -18,12 +18,9 @@
  */
 package org.exoplatform.upload;
 
-import lombok.AllArgsConstructor;
-
 /**
  * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Dec 26, 2005
  */
-@AllArgsConstructor
 public class UploadResource {
 
     public static final int UPLOADING_STATUS = 0;
@@ -56,6 +53,26 @@ public class UploadResource {
 
     public UploadResource(String uploadId) {
         uploadId_ = uploadId;
+    }
+
+    /**
+     * The constructor add-ons build a server-side, owner-less resource with;
+     * the owner is set on a request-registered resource only
+     */
+    public UploadResource(String uploadId,
+                          String fileName,
+                          String mimeType,
+                          String storeLocation,
+                          double uploadedSize,
+                          double estimatedSize,
+                          int status) {
+        uploadId_ = uploadId;
+        fileName_ = fileName;
+        mimeType_ = mimeType;
+        storeLocation_ = storeLocation;
+        uploadedSize_ = uploadedSize;
+        estimatedSize_ = estimatedSize;
+        status_ = status;
     }
 
     public UploadResource(String uploadId, String fileName) {
