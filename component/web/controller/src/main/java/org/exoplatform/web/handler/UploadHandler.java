@@ -115,7 +115,7 @@ public class UploadHandler extends WebRequestHandler {
         String action = req.getParameter("action");
         String[] uploadIds = req.getParameterValues("uploadId");
 
-        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Cache-Control", "private, no-store");
 
         UploadService service = ExoContainerContext.getService(UploadService.class);
         if (action == null || action.length() < 1)
@@ -159,20 +159,17 @@ public class UploadHandler extends WebRequestHandler {
           try {
             service.createUploadResource(req);
           } catch (FileUploadException e) {
-            if (!res.isCommitted()) {
-              res.resetBuffer();
-              res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-              res.setContentType("text/plain");
-              res.setCharacterEncoding("UTF-8");
-
-              String message = StringUtils.defaultIfBlank(e.getMessage(), "Upload failed");
-              res.getWriter().write(message);
-            }
+            refuse(res, e, "Upload failed");
           }
-        } else if (uploadActionService == UploadServiceAction.DELETE) {
-            service.removeUploadResource(uploadIds[0]);
-        } else if (uploadActionService == UploadServiceAction.ABORT) {
-            service.removeUploadResource(uploadIds[0]);
+        } else if (uploadActionService == UploadServiceAction.DELETE || uploadActionService == UploadServiceAction.ABORT) {
+          if (uploadIds == null || uploadIds.length == 0) {
+            return;
+          }
+          try {
+            service.removeUploadResource(uploadIds[0], req);
+          } catch (FileUploadException e) {
+            refuse(res, e, "Upload removal failed");
+          }
         }
     }
 
@@ -317,6 +314,19 @@ public class UploadHandler extends WebRequestHandler {
         }
         String token = authorization.substring(BEARER_PREFIX.length()).trim();
         return token.isEmpty() ? null : token;
+    }
+
+    private void refuse(HttpServletResponse res, FileUploadException e, String defaultMessage) throws IOException {
+      if (!res.isCommitted()) {
+        res.resetBuffer();
+        res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        res.setContentType("text/plain");
+        res.setCharacterEncoding("UTF-8");
+        Writer writer = res.getWriter();
+        if (writer != null) {
+          writer.write(StringUtils.defaultIfBlank(e.getMessage(), defaultMessage));
+        }
+      }
     }
 
     @Override

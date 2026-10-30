@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import org.apache.commons.fileupload2.core.DiskFileItem;
@@ -222,14 +223,18 @@ public class UploadService {
   }
 
   /**
-   * Registers the file of a multipart request under the given upload id, owned
-   * by the request's authenticated user ({@link HttpServletRequest#getRemoteUser()},
-   * null for an anonymous request).
+   * Registers the upload the request carries under the given id and reads its
+   * content. An id registered by an authenticated request belongs to the user
+   * who registered it, request.getRemoteUser(): the same user may register it
+   * again from any session (a retry of a failed upload), another user is
+   * refused, and so is any request on an id that is registered without an
+   * owner (a server-side registration, or an anonymous request's). The
+   * decision and the registration are one atomic step of the registry.
    *
-   * @param uploadId upload id
-   * @param request the request carrying one multipart file
-   * @throws FileUploadException when the id is invalid, the request carries
-   *           other than one file, or a validator refuses the file
+   * @param uploadId the client-chosen upload id
+   * @param request the upload request
+   * @throws FileUploadException when the id is malformed, is held by another
+   *           user or is a registered owner-less id
    */
   public void createUploadResource(String uploadId, HttpServletRequest request) throws FileUploadException {
     createUploadResource(uploadId, request, request.getRemoteUser());
@@ -354,8 +359,8 @@ public class UploadService {
 
   /**
    * Registers the file of a multipart request under the given upload id, owned
-   * by the given user, replacing any resource already registered under it, and
-   * ties it to the request's HTTP session for cleanup.
+   * by the given user, through {@link #register(UploadResource)}, and ties it
+   * to the request's HTTP session for cleanup.
    *
    * @param uploadId upload id
    * @param request the request carrying one multipart file
@@ -365,7 +370,7 @@ public class UploadService {
    */
   private void createUploadResource(String uploadId, HttpServletRequest request, String owner) throws FileUploadException {
     UploadResource upResource = newUploadResource(uploadId, owner);
-    uploadResources.put(upResource.getUploadId(), upResource);
+    register(upResource);
     receiveUpload(upResource, request);
   }
 
@@ -542,6 +547,20 @@ public class UploadService {
     }
   }
 
+  private void register(UploadResource upResource) throws FileUploadException {
+    AtomicBoolean refused = new AtomicBoolean();
+    uploadResources.compute(upResource.getUploadId(), (id, registered) -> {
+      if (registered != null && (registered.getOwner() == null || !registered.getOwner().equals(upResource.getOwner()))) {
+        refused.set(true);
+        return registered;
+      }
+      return upResource;
+    });
+    if (refused.get()) {
+      throw new FileUploadException("Upload id " + upResource.getUploadId() + " is already registered");
+    }
+  }
+
   /**
    * Deletes the temporary file of a removed resource, or schedules its deletion
    * at JVM exit when it cannot be deleted now.
@@ -549,7 +568,7 @@ public class UploadService {
    * @param upResource the removed resource
    */
   private void deleteStoredFile(UploadResource upResource) {
-    if (upResource.getStoreLocation() != null) {
+    if (upResource != null && upResource.getStoreLocation() != null) {
       File file = new File(upResource.getStoreLocation());
       if (!file.delete()) {
         file.deleteOnExit();
@@ -613,7 +632,7 @@ public class UploadService {
    * @return org.exoplatform.upload.UploadResource of uploadId
    */
   public UploadResource getUploadResource(String uploadId) {
-    return uploadResources.get(uploadId);
+    return uploadId == null ? null : uploadResources.get(uploadId);
   }
 
   /**
@@ -698,10 +717,37 @@ public class UploadService {
   public void removeUploadResource(String uploadId) {
     if (uploadId == null)
       return;
-    UploadResource upResource = uploadResources.remove(uploadId);
-    if (upResource != null) {
-      deleteStoredFile(upResource);
+    deleteStoredFile(uploadResources.remove(uploadId));
+  }
+
+  /**
+   * Removes the resource as the request's user: an id held by another user is
+   * refused, an id the user holds or an owner-less id is removed, with its
+   * temporary file. The decision and the removal are one atomic step of the
+   * registry.
+   *
+   * @param uploadId the upload id, null for nothing to remove
+   * @param request the delete or abort request
+   * @throws FileUploadException when the id is held by another user
+   */
+  public void removeUploadResource(String uploadId, HttpServletRequest request) throws FileUploadException {
+    if (uploadId == null)
+      return;
+    String username = request.getRemoteUser();
+    AtomicBoolean refused = new AtomicBoolean();
+    UploadResource[] removed = new UploadResource[1];
+    uploadResources.computeIfPresent(uploadId, (id, registered) -> {
+      if (registered.getOwner() != null && !registered.getOwner().equals(username)) {
+        refused.set(true);
+        return registered;
+      }
+      removed[0] = registered;
+      return null;
+    });
+    if (refused.get()) {
+      throw new FileUploadException("Upload id " + uploadId + " is held by another user");
     }
+    deleteStoredFile(removed[0]);
   }
 
   /**
@@ -734,17 +780,15 @@ public class UploadService {
   }
 
   public void addUploadLimit(String uploadId, Integer limit, UploadUnit unit) {
-    if (limit == null) {
-      uploadLimits.put(uploadId, defaultUploadLimitMB_);
-    } else if (unit == null) {
-      uploadLimits.put(uploadId, new UploadLimit(limit, UploadUnit.MB));
-    } else {
-      uploadLimits.put(uploadId, new UploadLimit(limit, unit));
+    if (uploadId != null) {
+      uploadLimits.put(uploadId, limit == null ? defaultUploadLimitMB_ : new UploadLimit(limit, unit == null ? UploadUnit.MB : unit));
     }
   }
 
   public void removeUploadLimit(String uploadId) {
-    uploadLimits.remove(uploadId);
+    if (uploadId != null) {
+      uploadLimits.remove(uploadId);
+    }
   }
 
   /**
@@ -864,7 +908,7 @@ public class UploadService {
     }
   }
 
-  private List<UploadFileValidator> getUploadFileValidators() {
+  List<UploadFileValidator> getUploadFileValidators() {
     if (uploadFileValidators == null) {
       List<UploadFileValidator> services = ExoContainerContext.getCurrentContainer()
                                                               .getComponentInstancesOfType(UploadFileValidator.class);
