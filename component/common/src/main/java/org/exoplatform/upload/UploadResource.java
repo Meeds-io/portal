@@ -18,12 +18,9 @@
  */
 package org.exoplatform.upload;
 
-import lombok.AllArgsConstructor;
-
 /**
  * Created by The eXo Platform SARL Author : Tuan Nguyen tuan08@users.sourceforge.net Dec 26, 2005
  */
-@AllArgsConstructor
 public class UploadResource {
 
     public static final int UPLOADING_STATUS = 0;
@@ -32,7 +29,7 @@ public class UploadResource {
 
     public static final int FAILED_STATUS = 2;
 
-    private String uploadId_;
+    private final String uploadId_;
 
     private String fileName_;
 
@@ -47,8 +44,35 @@ public class UploadResource {
     // private int limitMB_ = UploadService.uploadLimitMB_;
     private int status_ = UPLOADING_STATUS;
 
+    /**
+     * The username of the request that registered this resource, null for a
+     * resource registered server side or by an anonymous request: an owner-less
+     * resource, which any caller holding its id may consume or remove
+     */
+    private String owner_;
+
     public UploadResource(String uploadId) {
         uploadId_ = uploadId;
+    }
+
+    /**
+     * The constructor add-ons build a server-side, owner-less resource with;
+     * the owner is set on a request-registered resource only
+     */
+    public UploadResource(String uploadId,
+                          String fileName,
+                          String mimeType,
+                          String storeLocation,
+                          double uploadedSize,
+                          double estimatedSize,
+                          int status) {
+        uploadId_ = uploadId;
+        fileName_ = fileName;
+        mimeType_ = mimeType;
+        storeLocation_ = storeLocation;
+        uploadedSize_ = uploadedSize;
+        estimatedSize_ = estimatedSize;
+        status_ = status;
     }
 
     public UploadResource(String uploadId, String fileName) {
@@ -106,6 +130,14 @@ public class UploadResource {
 
     public void setStatus(int status) {
         status_ = status;
+    }
+
+    public String getOwner() {
+        return owner_;
+    }
+
+    public void setOwner(String owner) {
+        owner_ = owner;
     }
 
     // public int getLimitMB() { return limitMB_; }
