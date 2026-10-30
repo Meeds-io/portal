@@ -83,6 +83,7 @@ public class UploadHandlerTest {
     verify(uploadService).removeUploadResource("id1", request);
     verify(uploadService, never()).removeUploadResource(anyString());
     verify(response, never()).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(response).setHeader("Cache-Control", "private, no-store");
   }
 
   @Test
@@ -104,6 +105,7 @@ public class UploadHandlerTest {
     new UploadHandler(null).execute(request, response);
 
     verify(response).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(response).setHeader("Cache-Control", "private, no-store");
     body.flush();
     assertEquals("Upload id id1 is held by another user", body.toString());
   }

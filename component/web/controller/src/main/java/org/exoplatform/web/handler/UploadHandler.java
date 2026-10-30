@@ -79,7 +79,7 @@ public class UploadHandler extends WebRequestHandler {
         String action = req.getParameter("action");
         String[] uploadIds = req.getParameterValues("uploadId");
 
-        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Cache-Control", "private, no-store");
 
         UploadService service = ExoContainerContext.getService(UploadService.class);
         if (action == null || action.length() < 1)
