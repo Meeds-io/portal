@@ -141,6 +141,13 @@ class PortableSequenceGeneratorTest {
     assertInstanceOf(NoopOptimizer.class, optimizer(open(StepSequenceEntity.class), StepSequenceEntity.class));
   }
 
+  @Test
+  void theKernelTestUnitStartsAnUpgradedDatabaseAsThePlatformDoes() {
+    String setting = "hibernate.id.sequence.increment_size_mismatch_strategy";
+    assertEquals("FIX", platformSettings("meeds-jpa").get(setting));
+    assertEquals("FIX", platformSettings("meeds-jpa-test").get(setting));
+  }
+
   /**
    * Builds a session factory for one entity on the test database, with the
    * Hibernate settings of the platform's persistence unit.
@@ -151,7 +158,7 @@ class PortableSequenceGeneratorTest {
                                                                                                "sa")
                                                                                  .applySetting("hibernate.connection.password",
                                                                                                "");
-    platformSettings().forEach(builder::applySetting);
+    platformSettings("meeds-jpa").forEach(builder::applySetting);
     StandardServiceRegistry registry = builder.build();
     try {
       SessionFactory factory = new MetadataSources(registry).addAnnotatedClass(entityClass)
@@ -166,10 +173,10 @@ class PortableSequenceGeneratorTest {
   }
 
   /**
-   * Reads the {@code hibernate.*} properties of the platform's
-   * {@code meeds-jpa} persistence unit, but its entity scanner.
+   * Reads the {@code hibernate.*} properties of a persistence unit on the
+   * classpath, but its entity scanner.
    */
-  private Map<String, String> platformSettings() {
+  private Map<String, String> platformSettings(String unitName) {
     try {
       Enumeration<URL> resources = getClass().getClassLoader().getResources("META-INF/persistence.xml");
       while (resources.hasMoreElements()) {
@@ -178,7 +185,7 @@ class PortableSequenceGeneratorTest {
           NodeList units = document.getElementsByTagName("persistence-unit");
           for (int i = 0; i < units.getLength(); i++) {
             Element unit = (Element) units.item(i);
-            if ("meeds-jpa".equals(unit.getAttribute("name"))) {
+            if (unitName.equals(unit.getAttribute("name"))) {
               Map<String, String> settings = new LinkedHashMap<>();
               NodeList properties = unit.getElementsByTagName("property");
               for (int j = 0; j < properties.getLength(); j++) {
@@ -196,7 +203,7 @@ class PortableSequenceGeneratorTest {
     } catch (Exception e) {
       throw new IllegalStateException("Cannot read the platform's persistence unit", e);
     }
-    throw new IllegalStateException("No meeds-jpa persistence unit on the classpath");
+    throw new IllegalStateException("No " + unitName + " persistence unit on the classpath");
   }
 
   /** Persists {@code count} new entities, one transaction each, and returns their ids in order. */
