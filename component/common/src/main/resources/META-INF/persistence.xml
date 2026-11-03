@@ -34,6 +34,10 @@
       <property name="hibernate.current_session_context_class" value="thread"/>
       <property name="hibernate.cache.use_second_level_cache" value="false"/>
       <property name="hibernate.cache.use_query_cache" value="false"/>
+      <!-- The factory is built before the add-ons' changelogs run: a sequence whose increment an upgrade raises
+           is still at its old step on that first boot. FIX uses the database's increment instead of failing
+           the startup (see PortableSequenceGenerator#configure). -->
+      <property name="hibernate.id.sequence.increment_size_mismatch_strategy" value="FIX"/>
     </properties>
   </persistence-unit>
 </persistence>
