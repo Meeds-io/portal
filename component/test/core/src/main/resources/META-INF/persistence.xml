@@ -34,6 +34,9 @@
       <property name="hibernate.current_session_context_class" value="thread"/>
       <property name="hibernate.cache.use_second_level_cache" value="false"/>
       <property name="hibernate.cache.use_query_cache" value="false"/>
+      <!-- As the platform's meeds-jpa unit: an upgraded database's sequence may still be at its old step when the
+           factory is built (see PortableSequenceGenerator#configure). -->
+      <property name="hibernate.id.sequence.increment_size_mismatch_strategy" value="FIX"/>
     </properties>
   </persistence-unit>
 </persistence>
