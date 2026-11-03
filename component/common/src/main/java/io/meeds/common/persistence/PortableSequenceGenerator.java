@@ -48,6 +48,9 @@ public class PortableSequenceGenerator
 
   private static final long            serialVersionUID = 2177731333709865647L;
 
+  /** The optimizer used for a sequence whose increment is greater than 1. */
+  public static final String           POOLED_LO_OPTIMIZER = "pooled-lo";
+
   private final boolean                identity;
 
   private final IdentityGenerator      identityGenerator;
@@ -77,6 +80,31 @@ public class PortableSequenceGenerator
     this.sequenceGenerator = identity ? null : new SequenceStyleGenerator();
   }
 
+  /**
+   * Configures the sequence generator from the annotation. When
+   * {@link PortableSequence#incrementBy()} is greater than 1, the
+   * {@value #POOLED_LO_OPTIMIZER} optimizer is used: each {@code nextval} is
+   * the lowest id of a block of {@code incrementBy} ids. Hibernate's default,
+   * {@code pooled}, takes {@code nextval} as the highest id of the block, which
+   * overlaps ids already issued on an engine whose sequence returns its stored
+   * next value right after an {@code ALTER SEQUENCE ... INCREMENT BY} (HSQLDB).
+   * <p>
+   * Upgrade safety, together with
+   * {@code hibernate.id.sequence.increment_size_mismatch_strategy=FIX} in
+   * {@code META-INF/persistence.xml}: the platform's EntityManagerFactory is
+   * built before an add-on's changelog alters its sequence, so on the first
+   * boot after an upgrade the database still reports step 1, and FIX makes
+   * Hibernate issue one id per {@code nextval}. Once the sequence is altered,
+   * every {@code nextval} is a fresh value spaced by {@code incrementBy}, so
+   * a block that starts at one never contains another: there is no overlap
+   * between those two modes, including a cluster where nodes run both at
+   * once.
+   *
+   * @param context the generator creation context
+   * @param parameters the parameters Hibernate passes to the generator
+   * @throws MappingException when the sequence generator rejects the
+   *           configuration
+   */
   @Override
   public void configure(GeneratorCreationContext context, Properties parameters) throws MappingException {
     if (identity) {
@@ -88,6 +116,9 @@ public class PortableSequenceGenerator
     sequenceParams.put(SequenceStyleGenerator.SEQUENCE_PARAM, sequenceName);
     sequenceParams.put(SequenceStyleGenerator.INITIAL_PARAM, String.valueOf(startWith)); // NOSONAR
     sequenceParams.put(SequenceStyleGenerator.INCREMENT_PARAM, String.valueOf(incrementBy));// NOSONAR
+    if (incrementBy > 1) {
+      sequenceParams.putIfAbsent(SequenceStyleGenerator.OPT_PARAM, POOLED_LO_OPTIMIZER);
+    }
     sequenceGenerator.configure(context, sequenceParams);
   }
 
