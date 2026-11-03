@@ -36,6 +36,7 @@ import org.hibernate.generator.GeneratorCreationContext;
 import org.hibernate.generator.OnExecutionGenerator;
 import org.hibernate.id.Configurable;
 import org.hibernate.id.IdentityGenerator;
+import org.hibernate.id.OptimizableGenerator;
 import org.hibernate.id.PersistentIdentifierGenerator;
 import org.hibernate.id.enhanced.Optimizer;
 import org.hibernate.id.enhanced.SequenceStyleGenerator;
@@ -117,7 +118,7 @@ public class PortableSequenceGenerator
     sequenceParams.put(SequenceStyleGenerator.INITIAL_PARAM, String.valueOf(startWith)); // NOSONAR
     sequenceParams.put(SequenceStyleGenerator.INCREMENT_PARAM, String.valueOf(incrementBy));// NOSONAR
     if (incrementBy > 1) {
-      sequenceParams.putIfAbsent(SequenceStyleGenerator.OPT_PARAM, POOLED_LO_OPTIMIZER);
+      sequenceParams.putIfAbsent(OptimizableGenerator.OPT_PARAM, POOLED_LO_OPTIMIZER);
     }
     sequenceGenerator.configure(context, sequenceParams);
   }
