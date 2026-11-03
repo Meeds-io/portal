@@ -36,5 +36,16 @@ public @interface PortableSequence {
 
   int startWith() default 1;
 
+  /**
+   * The number of ids Hibernate takes from one {@code nextval}, on the engines
+   * that use a sequence (MySQL and MariaDB use an identity column and ignore
+   * it). Above 1, ids are issued in blocks (see
+   * {@link PortableSequenceGenerator#configure}). The add-on that owns the
+   * sequence sets the same increment on the database sequence in a new
+   * changeset: the first boot after the upgrade still works at step 1, and
+   * blocks start from the next boot.
+   *
+   * @return the sequence increment, 1 by default
+   */
   int incrementBy() default 1;
 }
