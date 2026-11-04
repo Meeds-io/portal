@@ -244,6 +244,38 @@
        right: -10000px !important;
        left: auto !important;
      }
+     #skipToContent:not(:focus) {
+       position: absolute !important;
+       width: 1px !important;
+       height: 1px !important;
+       margin: -1px !important;
+       padding: 0 !important;
+       border: 0 !important;
+       overflow: hidden !important;
+       clip: rect(0, 0, 0, 0) !important;
+       white-space: nowrap !important;
+     }
+     #skipToContent:focus {
+       position: fixed;
+       top: 8px;
+       left: 8px;
+       z-index: 100000;
+       padding: 8px 16px;
+       background: #fff;
+       color: #000;
+       border-radius: 4px;
+       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+       outline: 2px solid #000;
+       outline-offset: 2px;
+       text-decoration: underline;
+     }
+     html[dir="rtl"] #skipToContent:focus {
+       right: 8px;
+       left: auto;
+     }
+     .skipToContentTarget:focus, #skipToContentStart:focus {
+       outline: none;
+     }
    </style>
    <%/* The android browser on 2.3.x doesn't properly handle rtl so we need to handle this special situation.
         This old browser it expects right to be positive instead of negative in order to hide the content instead of displaying it.
@@ -261,6 +293,53 @@
          stylesheet.insertRule("html[dir='rtl'] .skipHidden { right: 10000px !important;}", stylesheet.cssRules.length);
        }
      }
+     function focusMainContent(event) {
+       var siteBody = document.getElementById('UISiteBody');
+       var target = (siteBody && siteBody.querySelector('[role="main"]')) || siteBody;
+       if (!target) {
+         return;
+       }
+       event.preventDefault();
+       if (!target.hasAttribute('tabindex')) {
+         target.setAttribute('tabindex', '-1');
+         target.classList.add('skipToContentTarget');
+       }
+       target.focus({ preventScroll: true });
+       target.scrollIntoView({ block: 'start' });
+     }
+     <%/* A page change without reload (pushState or back/forward to another path) leaves the focus where it was,
+          so it is moved back to the top of the page: the next Tab then reaches the skip link, as after a full load.
+          A change of the query string or the hash alone (filters, drawers, URL cleanup) is not a page change,
+          and the focus is never taken from a field being edited. */%>
+     (function() {
+       if (!window.history || !window.history.pushState) {
+         return;
+       }
+       var currentPath = window.location.pathname;
+       function focusPageStart(previousPath) {
+         var newPath = window.location.pathname;
+         currentPath = newPath;
+         if (newPath === previousPath) {
+           return;
+         }
+         var pageStart = document.getElementById('skipToContentStart');
+         var activeElement = document.activeElement;
+         if (!pageStart || (activeElement && (activeElement.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(activeElement.tagName) >= 0))) {
+           return;
+         }
+         pageStart.focus({ preventScroll: true });
+       }
+       var pushState = window.history.pushState;
+       window.history.pushState = function() {
+         var previousPath = window.location.pathname;
+         var result = pushState.apply(this, arguments);
+         focusPageStart(previousPath);
+         return result;
+       };
+       window.addEventListener('popstate', function() {
+         focusPageStart(currentPath);
+       });
+     })();
    </script>
    <%/* 508 Compliancy */
    /* Include extensible templates configured by Kernel configuration to be imported in Page Header */
@@ -268,7 +347,11 @@
        _ctx.includeTemplates("UIPortalApplication-head");
    }%>
  </head>
- <body style="height: 100%;$bodyStyle" class="$bodyClasses" onload="eXo.env.portal.onLoad()">
+ <body style="height: 100%;$bodyStyle" class="$bodyClasses" onload="eXo.env.portal.onLoad()"><%
+   if (!rcontext.isMaximizePortlet()) {%>
+   <span id="skipToContentStart" tabindex="-1"></span>
+   <a id="skipToContent" href="#UISiteBody" onclick="focusMainContent(event)"><%=_ctx.appRes("UIPortalApplication.msg.skipContent")%></a><%
+   }%>
    <div class="visible-tablet"></div>
    <div class="visible-tabletL"></div>
    <div class="visible-phone"></div>
