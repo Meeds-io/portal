@@ -25,11 +25,10 @@ import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.web.security.security.TokenExistsException;
 
+import io.meeds.common.TransactionCallbacks;
 import io.meeds.web.security.dao.TokenDAO;
 import io.meeds.web.security.model.TokenData;
 import io.meeds.web.security.storage.PortalTokenStorage;
-
-import lombok.SneakyThrows;
 
 public class CachedPortalTokenStorage extends PortalTokenStorage {
 
@@ -37,14 +36,15 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
 
   public static final TokenData                     NULL_TOKEN = new TokenData();
 
-  private ExoCache<String, TokenData>               cache;
+  private TokenDAO                                  tokenDAO;
 
   private FutureExoCache<String, TokenData, Object> futureCache;
 
   public CachedPortalTokenStorage(CacheService cacheService,
                                   TokenDAO tokenDAO) {
     super(tokenDAO);
-    cache = cacheService.getCacheInstance(CACHE_NAME);
+    this.tokenDAO = tokenDAO;
+    ExoCache<String, TokenData> cache = cacheService.getCacheInstance(CACHE_NAME);
     Loader<String, TokenData, Object> loader = new Loader<>() {
       @Override
       public TokenData retrieve(Object context, String tokenId) throws Exception {
@@ -69,10 +69,11 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   @Override
   @ExoTransactional
   public void deleteTokensByUsernameAndType(String username, String tokenType) {
-    try {
-      super.deleteTokensByUsernameAndType(username, tokenType);
-    } finally {
-      clearByUser(username);
+    // The tokens deleted may be cached on any node, under ids this node does
+    // not hold: a delete clears the cache of every node, and a login, which
+    // deletes the user's forgot-password tokens, mostly none, clears nothing
+    if (tokenDAO.deleteTokensByUsernameAndType(username, tokenType) > 0) {
+      clearAll();
     }
   }
 
@@ -96,7 +97,7 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
     try {
       super.deleteTokenOfUser(username);
     } finally {
-      clearByUser(username);
+      clearAll();
     }
   }
 
@@ -111,25 +112,32 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   }
 
   @Override
+  @ExoTransactional
   public void cleanExpired() {
-    try {
-      super.cleanExpired();
-    } finally {
+    if (tokenDAO.cleanExpired() > 0) {
       clearAll();
     }
   }
 
-  @SneakyThrows
-  private void clearByUser(String username) {
-    cache.select(new PortalTokenCacheSelector(username));
-  }
-
   private void clearKey(String key) {
-    futureCache.remove(key);
+    evict(() -> {
+      futureCache.removeFuture(key);
+      futureCache.remove(key);
+    });
   }
 
   private void clearAll() {
-    futureCache.clear();
+    evict(() -> {
+      futureCache.clearFutures();
+      futureCache.clear();
+    });
+  }
+
+  private void evict(Runnable eviction) {
+    eviction.run();
+    // Inside a transaction, a read made before the commit caches the deleted
+    // token again: the eviction runs again once the transaction completes
+    TransactionCallbacks.afterCompletion(eviction);
   }
 
 }
