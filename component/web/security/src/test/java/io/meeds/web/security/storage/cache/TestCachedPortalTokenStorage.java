@@ -46,7 +46,12 @@ import jakarta.persistence.EntityTransaction;
     @ConfigurationUnit(scope = ContainerScope.PORTAL, path = "conf/exo.portal.component.identity-configuration-local.xml") })
 public class TestCachedPortalTokenStorage extends AbstractKernelTest {
 
-  private static final String         TOKEN_TYPE = "cache-test";
+  private static final String         TOKEN_TYPE  = "cache-test";
+
+  /**
+   * A user whose all tokens a test deletes, which no other test creates
+   */
+  private static final String         TOKEN_OWNER = "cache-test-owner";
 
   private PortalTokenStorage          storage;
 
@@ -69,6 +74,7 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
     // rows: nothing is left behind
     storage.deleteTokensByUsernameAndType("jdoe", TOKEN_TYPE);
     storage.deleteTokensByUsernameAndType("mary", TOKEN_TYPE);
+    storage.deleteTokensByUsernameAndType(TOKEN_OWNER, TOKEN_TYPE);
     RequestLifeCycle.end();
   }
 
@@ -88,6 +94,16 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
 
     storage.deleteTokensByUsernameAndType("jdoe", TOKEN_TYPE);
 
+    assertNotNull(cache.get("mary-token"));
+  }
+
+  public void testDeleteOfAllTheTokensOfAUserEvictsThemOnly() throws Exception {
+    createToken("owner-token", TOKEN_OWNER);
+    createToken("mary-token", "mary");
+
+    storage.deleteTokenOfUser(TOKEN_OWNER);
+
+    assertNull(storage.getToken("owner-token"));
     assertNotNull(cache.get("mary-token"));
   }
 

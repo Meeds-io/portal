@@ -93,12 +93,11 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   }
 
   @Override
+  @ExoTransactional
   public void deleteTokenOfUser(String username) {
-    try {
-      super.deleteTokenOfUser(username);
-    } finally {
-      clearAll();
-    }
+    // Only the tokens deleted go, from every node: a user who has none
+    // evicts nothing
+    deleteTokens(username).forEach(token -> clearKey(token.getTokenId()));
   }
 
   @Override

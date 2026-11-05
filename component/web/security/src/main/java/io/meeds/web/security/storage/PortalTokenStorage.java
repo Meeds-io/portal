@@ -73,10 +73,20 @@ public class PortalTokenStorage {
 
   @ExoTransactional
   public void deleteTokenOfUser(String user) {
+    deleteTokens(user);
+  }
+
+  /**
+   * @param  user the name of the user
+   * @return      the tokens of the user, deleted
+   */
+  protected List<TokenEntity> deleteTokens(String user) {
     List<TokenEntity> entities = this.tokenDAO.findByUsername(user);
-    if (entities != null && !entities.isEmpty()) {
-      this.tokenDAO.deleteAll(entities);
+    if (entities == null || entities.isEmpty()) {
+      return List.of();
     }
+    this.tokenDAO.deleteAll(entities);
+    return entities;
   }
 
   @ExoTransactional
