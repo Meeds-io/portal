@@ -133,9 +133,10 @@ public class KernelCacheManagerAdapter implements CacheManager {
 
         @Override
         public void put(Object key, Object value) {
-          // Spring puts what a method loaded, on a miss or for a @CachePut:
-          // the other nodes of a cluster load it themselves. Only the
-          // evictions and clears below reach them.
+          // Spring puts what a method loaded on a miss: the other nodes of a
+          // cluster load it themselves. A @CachePut would leave their former
+          // value in place, so a cache shared by the nodes is evicted instead:
+          // only the evictions and clears below reach them.
           cacheInstance.putLocal(getSerializableKey(key), value);
         }
 
