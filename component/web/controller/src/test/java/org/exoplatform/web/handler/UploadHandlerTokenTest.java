@@ -19,7 +19,6 @@
 package org.exoplatform.web.handler;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -343,7 +342,7 @@ public class UploadHandlerTokenTest {
       @Override
       public int read() throws IOException {
         if (served[0] >= dropAt) {
-          throw new IOException("Connection reset by peer");
+          throw new java.net.SocketException("Connection reset by peer");
         }
         served[0]++;
         return body.read();
@@ -353,7 +352,7 @@ public class UploadHandlerTokenTest {
       @Override
       public int read(byte[] b, int off, int len) throws IOException {
         if (served[0] >= dropAt) {
-          throw new IOException("Connection reset by peer");
+          throw new java.net.SocketException("Connection reset by peer");
         }
         int read = body.read(b, off, Math.min(len, dropAt - served[0]));
         served[0] += Math.max(read, 0);
@@ -387,13 +386,29 @@ public class UploadHandlerTokenTest {
   }
 
   /**
-   * The staging folder check that decides a server error: a missing folder, a
-   * file in its place and a size beyond the usable space are refused, a
-   * writable folder with room is accepted.
+   * A validator refusal whose cause is an I/O failure (a {@code .svgz} that is
+   * not gzip) is the request's: 400 with the validator's text, not the server
+   * error the same cause gives a staging failure.
    */
   @Test
-  public void testCanStageUploadReadsTheStagingFolder() throws Exception {
-    java.io.File root = java.nio.file.Files.createTempDirectory("exo-upload-stage-check").toFile();
+  public void testValidatorRefusalWithAnIoCauseIsRequestError() throws Exception {
+    String uploadId = UUID.randomUUID().toString();
+    String token = uploadService.createUploadToken("john", uploadId, 100);
+
+    handler.execute(request("upload", uploadId, "Bearer " + token, null, "x.svgz", "not gzip"), response);
+
+    assertEquals(HttpServletResponse.SC_BAD_REQUEST, status[0]);
+    assertEquals("Unable to validate SVG file", responseBody.toString());
+    assertNull(uploadService.getUploadResource(uploadId));
+  }
+
+  /**
+   * The stored file cannot be read for validation (it is gone when the
+   * validator's stream is opened): a server failure, 500 "Upload failed".
+   */
+  @Test
+  public void testValidationReadFailureIsServerError() throws Exception {
+    java.io.File root = java.nio.file.Files.createTempDirectory("exo-upload-validation-read").toFile();
     java.io.File staging = new java.io.File(root, "portal/eXoUpload");
     InitParams params = new InitParams();
     ValueParam location = new ValueParam();
@@ -403,22 +418,45 @@ public class UploadHandlerTokenTest {
     PortalContainerInfo containerInfo = mock(PortalContainerInfo.class);
     when(containerInfo.getContainerName()).thenReturn("portal");
     UploadService service = new UploadService(containerInfo, params);
+    String uploadId = UUID.randomUUID().toString();
+    UploadFileValidator removesTheStoredFile = new UploadFileValidator() {
+      /** {@inheritDoc} */
+      @Override
+      public boolean supports(String fileName, String mimeType) {
+        new java.io.File(staging, uploadId).delete();
+        return true;
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public void validate(String fileName, String mimeType, java.io.InputStream inputStream) {
+        // never reached: the stored file is gone before its stream is opened
+      }
+    };
+    ExoContainer validatingContainer = mock(ExoContainer.class);
+    when(validatingContainer.getComponentInstancesOfType(UploadFileValidator.class)).thenReturn(List.of(removesTheStoredFile));
+    containerContext.when(ExoContainerContext::getCurrentContainer).thenReturn(validatingContainer);
+    containerContext.when(() -> ExoContainerContext.getService(UploadService.class)).thenReturn(service);
+    String token = service.createUploadToken("john", uploadId, 100);
     try {
-      assertFalse(service.canStageUpload(10));
-      assertTrue(staging.getParentFile().mkdirs());
-      assertTrue(staging.createNewFile());
-      assertFalse(service.canStageUpload(10));
-      assertTrue(staging.delete());
-      assertTrue(staging.mkdir());
-      assertTrue(service.canStageUpload(10));
-      assertTrue(service.canStageUpload(-1));
-      assertFalse(service.canStageUpload(Long.MAX_VALUE));
+      handler.execute(request("upload", uploadId, "Bearer " + token, null, "a.txt", "hello"), response);
+
+      assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, status[0]);
+      assertEquals("Upload failed", responseBody.toString());
+      assertNull(service.getUploadResource(uploadId));
     } finally {
+      java.io.File[] left = staging.listFiles();
+      if (left != null) {
+        for (java.io.File file : left) {
+          file.delete();
+        }
+      }
       staging.delete();
       staging.getParentFile().delete();
       root.delete();
     }
   }
+
 
   /**
    * Without a token and without a user, an upload is still refused with 403.
