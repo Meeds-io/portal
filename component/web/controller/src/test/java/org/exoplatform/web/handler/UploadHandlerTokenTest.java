@@ -287,6 +287,42 @@ public class UploadHandlerTokenTest {
   }
 
   /**
+   * A staging folder that fails while the multipart parser copies the file
+   * into it answers 500 "Upload failed", without the parser's message, and
+   * registers nothing. A regular file stands where the staging folder is,
+   * after the service is built, so the parser's first write into it fails.
+   */
+  @Test
+  public void testStagingFailureDuringParseIsServerError() throws Exception {
+    java.io.File root = java.nio.file.Files.createTempDirectory("exo-upload-staging").toFile();
+    java.io.File staging = new java.io.File(root, "portal/eXoUpload");
+    InitParams params = new InitParams();
+    ValueParam location = new ValueParam();
+    location.setName("upload.location");
+    location.setValue(root.getPath());
+    params.addParameter(location);
+    PortalContainerInfo containerInfo = mock(PortalContainerInfo.class);
+    when(containerInfo.getContainerName()).thenReturn("portal");
+    UploadService failingService = new UploadService(containerInfo, params);
+    containerContext.when(() -> ExoContainerContext.getService(UploadService.class)).thenReturn(failingService);
+    assertTrue(staging.getParentFile().mkdirs());
+    assertTrue(staging.createNewFile());
+    String uploadId = UUID.randomUUID().toString();
+    String token = failingService.createUploadToken("john", uploadId, 100);
+    try {
+      handler.execute(request("upload", uploadId, "Bearer " + token, null, "a.txt", "hello"), response);
+
+      assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, status[0]);
+      assertEquals("Upload failed", responseBody.toString());
+      assertNull(failingService.getUploadResource(uploadId));
+    } finally {
+      staging.delete();
+      staging.getParentFile().delete();
+      root.delete();
+    }
+  }
+
+  /**
    * Without a token and without a user, an upload is still refused with 403.
    */
   @Test
