@@ -530,12 +530,12 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
                                            .toList();
         int inactiveUsersSize = inactiveUsers.size();
         for (String userName : inactiveUsers) {
-          if ((gracePeriodDays <= 0 || !isReactivatedSince(userName, reactivatedSinceTime))
-              && CollectionUtils.isEmpty(orgService.getMembershipHandler()
-                                                   .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
+          if (CollectionUtils.isEmpty(orgService.getMembershipHandler()
+                                                .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
               && (StringUtils.isBlank(groupId)
                   || CollectionUtils.isNotEmpty(orgService.getMembershipHandler()
-                                                          .findMembershipsByUserAndGroup(userName, groupId)))) {
+                                                          .findMembershipsByUserAndGroup(userName, groupId)))
+              && (gracePeriodDays <= 0 || !isReactivatedSince(userName, reactivatedSinceTime))) {
             setEnabled(userName, false, true, true);
             disabledCount += 1;
           }
