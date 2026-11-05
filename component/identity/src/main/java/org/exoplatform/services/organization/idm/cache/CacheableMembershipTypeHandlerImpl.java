@@ -22,7 +22,7 @@ import java.util.Collection;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
-import org.exoplatform.services.cache.CachedObjectSelector;
+import org.exoplatform.services.cache.ClusterCachedObjectSelector;
 import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.cache.ObjectCacheInfo;
 import org.exoplatform.services.organization.Membership;
@@ -145,18 +145,18 @@ public class CacheableMembershipTypeHandlerImpl extends MembershipTypeDAOImpl {
   }
 
   public static final class ClearMembershipCacheByMembershipTypeSelector
-      implements CachedObjectSelector<MembershipCacheKey, Object> {
-    private String membershipType;
+      extends ClusterCachedObjectSelector<MembershipCacheKey, Object> {
+    private static final long serialVersionUID = 1L;
+
+    private final String      membershipType;
 
     public ClearMembershipCacheByMembershipTypeSelector(String membershipType) {
       this.membershipType = membershipType;
     }
 
     @Override
-    public void onSelect(ExoCache<? extends MembershipCacheKey, ? extends Object> cache,
-                         MembershipCacheKey key,
-                         ObjectCacheInfo<? extends Object> ocinfo) throws Exception {
-      cache.remove(key);
+    protected Object[] criteria() {
+      return new Object[] { membershipType };
     }
 
     @Override

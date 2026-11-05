@@ -29,7 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
-import org.exoplatform.services.cache.CachedObjectSelector;
+import org.exoplatform.services.cache.ClusterCachedObjectSelector;
 import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.cache.ObjectCacheInfo;
 import org.exoplatform.services.organization.ExtendedCloneable;
@@ -306,26 +306,24 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     return (StringUtils.isBlank(group.getParentId()) ? "" : group.getParentId()) + "/" + group.getGroupName();
   }
 
-  public static final class ClearGroupCacheByGroupIdSelector implements CachedObjectSelector<Serializable, Object> {
-    private String groupId;
+  public static final class ClearGroupCacheByGroupIdSelector extends ClusterCachedObjectSelector<Serializable, Object> {
+    private static final long serialVersionUID = 1L;
 
-    private String childrenKey;
+    private final String      groupId;
 
-    private String parentCachedChildrenKey;
+    private final String      childrenKey;
+
+    private final String      parentCachedChildrenKey;
 
     public ClearGroupCacheByGroupIdSelector(String groupId, String parentId, boolean clearCachedChildrenList) {
       this.groupId = groupId;
-      if (clearCachedChildrenList) {
-        this.childrenKey = computeChildrenKey(groupId);
-        this.parentCachedChildrenKey = computeChildrenKey(parentId);
-      }
+      this.childrenKey = clearCachedChildrenList ? computeChildrenKey(groupId) : null;
+      this.parentCachedChildrenKey = clearCachedChildrenList ? computeChildrenKey(parentId) : null;
     }
 
     @Override
-    public void onSelect(ExoCache<? extends Serializable, ? extends Object> cache,
-                         Serializable key,
-                         ObjectCacheInfo<? extends Object> ocinfo) throws Exception {
-      cache.remove(key);
+    protected Object[] criteria() {
+      return new Object[] { groupId, childrenKey, parentCachedChildrenKey };
     }
 
     @Override
@@ -340,18 +338,19 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     }
   }
 
-  public static final class ClearMembershipCacheByGroupIdSelector implements CachedObjectSelector<MembershipCacheKey, Object> {
-    private String groupId;
+  public static final class ClearMembershipCacheByGroupIdSelector
+      extends ClusterCachedObjectSelector<MembershipCacheKey, Object> {
+    private static final long serialVersionUID = 1L;
+
+    private final String      groupId;
 
     public ClearMembershipCacheByGroupIdSelector(String groupId) {
       this.groupId = groupId;
     }
 
     @Override
-    public void onSelect(ExoCache<? extends MembershipCacheKey, ? extends Object> cache,
-                         MembershipCacheKey key,
-                         ObjectCacheInfo<? extends Object> ocinfo) throws Exception {
-      cache.remove(key);
+    protected Object[] criteria() {
+      return new Object[] { groupId };
     }
 
     @Override
