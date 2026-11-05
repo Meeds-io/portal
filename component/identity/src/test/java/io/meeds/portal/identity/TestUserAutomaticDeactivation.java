@@ -20,10 +20,14 @@ package io.meeds.portal.identity;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+
+import org.picketlink.idm.api.Attribute;
+import org.picketlink.idm.impl.api.SimpleAttribute;
 
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
@@ -32,6 +36,9 @@ import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.idm.Config;
+import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
+import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
 @ConfiguredBy({
@@ -139,6 +146,73 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertEquals(OrganizationService.INTERNAL_STORE, user.getOriginatingStore());
     assertFalse("Internal store user must be disabled", user.isEnabled());
     assertTrue(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldNotDisableUserReactivatedWithinGracePeriod() throws Exception {
+    disableAsInactiveThenReactivate();
+
+    assertEquals(0, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue("User reactivated within the grace period must stay enabled", user.isEnabled());
+    assertFalse(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldDisableUserReactivatedBeforeGracePeriod() throws Exception {
+    disableAsInactiveThenReactivate();
+    long reactivationTime = ZonedDateTime.now().minusDays(8).toEpochSecond() * 1000;
+    getContainer().getComponentInstanceOfType(PicketLinkIDMService.class)
+                  .getIdentitySession()
+                  .getAttributesManager()
+                  .updateAttributes(userName,
+                                    new Attribute[] { new SimpleAttribute("reactivationTime",
+                                                                          String.valueOf(reactivationTime)) });
+    restartTransaction();
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse("User reactivated before the grace period must be disabled again", user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldDisableReactivatedUserWhenGracePeriodIsZero() throws Exception {
+    Config config = ((PicketLinkIDMOrganizationServiceImpl) organizationService).getConfiguration();
+    int gracePeriodDays = config.getReactivationGracePeriodDays();
+    config.setReactivationGracePeriodDays(0);
+    try {
+      disableAsInactiveThenReactivate();
+
+      assertEquals(1, userDao.disableInactiveUsers(null, 5));
+      restartTransaction();
+
+      User user = userDao.findUserByName(userName, UserStatus.ANY);
+      assertFalse("Without grace period, an inactive reactivated user must be disabled", user.isEnabled());
+    } finally {
+      config.setReactivationGracePeriodDays(gracePeriodDays);
+    }
+  }
+
+  @SuppressWarnings("deprecation")
+  private void disableAsInactiveThenReactivate() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    // No read back here: the job does not evict the user cache, so a cached
+    // copy read now would hide a later automatic deactivation
+    assertTrue(userDao.setEnabled(userName, true, true).isEnabled());
+    restartTransaction();
   }
 
   @SuppressWarnings("deprecation")

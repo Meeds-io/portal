@@ -94,6 +94,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
   private static final String     USER_AUTOMATIC_DEACTIVATION = "automaticDeactivation";
 
+  private static final String     USER_REACTIVATION_TIME      = "reactivationTime";
+
   private List<UserDecoratorPlugin> decoratorPlugins           = new ArrayList<>();
 
   static {
@@ -112,6 +114,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     keys.add(USER_PASSWORD_SALT128);
     keys.add(AUTOMATIC_DISABLE);
     keys.add(USER_CREATION_SOURCE);
+    keys.add(USER_REACTIVATION_TIME);
 
     USER_NON_PROFILE_KEYS = Collections.unmodifiableSet(keys);
   }
@@ -259,6 +262,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     if (enabled) {
       try {
         am.removeAttributes(userName, new String[] { USER_ENABLED });
+        am.updateAttributes(userName,
+                            new Attribute[] { new SimpleAttribute(USER_REACTIVATION_TIME,
+                                                                  String.valueOf(System.currentTimeMillis())) });
       } catch (Exception e) {
         handleException("Cannot update enabled status for user: " + userName + "; ", e);
       } finally {
@@ -504,6 +510,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   @Override
   public int disableInactiveUsers(String groupId, int inactiveDays) {
     long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
+    long reactivatedSinceTime = ZonedDateTime.now()
+                                             .minusDays(orgService.getConfiguration().getReactivationGracePeriodDays())
+                                             .toEpochSecond() * 1000;
     UserModificationSource.setSource(USER_AUTOMATIC_DEACTIVATION);
     try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
       int disabledCount = 0;
@@ -522,8 +531,9 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
                                            .toList();
         int inactiveUsersSize = inactiveUsers.size();
         for (String userName : inactiveUsers) {
-          if (CollectionUtils.isEmpty(orgService.getMembershipHandler()
-                                                .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
+          if (!isReactivatedSince(userName, reactivatedSinceTime)
+              && CollectionUtils.isEmpty(orgService.getMembershipHandler()
+                                                   .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
               && (StringUtils.isBlank(groupId)
                   || CollectionUtils.isNotEmpty(orgService.getMembershipHandler()
                                                           .findMembershipsByUserAndGroup(userName, groupId)))) {
@@ -1038,6 +1048,15 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
   private boolean disableUserActived() {
     return orgService.getConfiguration().isDisableUserActived();
+  }
+
+  private boolean isReactivatedSince(String userName, long sinceTime) throws Exception {
+    Attribute reactivationTime = service_.getIdentitySession()
+                                         .getAttributesManager()
+                                         .getAttribute(userName, USER_REACTIVATION_TIME);
+    return reactivationTime != null
+        && reactivationTime.getValue() != null
+        && Long.parseLong(reactivationTime.getValue().toString()) >= sinceTime;
   }
 
   private void preSave(UserEventListener listener, User user, boolean isNew) {

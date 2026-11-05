@@ -108,6 +108,11 @@ public class Config {
     private int               maxAuthenticationAttempts;
     private int blockingTime;
 
+    /* Number of days after an administrator re-enables a user during which the
+    automatic deactivation of inactive users leaves that user enabled, giving
+    them time to log in again. 0 or less disables the grace period */
+    private int reactivationGracePeriodDays = 7;
+
     public Config() {
     }
 
@@ -413,5 +418,13 @@ public class Config {
 
     public void setBlockingTime(int blockingTime) {
         this.blockingTime = blockingTime;
+    }
+
+    public int getReactivationGracePeriodDays() {
+        return reactivationGracePeriodDays;
+    }
+
+    public void setReactivationGracePeriodDays(int reactivationGracePeriodDays) {
+        this.reactivationGracePeriodDays = reactivationGracePeriodDays;
     }
 }
