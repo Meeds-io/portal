@@ -510,9 +510,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   @Override
   public int disableInactiveUsers(String groupId, int inactiveDays) {
     long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
-    long reactivatedSinceTime = ZonedDateTime.now()
-                                             .minusDays(orgService.getConfiguration().getReactivationGracePeriodDays())
-                                             .toEpochSecond() * 1000;
+    int gracePeriodDays = orgService.getConfiguration().getReactivationGracePeriodDays();
+    long reactivatedSinceTime = ZonedDateTime.now().minusDays(gracePeriodDays).toEpochSecond() * 1000;
     UserModificationSource.setSource(USER_AUTOMATIC_DEACTIVATION);
     try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
       int disabledCount = 0;
@@ -531,7 +530,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
                                            .toList();
         int inactiveUsersSize = inactiveUsers.size();
         for (String userName : inactiveUsers) {
-          if (!isReactivatedSince(userName, reactivatedSinceTime)
+          if ((gracePeriodDays <= 0 || !isReactivatedSince(userName, reactivatedSinceTime))
               && CollectionUtils.isEmpty(orgService.getMembershipHandler()
                                                    .findMembershipsByUserAndGroup(userName, "/platform/administrators"))
               && (StringUtils.isBlank(groupId)
