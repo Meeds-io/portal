@@ -87,6 +87,40 @@ public class OtpService {
     }
   }
 
+  /**
+   * Validates the code as {@link #validateOtp(String, String, String)} does,
+   * then consumes it, so that the same code never validates a second time.
+   * Two concurrent validations of one code see one winner: the loser is
+   * refused like a wrong code, without counting as a failed attempt.
+   *
+   * @param userName user login
+   * @param otpMethod OTP method name
+   * @param otpCode code to validate
+   * @throws IllegalAccessException when the code is blank, wrong, expired,
+   *           already consumed, or when the user exceeded the allowed attempts
+   */
+  public void validateAndConsumeOtp(String userName, String otpMethod, String otpCode) throws IllegalAccessException {
+    validateOtp(userName, otpMethod, otpCode);
+    if (!consumeOtp(userName, otpMethod, otpCode)) {
+      throw new IllegalAccessException();
+    }
+  }
+
+  /**
+   * Consumes a code already validated, for a flow that writes between its
+   * validation and the consumption
+   *
+   * @param userName user login
+   * @param otpMethod OTP method name
+   * @param otpCode validated code
+   * @return true when this call consumed the code, false when it was no longer
+   *         there or the method is unknown
+   */
+  public boolean consumeOtp(String userName, String otpMethod, String otpCode) {
+    OtpPlugin otpPlugin = getOtpPlugin(otpMethod);
+    return otpPlugin != null && otpPlugin.consumeOtp(userName, otpCode);
+  }
+
   private long getOtpTentativeCount(String userName) {
     Long tentativeCount = getOtpTentativeCache().get(userName);
     if (tentativeCount == null) {

@@ -18,13 +18,18 @@
  */
 package org.exoplatform.portal.rest;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.DELETE;
@@ -37,6 +42,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -44,10 +50,9 @@ import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 
-import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.rest.model.MembershipRestEntity;
 import org.exoplatform.portal.rest.model.UserRestEntity;
@@ -56,7 +61,6 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.Query;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.UserStatus;
@@ -101,7 +105,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public static final String             UNCHANGED_NEW_PASSWORD_ERROR_CODE = "UNCHANGED_NEW_PASSWORD";
 
-  public static final String             CREATION_SOURCE_UI             = "ui";
+  public static final String             CREATION_SOURCE_UI             = UserAccountService.CREATION_SOURCE_UI;
+
+  public static final String             OTP_CODE_INVALID               = "OTP_CODE_INVALID";
 
   public static final UserFieldValidator USERNAME_VALIDATOR             = new UserFieldValidator("userName", true, false);
 
@@ -120,6 +126,8 @@ public class UserRestResourcesV1 implements ResourceContainer {
   private UserACL                        userACL;
   
   private PasswordRecoveryService        passwordRecoveryService;
+
+  private UserAccountService             userAccountService;
 
   public UserRestResourcesV1(OrganizationService organizationService,
                              UserSearchService userSearchService,
@@ -213,103 +221,101 @@ public class UserRestResourcesV1 implements ResourceContainer {
   @RolesAllowed("administrators")
   @Operation(
       summary = "Create new user",
-      description = "Create new user",
-      method = "GET")
+      description = "Creates an account: the login is the given one or a generated one, the password is optional,"
+          + " the role (INTERNAL, EXTERNAL or ADMINISTRATOR) decides the memberships, the language is the preferred one",
+      method = "POST")
   @ApiResponses(
       value = {
-          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
-          @ApiResponse(responseCode = "400", description = "Invalid query input"),
-          @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
+          @ApiResponse(responseCode = "201", description = "Account created, the body carries its login"),
+          @ApiResponse(responseCode = "400", description = "A refused field, the body being its code: USERNAME:*, PASSWORD:*,"
+              + " FIRSTNAME:*, LASTNAME:*, EMAIL:*, ROLE:INVALID, LANGUAGE:INVALID"),
+          @ApiResponse(responseCode = "403", description = "The session has not been confirmed with a one-time password: OTP_REQUIRED"),
+          @ApiResponse(responseCode = "500", description = "The store did not complete the creation, the body being the code:"
+              + " USER:CREATION_FAILED and USER:USERNAME_GENERATION_EXHAUSTED (nothing created),"
+              + " USER:CREATED_INCOMPLETE:<login>:<parts> (created, then deactivated),"
+              + " USER:CREATED_INCOMPLETE_ENABLED:<login>:<parts> (created, still active)"),
       }
   )
   public Response createUser(@Context HttpServletRequest request,
                              @RequestBody(description = "User Object") UserRestEntity userEntity) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (userEntity == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("empty user object").build();
     }
-
-    String userName = userEntity.getUserName();
-    String email = userEntity.getEmail();
-    String firstName = userEntity.getFirstName();
-    String lastName = userEntity.getLastName();
-    String password = userEntity.getPassword();
-    Boolean isEnabled = userEntity.isEnabled();
-
     Locale locale = request == null ? Locale.ENGLISH : request.getLocale();
-
-    String errorMessage = USERNAME_VALIDATOR.validate(locale, userName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("USERNAME:" + errorMessage).build();
-    }
-
-    errorMessage = PASSWORD_VALIDATOR.validate(locale, password);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("PASSWORD:" + errorMessage).build();
-    }
-
-    errorMessage = LASTNAME_VALIDATOR.validate(locale, lastName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("LASTNAME:" + errorMessage).build();
-    }
-
-    errorMessage = FIRSTNAME_VALIDATOR.validate(locale, firstName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("FIRSTNAME:" + errorMessage).build();
-    }
-
-    errorMessage = EMAIL_VALIDATOR.validate(locale, email);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:" + errorMessage).build();
-    }
-
-    User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
-    if (user != null) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("USERNAME:ALREADY_EXISTS").build();
-    }
-
-    // Check if mail address is already used
-    Query query = new Query();
-    query.setEmail(email);
-    if (organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY).getSize() > 0) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:ALREADY_EXISTS").build();
-    }
-
-    user = organizationService.getUserHandler().createUserInstance(userName);
-    user.setEmail(email);
-    user.setFirstName(firstName);
-    user.setLastName(lastName);
-    user.setPassword(password);
-    user.setCreationSource(CREATION_SOURCE_UI);
+    UserAccount account = new UserAccount(userEntity.getUserName(),
+                                          userEntity.getFirstName(),
+                                          userEntity.getLastName(),
+                                          userEntity.getEmail(),
+                                          userEntity.getPassword(),
+                                          userEntity.getLanguage(),
+                                          userEntity.getRole(),
+                                          userEntity.isEnabled());
+    String userName;
     try {
-      organizationService.getUserHandler().createUser(user, true);
-    } catch (Exception exception) {
-      // the creation is vetoed (ObjectAlreadyExistsException) when the username
-      // belonged to a deleted account, but the IDM wraps the exceptions of its
-      // listeners: the veto has to be looked up in the cause chain
-      if (ExceptionUtils.indexOfType(exception, ObjectAlreadyExistsException.class) >= 0) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("USERNAME:ALREADY_EXISTS_AS_DELETED").build();
+      userName = getUserAccountService().createUser(account, locale);
+    } catch (IllegalArgumentException e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+    } catch (UserAccountCreationException e) {
+      return Response.serverError().entity(e.getMessage()).build();
+    }
+    // The login may have been generated: the client needs it to send the
+    // onboarding email
+    return Response.created(URI.create("/portal/rest/v1/users/" + userName))
+                   .entity(Collections.singletonMap("userName", userName))
+                   .type(MediaType.APPLICATION_JSON)
+                   .build();
+  }
+
+  @GET
+  @Path("onboardingSettings")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("administrators")
+  @Operation(
+      summary = "Gets the onboarding settings",
+      description = "Gets the validity of an onboarding link, in days and in hours, as configured on the platform",
+      method = "GET")
+  @ApiResponses(
+      value = {
+          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
       }
-      throw exception;
-    }
-
-    if (!isEnabled) {
-      organizationService.getUserHandler().setEnabled(userName, isEnabled, true);
-    }
-
-    return Response.noContent().build();
+  )
+  public Response getOnboardingSettings() {
+    long validityMillis = passwordRecoveryService.getOnboardingTokenValidity();
+    long days = TimeUnit.MILLISECONDS.toDays(validityMillis);
+    // The hours and the whole-days flag let a client state the validity the
+    // way the email states it: in days when it is a whole number of days
+    // from two up, in whole hours otherwise. The rule mirrors
+    // PasswordRecoveryServiceImpl.isWholeDays, out of reach of this module;
+    // the two are pinned by their tests
+    Map<String, Object> settings = new LinkedHashMap<>();
+    settings.put("linkValidityDays", days);
+    settings.put("linkValidityHours", TimeUnit.MILLISECONDS.toHours(validityMillis));
+    settings.put("linkValidityWholeDays", days >= 2 && validityMillis == TimeUnit.DAYS.toMillis(days));
+    return Response.ok(settings)
+                   .cacheControl(privateNoStore())
+                   .build();
   }
 
   @PUT
   @RolesAllowed("users")
   @Operation(
       summary = "Update an existing user",
-      description = "Update an existing user",
-      method = "GET")
+      description = "Update an existing user: names, email, password when given, enabled flag, and the preferred"
+          + " language when given, a blank one leaving the stored one unchanged",
+      method = "PUT")
   @ApiResponses(
       value = {
           @ApiResponse(responseCode = "200", description = "Request fulfilled"),
-          @ApiResponse(responseCode = "400", description = "Invalid query input"),
-          @ApiResponse(responseCode = "500", description = "Internal server error due to data encoding"),
+          @ApiResponse(responseCode = "400", description = "Invalid query input, or a language that is not a supported"
+              + " locale: LANGUAGE:INVALID"),
+          @ApiResponse(responseCode = "404", description = "Unknown user"),
+          @ApiResponse(responseCode = "403", description = "User not administrator, or the session has not been confirmed with a one-time password: OTP_REQUIRED"),
+          @ApiResponse(responseCode = "500", description = "The update could not be proven: USER:PASSWORD_NOT_STORED or"
+              + " USER:PASSWORD_NOT_VERIFIABLE, nothing written after the password; USER:UPDATE_INCOMPLETE, a field read back"
+              + " other than requested"),
       }
   )
   public Response updateUser(@Context HttpServletRequest request,
@@ -318,85 +324,32 @@ public class UserRestResourcesV1 implements ResourceContainer {
     if (!userACL.isAdministrator(identity)) {
       throw new WebApplicationException(Response.Status.FORBIDDEN);
     }
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     if (userEntity == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("empty user object").build();
     }
 
-    String userName = userEntity.getUserName();
-    String email = userEntity.getEmail();
-    String firstName = userEntity.getFirstName();
-    String lastName = userEntity.getLastName();
-    String password = userEntity.getPassword();
-    boolean enabled = userEntity.isEnabled();
-
-    Locale locale = request == null ? Locale.ENGLISH : request.getLocale();
-
-    if (StringUtils.isNotBlank(password)) {
-      String errorMessage = PASSWORD_VALIDATOR.validate(locale, password);
-      if (StringUtils.isNotBlank(errorMessage)) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("PASSWORD:" + errorMessage).build();
-      }
-    }
-
-    User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    User user = organizationService.getUserHandler().findUserByName(userEntity.getUserName(), UserStatus.ANY);
     if (user == null) {
       return Response.status(Response.Status.NOT_FOUND).build();
     }
-
-    String errorMessage = LASTNAME_VALIDATOR.validate(locale, lastName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("LASTNAME:" + errorMessage).build();
+    UserAccount account = new UserAccount();
+    account.setUserName(userEntity.getUserName());
+    account.setFirstName(userEntity.getFirstName());
+    account.setLastName(userEntity.getLastName());
+    account.setEmail(userEntity.getEmail());
+    account.setPassword(userEntity.getPassword());
+    account.setLanguage(userEntity.getLanguage());
+    account.setEnabled(userEntity.isEnabled());
+    try {
+      getUserAccountService().updateUser(account, request == null ? Locale.ENGLISH : request.getLocale(), getCurrentUsername());
+    } catch (IllegalArgumentException e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+    } catch (UserAccountUpdateException e) {
+      return Response.serverError().entity(e.getMessage()).build();
     }
-
-    errorMessage = FIRSTNAME_VALIDATOR.validate(locale, firstName);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("FIRSTNAME:" + errorMessage).build();
-    }
-
-    errorMessage = EMAIL_VALIDATOR.validate(locale, email);
-    if (StringUtils.isNotBlank(errorMessage)) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:" + errorMessage).build();
-    }
-
-    // Check if mail address is already used
-    Query query = new Query();
-    query.setEmail(email);
-    if (!StringUtils.equals(user.getEmail(), email)
-        && organizationService.getUserHandler().findUsersByQuery(query, UserStatus.ANY).getSize() > 0) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("EMAIL:ALREADY_EXISTS").build();
-    }
-
-    if (!StringUtils.equals(email, user.getEmail())
-        || !StringUtils.equals(lastName, user.getLastName())
-        || !StringUtils.equals(firstName, user.getFirstName())) {
-      user.setEmail(email);
-      user.setFirstName(firstName);
-      user.setLastName(lastName);
-      user.setPassword(password);
-      user.setDisplayName(firstName+" "+lastName);
-      organizationService.getUserHandler().saveUser(user, true);
-    }
-
-    if (StringUtils.isNotBlank(password)) {
-      // we save the password separatly from saving the user, because when changing
-      // password, we need to remove rememberme token
-      // related to this password as they are no more valid
-      passwordRecoveryService.getActiveChangePasswordConnector().changePassword(userName, password);
-    }
-
-    if (user.isEnabled() != enabled) {
-      if (!enabled) {
-        String currentUsername = getCurrentUsername();
-        if (StringUtils.equals(currentUsername, user.getUserName())) {
-          return Response.status(Response.Status.BAD_REQUEST).entity("SelfDisable").build();
-        }
-        if (StringUtils.equals(userACL.getSuperUser(), user.getUserName())) {
-          return Response.status(Response.Status.BAD_REQUEST).entity("DisableSuperUser").build();
-        }
-      }
-      organizationService.getUserHandler().setEnabled(userName, enabled, true);
-    }
-
     return Response.noContent().build();
   }
 
@@ -411,13 +364,18 @@ public class UserRestResourcesV1 implements ResourceContainer {
       value = {
           @ApiResponse(responseCode = "204", description = "Request fulfilled"),
           @ApiResponse(responseCode = "401", description = "User not authorized to call this endpoint"),
+          @ApiResponse(responseCode = "403", description = "The session has not been confirmed with a one-time password: OTP_REQUIRED"),
           @ApiResponse(responseCode = "404", description = "User not found"),
           @ApiResponse(responseCode = "500", description = "Internal server error"),
       }
   )
-  public Response deleteUser(@Parameter(description = "User name identifier", required = true) @PathParam(
+  public Response deleteUser(@Context HttpServletRequest request,
+                             @Parameter(description = "User name identifier", required = true) @PathParam(
     "id"
   ) String userName) throws Exception {
+    if (!UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
     User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
     if (user == null) {
       return Response.status(Response.Status.NOT_FOUND).build();
@@ -464,6 +422,14 @@ public class UserRestResourcesV1 implements ResourceContainer {
     }
 
     UserRestEntity userRestEntity = toEntity(user);
+    try {
+      userRestEntity.setLanguage(getUserAccountService().getLanguage(id));
+    } catch (IllegalStateException e) {
+      // The account is read without its language, which an edit then
+      // leaves unchanged
+      LOG.warn("The preferred language of {} could not be read", id, e);
+    }
+    userRestEntity.setIsInternal(user.isInternalStore());
 
     Collection<Membership> memberships = organizationService.getMembershipHandler().findMembershipsByUser(id);
     if (memberships != null) {
@@ -507,6 +473,9 @@ public class UserRestResourcesV1 implements ResourceContainer {
     if (!isAdmin && !isSameUser) {
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
+    if (!isSameUser && !UserAccountConfirmation.isConfirmed(request)) {
+      return UserAccountConfirmation.otpRequired();
+    }
 
     try {
       UserHandler userHandler = organizationService.getUserHandler();
@@ -540,6 +509,35 @@ public class UserRestResourcesV1 implements ResourceContainer {
     } catch (Exception e) {
       return Response.serverError().entity(PASSWORD_UNKNOWN_ERROR_CODE + ":" + e.getMessage()).build();
     }
+  }
+
+  @POST
+  @Path("confirmation")
+  @RolesAllowed("users")
+  @Operation(
+      summary = "Confirms the current session with a one-time password",
+      description = "Validates the one-time password sent by email to the authenticated user and marks the current"
+          + " session as confirmed, so that the administrator actions on user accounts are applied from it."
+          + " The code validates once. The confirmation proves the caller's identity only: each guarded"
+          + " endpoint keeps its own permission check.",
+      method = "POST")
+  @ApiResponses(
+      value = {
+          @ApiResponse(responseCode = "204", description = "Session confirmed"),
+          @ApiResponse(responseCode = "401", description = "Wrong, expired, already used or throttled code: OTP_CODE_INVALID"),
+      }
+  )
+  public Response confirmSession(@Context HttpServletRequest request,
+                                 @Parameter(description = "One-time password received by email", required = true)
+                                 @FormParam("otpCode") String otpCode) {
+    String username = getCurrentUsername();
+    try {
+      getUserAccountService().confirmSession(username, otpCode);
+    } catch (IllegalAccessException e) {
+      return Response.status(Response.Status.UNAUTHORIZED).entity(OTP_CODE_INVALID).build();
+    }
+    UserAccountConfirmation.confirm(request, username);
+    return Response.noContent().build();
   }
 
   @GET
@@ -694,6 +692,30 @@ public class UserRestResourcesV1 implements ResourceContainer {
 
   public boolean isMemberOfAdminGroup() {
     return ConversationState.getCurrent().getIdentity().isMemberOf(ADMINISTRATOR_GROUP);
+  }
+
+  /**
+   * The service is implemented in the web security module, above this one in
+   * the module graph, and registered in the container at runtime by the
+   * Kernel-Spring bridge: it is resolved by type at call time, once
+   */
+  private UserAccountService getUserAccountService() {
+    if (userAccountService == null) {
+      userAccountService = ExoContainerContext.getService(UserAccountService.class);
+    }
+    return userAccountService;
+  }
+
+  /**
+   * The cache directives of an answer meant for the administrator's session
+   * only
+   */
+  private static CacheControl privateNoStore() {
+    CacheControl cacheControl = new CacheControl();
+    cacheControl.setPrivate(true);
+    cacheControl.setNoStore(true);
+    cacheControl.setNoTransform(false);
+    return cacheControl;
   }
 
   private boolean isNestedInGroup(String groupId, String targetGroupId) {

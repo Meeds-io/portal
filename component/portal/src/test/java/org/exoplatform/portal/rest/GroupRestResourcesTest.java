@@ -18,7 +18,13 @@
  */
 package org.exoplatform.portal.rest;
 
+import static org.junit.Assert.assertNotEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -31,6 +37,7 @@ import org.exoplatform.portal.rest.model.GroupRestEntity;
 import org.exoplatform.portal.rest.services.BaseRestServicesTestCase;
 import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.GroupHandler;
+import org.exoplatform.services.organization.MembershipHandler;
 import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.search.GroupSearchService;
@@ -40,11 +47,17 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
 
   private static final String PARENT_GROUP_ID = "/company";
 
+  private static final String ADMIN           = "admin";
+
   private OrganizationService organizationService;
 
   private GroupHandler        groupHandler;
 
   private GroupSearchService  groupSearchService;
+
+  private MembershipHandler   membershipHandler;
+
+  private UserACL             userACL;
 
   protected Class<?> getComponentClass() {
     return GroupRestResourcesV1.class;
@@ -57,7 +70,10 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
     organizationService = mock(OrganizationService.class);
     groupHandler = mock(GroupHandler.class);
     groupSearchService = mock(GroupSearchService.class);
+    membershipHandler = mock(MembershipHandler.class);
+    userACL = mock(UserACL.class);
     when(organizationService.getGroupHandler()).thenReturn(groupHandler);
+    when(organizationService.getMembershipHandler()).thenReturn(membershipHandler);
 
     getContainer().unregisterComponent(OrganizationService.class);
     getContainer().unregisterComponent(GroupSearchService.class);
@@ -65,7 +81,7 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
     getContainer().registerComponentInstance("org.exoplatform.services.organization.OrganizationService", organizationService);
     getContainer().registerComponentInstance("org.exoplatform.services.organization.search.GroupSearchService",
                                              groupSearchService);
-    getContainer().registerComponentInstance("org.exoplatform.portal.config.UserACL", mock(UserACL.class));
+    getContainer().registerComponentInstance("org.exoplatform.portal.config.UserACL", userACL);
   }
 
   @Override
@@ -202,6 +218,103 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
       }
     };
     when(groupSearchService.searchGroups("comp")).thenReturn(listAccess);
+  }
+
+
+  public void testCreateGroupRequiresConfirmedSession() throws Exception {
+    startUserSession(ADMIN);
+    ContainerResponse response = getResponse("POST", "/v1/groups", "{\"groupName\":\"\"}", unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    response = getResponse("POST", "/v1/groups", "{\"groupName\":\"\"}", confirmedContext(ADMIN));
+    assertEquals(400, response.getStatus());
+    assertEquals("NAME:MANDATORY", response.getEntity());
+    verify(groupHandler, never()).addChild(any(), any(), anyBoolean());
+  }
+
+  public void testUpdateGroupRequiresConfirmedSession() throws Exception {
+    startUserSession(ADMIN);
+    String body = "{\"id\":\"/unknown\",\"groupName\":\"unknown\"}";
+    ContainerResponse response = getResponse("PUT", "/v1/groups", body, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    verify(groupHandler, never()).findGroupById(anyString());
+    response = getResponse("PUT", "/v1/groups", body, confirmedContext(ADMIN));
+    assertEquals(404, response.getStatus());
+    verify(groupHandler, never()).updateGroup(any(), anyBoolean());
+  }
+
+  public void testDeleteGroupRequiresConfirmedSession() throws Exception {
+    startUserSession(ADMIN);
+    ContainerResponse response = launcher.service("DELETE", "/v1/groups?groupId=/unknown", "", null, null, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    verify(groupHandler, never()).findGroupById(anyString());
+    response = launcher.service("DELETE", "/v1/groups?groupId=/unknown", "", null, null, confirmedContext(ADMIN));
+    assertEquals(404, response.getStatus());
+    verify(groupHandler, never()).removeGroup(any(), anyBoolean());
+  }
+
+  public void testCreateMembershipRequiresConfirmedSessionAfterPermissionCheck() throws Exception {
+    startUserSession(ADMIN);
+    String body = "{\"groupId\":\"" + PARENT_GROUP_ID + "\",\"membershipType\":\"member\"}";
+
+    // Not allowed on the group: today's answer, without the confirmation code
+    ContainerResponse response = getResponse("POST", "/v1/groups/memberships", body, unconfirmedContext(ADMIN));
+    assertEquals(403, response.getStatus());
+    assertNotEquals(UserAccountConfirmation.OTP_REQUIRED, response.getEntity());
+
+    when(userACL.isAdministrator(any())).thenReturn(true);
+    response = getResponse("POST", "/v1/groups/memberships", body, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    verify(membershipHandler, never()).findMembership(any());
+
+    response = getResponse("POST", "/v1/groups/memberships", body, confirmedContext(ADMIN));
+    assertEquals(400, response.getStatus());
+    assertEquals("USER:MANDATORY", response.getEntity());
+    verify(membershipHandler, never()).linkMembership(any(), any(), any(), anyBoolean());
+  }
+
+  public void testCreateMultipleMembershipsRequiresConfirmedSession() throws Exception {
+    startUserSession(ADMIN);
+    String body = "[{\"groupId\":\"\"}]";
+    ContainerResponse response = getResponse("POST", "/v1/groups/memberships/bulk", body, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    response = getResponse("POST", "/v1/groups/memberships/bulk", body, confirmedContext(ADMIN));
+    assertEquals(400, response.getStatus());
+    assertEquals("GROUP_ID:MANDATORY", response.getEntity());
+    verify(membershipHandler, never()).linkMembership(any(), any(), any(), anyBoolean());
+  }
+
+  public void testUpdateMembershipRequiresConfirmedSession() throws Exception {
+    startUserSession(ADMIN);
+    String body = "{\"groupId\":\"" + PARENT_GROUP_ID + "\"}";
+    ContainerResponse response = getResponse("PUT", "/v1/groups/memberships", body, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    response = getResponse("PUT", "/v1/groups/memberships", body, confirmedContext(ADMIN));
+    assertEquals(400, response.getStatus());
+    verify(membershipHandler, never()).findMembership(any());
+    verify(membershipHandler, never()).removeMembership(any(), anyBoolean());
+  }
+
+  public void testDeleteMembershipRequiresConfirmedSessionAfterPermissionCheck() throws Exception {
+    startUserSession(ADMIN);
+    String path = "/v1/groups/memberships?membershipId=member:john:" + PARENT_GROUP_ID;
+
+    ContainerResponse response = launcher.service("DELETE", path, "", null, null, unconfirmedContext(ADMIN));
+    assertEquals(403, response.getStatus());
+    assertNotEquals(UserAccountConfirmation.OTP_REQUIRED, response.getEntity());
+
+    when(userACL.isAdministrator(any())).thenReturn(true);
+    response = launcher.service("DELETE", path, "", null, null, unconfirmedContext(ADMIN));
+    assertOtpRequired(response);
+    verify(membershipHandler, never()).findMembership(any());
+
+    response = launcher.service("DELETE", path, "", null, null, confirmedContext(ADMIN));
+    assertEquals(404, response.getStatus());
+    verify(membershipHandler, never()).removeMembership(any(), anyBoolean());
+  }
+
+  private void assertOtpRequired(ContainerResponse response) {
+    assertEquals(403, response.getStatus());
+    assertEquals(UserAccountConfirmation.OTP_REQUIRED, response.getEntity());
   }
 
 }
