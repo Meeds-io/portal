@@ -767,6 +767,114 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
+   * A token upload refused by a validator removes only its own registration: a
+   * resource registered under the same id while it was received, and that
+   * resource's file, are kept. The mime type plugin holds the token upload
+   * while the other resource replaces it.
+   */
+  public void testValidatorRefusalKeepsARegistrationThatReplacedIt() throws Exception {
+    UploadService service = new UploadService(containerInfo(), null);
+    CountDownLatch inWindow = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    service.register(new BlockingMimeTypePlugin(inWindow, release));
+    String uploadId = newUploadId();
+    String token = service.createUploadToken("john", uploadId, 1000);
+    MultipartRequest request = multipart("x.svg", "image/svg+xml", UNSAFE_SVG);
+    UploadResource replacement = replacement(uploadId);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<UploadResource> upload = executor.submit(() -> {
+        ExoContainerContext.setCurrentContainer(getContainer());
+        return service.createUploadResourceWithToken(token, uploadId, request.request);
+      });
+      assertTrue(inWindow.await(30, TimeUnit.SECONDS));
+      service.createUploadResource(replacement);
+      release.countDown();
+      try {
+        upload.get(30, TimeUnit.SECONDS);
+        fail("A scripted SVG must be refused");
+      } catch (java.util.concurrent.ExecutionException e) {
+        assertTrue(e.getCause() instanceof FileUploadException);
+      }
+
+      assertSame(replacement, service.getUploadResource(uploadId));
+      assertTrue(new File(replacement.getStoreLocation()).exists());
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      service.removeUploadResource(uploadId);
+      new File(System.getProperty("java.io.tmpdir") + "/portal/eXoUpload/" + uploadId).delete();
+    }
+  }
+
+  /**
+   * An upload refused for carrying other than one file removes only its own
+   * registration: a resource registered under the same id while the request
+   * was read, and that resource's file, are kept.
+   */
+  public void testFileCountRefusalKeepsARegistrationThatReplacedIt() throws Exception {
+    UploadService service = new UploadService(containerInfo(), null);
+    String uploadId = newUploadId();
+    UploadResource replacement = replacement(uploadId);
+    MultipartRequest request = multipart("a.txt", "text/plain", "a");
+    String boundary = "----TwoFiles";
+    String body = "--" + boundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\n\r\na\r\n"
+        + "--" + boundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"file\"; filename=\"b.txt\"\r\n\r\nb\r\n"
+        + "--" + boundary + "--\r\n";
+    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+    when(request.request.getContentType()).thenReturn("multipart/form-data; boundary=" + boundary);
+    when(request.request.getContentLength()).thenReturn(bytes.length);
+    when(request.request.getContentLengthLong()).thenReturn((long) bytes.length);
+    when(request.request.getHeader(anyString())).thenAnswer(invocation -> {
+      String name = invocation.getArgument(0, String.class);
+      if ("content-type".equalsIgnoreCase(name)) {
+        return "multipart/form-data; boundary=" + boundary;
+      } else if ("content-length".equalsIgnoreCase(name)) {
+        return String.valueOf(bytes.length);
+      }
+      return null;
+    });
+    when(request.request.getInputStream()).thenReturn(new ByteArrayServletInputStream(bytes) {
+      @Override
+      public int read(byte[] b, int off, int len) {
+        int read = super.read(b, off, len);
+        if (isFinished() && service.getUploadResource(uploadId) != replacement) {
+          service.createUploadResource(replacement);
+        }
+        return read;
+      }
+    });
+    try {
+      service.createUploadResource(uploadId, request.request);
+      fail("Two files must be refused");
+    } catch (FileUploadException e) {
+      assertEquals("You can upload 1 file per request", e.getMessage());
+    } finally {
+      assertSame(replacement, service.getUploadResource(uploadId));
+      assertTrue(new File(replacement.getStoreLocation()).exists());
+      service.removeUploadResource(uploadId);
+    }
+  }
+
+  /**
+   * Builds a resource, with its own stored file, that replaces an upload's
+   * registration under the same id.
+   *
+   * @param uploadId upload id
+   * @return the resource, uploaded
+   */
+  private UploadResource replacement(String uploadId) throws IOException {
+    File stored = File.createTempFile("replacement", ".txt");
+    stored.deleteOnExit();
+    UploadResource replacement = new UploadResource(uploadId, "replacement.txt");
+    replacement.setStoreLocation(stored.getPath());
+    replacement.setStatus(UploadResource.UPLOADED_STATUS);
+    return replacement;
+  }
+
+  /**
    * Asserts the token is refused for the upload id.
    *
    * @param token token presented

@@ -26,6 +26,7 @@ import java.net.URLEncoder;
 
 import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.fileupload2.core.FileUploadSizeException;
+import org.apache.commons.fileupload2.core.MultipartInput;
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.common.text.EntityEncoder;
 
@@ -177,7 +178,8 @@ public class UploadHandler extends WebRequestHandler {
      * {@code Content-Length}, 413 above the token's size, 409 for an upload id
      * already registered, 400 when the request is not one multipart file or a
      * validator refuses it, and 500 "Upload failed" when the file cannot be
-     * written to the staging folder (logged).
+     * written to or read from the staging folder, during the parse or when it
+     * is moved to its store location (logged, the cause never in the body).
      *
      * @param req the request
      * @param res the response
@@ -206,11 +208,34 @@ public class UploadHandler extends WebRequestHandler {
                     + " bytes, " + e.getPermitted() + " permitted");
             }
         } catch (FileUploadException e) {
-            writeError(res, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            if (isStagingFailure(e)) {
+                LOG.warn("Token upload of id {} failed while staging its file", req.getParameter("uploadId"), e);
+                writeError(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Upload failed");
+            } else {
+                writeError(res, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            }
         } catch (IllegalStateException e) {
             LOG.warn("Token upload of id {} failed while staging its file", req.getParameter("uploadId"), e);
             writeError(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Upload failed");
         }
+    }
+
+    /**
+     * Tells whether a refused upload failed on the server side rather than on
+     * the request: the multipart parser wraps an {@link IOException} raised
+     * while it copies the file to the staging folder, or while the stored file
+     * is read for validation, in a plain {@link FileUploadException}, where a
+     * malformed, truncated or oversized request raises one of its subclasses.
+     *
+     * @param e the exception the upload was refused with
+     * @return true when its cause is an I/O failure that is not itself a
+     *         refusal of the request
+     */
+    private static boolean isStagingFailure(FileUploadException e) {
+        return !(e instanceof FileUploadSizeException)
+            && !(e instanceof MultipartInput.MalformedStreamException)
+            && e.getCause() instanceof IOException
+            && !(e.getCause() instanceof FileUploadException);
     }
 
     /**

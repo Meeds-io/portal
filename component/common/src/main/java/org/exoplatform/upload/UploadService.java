@@ -344,8 +344,8 @@ public class UploadService {
     } finally {
       // unregister a refused upload before dropping its receiving mark, so an
       // owner-checked consumer never gets it as uploaded
-      if (!registered && uploadResources.remove(uploadId, upResource)) {
-        deleteStoredFile(upResource);
+      if (!registered) {
+        removeRefusedUpload(upResource);
       }
       receivingTokenUploads.remove(upResource);
       removeUploadLimit(uploadId);
@@ -530,6 +530,19 @@ public class UploadService {
   }
 
   /**
+   * Unregisters a refused upload and deletes its temporary file, only while the
+   * upload id is still registered to this resource: a resource that replaced it
+   * under the same id, and the file it stores at the same location, are kept.
+   *
+   * @param upResource the refused resource
+   */
+  private void removeRefusedUpload(UploadResource upResource) {
+    if (uploadResources.remove(upResource.getUploadId(), upResource)) {
+      deleteStoredFile(upResource);
+    }
+  }
+
+  /**
    * Deletes the temporary file of a removed resource, or schedules its deletion
    * at JVM exit when it cannot be deleted now.
    *
@@ -570,11 +583,11 @@ public class UploadService {
         uploadFileValidator.validate(upResource.getFileName(), upResource.getMimeType(), inputStream);
       } catch (FileUploadException e) {
         upResource.setStatus(UploadResource.FAILED_STATUS);
-        removeUploadResource(upResource.getUploadId());
+        removeRefusedUpload(upResource);
         throw e;
       } catch (IOException e) {
         upResource.setStatus(UploadResource.FAILED_STATUS);
-        removeUploadResource(upResource.getUploadId());
+        removeRefusedUpload(upResource);
         throw new FileUploadException("Unable to read uploaded file for validation", e);
       }
     }
@@ -828,7 +841,7 @@ public class UploadService {
     servletUpload.setProgressListener(listener);
     List<DiskFileItem> fileItems = servletUpload.parseRequest(request);
     if (fileItems == null || fileItems.size() != 1 || fileItems.get(0).isFormField()) {
-      removeUploadResource(upResource.getUploadId());
+      removeRefusedUpload(upResource);
       throw new FileUploadException("You can upload 1 file per request");
     }
     DiskFileItem fileItem = fileItems.get(0);
