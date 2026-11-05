@@ -186,8 +186,11 @@ public class UploadHandler extends WebRequestHandler {
      * validator refuses it or the client's connection fails while the body is
      * read, and 500 "Upload failed" when the file cannot be written to or read
      * from the staging folder, during the parse, when it is moved to its store
-     * location or when it is read for validation (logged, the cause never in
-     * the body).
+     * location or when it cannot be opened for validation (logged, the cause
+     * never in the body). A read failure inside a validator is the validator's
+     * refusal, 400 with its text: a validator reports any failure as a
+     * {@link FileUploadException}, and cannot tell a failing disk from a file it
+     * cannot parse.
      *
      * @param req the request
      * @param res the response
@@ -235,7 +238,8 @@ public class UploadHandler extends WebRequestHandler {
      * while the request was read, and {@link UploadService} does the same when
      * the stored file cannot be read for validation. A size or malformed-body
      * refusal is one of the parser's subclasses, and a validator's refusal is an
-     * {@link UploadRefusedException}: both are the request's. Among the rest,
+     * {@link UploadRefusedException}: both are the request's, a read failure
+     * the validator met while it parsed the file included. Among the rest,
      * a cause chain holding a connection failure (the client dropped or stalled
      * the connection) is the request's too; any other I/O cause is the
      * server's.
