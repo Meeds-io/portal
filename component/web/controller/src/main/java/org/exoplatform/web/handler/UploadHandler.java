@@ -18,10 +18,13 @@
  */
 package org.exoplatform.web.handler;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
 
 import org.apache.commons.fileupload2.core.FileUploadException;
@@ -36,6 +39,7 @@ import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.upload.UploadRefusedException;
 import org.exoplatform.upload.UploadResource;
 import org.exoplatform.upload.UploadService;
 import org.exoplatform.upload.UploadService.UploadLimit;
@@ -55,6 +59,8 @@ public class UploadHandler extends WebRequestHandler {
     private static final String RESTRICT_PUBLIC_PARAM = "public-access-restriction";
 
     private static final String BEARER_PREFIX         = "Bearer ";
+
+    private static final String CLIENT_ABORT_EXCEPTION = "org.apache.catalina.connector.ClientAbortException";
 
     private boolean             isRestrictToPublic    = false;
 
@@ -177,9 +183,11 @@ public class UploadHandler extends WebRequestHandler {
      * expired, already used or mismatched token, 411 without a
      * {@code Content-Length}, 413 above the token's size, 409 for an upload id
      * already registered, 400 when the request is not one multipart file or a
-     * validator refuses it, and 500 "Upload failed" when the file cannot be
-     * written to or read from the staging folder, during the parse or when it
-     * is moved to its store location (logged, the cause never in the body).
+     * validator refuses it or the client's connection fails while the body is
+     * read, and 500 "Upload failed" when the file cannot be written to or read
+     * from the staging folder, during the parse, when it is moved to its store
+     * location or when it is read for validation (logged, the cause never in
+     * the body).
      *
      * @param req the request
      * @param res the response
@@ -208,7 +216,7 @@ public class UploadHandler extends WebRequestHandler {
                     + " bytes, " + e.getPermitted() + " permitted");
             }
         } catch (FileUploadException e) {
-            if (isStagingFailure(e) && !service.canStageUpload(req.getContentLengthLong())) {
+            if (isServerFailure(e)) {
                 LOG.warn("Token upload of id {} failed while staging its file", req.getParameter("uploadId"), e);
                 writeError(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Upload failed");
             } else {
@@ -221,25 +229,52 @@ public class UploadHandler extends WebRequestHandler {
     }
 
     /**
-     * Tells whether a refused upload may have failed on the server side: the
-     * multipart parser wraps an {@link IOException} raised while it copies the
-     * file to the staging folder in a plain {@link FileUploadException}, where a
-     * malformed or oversized request raises one of its subclasses. A failed
-     * read of the request stream (a client abort, a timeout) is wrapped the same
-     * way, so the caller also checks the staging folder
-     * ({@link UploadService#canStageUpload(long)}) before answering a server
-     * error.
+     * Tells whether a refused upload failed on the server side. The multipart
+     * parser wraps an {@link IOException} in a plain {@link FileUploadException},
+     * whether it was raised while the file was written to the staging folder or
+     * while the request was read, and {@link UploadService} does the same when
+     * the stored file cannot be read for validation. A size or malformed-body
+     * refusal is one of the parser's subclasses, and a validator's refusal is an
+     * {@link UploadRefusedException}: both are the request's. Among the rest,
+     * a cause chain holding a connection failure (the client dropped or stalled
+     * the connection) is the request's too; any other I/O cause is the
+     * server's.
      *
      * @param e the exception the upload was refused with
-     * @return true when its cause is an I/O failure that is not itself a
-     *         refusal of the request
+     * @return true when the upload failed on the server side
      */
-    private static boolean isStagingFailure(FileUploadException e) {
-        return !(e instanceof FileUploadSizeException)
-            && !(e instanceof MultipartInput.MalformedStreamException)
-            && e.getCause() instanceof IOException
-            && !(e.getCause() instanceof FileUploadException);
+    private static boolean isServerFailure(FileUploadException e) {
+        if (e instanceof FileUploadSizeException
+            || e instanceof MultipartInput.MalformedStreamException
+            || e instanceof UploadRefusedException
+            || !(e.getCause() instanceof IOException)
+            || e.getCause() instanceof FileUploadException) {
+            return false;
+        }
+        return !isConnectionFailure(e.getCause());
     }
+
+    /**
+     * Tells whether an I/O failure comes from the client's connection: an end
+     * of stream before the body was complete, a socket failure or timeout, or
+     * the servlet container's client-abort exception (matched by name, so the
+     * handler does not depend on the container).
+     *
+     * @param failure the I/O failure
+     * @return true when the failure or one of its causes is a connection failure
+     */
+    private static boolean isConnectionFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof EOFException
+                || cause instanceof SocketException
+                || cause instanceof SocketTimeoutException
+                || CLIENT_ABORT_EXCEPTION.equals(cause.getClass().getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * Writes a plain-text error response, unless the response is already
