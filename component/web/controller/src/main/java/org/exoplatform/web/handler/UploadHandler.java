@@ -208,7 +208,7 @@ public class UploadHandler extends WebRequestHandler {
                     + " bytes, " + e.getPermitted() + " permitted");
             }
         } catch (FileUploadException e) {
-            if (isStagingFailure(e)) {
+            if (isStagingFailure(e) && !service.canStageUpload(req.getContentLengthLong())) {
                 LOG.warn("Token upload of id {} failed while staging its file", req.getParameter("uploadId"), e);
                 writeError(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Upload failed");
             } else {
@@ -221,11 +221,14 @@ public class UploadHandler extends WebRequestHandler {
     }
 
     /**
-     * Tells whether a refused upload failed on the server side rather than on
-     * the request: the multipart parser wraps an {@link IOException} raised
-     * while it copies the file to the staging folder, or while the stored file
-     * is read for validation, in a plain {@link FileUploadException}, where a
-     * malformed, truncated or oversized request raises one of its subclasses.
+     * Tells whether a refused upload may have failed on the server side: the
+     * multipart parser wraps an {@link IOException} raised while it copies the
+     * file to the staging folder in a plain {@link FileUploadException}, where a
+     * malformed or oversized request raises one of its subclasses. A failed
+     * read of the request stream (a client abort, a timeout) is wrapped the same
+     * way, so the caller also checks the staging folder
+     * ({@link UploadService#canStageUpload(long)}) before answering a server
+     * error.
      *
      * @param e the exception the upload was refused with
      * @return true when its cause is an I/O failure that is not itself a
