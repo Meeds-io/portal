@@ -161,14 +161,7 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
 
   public void testShouldDisableUserReactivatedBeforeGracePeriod() throws Exception {
     disableAsInactiveThenReactivate();
-    long reactivationTime = ZonedDateTime.now().minusDays(8).toEpochSecond() * 1000;
-    getContainer().getComponentInstanceOfType(PicketLinkIDMService.class)
-                  .getIdentitySession()
-                  .getAttributesManager()
-                  .updateAttributes(userName,
-                                    new Attribute[] { new SimpleAttribute("reactivationTime",
-                                                                          String.valueOf(reactivationTime)) });
-    restartTransaction();
+    setReactivationTime(ZonedDateTime.now().minusDays(8));
 
     assertEquals(1, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
@@ -184,6 +177,9 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     config.setReactivationGracePeriodDays(0);
     try {
       disableAsInactiveThenReactivate();
+      // A reactivation time ahead of the job's start: only the zero grace
+      // period itself, not the clock, can then let the job disable the user
+      setReactivationTime(ZonedDateTime.now().plusMinutes(1));
 
       assertEquals(1, userDao.disableInactiveUsers(null, 5));
       restartTransaction();
@@ -193,26 +189,6 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     } finally {
       config.setReactivationGracePeriodDays(gracePeriodDays);
     }
-  }
-
-  @SuppressWarnings("deprecation")
-  private void disableAsInactiveThenReactivate() throws Exception {
-    User user = userDao.findUserByName(userName, UserStatus.ANY);
-    user.setLastLoginTime(Date.from(LocalDate.now()
-                                             .minusDays(6)
-                                             .atStartOfDay()
-                                             .atZone(ZoneId.systemDefault())
-                                             .toInstant()));
-    userDao.saveUser(user, true);
-    restartTransaction();
-
-    assertEquals(1, userDao.disableInactiveUsers(null, 5));
-    restartTransaction();
-
-    // No read back here: the job does not evict the user cache, so a cached
-    // copy read now would hide a later automatic deactivation
-    assertTrue(userDao.setEnabled(userName, true, true).isEnabled());
-    restartTransaction();
   }
 
   @SuppressWarnings("deprecation")
@@ -273,6 +249,37 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
       }
       restartTransaction();
     }
+  }
+
+  @SuppressWarnings("deprecation")
+  private void disableAsInactiveThenReactivate() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    // No read back here: the job does not evict the user cache, so a cached
+    // copy read now would hide a later automatic deactivation
+    assertTrue(userDao.setEnabled(userName, true, true).isEnabled());
+    restartTransaction();
+  }
+
+  private void setReactivationTime(ZonedDateTime reactivationTime) throws Exception {
+    getContainer().getComponentInstanceOfType(PicketLinkIDMService.class)
+                  .getIdentitySession()
+                  .getAttributesManager()
+                  .updateAttributes(userName,
+                                    new Attribute[] { new SimpleAttribute("reactivationTime",
+                                                                          String.valueOf(reactivationTime.toInstant()
+                                                                                                         .toEpochMilli())) });
+    restartTransaction();
   }
 
 }
