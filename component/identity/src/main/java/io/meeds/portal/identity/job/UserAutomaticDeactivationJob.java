@@ -39,6 +39,13 @@ import lombok.extern.slf4j.Slf4j;
  * {@code social.user.inactive.period.days} (default value: 180 days).
  * </p>
  * <p>
+ * A user re-enabled by an administrator stays enabled for a grace period after
+ * the reactivation, giving them time to log in again. Its length is
+ * configurable using the system property
+ * {@code social.user.inactive.reactivation.grace.days} (default value: 7 days,
+ * 0 turns it off).
+ * </p>
+ * <p>
  * The job execution schedule is configurable using the cron expression
  * {@code social.UserAutomaticDeactivationJob.expression}. By default, the job
  * is executed once per day.
