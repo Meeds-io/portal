@@ -19,44 +19,100 @@
 package io.meeds.spring.kernel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.cache.Cache;
-import org.springframework.core.env.Environment;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.StandardEnvironment;
 
+import org.exoplatform.services.cache.CacheMode;
 import org.exoplatform.services.cache.CacheService;
+import org.exoplatform.services.cache.ExoCacheConfig;
+import org.exoplatform.services.cache.ExoCacheConfigPlugin;
 import org.exoplatform.services.cache.concurrent.ConcurrentFIFOExoCache;
 
 /**
  * What a Spring cache does to the kernel cache behind it: in a cluster, the
  * kernel cache of an invalidated cache sends its puts, removes and clears to
  * the other nodes, so a value Spring loads must stay on the node that loaded
- * it, and an eviction must not.
+ * it, and an eviction must not. The cache is shared by the nodes when the
+ * properties give it a mode, which the cluster profile does.
  */
 class KernelCacheManagerAdapterTest {
 
-  private RecordingCache kernelCache;
+  private RecordingCache      kernelCache;
 
-  private Cache          cache;
+  private CacheService        cacheService;
+
+  private Map<String, Object> properties;
+
+  private Cache               cache;
 
   @BeforeEach
   void setUp() {
     kernelCache = new RecordingCache();
-    CacheService cacheService = mock(CacheService.class);
+    cacheService = mock(CacheService.class);
     when(cacheService.getAllCacheInstances()).thenReturn(new ArrayList<>());
     when(cacheService.getCacheInstance("test.spring")).thenAnswer(invocation -> kernelCache);
-    Environment environment = mock(Environment.class);
-    when(environment.getProperty(anyString(), eq(""))).thenReturn("");
-    cache = new KernelCacheManagerAdapter(cacheService, environment).getCache("test.spring");
+    properties = new HashMap<>();
+    cache = getCache();
+  }
+
+  @Test
+  void cacheWithAModeIsConfiguredBeforeItsCreation() {
+    properties.put("meeds.cache.cacheMode", "local");
+    properties.put("meeds.cache.test.spring.cacheMode", "asyncInvalidation");
+    properties.put("meeds.cache.test.spring.max", "50");
+    properties.put("meeds.cache.test.spring.ttl", "60");
+
+    getCache();
+
+    ExoCacheConfig config = getClusterConfig();
+    assertEquals("test.spring", config.getName());
+    assertEquals(CacheMode.ASYNCINVALIDATION, config.getCacheMode());
+    assertEquals(50, config.getMaxSize());
+    assertEquals(60, config.getLiveTime());
+    // A clustered cache refuses to be resized
+    assertEquals(List.of(), kernelCache.calls);
+  }
+
+  @Test
+  void cacheWithoutAModeOfItsOwnTakesTheDefaultOneAndSize() {
+    properties.put("meeds.cache.cacheMode", "asyncInvalidation");
+
+    getCache();
+
+    ExoCacheConfig config = getClusterConfig();
+    assertEquals(CacheMode.ASYNCINVALIDATION, config.getCacheMode());
+    assertEquals(300, config.getMaxSize());
+    assertEquals(600, config.getLiveTime());
+  }
+
+  @Test
+  void localCacheIsResizedOnceCreated() {
+    properties.put("meeds.cache.cacheMode", "asyncInvalidation");
+    properties.put("meeds.cache.test.spring.cacheMode", "local");
+    properties.put("meeds.cache.test.spring.ttl", "60");
+
+    getCache();
+
+    verify(cacheService, never()).addExoCacheConfig(any(ExoCacheConfigPlugin.class));
+    assertEquals(List.of("liveTime 60"), kernelCache.calls);
   }
 
   @Test
@@ -86,6 +142,23 @@ class KernelCacheManagerAdapterTest {
     cache.clear();
 
     assertEquals(List.of("clear"), kernelCache.calls);
+  }
+
+  private Cache getCache() {
+    StandardEnvironment environment = new StandardEnvironment();
+    environment.getPropertySources().addFirst(new MapPropertySource("test", properties));
+    kernelCache.calls.clear();
+    return new KernelCacheManagerAdapter(cacheService, environment).getCache("test.spring");
+  }
+
+  private ExoCacheConfig getClusterConfig() {
+    ArgumentCaptor<ExoCacheConfigPlugin> plugin = ArgumentCaptor.forClass(ExoCacheConfigPlugin.class);
+    InOrder order = inOrder(cacheService);
+    order.verify(cacheService).addExoCacheConfig(plugin.capture());
+    order.verify(cacheService).getCacheInstance("test.spring");
+    List<ExoCacheConfig> configs = plugin.getValue().getConfigs();
+    assertEquals(1, configs.size());
+    return configs.get(0);
   }
 
   /**
@@ -121,6 +194,18 @@ class KernelCacheManagerAdapterTest {
     public void clearCache() {
       calls.add("clear");
       super.clearCache();
+    }
+
+    @Override
+    public void setLiveTime(long period) {
+      calls.add("liveTime " + period);
+      super.setLiveTime(period);
+    }
+
+    @Override
+    public void setMaxSize(int max) {
+      calls.add("maxSize " + max);
+      super.setMaxSize(max);
     }
   }
 }

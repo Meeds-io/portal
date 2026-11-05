@@ -20,6 +20,7 @@ package io.meeds.spring.kernel;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,12 +34,21 @@ import org.springframework.core.env.Environment;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
+import org.exoplatform.container.xml.InitParams;
+import org.exoplatform.container.xml.ObjectParameter;
+import org.exoplatform.services.cache.CacheMode;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.cache.ExoCacheConfig;
+import org.exoplatform.services.cache.ExoCacheConfigPlugin;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
 import lombok.Setter;
 
 public class KernelCacheManagerAdapter implements CacheManager {
+
+  private static final Log   LOG            = ExoLogger.getLogger(KernelCacheManagerAdapter.class);
 
   @Setter
   private CacheService       cacheService;
@@ -65,8 +75,14 @@ public class KernelCacheManagerAdapter implements CacheManager {
                                   .stream()
                                   .map(ExoCache::getName)
                                   .noneMatch(n -> Strings.CS.equals(n, name));
+      CacheMode clusterMode = isNew ? getClusterMode(name) : null;
+      if (clusterMode != null) {
+        // A cache shared by the nodes of a cluster cannot be resized once
+        // created: it is configured before its creation
+        cacheService.addExoCacheConfig(getClusterConfig(name, clusterMode));
+      }
       ExoCache<Serializable, Object> cacheInstance = cacheService.getCacheInstance(name);
-      if (isNew) {
+      if (isNew && clusterMode == null) {
         String ttl = environment.getProperty("meeds.cache." + name + ".ttl", "");
         if (StringUtils.isNotBlank(ttl)) {
           cacheInstance.setLiveTime(Integer.parseInt(ttl));
@@ -163,6 +179,49 @@ public class KernelCacheManagerAdapter implements CacheManager {
 
       };
     });
+  }
+
+  /**
+   * @param  name the name of the cache
+   * @return      the mode the {@code meeds.cache.<name>.cacheMode} property
+   *              sets, or else {@code meeds.cache.cacheMode}, when it shares
+   *              the cache between the nodes of a cluster; null otherwise
+   */
+  private CacheMode getClusterMode(String name) {
+    String mode = getProperty("meeds.cache." + name + ".cacheMode", getProperty("meeds.cache.cacheMode", null));
+    if (mode == null) {
+      return null;
+    }
+    try {
+      CacheMode cacheMode = CacheMode.valueOf(mode.toUpperCase(Locale.ROOT));
+      return cacheMode.isLocal() ? null : cacheMode;
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Unknown mode '{}' for the cache '{}', which stays local", mode, name);
+      return null;
+    }
+  }
+
+  private ExoCacheConfigPlugin getClusterConfig(String name, CacheMode cacheMode) {
+    ExoCacheConfig config = new ExoCacheConfig();
+    config.setName(name);
+    config.setCacheMode(cacheMode);
+    // Without a size of its own, the cache takes the default one of the
+    // kernel, which the same properties set
+    config.setMaxSize(Integer.parseInt(getProperty("meeds.cache." + name + ".max",
+                                                   getProperty("exo.cache.default.MaxNodes", "300"))));
+    config.setLiveTime(Long.parseLong(getProperty("meeds.cache." + name + ".ttl",
+                                                  getProperty("exo.cache.default.TimeToLive", "600"))));
+    ObjectParameter parameter = new ObjectParameter();
+    parameter.setName(name);
+    parameter.setObject(config);
+    InitParams params = new InitParams();
+    params.addParameter(parameter);
+    return new ExoCacheConfigPlugin(params);
+  }
+
+  private String getProperty(String key, String defaultValue) {
+    String value = environment.getProperty(key);
+    return StringUtils.isBlank(value) ? defaultValue : value.trim();
   }
 
   /**
