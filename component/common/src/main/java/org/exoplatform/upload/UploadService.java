@@ -584,7 +584,7 @@ public class UploadService {
       } catch (FileUploadException e) {
         upResource.setStatus(UploadResource.FAILED_STATUS);
         removeRefusedUpload(upResource);
-        throw e;
+        throw e instanceof UploadRefusedException refused ? refused : new UploadRefusedException(e);
       } catch (IOException e) {
         upResource.setStatus(UploadResource.FAILED_STATUS);
         removeRefusedUpload(upResource);
@@ -603,21 +603,6 @@ public class UploadService {
     session.setAttribute(UploadService.UPLOAD_RESOURCES_STACK, uploadResouceIds);
   }
 
-  /**
-   * Tells whether the staging folder can take an upload of the given size: it
-   * exists, is a writable folder and has at least that many bytes of usable
-   * space. A failed upload is a server failure only when this answers false; an
-   * I/O failure while the folder is usable is the request's, such as a client
-   * that dropped the connection.
-   *
-   * @param size the size announced by the request, in bytes, 0 or less when
-   *          unknown
-   * @return true when the staging folder can take the upload
-   */
-  public boolean canStageUpload(long size) {
-    File folder = new File(uploadLocation_);
-    return folder.isDirectory() && folder.canWrite() && folder.getUsableSpace() >= Math.max(size, 1);
-  }
 
   /**
    * Get UploadResource by uploadId. Answers any caller, whoever uploaded the
