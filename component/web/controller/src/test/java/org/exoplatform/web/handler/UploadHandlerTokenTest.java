@@ -19,6 +19,7 @@
 package org.exoplatform.web.handler;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -315,6 +316,103 @@ public class UploadHandlerTokenTest {
       assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, status[0]);
       assertEquals("Upload failed", responseBody.toString());
       assertNull(failingService.getUploadResource(uploadId));
+    } finally {
+      staging.delete();
+      staging.getParentFile().delete();
+      root.delete();
+    }
+  }
+
+  /**
+   * A request stream that fails while the parser reads it (a client that
+   * dropped the connection) is wrapped by the parser like a staging write
+   * failure; with a usable staging folder it stays the request's failure: 400,
+   * nothing logged as a server error, nothing left registered.
+   */
+  @Test
+  public void testClientAbortDuringParseIsRequestError() throws Exception {
+    String uploadId = UUID.randomUUID().toString();
+    String token = uploadService.createUploadToken("john", uploadId, 100);
+    HttpServletRequest request = request("upload", uploadId, "Bearer " + token, null, "a.txt", "hello");
+    ServletInputStream body = request.getInputStream();
+    // the connection drops inside the closing boundary: headers parsed, file copy under way
+    int dropAt = request.getContentLength() - 30;
+    int[] served = { 0 };
+    when(request.getInputStream()).thenReturn(new ServletInputStream() {
+      /** {@inheritDoc} */
+      @Override
+      public int read() throws IOException {
+        if (served[0] >= dropAt) {
+          throw new IOException("Connection reset by peer");
+        }
+        served[0]++;
+        return body.read();
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public int read(byte[] b, int off, int len) throws IOException {
+        if (served[0] >= dropAt) {
+          throw new IOException("Connection reset by peer");
+        }
+        int read = body.read(b, off, Math.min(len, dropAt - served[0]));
+        served[0] += Math.max(read, 0);
+        return read;
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public boolean isFinished() {
+        return false;
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public boolean isReady() {
+        return true;
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public void setReadListener(ReadListener readListener) {
+        // not used: the parser reads synchronously
+      }
+    });
+
+    handler.execute(request, response);
+
+    assertEquals(HttpServletResponse.SC_BAD_REQUEST, status[0]);
+    assertTrue(responseBody.toString().contains("Connection reset by peer"));
+    assertNull(uploadService.getUploadResource(uploadId));
+  }
+
+  /**
+   * The staging folder check that decides a server error: a missing folder, a
+   * file in its place and a size beyond the usable space are refused, a
+   * writable folder with room is accepted.
+   */
+  @Test
+  public void testCanStageUploadReadsTheStagingFolder() throws Exception {
+    java.io.File root = java.nio.file.Files.createTempDirectory("exo-upload-stage-check").toFile();
+    java.io.File staging = new java.io.File(root, "portal/eXoUpload");
+    InitParams params = new InitParams();
+    ValueParam location = new ValueParam();
+    location.setName("upload.location");
+    location.setValue(root.getPath());
+    params.addParameter(location);
+    PortalContainerInfo containerInfo = mock(PortalContainerInfo.class);
+    when(containerInfo.getContainerName()).thenReturn("portal");
+    UploadService service = new UploadService(containerInfo, params);
+    try {
+      assertFalse(service.canStageUpload(10));
+      assertTrue(staging.getParentFile().mkdirs());
+      assertTrue(staging.createNewFile());
+      assertFalse(service.canStageUpload(10));
+      assertTrue(staging.delete());
+      assertTrue(staging.mkdir());
+      assertTrue(service.canStageUpload(10));
+      assertTrue(service.canStageUpload(-1));
+      assertFalse(service.canStageUpload(Long.MAX_VALUE));
     } finally {
       staging.delete();
       staging.getParentFile().delete();
