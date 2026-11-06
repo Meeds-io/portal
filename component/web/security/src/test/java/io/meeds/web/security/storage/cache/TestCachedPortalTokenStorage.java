@@ -107,6 +107,30 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
     assertNotNull(cache.get("mary-token"));
   }
 
+  public void testCleanOfExpiredTokensClearsTheCache() throws Exception {
+    storage.createToken(new TokenData("jdoe-expired-token",
+                                      "hash",
+                                      "jdoe",
+                                      new Date(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1)),
+                                      TOKEN_TYPE));
+    createToken("mary-token", "mary");
+
+    storage.cleanExpired();
+
+    assertNull(storage.getToken("jdoe-expired-token"));
+    assertNull(cache.get("mary-token"));
+  }
+
+  public void testCleanThatRemovesNoTokenKeepsTheCache() throws Exception {
+    // No expired token is left in the store the token tests share
+    storage.cleanExpired();
+    createToken("mary-token", "mary");
+
+    storage.cleanExpired();
+
+    assertNotNull(cache.get("mary-token"));
+  }
+
   public void testTokenCachedAgainBeforeTheCommitIsEvictedAfterIt() throws Exception {
     createToken("jdoe-token", "jdoe");
     TokenData token = cache.get("jdoe-token");
