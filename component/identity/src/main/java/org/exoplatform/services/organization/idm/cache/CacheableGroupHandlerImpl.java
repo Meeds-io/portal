@@ -29,12 +29,9 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
-import org.exoplatform.services.cache.ClusterCachedObjectSelector;
 import org.exoplatform.services.cache.ExoCache;
-import org.exoplatform.services.cache.ObjectCacheInfo;
 import org.exoplatform.services.organization.ExtendedCloneable;
 import org.exoplatform.services.organization.Group;
-import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.cache.MembershipCacheKey;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
@@ -292,7 +289,7 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
     return computeChildrenKey(getGroupId(parent));
   }
 
-  private static final String computeChildrenKey(String parentId) {
+  static final String computeChildrenKey(String parentId) {
     return "children_" + parentId;
   }
 
@@ -304,69 +301,6 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
       return group.getId();
     }
     return (StringUtils.isBlank(group.getParentId()) ? "" : group.getParentId()) + "/" + group.getGroupName();
-  }
-
-  public static final class ClearGroupCacheByGroupIdSelector extends ClusterCachedObjectSelector<Serializable, Object> {
-    private static final long serialVersionUID = 1L;
-
-    private final String      groupId;
-
-    private final String      childrenKey;
-
-    private final String      parentCachedChildrenKey;
-
-    public ClearGroupCacheByGroupIdSelector(String groupId, String parentId, boolean clearCachedChildrenList) {
-      this.groupId = groupId;
-      this.childrenKey = clearCachedChildrenList ? computeChildrenKey(groupId) : null;
-      this.parentCachedChildrenKey = clearCachedChildrenList ? computeChildrenKey(parentId) : null;
-    }
-
-    @Override
-    protected Object[] criteria() {
-      return new Object[] { groupId, childrenKey, parentCachedChildrenKey };
-    }
-
-    @Override
-    public boolean select(Serializable key, ObjectCacheInfo<? extends Object> ocinfo) {
-      String keyString = key.toString();
-      if (key.equals(groupId) || keyString.startsWith(groupId + "/")
-          || (StringUtils.isNotBlank(childrenKey) && (keyString.equals(childrenKey) || keyString.startsWith(childrenKey + "/")))
-          || (StringUtils.isNotBlank(parentCachedChildrenKey) && (keyString.equals(parentCachedChildrenKey)))) {
-        return true;
-      }
-      return false;
-    }
-  }
-
-  public static final class ClearMembershipCacheByGroupIdSelector
-      extends ClusterCachedObjectSelector<MembershipCacheKey, Object> {
-    private static final long serialVersionUID = 1L;
-
-    private final String      groupId;
-
-    public ClearMembershipCacheByGroupIdSelector(String groupId) {
-      this.groupId = groupId;
-    }
-
-    @Override
-    protected Object[] criteria() {
-      return new Object[] { groupId };
-    }
-
-    @Override
-    public boolean select(MembershipCacheKey key, ObjectCacheInfo<? extends Object> ocinfo) {
-      Object obj = ocinfo.get();
-      if (obj instanceof Membership) {
-        Membership cachedMembership = (Membership) ocinfo.get();
-        if (cachedMembership.getGroupId().equals(groupId)) {
-          return true;
-        }
-      } else if (obj instanceof Collection) {
-        // Delete all cached user's memberships when deleting a group
-        return true;
-      }
-      return false;
-    }
   }
 
   @Override
