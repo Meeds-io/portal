@@ -20,9 +20,7 @@ package org.exoplatform.settings.cache.selector;
 
 import org.exoplatform.commons.api.settings.data.SettingContext;
 import org.exoplatform.commons.api.settings.data.SettingKey;
-import org.exoplatform.commons.api.settings.data.SettingScope;
-import org.exoplatform.services.cache.CachedObjectSelector;
-import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.cache.ClusterCachedObjectSelector;
 import org.exoplatform.services.cache.ObjectCacheInfo;
 
 /**
@@ -31,28 +29,24 @@ import org.exoplatform.services.cache.ObjectCacheInfo;
  *          bangnv@exoplatform.com
  * Nov 27, 2012  
  * This class allows to select all setting cache objects which are in a specified Context or Scope.
- * The callback function of this selector is to remove all selected setting object.
+ * The selected settings are removed, from every node of a cluster.
  * @LevelAPI Experimental
  */
+public class SettingCacheSelector extends ClusterCachedObjectSelector<SettingKey, Object> {
+  private static final long    serialVersionUID = 2817394650273819465L;
 
-public class SettingCacheSelector implements CachedObjectSelector<SettingKey,Object>{
-  private SettingContext provider;
-  
+  private final SettingContext provider;
+
   /**
    * Create a selector with a specified context 
    * @param provider context or scope with which the specified value is to be associated
    * @LevelAPI Experimental
    */
-  public SettingCacheSelector( SettingContext provider) {
-    if (provider==null) {
+  public SettingCacheSelector(SettingContext provider) {
+    if (provider == null) {
       throw new NullPointerException();
     }
-    if(provider instanceof SettingScope ) {
-      this.provider =(SettingScope) provider;
-    }
-    else {
     this.provider = provider;
-    }
   }
 
   /**
@@ -70,18 +64,10 @@ public class SettingCacheSelector implements CachedObjectSelector<SettingKey,Obj
     return false;
   }
 
-  /**
-   * Callback function if select function return true. This function will remove this selected setting key from cache.
-   * @param cache	ExoCache 
-   * @param key		setting will be removed
-   * @param ocinfo	cache info
-   * @LevelAPI Experimental
-   */
-  @Override  
-  public void onSelect(ExoCache<? extends SettingKey, ? extends Object> cache,
-                       SettingKey key,
-                       ObjectCacheInfo<? extends Object> ocinfo) throws Exception {
-    cache.remove(key)    ;
+  @Override
+  protected Object[] criteria() {
+    // A context equals a scope of its own: the class keeps the selection of a context apart from a scope's
+    return new Object[] { provider.getClass().getName(), provider };
   }
 
 }
