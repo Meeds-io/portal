@@ -18,8 +18,13 @@
  */
 package io.meeds.web.security.storage.cache;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.component.test.AbstractKernelTest;
@@ -31,6 +36,8 @@ import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 
+import io.meeds.web.security.dao.TokenDAO;
+import io.meeds.web.security.dao.TokenDAOImpl;
 import io.meeds.web.security.model.TokenData;
 import io.meeds.web.security.storage.PortalTokenStorage;
 
@@ -145,6 +152,48 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
     }
 
     assertNull(cache.get("jdoe-token"));
+  }
+
+  public void testAFailedDeleteOfAllTheTokensOfAUserDeletesNone() throws Exception {
+    // The store itself, whatever DAO the container the tests share was built with
+    TokenDAO tokenDAO = new TokenDAOImpl();
+    TokenDAO failingDAO = spy(tokenDAO);
+    // The store fails on the second token
+    AtomicInteger deletes = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (deletes.incrementAndGet() > 1) {
+        throw new IllegalStateException("store unavailable");
+      }
+      return invocation.callRealMethod();
+    }).when(failingDAO).delete(any());
+    CachedPortalTokenStorage failingStorage =
+                                            new CachedPortalTokenStorage(getContainer().getComponentInstanceOfType(CacheService.class),
+                                                                         failingDAO);
+    failingStorage.createToken(token("owner-token", TOKEN_OWNER));
+    failingStorage.createToken(token("owner-second-token", TOKEN_OWNER));
+    try {
+      try {
+        failingStorage.deleteTokenOfUser(TOKEN_OWNER);
+        fail("The failure of the store reaches the caller");
+      } catch (IllegalStateException e) {
+        // The second delete failed
+      }
+
+      // Read from the store, not from the persistence context of the rolled
+      // back transaction: the tokens of the user are all kept
+      entityManagerService.getEntityManager().clear();
+      assertEquals(2, tokenDAO.findByUsername(TOKEN_OWNER).size());
+    } finally {
+      tokenDAO.deleteTokensByUsernameAndType(TOKEN_OWNER, TOKEN_TYPE);
+    }
+  }
+
+  private static TokenData token(String tokenId, String username) {
+    return new TokenData(tokenId,
+                         "hash",
+                         username,
+                         new Date(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1)),
+                         TOKEN_TYPE);
   }
 
   private void createToken(String tokenId, String username) throws Exception {
