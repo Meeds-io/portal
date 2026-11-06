@@ -1053,9 +1053,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     Attribute reactivationTime = service_.getIdentitySession()
                                          .getAttributesManager()
                                          .getAttribute(userName, USER_REACTIVATION_TIME);
-    return reactivationTime != null
-        && reactivationTime.getValue() != null
-        && Long.parseLong(reactivationTime.getValue().toString()) >= sinceTime;
+    Object reactivationTimeValue = reactivationTime == null ? null : reactivationTime.getValue();
+    return reactivationTimeValue != null && Long.parseLong(reactivationTimeValue.toString()) >= sinceTime;
   }
 
   private void preSave(UserEventListener listener, User user, boolean isNew) {
