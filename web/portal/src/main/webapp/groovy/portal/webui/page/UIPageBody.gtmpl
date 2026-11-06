@@ -1,4 +1,4 @@
-<div class="UIPageBody" id="UIPageBody">
+<div class="UIPageBody" id="UIPageBody" tabindex="-1">
 	<div class="UIComponent UIComponentBlock">
   	<div class="VIEW-PAGEBODY VIEW-BLOCK" id="PAGEBODY-VIEW-BLOCK">
   		<% if (uicomponent.getUIComponent() == null) { %>
