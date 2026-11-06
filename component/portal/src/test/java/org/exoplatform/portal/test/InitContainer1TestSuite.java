@@ -72,10 +72,12 @@ import io.meeds.portal.security.listener.DefaultUserMembershipListenerTest;
 import io.meeds.portal.security.listener.PortalRegistrationUpdateListenerTest;
 import io.meeds.portal.security.rest.RegistrationSettingRestTest;
 import io.meeds.portal.security.service.SecuritySettingServiceTest;
+import org.exoplatform.portal.mop.storage.cache.model.TestCacheSelectors;
 
 @RunWith(Suite.class)
 @SuiteClasses({
     SecuritySettingServiceTest.class,
+    TestCacheSelectors.class,
     PortalRegistrationUpdateListenerTest.class,
     DefaultUserMembershipListenerTest.class,
     PermanentLinkServiceTest.class,
