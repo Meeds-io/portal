@@ -25,6 +25,7 @@ import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.web.security.security.TokenExistsException;
 
+import io.meeds.common.ContainerTransactional;
 import io.meeds.common.TransactionCallbacks;
 import io.meeds.web.security.dao.TokenDAO;
 import io.meeds.web.security.model.TokenData;
@@ -93,10 +94,10 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   }
 
   @Override
-  @ExoTransactional
+  @ContainerTransactional(atomic = true)
   public void deleteTokenOfUser(String username) {
-    // Only the tokens deleted go, from every node: a user who has none
-    // evicts nothing
+    // The tokens of the user are deleted one by one, all of them or none; only
+    // the tokens deleted go, from every node: a user who has none evicts nothing
     deleteTokens(username).forEach(token -> clearKey(token.getTokenId()));
   }
 
@@ -111,7 +112,6 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   }
 
   @Override
-  @ExoTransactional
   public void cleanExpired() {
     if (tokenDAO.cleanExpired() > 0) {
       clearAll();
