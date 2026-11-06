@@ -18,13 +18,18 @@
  */
 package org.exoplatform.settings.cache.selector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
@@ -35,7 +40,7 @@ import org.exoplatform.commons.api.settings.data.SettingScope;
 /**
  * The selection of the settings of a context or a scope, which travels to the other nodes of a cluster.
  */
-public class SettingCacheSelectorTest extends TestCase {
+class SettingCacheSelectorTest {
 
   private static final SettingKey JOHN_APPLICATION = new SettingKey(Context.USER.id("john"), Scope.APPLICATION.id("app"), "k");
 
@@ -43,7 +48,8 @@ public class SettingCacheSelectorTest extends TestCase {
 
   private static final SettingKey MARY_APPLICATION = new SettingKey(Context.USER.id("mary"), Scope.APPLICATION.id("app"), "k");
 
-  public void testScopeSelectionSelectsTheKeysOfItsScope() {
+  @Test
+  void scopeSelectionSelectsTheKeysOfItsScope() {
     SettingCacheSelector selector = new SettingCacheSelector(new SettingScope(Context.USER.id("john"),
                                                                               Scope.APPLICATION.id("app")));
 
@@ -52,7 +58,8 @@ public class SettingCacheSelectorTest extends TestCase {
     assertFalse(selector.select(MARY_APPLICATION, null));
   }
 
-  public void testContextSelectionSelectsEveryScopeOfItsContext() {
+  @Test
+  void contextSelectionSelectsEveryScopeOfItsContext() {
     SettingCacheSelector selector = new SettingCacheSelector(new SettingContext(Context.USER.id("john")));
 
     assertTrue(selector.select(JOHN_APPLICATION, null));
@@ -60,16 +67,18 @@ public class SettingCacheSelectorTest extends TestCase {
     assertFalse(selector.select(MARY_APPLICATION, null));
   }
 
-  public void testAContextSelectionIsNotTheSelectionOfOneOfItsScopes() {
+  @Test
+  void aContextSelectionIsNotTheSelectionOfOneOfItsScopes() {
     SettingCacheSelector context = new SettingCacheSelector(new SettingContext(Context.USER.id("john")));
     SettingCacheSelector scope = new SettingCacheSelector(new SettingScope(Context.USER.id("john"),
                                                                            Scope.APPLICATION.id("app")));
 
-    assertFalse(context.equals(scope));
-    assertFalse(scope.equals(context));
+    assertNotEquals(context, scope);
+    assertNotEquals(scope, context);
   }
 
-  public void testASelectionTravelsAsTheSameSelection() throws Exception {
+  @Test
+  void aSelectionTravelsAsTheSameSelection() throws Exception {
     SettingCacheSelector selector = new SettingCacheSelector(new SettingScope(Context.USER.id("john"),
                                                                               Scope.APPLICATION.id("app")));
 
