@@ -246,9 +246,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   DEFAULT_FONT_FAMILY                = "Arimo";
 
   /**
-   * Default page background color of the Branding and Theme page (social
-   * SiteBranding.vue and PageStylingDrawer.vue), stored as is or with an
-   * opaque alpha
+   * Built-in default page background color of the Branding and Theme page
+   * (social SiteBranding.vue and PageStylingDrawer.vue), stored as is or with
+   * an opaque alpha when no default is configured
+   * (exo.branding.page.backgroundColor)
    */
   public static final String   DEFAULT_PAGE_BACKGROUND_COLOR      = "#F0F0F0";
 
