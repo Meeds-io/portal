@@ -87,7 +87,7 @@ public interface BrandingService {
    *         default of the Branding and Theme page, which that page stores
    *         when its page styling is applied or reset without choosing a color
    *         and no default is configured (exo.branding.page.backgroundColor);
-   *         a configured default is not matched
+   *         a configured default other than #F0F0F0 is not matched
    */
   boolean isDefaultPageBackgroundColor();
 

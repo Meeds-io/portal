@@ -1370,12 +1370,6 @@ public class BrandingServiceImplTest {
     assertEquals("Inter", brandingService.getDefaultThemeStyle().get(THEME_FONT_FAMILY_KEY));
   }
 
-  private ConfigurationManager lessConfigurationManager() throws Exception {
-    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
-    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(TEST_LESS_TEMPLATE.getBytes()));
-    return configurationManager;
-  }
-
   @Test
   public void shouldTellWhenThePageBackgroundColorIsTheBrandingDefault() {
     SettingService settingService = mock(SettingService.class);
@@ -1400,6 +1394,12 @@ public class BrandingServiceImplTest {
                               BRANDING_PAGE_BG_COLOR_KEY)).thenReturn((SettingValue) SettingValue.create(otherColor));
       assertFalse(otherColor, brandingService.isDefaultPageBackgroundColor());
     }
+  }
+
+  private ConfigurationManager lessConfigurationManager() throws Exception {
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(TEST_LESS_TEMPLATE.getBytes()));
+    return configurationManager;
   }
 
   private BrandingServiceImpl newBrandingServiceWithVariable(String variableEntry) {
