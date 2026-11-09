@@ -20,10 +20,14 @@ package io.meeds.portal.identity;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+
+import org.picketlink.idm.api.Attribute;
+import org.picketlink.idm.impl.api.SimpleAttribute;
 
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
@@ -32,6 +36,7 @@ import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
 @ConfiguredBy({
@@ -141,6 +146,41 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertTrue(user.isAutomaticDeactivation());
   }
 
+  public void testShouldNotDisableUserReactivatedWithinInactivityPeriod() throws Exception {
+    disableAsInactiveThenReactivate(6, 5);
+
+    assertEquals(0, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue("User reactivated within the inactivity period must stay enabled", user.isEnabled());
+    assertFalse(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldCountInactivityFromReactivationOverLongPeriod() throws Exception {
+    disableAsInactiveThenReactivate(400, 365);
+    setReactivationTime(ZonedDateTime.now().minusDays(30));
+
+    assertEquals(0, userDao.disableInactiveUsers(null, 365));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue("User reactivated 30 days ago must stay enabled with a 365-day inactivity period", user.isEnabled());
+    assertFalse(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldDisableUserReactivatedBeforeInactivityPeriod() throws Exception {
+    disableAsInactiveThenReactivate(10, 5);
+    setReactivationTime(ZonedDateTime.now().minusDays(6));
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse("User inactive for the whole period since the reactivation must be disabled again", user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
+  }
+
   @SuppressWarnings("deprecation")
   public void testShouldDisableInactiveUsersBeyondFirstPage() throws Exception {
     List<String> createdUserNames = new ArrayList<>();
@@ -199,6 +239,37 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
       }
       restartTransaction();
     }
+  }
+
+  @SuppressWarnings("deprecation")
+  private void disableAsInactiveThenReactivate(int lastLoginDaysAgo, int inactiveDays) throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(lastLoginDaysAgo)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+
+    assertEquals(1, userDao.disableInactiveUsers(null, inactiveDays));
+    restartTransaction();
+
+    // No read back here: the job does not evict the user cache, so a cached
+    // copy read now would hide a later automatic deactivation
+    assertTrue(userDao.setEnabled(userName, true, true).isEnabled());
+    restartTransaction();
+  }
+
+  private void setReactivationTime(ZonedDateTime reactivationTime) throws Exception {
+    getContainer().getComponentInstanceOfType(PicketLinkIDMService.class)
+                  .getIdentitySession()
+                  .getAttributesManager()
+                  .updateAttributes(userName,
+                                    new Attribute[] { new SimpleAttribute("reactivationTime",
+                                                                          String.valueOf(reactivationTime.toInstant()
+                                                                                                         .toEpochMilli())) });
+    restartTransaction();
   }
 
 }
