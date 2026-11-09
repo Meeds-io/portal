@@ -83,6 +83,13 @@ public interface BrandingService {
   String getPageBackgroundColor();
 
   /**
+   * @return true when the page background color is the default color of the
+   *         Branding and Theme page, which that page stores when its page
+   *         styling is applied or reset without choosing a color
+   */
+  boolean isDefaultPageBackgroundColor();
+
+  /**
    * @return Page Background Size
    */
   String getPageBackgroundSize();

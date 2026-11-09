@@ -32,6 +32,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN_TITLE_PARAM;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGO_ID_SETTING_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGO_INIT_PARAM;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_PAGE_BG_COLOR_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_RESET_ATTACHMENT_ID;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SCOPE;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SITE_NAME_INIT_PARAM;
@@ -47,6 +48,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.LOGIN_BACKGROU
 import static org.exoplatform.portal.branding.BrandingServiceImpl.SUPPORTED_FONT_FAMILIES;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.THEME_FONT_FAMILY_KEY;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -1372,6 +1374,32 @@ public class BrandingServiceImplTest {
     ConfigurationManager configurationManager = mock(ConfigurationManager.class);
     when(configurationManager.getInputStream(TEST_LESS_PATH)).thenAnswer(invocation -> new ByteArrayInputStream(TEST_LESS_TEMPLATE.getBytes()));
     return configurationManager;
+  }
+
+  @Test
+  public void shouldTellWhenThePageBackgroundColorIsTheBrandingDefault() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+
+    assertFalse("No page background color stored", brandingService.isDefaultPageBackgroundColor());
+    for (String defaultColor : List.of("#F0F0F0", "#f0f0f0", "#F0F0F0FF", "#f0f0f0ff")) {
+      when(settingService.get(Context.GLOBAL,
+                              Scope.GLOBAL,
+                              BRANDING_PAGE_BG_COLOR_KEY)).thenReturn((SettingValue) SettingValue.create(defaultColor));
+      assertTrue(defaultColor, brandingService.isDefaultPageBackgroundColor());
+    }
+    for (String otherColor : List.of("#F2F2F2", "#FFFFFF", "#F0F0F0AA", "#F0F0F0F0")) {
+      when(settingService.get(Context.GLOBAL,
+                              Scope.GLOBAL,
+                              BRANDING_PAGE_BG_COLOR_KEY)).thenReturn((SettingValue) SettingValue.create(otherColor));
+      assertFalse(otherColor, brandingService.isDefaultPageBackgroundColor());
+    }
   }
 
   private BrandingServiceImpl newBrandingServiceWithVariable(String variableEntry) {
