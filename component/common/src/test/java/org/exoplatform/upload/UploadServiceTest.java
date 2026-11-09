@@ -151,6 +151,7 @@ public class UploadServiceTest {
 
     HttpServletRequest marysRequest = multipartRequest("mary");
     assertThrows(FileUploadException.class, () -> uploadService.removeUploadResource("johns", marysRequest));
+    assertThrows(FileUploadException.class, () -> uploadService.removeUploadResource("johns", multipartRequest(null)));
     assertNotNull(uploadService.getUploadResource("johns"));
     assertTrue(johnsFile.exists());
 
