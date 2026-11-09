@@ -245,6 +245,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   DEFAULT_FONT_FAMILY                = "Arimo";
 
+  /**
+   * Built-in default page background color of the Branding and Theme page
+   * (social SiteBranding.vue and PageStylingDrawer.vue), stored as is or with
+   * an opaque alpha when no default is configured
+   * (exo.branding.page.backgroundColor); a configured default other than this
+   * color is not matched
+   */
+  public static final String   DEFAULT_PAGE_BACKGROUND_COLOR      = "#F0F0F0";
+
   public static final List<String> SUPPORTED_FONT_FAMILIES         = List.of(DEFAULT_FONT_FAMILY, "Inter", "Roboto", "Open Sans", "Public Sans");
 
   public static final String   FONT_FAMILY_UNSUPPORTED_MESSAGE    = "branding.fontFamily.unsupported";
@@ -617,6 +626,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getPageBackgroundColor() {
     return getPropertyValue(BRANDING_PAGE_BG_COLOR_KEY, defaultPageBackgroundColor);
+  }
+
+  @Override
+  public boolean isDefaultPageBackgroundColor() {
+    String pageBackgroundColor = StringUtils.trim(getPageBackgroundColor());
+    return StringUtils.equalsIgnoreCase(pageBackgroundColor, DEFAULT_PAGE_BACKGROUND_COLOR)
+           || StringUtils.equalsIgnoreCase(pageBackgroundColor, DEFAULT_PAGE_BACKGROUND_COLOR + "FF");
   }
 
   @Override
