@@ -212,15 +212,6 @@
           <field name="disableUserActived">
             <boolean>${exo.disable.user.activated:true}</boolean>
           </field>
-
-          <!--
-          Number of days after an administrator re-enables a user during which
-          the automatic deactivation of inactive users leaves that user enabled.
-          Set it to 0 to disable the grace period
-          -->
-          <field name="reactivationGracePeriodDays">
-            <int>${social.user.inactive.reactivation.grace.days:7}</int>
-          </field>
         </object>
       </object-param>
     </init-params>

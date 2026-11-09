@@ -510,8 +510,6 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
   @Override
   public int disableInactiveUsers(String groupId, int inactiveDays) {
     long sinceTime = ZonedDateTime.now().minusDays(inactiveDays).toEpochSecond() * 1000;
-    int gracePeriodDays = orgService.getConfiguration().getReactivationGracePeriodDays();
-    long reactivatedSinceTime = ZonedDateTime.now().minusDays(gracePeriodDays).toEpochSecond() * 1000;
     UserModificationSource.setSource(USER_AUTOMATIC_DEACTIVATION);
     try (Session session = ((PicketLinkIDMServiceImpl) service_).getHibernateService().openSession()) {
       int disabledCount = 0;
@@ -535,7 +533,7 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
               && (StringUtils.isBlank(groupId)
                   || CollectionUtils.isNotEmpty(orgService.getMembershipHandler()
                                                           .findMembershipsByUserAndGroup(userName, groupId)))
-              && (gracePeriodDays <= 0 || !isReactivatedSince(userName, reactivatedSinceTime))) {
+              && !isReactivatedSince(userName, sinceTime)) {
             setEnabled(userName, false, true, true);
             disabledCount += 1;
           }

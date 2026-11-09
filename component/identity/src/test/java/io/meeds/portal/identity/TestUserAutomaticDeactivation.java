@@ -36,8 +36,6 @@ import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserStatus;
-import org.exoplatform.services.organization.idm.Config;
-import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
@@ -148,47 +146,39 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertTrue(user.isAutomaticDeactivation());
   }
 
-  public void testShouldNotDisableUserReactivatedWithinGracePeriod() throws Exception {
-    disableAsInactiveThenReactivate();
+  public void testShouldNotDisableUserReactivatedWithinInactivityPeriod() throws Exception {
+    disableAsInactiveThenReactivate(6, 5);
 
     assertEquals(0, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
 
     User user = userDao.findUserByName(userName, UserStatus.ANY);
-    assertTrue("User reactivated within the grace period must stay enabled", user.isEnabled());
+    assertTrue("User reactivated within the inactivity period must stay enabled", user.isEnabled());
     assertFalse(user.isAutomaticDeactivation());
   }
 
-  public void testShouldDisableUserReactivatedBeforeGracePeriod() throws Exception {
-    disableAsInactiveThenReactivate();
-    setReactivationTime(ZonedDateTime.now().minusDays(8));
+  public void testShouldCountInactivityFromReactivationOverLongPeriod() throws Exception {
+    disableAsInactiveThenReactivate(400, 365);
+    setReactivationTime(ZonedDateTime.now().minusDays(30));
+
+    assertEquals(0, userDao.disableInactiveUsers(null, 365));
+    restartTransaction();
+
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue("User reactivated 30 days ago must stay enabled with a 365-day inactivity period", user.isEnabled());
+    assertFalse(user.isAutomaticDeactivation());
+  }
+
+  public void testShouldDisableUserReactivatedBeforeInactivityPeriod() throws Exception {
+    disableAsInactiveThenReactivate(10, 5);
+    setReactivationTime(ZonedDateTime.now().minusDays(6));
 
     assertEquals(1, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
 
     User user = userDao.findUserByName(userName, UserStatus.ANY);
-    assertFalse("User reactivated before the grace period must be disabled again", user.isEnabled());
+    assertFalse("User inactive for the whole period since the reactivation must be disabled again", user.isEnabled());
     assertTrue(user.isAutomaticDeactivation());
-  }
-
-  public void testShouldDisableReactivatedUserWhenGracePeriodIsZero() throws Exception {
-    Config config = ((PicketLinkIDMOrganizationServiceImpl) organizationService).getConfiguration();
-    int gracePeriodDays = config.getReactivationGracePeriodDays();
-    config.setReactivationGracePeriodDays(0);
-    try {
-      disableAsInactiveThenReactivate();
-      // A reactivation time ahead of the job's start: only the zero grace
-      // period itself, not the clock, can then let the job disable the user
-      setReactivationTime(ZonedDateTime.now().plusMinutes(1));
-
-      assertEquals(1, userDao.disableInactiveUsers(null, 5));
-      restartTransaction();
-
-      User user = userDao.findUserByName(userName, UserStatus.ANY);
-      assertFalse("Without grace period, an inactive reactivated user must be disabled", user.isEnabled());
-    } finally {
-      config.setReactivationGracePeriodDays(gracePeriodDays);
-    }
   }
 
   @SuppressWarnings("deprecation")
@@ -252,17 +242,17 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   }
 
   @SuppressWarnings("deprecation")
-  private void disableAsInactiveThenReactivate() throws Exception {
+  private void disableAsInactiveThenReactivate(int lastLoginDaysAgo, int inactiveDays) throws Exception {
     User user = userDao.findUserByName(userName, UserStatus.ANY);
     user.setLastLoginTime(Date.from(LocalDate.now()
-                                             .minusDays(6)
+                                             .minusDays(lastLoginDaysAgo)
                                              .atStartOfDay()
                                              .atZone(ZoneId.systemDefault())
                                              .toInstant()));
     userDao.saveUser(user, true);
     restartTransaction();
 
-    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    assertEquals(1, userDao.disableInactiveUsers(null, inactiveDays));
     restartTransaction();
 
     // No read back here: the job does not evict the user cache, so a cached
