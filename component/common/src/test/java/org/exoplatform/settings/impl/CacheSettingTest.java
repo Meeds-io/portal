@@ -23,6 +23,7 @@ import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
 import org.exoplatform.commons.api.settings.data.SettingKey;
+import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.commons.testing.BaseTestCase;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
@@ -32,6 +33,8 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.settings.cache.CacheSettingServiceImpl;
+
+import jakarta.persistence.EntityTransaction;
 
 /** test just for the cache
  * Created by The eXo Platform SAS Author : eXoPlatform bangnv@exoplatform.com
@@ -47,6 +50,8 @@ public class CacheSettingTest extends BaseTestCase {
 
   private ExoCache<SettingKey, SettingValue<?>> settingCache;
 
+  private EntityManagerService                  entityManagerService;
+
   private final static String SETTING_CACHING_NAME = "commons.SettingService";
 
 
@@ -55,6 +60,7 @@ public class CacheSettingTest extends BaseTestCase {
     super.setUp();
     settingCache = getService(CacheService.class).getCacheInstance(SETTING_CACHING_NAME);
     settingService = getService(SettingService.class);
+    entityManagerService = getService(EntityManagerService.class);
     assertNotNull("Cannot find Setting Service", settingService);
     assertTrue("settingService should be of type CacheSettingServiceImpl instead of " + settingService.getClass().getName(), settingService instanceof CacheSettingServiceImpl);
     ConversationState c = new ConversationState(new Identity("test"));
@@ -64,51 +70,56 @@ public class CacheSettingTest extends BaseTestCase {
 
   public void testSetAndSimpleRemove() {
 
-    // set a simple Key and String Value
+    // set a simple Key and String Value: the write evicts, the read loads it
     assertEquals(0, settingCache.getCacheSize());
     settingService.set(Context.USER, Scope.SPACE, "a", SettingValue.create("b"));
+    assertEquals(0, settingCache.getCacheSize());
+    assertEquals("b", settingService.get(Context.USER, Scope.SPACE, "a").getValue());
     assertEquals(1, settingCache.getCacheSize());
     assertEquals("b", settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "a")).getValue());
+
+    // set a new value of a cached key
+    settingService.set(Context.USER, Scope.SPACE, "a", SettingValue.create("c"));
+    assertNull(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "a")));
+    assertEquals("c", settingService.get(Context.USER, Scope.SPACE, "a").getValue());
 
     // remove
     settingService.remove(Context.USER, Scope.SPACE, "a");
     assertEquals(0, settingCache.getCacheSize());
+    assertNull(settingService.get(Context.USER, Scope.SPACE, "a"));
 
-    // set a simple Key and Float Value
-    settingService.set(Context.USER, Scope.SPACE, "b", SettingValue.create(new Long(987)));
-    assertEquals(1, settingCache.getCacheSize());
-    assertEquals(new Long(987), settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b"))
-                                            .getValue());
+    // set a simple Key and Long Value: the store keeps and returns its text
+    settingService.set(Context.USER, Scope.SPACE, "b", SettingValue.create(Long.valueOf(987)));
+    assertEquals("987", settingService.get(Context.USER, Scope.SPACE, "b").getValue());
+    assertEquals("987", settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue());
     settingService.remove(Context.USER, Scope.SPACE, "b");
-    assertEquals(0, settingCache.getCacheSize());
+    assertNull(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")));
 
     // set a simple Key and Double Value
-    settingService.set(Context.USER, Scope.SPACE, "b", SettingValue.create(new Double(1.5)));
-    assertEquals(1, settingCache.getCacheSize());
-    assertEquals(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue(), 1.5);
-    assertEquals(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue(),
-                 new Double(1.5));
-    settingCache.clearCache();
-    assertEquals(0, settingCache.getCacheSize());
+    settingService.set(Context.USER, Scope.SPACE, "b", SettingValue.create(Double.valueOf(1.5)));
+    assertEquals("1.5", settingService.get(Context.USER, Scope.SPACE, "b").getValue());
+    assertEquals("1.5", settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue());
+    settingService.remove(Context.USER, Scope.SPACE, "b");
 
     // set a simple key and Boolean Value
     settingService.set(Context.USER, Scope.SPACE, "b", SettingValue.create(true));
-    assertEquals(1, settingCache.getCacheSize());
-    assertEquals(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue(), true);
-    assertEquals(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue(),
-                 new Boolean(true));
-    settingCache.clearCache();
-    assertEquals(0, settingCache.getCacheSize());
-
+    assertEquals("true", settingService.get(Context.USER, Scope.SPACE, "b").getValue());
+    assertEquals("true", settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")).getValue());
+    settingService.remove(Context.USER, Scope.SPACE, "b");
+    assertNull(settingCache.get(new SettingKey(Context.USER, Scope.SPACE, "b")));
   }
 
   public void testSetAndRemovePage() {
     assertEquals(0, settingCache.getCacheSize());
     settingService.set(Context.GLOBAL, Scope.PAGE.id("name1"), "x1", SettingValue.create("y1"));
     settingService.set(Context.GLOBAL, Scope.PAGE.id("name1"), "x2", SettingValue.create("y2"));
+    assertEquals("y1", settingService.get(Context.GLOBAL, Scope.PAGE.id("name1"), "x1").getValue());
+    assertEquals("y2", settingService.get(Context.GLOBAL, Scope.PAGE.id("name1"), "x2").getValue());
     assertEquals(2, settingCache.getCacheSize());
     settingService.remove(Context.GLOBAL, Scope.PAGE.id("name1"));
     assertEquals(0, settingCache.getCacheSize());
+    assertNull(settingService.get(Context.GLOBAL, Scope.PAGE.id("name1"), "x1"));
+    assertNull(settingService.get(Context.GLOBAL, Scope.PAGE.id("name1"), "x2"));
   }
 
   public void testSetAndRemoveUser() {
@@ -118,10 +129,75 @@ public class CacheSettingTest extends BaseTestCase {
     settingService.set(Context.USER, Scope.PAGE.id("name3"), "x3", SettingValue.create("y3"));
     settingService.set(Context.USER, Scope.PAGE.id("name4"), "x4", SettingValue.create("y4"));
     // verify
+    assertEquals("y1", settingService.get(Context.USER, Scope.PORTAL.id("name1"), "x1").getValue());
+    assertEquals("y2", settingService.get(Context.USER, Scope.PORTAL.id("name2"), "x2").getValue());
+    assertEquals("y3", settingService.get(Context.USER, Scope.PAGE.id("name3"), "x3").getValue());
+    assertEquals("y4", settingService.get(Context.USER, Scope.PAGE.id("name4"), "x4").getValue());
     assertEquals(4, settingCache.getCacheSize());
     // remove all
     settingService.remove(Context.USER);
     assertEquals(0, settingCache.getCacheSize());
+    assertNull(settingService.get(Context.USER, Scope.PORTAL.id("name1"), "x1"));
+    assertNull(settingService.get(Context.USER, Scope.PAGE.id("name4"), "x4"));
+  }
+
+  public void testSettingCachedAgainBeforeTheCommitOfASetIsEvictedAfterIt() {
+    SettingKey key = new SettingKey(Context.USER, Scope.SPACE, "set");
+    settingService.set(Context.USER, Scope.SPACE, "set", SettingValue.create("before"));
+    inTransaction(() -> {
+      settingService.set(Context.USER, Scope.SPACE, "set", SettingValue.create("after"));
+      // A read on another thread, before the commit, loads the former value
+      settingCache.put(key, SettingValue.create("before"));
+    });
+
+    assertNull(settingCache.get(key));
+    assertEquals("after", settingService.get(Context.USER, Scope.SPACE, "set").getValue());
+  }
+
+  public void testSettingCachedAgainBeforeTheCommitOfARemoveIsEvictedAfterIt() {
+    SettingKey key = new SettingKey(Context.USER, Scope.SPACE, "remove");
+    settingService.set(Context.USER, Scope.SPACE, "remove", SettingValue.create("removed"));
+    inTransaction(() -> {
+      settingService.remove(Context.USER, Scope.SPACE, "remove");
+      settingCache.put(key, SettingValue.create("removed"));
+    });
+
+    assertNull(settingCache.get(key));
+    assertNull(settingService.get(Context.USER, Scope.SPACE, "remove"));
+  }
+
+  public void testSettingsCachedAgainBeforeTheCommitOfAScopeRemoveAreEvictedAfterIt() {
+    SettingKey key = new SettingKey(Context.GLOBAL, Scope.PAGE.id("scope"), "x");
+    settingService.set(Context.GLOBAL, Scope.PAGE.id("scope"), "x", SettingValue.create("removed"));
+    inTransaction(() -> {
+      settingService.remove(Context.GLOBAL, Scope.PAGE.id("scope"));
+      settingCache.put(key, SettingValue.create("removed"));
+    });
+
+    assertNull(settingCache.get(key));
+    assertNull(settingService.get(Context.GLOBAL, Scope.PAGE.id("scope"), "x"));
+  }
+
+  public void testSettingsCachedAgainBeforeTheCommitOfAContextRemoveAreEvictedAfterIt() {
+    SettingKey key = new SettingKey(Context.USER, Scope.PORTAL.id("context"), "x");
+    settingService.set(Context.USER, Scope.PORTAL.id("context"), "x", SettingValue.create("removed"));
+    inTransaction(() -> {
+      settingService.remove(Context.USER);
+      settingCache.put(key, SettingValue.create("removed"));
+    });
+
+    assertNull(settingCache.get(key));
+    assertNull(settingService.get(Context.USER, Scope.PORTAL.id("context"), "x"));
+  }
+
+  private void inTransaction(Runnable work) {
+    EntityTransaction transaction = entityManagerService.getEntityManager().getTransaction();
+    transaction.begin();
+    try {
+      work.run();
+    } finally {
+      transaction.commit();
+    }
   }
 
 }
