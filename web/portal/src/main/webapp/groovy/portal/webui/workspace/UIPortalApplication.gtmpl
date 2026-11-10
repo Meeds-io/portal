@@ -273,6 +273,9 @@
    }%>
  </head>
  <body style="height: 100%;$bodyStyle" class="$bodyClasses" onload="eXo.env.portal.onLoad()">
+   <% if (selectedNodeUri != "login") { %>
+   <a id="skipToContentLink" class="skip-to-content-link" href="#UISiteBody"><%=_ctx.appRes("UIPortalApplication.msg.skipContent")%></a>
+   <% } %>
    <div class="visible-tablet"></div>
    <div class="visible-tabletL"></div>
    <div class="visible-phone"></div>
