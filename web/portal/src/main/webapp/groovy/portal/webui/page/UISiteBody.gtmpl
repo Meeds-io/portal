@@ -1,7 +1,7 @@
 <%
   String siteClass = uicomponent.getSiteClass();
 %>
-<div class="UISiteBody $siteClass" id="UISiteBody">
+<div class="UISiteBody $siteClass" id="UISiteBody" tabindex="-1">
 	<div class="UIComponent UIComponentBlock">
 		<div class="VIEW-SITEBODY VIEW-BLOCK" id="SITEBODY-VIEW-BLOCK">
       <% if (uicomponent.getUIComponent() == null) { %>
