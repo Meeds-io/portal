@@ -67,7 +67,7 @@ public class EntityMapperUtils {
       throw new IllegalStateException("Attributes map is mandatory");
     }
     boolean changed = false;
-    if (attrs.containsKey(USER_CREATED_DATE)) {
+    if (attrs.containsKey(USER_CREATED_DATE) && attrs.get(USER_CREATED_DATE) != null && attrs.get(USER_CREATED_DATE).getValue() != null) {
       Date origCreatedDate = user.getCreatedDate();
       Date createdDate = null;
       try {
@@ -85,12 +85,12 @@ public class EntityMapperUtils {
       }
       changed |= checkIfChanged && !Objects.equals(createdDate, origCreatedDate);
     }
-    if (attrs.containsKey(USER_EMAIL)) {
+    if (attrs.containsKey(USER_EMAIL) && attrs.get(USER_EMAIL) != null && attrs.get(USER_EMAIL).getValue() != null) {
       String email = attrs.get(USER_EMAIL).getValue().toString();
       changed |= checkIfChanged && !Objects.equals(email, user.getEmail());
       user.setEmail(email);
     }
-    if (attrs.containsKey(USER_FIRST_NAME)) {
+    if (attrs.containsKey(USER_FIRST_NAME) && attrs.get(USER_FIRST_NAME) != null && attrs.get(USER_FIRST_NAME).getValue() != null) {
       String firstName = attrs.get(USER_FIRST_NAME).getValue().toString();
       changed |= checkIfChanged && !Objects.equals(firstName, user.getFirstName());
       user.setFirstName(firstName);
@@ -122,24 +122,26 @@ public class EntityMapperUtils {
       }
       changed |= checkIfChanged && !Objects.equals(originalLastLoginDate, lastLoginDate);
     }
-    if (attrs.containsKey(USER_LAST_NAME)) {
+    if (attrs.containsKey(USER_LAST_NAME) && attrs.get(USER_LAST_NAME) != null && attrs.get(USER_LAST_NAME).getValue() != null) {
       String lastName = attrs.get(USER_LAST_NAME).getValue().toString();
       changed |= checkIfChanged && !Objects.equals(lastName, user.getLastName());
       user.setLastName(lastName);
     }
-    if (attrs.containsKey(USER_DISPLAY_NAME)) {
+    if (attrs.containsKey(USER_DISPLAY_NAME) && attrs.get(USER_DISPLAY_NAME) != null && attrs.get(USER_DISPLAY_NAME).getValue() != null) {
       // TODO: GTNPORTAL-2358 Change once displayName will be available as
       // part of Organization API
       String fullName = attrs.get(USER_DISPLAY_NAME).getValue().toString();
       changed |= checkIfChanged && !Objects.equals(fullName, user.getDisplayName());
       user.setDisplayName(fullName);
     }
-    if (attrs.containsKey(USER_ORGANIZATION_ID)) {
+    if (attrs.containsKey(USER_ORGANIZATION_ID) && attrs.get(USER_ORGANIZATION_ID) != null && attrs.get(USER_ORGANIZATION_ID).getValue() != null) {
       String organizationId = attrs.get(USER_ORGANIZATION_ID).getValue().toString();
       changed |= checkIfChanged && !Objects.equals(organizationId, user.getOrganizationId());
       user.setOrganizationId(organizationId);
     }
-    if (attrs.containsKey(USER_ENABLED)) {
+
+    if (attrs.containsKey(USER_ENABLED) && attrs.get(USER_ENABLED) != null && attrs.get(USER_ENABLED).getValue() != null) {
+
       // used when populating User from AD ; it returns numbers : 512 = enbaled, 514 = disabled
       String status = attrs.get(USER_ENABLED).getValue().toString();
 
@@ -160,7 +162,7 @@ public class EntityMapperUtils {
         ((UserImpl) user).setEnabled(enabled);
       }
     }
-    if (user instanceof UserImpl && attrs.containsKey(ORIGINATING_STORE)) {
+    if (user instanceof UserImpl && attrs.containsKey(ORIGINATING_STORE) && attrs.get(ORIGINATING_STORE).getValue() != null && attrs.get(ORIGINATING_STORE).getValue().toString() != null) {
       UserImpl userImpl = (UserImpl) user;
       userImpl.setOriginatingStore(attrs.get(ORIGINATING_STORE).getValue().toString());
     }
