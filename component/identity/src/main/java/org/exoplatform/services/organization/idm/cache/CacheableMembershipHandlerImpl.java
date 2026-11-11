@@ -180,8 +180,8 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   }
 
   @Override
-  protected void onMembershipWritten(Membership membership) {
-    evictMembership(membership);
+  protected void onMembershipWritten(Membership membership, boolean storedUserName) {
+    evictMembership(membership, storedUserName);
   }
 
   public void clearCache() {
@@ -216,22 +216,17 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
    */
   private void evictAfterFailure(Membership membership, Exception failure) {
     try {
-      evictMembership(membership);
+      evictMembership(membership, false);
     } catch (RuntimeException e) {
       failure.addSuppressed(e);
     }
   }
 
-  private void evictMembership(Membership membership) {
+  private void evictMembership(Membership membership, boolean storedUserName) {
     if (membership == null) {
       return;
     }
-    String userName;
-    try {
-      userName = storedName(membership.getUserName());
-    } catch (Exception e) {
-      throw new IllegalStateException("Cannot read the user of the membership " + membership.getId(), e);
-    }
+    String userName = storedUserName ? membership.getUserName() : storedNameToEvict(membership.getUserName());
     MembershipCacheKey key = new MembershipCacheKey(userName, membership.getGroupId(), membership.getMembershipType());
     MembershipCacheKey listKey = new MembershipCacheKey(userName, null, null);
     orgService.runNowAndAfterTransaction(() -> {
@@ -241,9 +236,21 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
       if (useCacheList) {
         membershipCache.remove(listKey);
       }
-      // The names the write was given, under which an entry may predate this rule
-      clearMembershipCache(membership);
     });
+  }
+
+  /**
+   * The stored name of a written membership's user, or the name as given when
+   * the store cannot be read: the write is already flushed, and its eviction
+   * must not fail it
+   */
+  private String storedNameToEvict(String userName) {
+    try {
+      return storedName(userName);
+    } catch (Exception e) {
+      log.warn("Cannot read the user '{}' of a written membership, which is evicted under the name as given", userName, e);
+      return userName;
+    }
   }
 
   /**

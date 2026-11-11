@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThrows;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -41,6 +42,9 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.organization.cache.MembershipCacheKey;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.MembershipDAOImpl;
+import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
+import org.exoplatform.services.organization.idm.PicketLinkIDMService;
+import org.exoplatform.services.organization.idm.cache.CacheableUserHandlerImpl;
 import org.exoplatform.services.organization.impl.MembershipImpl;
 
 /**
@@ -56,6 +60,9 @@ public class TestOrganizationCacheEviction extends AbstractKernelTest {// NOSONA
   private static final String GROUP_ID        = "/platform/users";
 
   private static final String MEMBERSHIP_TYPE = "member";
+
+  /** A type the store keeps as a role, where "member" is kept as an association */
+  private static final String ROLE_TYPE       = "manager";
 
   private OrganizationService organizationService;                    // NOSONAR
 
@@ -486,6 +493,174 @@ public class TestOrganizationCacheEviction extends AbstractKernelTest {// NOSONA
     throw new NoSuchFieldException(name);
   }
 
+  @SuppressWarnings("unchecked")
+  public void testDisablingADisabledUserEvictsACopyStillEnabled() throws Exception {
+    organizationService.getUserHandler().setEnabled(userName, false, true);
+    restartTransaction();
+    User disabled = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    assertFalse(disabled.isEnabled());
+    // A copy cached before the first write, by another thread or node
+    org.exoplatform.services.organization.idm.UserImpl staleCopy =
+        (org.exoplatform.services.organization.idm.UserImpl) ((ExtendedCloneable) disabled).clone();
+    staleCopy.setEnabled(true);
+    cacheHandler().getUserCache().put(userName, staleCopy);
+
+    organizationService.getUserHandler().setEnabled(userName, false, true);
+
+    assertFalse(organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY).isEnabled());
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testLinkingAnExistingMembershipEvictsAListThatMissesIt() throws Exception {
+    link(ROLE_TYPE);
+    restartTransaction();
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    assertEquals(1, membershipHandler.findMembershipsByUser(userName).size());
+    // A list cached before the first link, by another thread or node
+    cacheHandler().getMembershipCache().put(new MembershipCacheKey(userName, null, null), new ArrayList<Membership>());
+
+    link(ROLE_TYPE);
+
+    assertEquals(1, membershipHandler.findMembershipsByUser(userName).size());
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testSavingAnExistingMembershipEvictsAListThatMissesIt() throws Exception {
+    link(ROLE_TYPE);
+    restartTransaction();
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    Membership membership = membershipHandler.findMembershipsByUser(userName).iterator().next();
+    // A list cached before the first save, by another thread or node
+    cacheHandler().getMembershipCache().put(new MembershipCacheKey(userName, null, null), new ArrayList<Membership>());
+
+    ((MembershipDAOImpl) membershipHandler).saveMembership(membership, false);
+
+    assertEquals(1, membershipHandler.findMembershipsByUser(userName).size());
+  }
+
+  public void testTheMembershipsRemovedWithTheirUserCarryTheStoredName() throws Exception {
+    link(ROLE_TYPE);
+    restartTransaction();
+    PicketLinkIDMOrganizationServiceImpl idmOrganizationService =
+        getContainer().getComponentInstanceOfType(PicketLinkIDMOrganizationServiceImpl.class);
+    PicketLinkIDMService idmService = getContainer().getComponentInstanceOfType(PicketLinkIDMService.class);
+    List<Boolean> storedNames = new ArrayList<>();
+    MembershipDAOImpl membershipDAO = new MembershipDAOImpl(idmOrganizationService, idmService) {
+      @Override
+      protected void onMembershipWritten(Membership membership, boolean storedUserName) {
+        storedNames.add(storedUserName);
+      }
+    };
+
+    membershipDAO.removeMembershipByUser(userName, false);
+
+    assertTrue("The removed role and the user's list are evicted", storedNames.size() >= 2);
+    assertFalse("The hook resolves no user per removed membership", storedNames.contains(false));
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testAUserReadUnderAnotherSpellingDropsItsEntryOnThisNodeOnly() throws Exception {
+    CacheableUserHandlerImpl userHandler = (CacheableUserHandlerImpl) organizationService.getUserHandler();
+    Field userCacheField = CacheableUserHandlerImpl.class.getDeclaredField("userCache");
+    userCacheField.setAccessible(true);
+    ExoCache<String, User> userCache = (ExoCache<String, User>) userCacheField.get(userHandler);
+    List<String> removals = new ArrayList<>();
+    ExoCache<String, User> recordingCache = (ExoCache<String, User>) Proxy.newProxyInstance(getClass().getClassLoader(),
+                                                                                           new Class<?>[] { ExoCache.class },
+                                                                                           (proxy, method, args) -> {
+                                                                                             if (method.getName()
+                                                                                                       .startsWith("remove")) {
+                                                                                               removals.add(method.getName());
+                                                                                             }
+                                                                                             return method.invoke(userCache,
+                                                                                                                  args);
+                                                                                           });
+    userCacheField.set(userHandler, recordingCache);
+    try {
+      assertNotNull(userHandler.findUserByName(userName.toUpperCase(), UserStatus.ANY));
+    } finally {
+      userCacheField.set(userHandler, userCache);
+    }
+
+    assertEquals(List.of("removeLocal"), removals);
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testRevokingAGoneMembershipEvictsAListThatStillHoldsIt() throws Exception {
+    link(ROLE_TYPE);
+    restartTransaction();
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    Collection<Membership> memberships = membershipHandler.findMembershipsByUser(userName);
+    assertEquals(1, memberships.size());
+    Membership membership = memberships.iterator().next();
+    membershipHandler.removeMembership(membership.getId(), false);
+    restartTransaction();
+    // A list cached before the first revoke, by another thread or node
+    cacheHandler().getMembershipCache().put(new MembershipCacheKey(userName, null, null), new ArrayList<>(memberships));
+
+    assertNull(membershipHandler.removeMembership(membership.getId(), false));
+
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testRemovingAMissingProfileEvictsACopyStillCached() throws Exception {
+    saveProfile("first", false);
+    restartTransaction();
+    UserProfileHandler profileHandler = organizationService.getUserProfileHandler();
+    UserProfile profile = profileHandler.findUserProfileByName(userName);
+    assertNotNull(profile);
+    profileHandler.removeUserProfile(userName, false);
+    restartTransaction();
+    // A profile cached before the first removal, by another thread or node
+    cacheHandler().getUserProfileCache().put(userName, profile);
+
+    assertNull(profileHandler.removeUserProfile(userName, false));
+
+    assertNull(profileHandler.findUserProfileByName(userName));
+  }
+
+  public void testRemovingTheMembershipsOfAUserEvictsItsAssociations() throws Exception {
+    link();
+    restartTransaction();
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    assertEquals(1, membershipHandler.findMembershipsByUser(userName).size());
+    assertNotNull(membershipHandler.findMembershipByUserGroupAndType(userName, GROUP_ID, MEMBERSHIP_TYPE));
+
+    membershipHandler.removeMembershipByUser(userName, false);
+
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+    assertNull(membershipHandler.findMembershipByUserGroupAndType(userName, GROUP_ID, MEMBERSHIP_TYPE));
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testRemovingTheMembershipsOfAUserWithNoneEvictsAStaleList() throws Exception {
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+    MembershipImpl stale = new MembershipImpl();
+    stale.setUserName(userName);
+    stale.setGroupId(GROUP_ID);
+    stale.setMembershipType(ROLE_TYPE);
+    // A list cached before another thread or node revoked its last membership
+    cacheHandler().getMembershipCache().put(new MembershipCacheKey(userName, null, null), new ArrayList<>(List.of(stale)));
+
+    membershipHandler.removeMembershipByUser(userName, false);
+
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+  }
+
+  @SuppressWarnings("unchecked")
+  public void testRemovingAMissingUserEvictsItsCachedMemberships() throws Exception {
+    String missingUser = UUID.randomUUID().toString();
+    MembershipCacheKey listKey = new MembershipCacheKey(missingUser, null, null);
+    // A list cached before the user was removed, by another thread or node
+    cacheHandler().getMembershipCache().put(listKey, new ArrayList<Membership>());
+
+    assertNull(organizationService.getUserHandler().removeUser(missingUser, false));
+
+    assertNull(cacheHandler().getMembershipCache().get(listKey));
+  }
+
   @FunctionalInterface
   private interface Write {
     void run() throws Exception;
@@ -498,8 +673,12 @@ public class TestOrganizationCacheEviction extends AbstractKernelTest {// NOSONA
   }
 
   private void link() throws Exception {
+    link(MEMBERSHIP_TYPE);
+  }
+
+  private void link(String membershipType) throws Exception {
     Group group = organizationService.getGroupHandler().findGroupById(GROUP_ID);
-    MembershipType type = organizationService.getMembershipTypeHandler().findMembershipType(MEMBERSHIP_TYPE);
+    MembershipType type = organizationService.getMembershipTypeHandler().findMembershipType(membershipType);
     assertNotNull(group);
     assertNotNull(type);
     User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);

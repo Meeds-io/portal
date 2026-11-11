@@ -110,7 +110,10 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
     public UserProfile removeUserProfile(String userName, boolean broadcast) throws Exception {
         UserProfile profile = getProfile(userName);
 
-        if (profile != null) {
+        if (profile == null) {
+            // Nothing to remove, but a cached copy may still hold a profile
+            onUserProfileWritten(userName);
+        } else {
             try {
                 if (broadcast) {
                     preDelete(profile);

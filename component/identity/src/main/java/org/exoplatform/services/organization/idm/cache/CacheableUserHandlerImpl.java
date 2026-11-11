@@ -86,10 +86,6 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       user = super.removeUser(userName, broadcast);
-      if (user == null && StringUtils.isNotBlank(userName)) {
-        userCache.remove(userName);
-        userProfileCache.remove(userName);
-      }
     } finally {
       disableCacheInThread.set(false);
     }
@@ -153,8 +149,9 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
       user = futureUserCache.get(status, userName);
       if (user != null && !user.getUserName().equals(userName)) {
         // Asked under another spelling than the stored one, which is the only
-        // name a write of the user evicts: keep no entry under it
-        userCache.remove(userName);
+        // name a write of the user evicts: keep no entry under it. The load
+        // put it on this node only, so no other node holds it
+        userCache.removeLocal(userName);
       }
     } else {
       user = super.findUserByName(userName, status);

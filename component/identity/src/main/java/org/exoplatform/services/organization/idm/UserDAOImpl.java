@@ -254,7 +254,12 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       return foundUser;
     }
 
-    if (foundUser == null || foundUser.isEnabled() == enabled) {
+    if (foundUser == null) {
+      return null;
+    }
+    if (foundUser.isEnabled() == enabled) {
+      // Nothing to write, but a cached copy may still hold the other status
+      onUserWritten(foundUser.getUserName());
       return foundUser;
     }
     ((UserImpl) foundUser).setEnabled(enabled);
@@ -333,6 +338,10 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     }
 
     if (foundUser == null) {
+      // Nothing to remove, but a cached copy may still hold the user
+      if (userName != null && !userName.isBlank()) {
+        onUserRemoved(userName);
+      }
       return null;
     }
 
@@ -872,7 +881,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
    * before its post listeners run. A handler that caches users, their profiles
    * or their memberships evicts them here.
    *
-   * @param userName the removed user's name as stored
+   * @param userName the removed user's name as stored, or the name as given
+   *          when the store holds no such user
    */
   protected void onUserRemoved(String userName) {
     onUserWritten(userName);

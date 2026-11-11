@@ -157,17 +157,25 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
 
   @Override
   protected void onUserProfileWritten(String userName) {
-    String key;
-    try {
-      key = storedName(userName);
-    } catch (Exception e) {
-      throw new IllegalStateException("Cannot read the user of the profile " + userName, e);
-    }
+    String key = storedNameToEvict(userName);
     orgService.runNowAndAfterTransaction(() -> {
       futureUserProfile.removeFuture(key);
       userProfileCache.remove(key);
-      userProfileCache.remove(userName);
     });
+  }
+
+  /**
+   * The stored name of a written profile's user, or the name as given when the
+   * store cannot be read: the write is already flushed, and its eviction must
+   * not fail it
+   */
+  private String storedNameToEvict(String userName) {
+    try {
+      return storedName(userName);
+    } catch (Exception e) {
+      log.warn("Cannot read the user '{}' of a written profile, which is evicted under the name as given", userName, e);
+      return userName;
+    }
   }
 
   /**

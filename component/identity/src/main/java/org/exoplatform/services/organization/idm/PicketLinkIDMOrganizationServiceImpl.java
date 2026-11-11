@@ -201,17 +201,27 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
    * before the commit lets another thread or node cache the committed state
    * again, which the second run evicts.
    *
+   * A failure of either run is logged, never thrown: the write the action
+   * follows is already flushed, and its listeners must still run.
+   *
    * @param action the action, which must be safe to run twice
    */
   public void runNowAndAfterTransaction(Runnable action) {
-    action.run();
-    if (acceptComponentRequestCall && isStarted(null)) {
+    boolean runsAgain = acceptComponentRequestCall && isStarted(null);
+    if (runsAgain) {
       List<Runnable> actions = afterTransaction.get();
       if (actions == null) {
         actions = new ArrayList<>();
         afterTransaction.set(actions);
       }
       actions.add(action);
+    }
+    try {
+      action.run();
+    } catch (RuntimeException e) {
+      log.warn(runsAgain ? "Error while running an action of an IDM write, it runs again when the IDM transaction ends"
+                         : "Error while running an action of an IDM write",
+               e);
     }
   }
 
