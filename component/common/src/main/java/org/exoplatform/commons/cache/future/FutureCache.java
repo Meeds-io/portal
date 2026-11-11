@@ -64,6 +64,9 @@ public abstract class FutureCache<K, V, C> {
   /** . */
   private final Log                                  log = ExoLogger.getLogger(FutureCache.class);
 
+  /** Created on first use, once a subclass can name the cache. */
+  private volatile MissReport                        missReport;
+
   protected FutureCache(Loader<K, V, C> loader) {
     this.loader = loader;
     this.futureEntries = new ConcurrentHashMap<>();
@@ -95,6 +98,27 @@ public abstract class FutureCache<K, V, C> {
     // Each load leaves the map with its invalidation, so that a load
     // registered meanwhile is never dropped from the map without it
     futureEntries.keySet().forEach(this::removeFuture);
+  }
+
+  /**
+   * @return the name the logs give this cache
+   */
+  protected String getName() {
+    return loader.getClass().getName();
+  }
+
+  MissReport missReport() {
+    MissReport report = missReport;
+    if (report == null) {
+      synchronized (this) {
+        report = missReport;
+        if (report == null) {
+          report = new MissReport(getName());
+          missReport = report;
+        }
+      }
+    }
+    return report;
   }
 
   /**

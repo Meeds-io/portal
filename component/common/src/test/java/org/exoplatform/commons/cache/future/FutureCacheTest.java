@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,53 @@ class FutureCacheTest {
 
     assertEquals("previous value", loadedValue.get(), "The load in flight returns its value to its reader");
     assertNull(futureCache.get("key"), "The load in flight caches its value after the clear");
+  }
+
+  @Test
+  void testALoadThatFindsNoValueIsCountedAndNotCached() {
+    FutureMap<String, String, Object> futureCache = new FutureMap<>((context, key) -> "known".equals(key) ? "value" : null);
+
+    assertNull(futureCache.get(null, "unknown"));
+    assertNull(futureCache.get(null, "unknown"));
+    assertNull(futureCache.get(null, "unknown"));
+    assertEquals("value", futureCache.get(null, "known"));
+
+    assertNull(futureCache.get("unknown"), "No entry is kept for a key the loader found no value for");
+    assertEquals(2,
+                 futureCache.missReport().pendingMisses(),
+                 "The first miss is reported at once, the two others wait for the next report, the hit is not counted");
+  }
+
+  @Test
+  void testTheMissesAreReportedOncePerPeriod() {
+    AtomicLong now = new AtomicLong(1_000_000);
+    MissReport report = new MissReport("cache", 60, now::get);
+
+    assertEquals(1, report.onMiss("a"), "The first miss is reported at once");
+    assertEquals(0, report.onMiss("b"));
+    now.addAndGet(59_999);
+    assertEquals(0, report.onMiss("c"), "No second report within the period");
+    now.addAndGet(1);
+    assertEquals(3, report.onMiss("d"), "The report counts every miss since the previous one");
+    assertEquals(0, report.pendingMisses());
+  }
+
+  @Test
+  void testAPeriodOutOfRangeFallsBackToTheDefault() {
+    assertEquals(MissReport.DEFAULT_PERIOD_SECONDS, MissReport.parsePeriod(null));
+    assertEquals(MissReport.DEFAULT_PERIOD_SECONDS, MissReport.parsePeriod("not a number"));
+    assertEquals(MissReport.DEFAULT_PERIOD_SECONDS, MissReport.parsePeriod("-1"));
+    assertEquals(MissReport.DEFAULT_PERIOD_SECONDS, MissReport.parsePeriod(String.valueOf(Long.MAX_VALUE)));
+    assertEquals(0, MissReport.parsePeriod("0"));
+    assertEquals(60, MissReport.parsePeriod(" 60 "));
+  }
+
+  @Test
+  void testAPeriodOfZeroTurnsTheReportOff() {
+    MissReport report = new MissReport("cache", 0, () -> 0);
+
+    assertEquals(0, report.onMiss("a"));
+    assertEquals(0, report.pendingMisses());
   }
 
 }

@@ -34,6 +34,11 @@ public class FutureExoCache<K extends Serializable, V, C> extends FutureCache<K,
         this.cache = cache;
     }
 
+    @Override
+    protected String getName() {
+        return cache.getName();
+    }
+
     public void clear() {
         cache.clearCache();
     }
