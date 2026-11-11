@@ -25,7 +25,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
 import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserProfile;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
@@ -86,7 +88,7 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
   public UserProfile findUserProfileByName(String userName) throws Exception {
     UserProfile userProfile = null;
     if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
-      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME_NO_NULL, userName);
+      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME_NO_NULL, storedName(userName));
     } else {
       return super.findUserProfileByName(userName);
     }
@@ -135,7 +137,6 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
     UserProfile userProfile = null;
     try {
       userProfile = super.removeUserProfile(userName, broadcast);
-      userProfileCache.remove(userName);
       return userProfile;
     } finally {
       disableCacheInThread.set(false);
@@ -149,10 +150,37 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.saveUserProfile(profile, broadcast);
-      userProfileCache.remove(profile.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
+  }
+
+  @Override
+  protected void onUserProfileWritten(String userName) {
+    String key;
+    try {
+      key = storedName(userName);
+    } catch (Exception e) {
+      throw new IllegalStateException("Cannot read the user of the profile " + userName, e);
+    }
+    orgService.runNowAndAfterTransaction(() -> {
+      futureUserProfile.removeFuture(key);
+      userProfileCache.remove(key);
+      userProfileCache.remove(userName);
+    });
+  }
+
+  /**
+   * The user's name as stored, which keys the entries of this cache: a name
+   * asked under another spelling, which the store finds too, would otherwise
+   * key an entry that no write of the user evicts
+   */
+  private String storedName(String userName) throws Exception {
+    if (userName == null) {
+      return null;
+    }
+    User user = orgService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    return user == null ? userName : user.getUserName();
   }
 
   public void clearCache() {

@@ -160,6 +160,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
       orgService.flush();
     }
 
+    onMembershipWritten(membership);
+
     if (broadcast) {
       postSave(membership, true);
     }
@@ -228,6 +230,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     } finally {
       orgService.flush();
     }
+
+    onMembershipWritten(m);
 
     if (broadcast) {
       postSave(m, false);
@@ -309,6 +313,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
       orgService.flush();
     }
 
+    onMembershipWritten(m);
+
     if (broadcast) {
       postDelete(m);
     }
@@ -353,6 +359,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
       } finally {
         orgService.flush();
       }
+
+      onMembershipWritten(m);
 
       if (broadcast) {
         postDelete(m);
@@ -796,6 +804,17 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                       .flatMap(Set::stream)
                       .filter(m -> !memberships.contains(m))
                       .toList();
+  }
+
+  /**
+   * Called once a write of the membership is flushed to the IDM session and
+   * before its post listeners run. A handler that caches memberships evicts the
+   * membership here.
+   *
+   * @param membership the membership written
+   */
+  protected void onMembershipWritten(Membership membership) {
+    // nothing is cached here
   }
 
   private void preSave(Membership membership, boolean isNew) throws Exception {

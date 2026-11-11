@@ -196,6 +196,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       orgService.flush();
     }
 
+    onUserWritten(user.getUserName());
+
     if (broadcast) {
       postSave(user, true);
     }
@@ -223,6 +225,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
 
     org.picketlink.idm.api.User plIDMUser = session.getPersistenceManager().findUser(user.getUserName());
     persistUserInfo(user, plIDMUser, session, false);
+
+    onUserWritten(existingUser.getUserName());
 
     if (broadcast) {
       postSave(user, false);
@@ -300,6 +304,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
       }
     }
 
+    onUserWritten(foundUser.getUserName());
+
     if (broadcast)
       postSetEnabled(foundUser);
 
@@ -351,6 +357,8 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     } finally {
       orgService.flush();
     }
+
+    onUserRemoved(exoUser.getUserName());
 
     if (broadcast) {
       postDelete(exoUser);
@@ -846,6 +854,28 @@ public class UserDAOImpl extends AbstractDAOImpl implements UserHandler {
     for (UserEventListener listener : listeners_) {
       executeWithTransaction(() -> postSetEnabled(listener, user));
     }
+  }
+
+  /**
+   * Called once a write of the user is flushed to the IDM session and before
+   * its post listeners run, each in a transaction restart that commits the
+   * write first. A handler that caches users evicts the user here.
+   *
+   * @param userName the user's name as stored
+   */
+  protected void onUserWritten(String userName) {
+    // nothing is cached here
+  }
+
+  /**
+   * Called once the removal of the user is flushed to the IDM session and
+   * before its post listeners run. A handler that caches users, their profiles
+   * or their memberships evicts them here.
+   *
+   * @param userName the removed user's name as stored
+   */
+  protected void onUserRemoved(String userName) {
+    onUserWritten(userName);
   }
 
   public void persistUserInfo(User user, IdentitySession session, boolean isNew) throws Exception {
