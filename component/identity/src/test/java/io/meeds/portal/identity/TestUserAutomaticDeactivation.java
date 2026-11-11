@@ -39,6 +39,7 @@ import org.exoplatform.services.organization.DisabledUserException;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
@@ -124,6 +125,30 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertFalse(user.isEnabled());
     assertTrue(user.isAutomaticDeactivation());
     assertThrows(DisabledUserException.class, () -> userDao.authenticate(userName, "any"));
+  }
+
+  @SuppressWarnings("deprecation")
+  public void testShouldNotKeepACopyCachedBeforeTheJobCommits() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+    User committed = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue(committed.isEnabled());
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    // Another thread or node reads the user before the job commits, and caches
+    // the committed state, still enabled
+    getContainer().getComponentInstanceOfType(OrganizationCacheHandler.class).getUserCache().put(userName, committed);
+    restartTransaction();
+
+    user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse(user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
   }
 
   @SuppressWarnings("deprecation")

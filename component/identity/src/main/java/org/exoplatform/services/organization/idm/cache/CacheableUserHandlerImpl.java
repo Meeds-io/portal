@@ -88,18 +88,14 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
       user = super.removeUser(userName, broadcast);
 
       if (StringUtils.isNotBlank(userName)) {
-        userCache.remove(userName);
-        userProfileCache.remove(userName);
+        orgService.runNowAndAfterTransaction(() -> {
+          userCache.remove(userName);
+          userProfileCache.remove(userName);
+        });
       }
 
       if (user != null) {
-        membershipCache.remove(new MembershipCacheKey(userName, null, null));
-        List<?> objects = membershipCache.getCachedObjects();
-        for (Object obj : objects) {
-          if (obj instanceof Membership membership && membership.getUserName().equals(userName)) {
-            membershipCache.remove(new MembershipCacheKey(membership));
-          }
-        }
+        orgService.runNowAndAfterTransaction(() -> evictMemberships(userName));
       }
     } finally {
       disableCacheInThread.set(false);
@@ -125,7 +121,7 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.saveUser(user, broadcast);
-      userCache.remove(user.getUserName());
+      evictUser(user.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
@@ -138,7 +134,7 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.createUser(user, broadcast);
-      userCache.remove(user.getUserName());
+      evictUser(user.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
@@ -152,7 +148,7 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       User result = super.setEnabled(userName, enabled, automaticDeactivation, broadcast);
-      userCache.remove(userName);
+      evictUser(userName);
       return result;
     } finally {
       disableCacheInThread.set(false);
@@ -170,6 +166,25 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
       user = super.findUserByName(userName, status);
     }
     return user == null ? null : (status.matches(user.isEnabled()) ? (User) ((ExtendedCloneable) user).clone() : null);
+  }
+
+  private void evictMemberships(String userName) {
+    membershipCache.remove(new MembershipCacheKey(userName, null, null));
+    List<?> objects;
+    try {
+      objects = membershipCache.getCachedObjects();
+    } catch (Exception e) {
+      throw new IllegalStateException("Cannot read the cached memberships of " + userName, e);
+    }
+    for (Object obj : objects) {
+      if (obj instanceof Membership membership && membership.getUserName().equals(userName)) {
+        membershipCache.remove(new MembershipCacheKey(membership));
+      }
+    }
+  }
+
+  private void evictUser(String userName) {
+    orgService.runNowAndAfterTransaction(() -> userCache.remove(userName));
   }
 
   public void clearCache() {

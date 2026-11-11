@@ -18,6 +18,7 @@
  */
 package org.exoplatform.services.organization.idm;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -69,6 +70,12 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
                                                  ExoLogger.getLogger(PicketLinkIDMOrganizationServiceImpl.class);
 
   private static final boolean               traceLoggingEnabled  = log.isTraceEnabled();
+
+  // The cache evictions of the thread's writes, run again once its IDM
+  // transaction has ended: a copy cached before the commit is removed then,
+  // but a load still running on another node, or one already writing its
+  // result on this one, keeps its copy until the entry expires
+  private final ThreadLocal<List<Runnable>>  afterTransaction     = new ThreadLocal<>();
 
   // Indicates whether any call to startRequest and endRequest is accepted
   private volatile boolean                   acceptComponentRequestCall;
@@ -183,6 +190,43 @@ public class PicketLinkIDMOrganizationServiceImpl extends BaseOrganizationServic
     } catch (Exception e) {
       log.error("Error while committing IDM transaction", e);
       recoverFromIDMError();
+    } finally {
+      runAfterTransaction();
+    }
+  }
+
+  /**
+   * Runs an action now and, when the thread holds an active IDM transaction,
+   * once more when the request ends that transaction: a cache eviction made
+   * before the commit lets another thread or node cache the committed state
+   * again, which the second run evicts.
+   *
+   * @param action the action, which must be safe to run twice
+   */
+  public void runNowAndAfterTransaction(Runnable action) {
+    action.run();
+    if (acceptComponentRequestCall && isStarted(null)) {
+      List<Runnable> actions = afterTransaction.get();
+      if (actions == null) {
+        actions = new ArrayList<>();
+        afterTransaction.set(actions);
+      }
+      actions.add(action);
+    }
+  }
+
+  private void runAfterTransaction() {
+    List<Runnable> actions = afterTransaction.get();
+    if (actions == null) {
+      return;
+    }
+    afterTransaction.remove();
+    for (Runnable action : actions) {
+      try {
+        action.run();
+      } catch (RuntimeException e) {
+        log.warn("Error while running an action after the IDM transaction", e);
+      }
     }
   }
 
