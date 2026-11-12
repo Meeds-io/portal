@@ -71,7 +71,7 @@ final class StaticResourceResponse {
     httpResponse.setContentType(mimeType);
     httpResponse.setContentLength(bytes.length);
     if (publiclyCacheable) {
-      httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, " + maxAge);
+      httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, max-age=" + maxAge);
       httpResponse.setDateHeader(ResourceRequestFilter.LAST_MODIFIED, System.currentTimeMillis());
       httpResponse.setDateHeader(ResourceRequestFilter.EXPIRES, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(maxAge));
     } else {

@@ -63,7 +63,7 @@ public class TestStaticResourceResponse extends TestCase {
     long before = System.currentTimeMillis();
     StaticResourceResponse.write(response, "a;".getBytes(StandardCharsets.UTF_8), "text/javascript", true, MAX_AGE);
     long after = System.currentTimeMillis();
-    verify(response).setHeader("Cache-Control", "public, " + MAX_AGE);
+    verify(response).setHeader("Cache-Control", "public, max-age=" + MAX_AGE);
     verify(response, never()).setHeader("Cache-Control", "no-cache");
     ArgumentCaptor<Long> expires = ArgumentCaptor.forClass(Long.class);
     verify(response).setDateHeader(eq("Expires"), expires.capture());
@@ -77,7 +77,7 @@ public class TestStaticResourceResponse extends TestCase {
     HttpServletResponse response = response(body);
     StaticResourceResponse.write(response, "a;".getBytes(StandardCharsets.UTF_8), "text/javascript", false, MAX_AGE);
     verify(response).setHeader("Cache-Control", "no-cache");
-    verify(response, never()).setHeader("Cache-Control", "public, " + MAX_AGE);
+    verify(response, never()).setHeader("Cache-Control", "public, max-age=" + MAX_AGE);
     verify(response, never()).setDateHeader(anyString(), anyLong());
     verify(response).setContentType("text/javascript");
     verify(response).setContentLength(2);

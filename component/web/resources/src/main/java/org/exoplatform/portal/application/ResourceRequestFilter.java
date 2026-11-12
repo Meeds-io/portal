@@ -145,7 +145,7 @@ public class ResourceRequestFilter extends AbstractFilter {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
     // All other static resources caching basic HTTP Headers
-    httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, " + maxAge);
+    httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, max-age=" + maxAge);
     httpResponse.setDateHeader(ResourceRequestFilter.LAST_MODIFIED, System.currentTimeMillis());
     httpResponse.setDateHeader(ResourceRequestFilter.EXPIRES,
                                System.currentTimeMillis() + maxAge * 1000);
