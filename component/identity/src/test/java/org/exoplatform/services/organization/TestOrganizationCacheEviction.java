@@ -44,6 +44,7 @@ import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.MembershipDAOImpl;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
+import org.exoplatform.services.organization.idm.UserProfileDAOImpl;
 import org.exoplatform.services.organization.idm.cache.CacheableUserHandlerImpl;
 import org.exoplatform.services.organization.impl.MembershipImpl;
 
@@ -222,6 +223,19 @@ public class TestOrganizationCacheEviction extends AbstractKernelTest {// NOSONA
     restartTransaction();
 
     assertEquals("second", profileHandler.findUserProfileByName(typedName).getAttribute("user.jobtitle"));
+  }
+
+  public void testProfileGotUnderAnotherSpellingFollowsTheWrites() throws Exception {
+    UserProfileDAOImpl profileHandler = (UserProfileDAOImpl) organizationService.getUserProfileHandler();
+    String typedName = userName.toUpperCase();
+    saveProfile("first", true);
+    restartTransaction();
+    assertEquals("first", profileHandler.getProfile(typedName).getAttribute("user.jobtitle"));
+
+    saveProfile("second", false);
+    restartTransaction();
+
+    assertEquals("second", profileHandler.getProfile(typedName).getAttribute("user.jobtitle"));
   }
 
   @SuppressWarnings("unchecked")

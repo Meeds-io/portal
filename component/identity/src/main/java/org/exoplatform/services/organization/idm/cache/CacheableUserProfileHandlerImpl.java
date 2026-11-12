@@ -107,8 +107,20 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
   @Override
   public UserProfile getProfile(String userName) {
     UserProfile userProfile = null;
-    if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
-      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME, userName);
+    String key = null;
+    boolean cached = disableCacheInThread.get() == null || !disableCacheInThread.get();
+    if (cached) {
+      try {
+        key = storedName(userName);
+      } catch (Exception e) {
+        // An entry under a name not resolved to its stored spelling is evicted
+        // by no write: the profile is read from the store, uncached
+        log.warn("Cannot read the user '{}' of a profile read, which reads the store uncached", userName, e);
+        cached = false;
+      }
+    }
+    if (cached) {
+      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME, key);
     } else {
       userProfile = super.getProfile(userName);
     }
