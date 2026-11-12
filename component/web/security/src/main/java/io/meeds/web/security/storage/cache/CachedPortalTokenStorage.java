@@ -68,7 +68,6 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   }
 
   @Override
-  @ExoTransactional
   public void deleteTokensByUsernameAndType(String username, String tokenType) {
     // The tokens deleted may be cached on any node, under ids this node does
     // not hold: a delete clears the cache of every node, and a login, which
