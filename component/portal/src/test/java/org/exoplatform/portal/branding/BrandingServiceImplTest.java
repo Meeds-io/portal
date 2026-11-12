@@ -32,6 +32,7 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGIN_TITLE_PARAM;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGO_ID_SETTING_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_LOGO_INIT_PARAM;
+import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_PAGE_BG_COLOR_INIT_PARAM;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_PAGE_BG_COLOR_KEY;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_RESET_ATTACHMENT_ID;
 import static org.exoplatform.portal.branding.BrandingServiceImpl.BRANDING_SCOPE;
@@ -1394,6 +1395,24 @@ public class BrandingServiceImplTest {
                               BRANDING_PAGE_BG_COLOR_KEY)).thenReturn((SettingValue) SettingValue.create(otherColor));
       assertFalse(otherColor, brandingService.isDefaultPageBackgroundColor());
     }
+  }
+
+  @Test
+  public void shouldTellWhenTheConfiguredPageBackgroundColorIsTheBrandingDefault() {
+    InitParams initParams = new InitParams();
+    ValueParam pageBackgroundColor = new ValueParam();
+    pageBackgroundColor.setName(BRANDING_PAGE_BG_COLOR_INIT_PARAM);
+    pageBackgroundColor.setValue("#F0F0F0");
+    initParams.addParam(pageBackgroundColor);
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             initParams);
+
+    assertTrue("Configured default page background color, none stored", brandingService.isDefaultPageBackgroundColor());
   }
 
   private ConfigurationManager lessConfigurationManager() throws Exception {
