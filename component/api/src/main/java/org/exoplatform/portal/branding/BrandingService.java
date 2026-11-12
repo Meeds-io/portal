@@ -83,11 +83,13 @@ public interface BrandingService {
   String getPageBackgroundColor();
 
   /**
-   * @return true when the page background color is #F0F0F0, the built-in
-   *         default of the Branding and Theme page, which that page stores
-   *         when its page styling is applied or reset without choosing a color
-   *         and no default is configured (exo.branding.page.backgroundColor);
-   *         a configured default other than #F0F0F0 is not matched
+   * @return true when {@link #getPageBackgroundColor()}, stored or configured
+   *         (exo.branding.page.backgroundColor), is #F0F0F0 or #F0F0F0FF in
+   *         any case, the built-in default of the Branding and Theme page,
+   *         which that page stores when its page styling is applied or reset
+   *         without choosing a color and no default is configured; false when
+   *         no color is set or for any other color, a configured default other
+   *         than #F0F0F0 included
    */
   boolean isDefaultPageBackgroundColor();
 
