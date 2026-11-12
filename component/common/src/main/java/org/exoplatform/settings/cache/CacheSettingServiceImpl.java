@@ -256,8 +256,11 @@ public class CacheSettingServiceImpl implements SettingService {
   /**
    * Evicts once the write is done, and again once the transaction completes:
    * inside a transaction, a read made before the commit caches the former value
-   * again. The loads in flight are invalidated first, so that none of them puts
-   * the former value back.
+   * again. The loads in flight on this node are invalidated first, so that none
+   * of them puts the former value back. Another node receives the eviction as a
+   * cache invalidation, which reaches its cache and not its loads in flight: a
+   * load already running there that read the former value keeps it until the
+   * entry expires.
    */
   private void evict(Runnable eviction) {
     eviction.run();
