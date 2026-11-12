@@ -31,13 +31,15 @@ import org.exoplatform.services.log.Log;
  * a store query: a key read again and again while the store does not hold it is
  * a wrong call, or a value that should be cached as absent.
  * <p>
- * The count is logged at warning level, at most once per period and cache. The
- * keys and their callers are logged at debug level only, since a key can be
- * what a user typed, a password typed in a login field included.
+ * The count is logged at info level, at most once per period and cache: a load
+ * that finds no value is routine (a login typed wrong, a name the store does not
+ * hold), so the count is a diagnosis, not an alert. The keys and their callers
+ * are logged at debug level only, since a key can be what a user typed, a
+ * password typed in a login field included.
  */
 class MissReport {
 
-  /** The period between two warnings of a cache, in seconds; 0 turns them off. */
+  /** The period between two reports of a cache, in seconds; 0 turns them off. */
   static final String  PERIOD_PROPERTY       = "meeds.cache.missReport.period";
 
   static final long    DEFAULT_PERIOD_SECONDS = 300;
@@ -68,10 +70,10 @@ class MissReport {
 
   /**
    * Counts a load that found no value, and logs the count when the period of
-   * the previous warning is over
+   * the previous report is over
    *
    * @param  key the key whose load found no value
-   * @return     the count the warning logged, 0 when none was logged
+   * @return     the count the report logged, 0 when none was logged
    */
   long onMiss(Object key) {
     if (LOG.isDebugEnabled()) {
@@ -87,7 +89,7 @@ class MissReport {
       return 0;
     }
     long count = misses.getAndSet(0);
-    LOG.warn("Cache {}: {} read(s) found no value since the previous report. The cache keeps no entry for them, so each one called its loader again, most often a store query. The keys and their callers are logged at debug level by {}",
+    LOG.info("Cache {}: {} read(s) found no value since the previous report. The cache keeps no entry for them, so each one called its loader again, most often a store query. The keys and their callers are logged at debug level by {}",
              cacheName,
              count,
              FutureCache.class.getName());
