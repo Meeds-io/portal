@@ -671,6 +671,10 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
 
       for (String name : mappedNames) {
         String attrName = getTypeConfiguration(ctx, identity.getIdentityType()).getAttributeMapping(name);
+        if (StringUtils.isBlank(attrName)) {
+          // Optional attribute (e.g. profile picture) left unmapped by the admin
+          continue;
+        }
         Attribute attr = attrs.get(attrName);
 
         IdentityObjectAttribute identityObjectAttribute;
@@ -680,20 +684,7 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
           identityObjectAttribute = new SimpleAttribute(name);
         }
         if (attr != null) {
-          NamingEnumeration<?> values = attr.getAll();
-
-          while (values.hasMoreElements()) {
-            String value = values.nextElement().toString();
-
-            // check if the value is the DN of another identity type
-            IdentityObject identityObject = findIdentityObject(ctx, value);
-            // If it is an identity object, let's add its ID
-            if (identityObject != null) {
-              identityObjectAttribute.addValue(identityObject.getName());
-            } else { // Otherwise, we add the String value as is
-              identityObjectAttribute.addValue(value);
-            }
-          }
+          addAttributeValues(ctx, attr, identityObjectAttribute);
         } else {
           // mapped attribute exists in configuration but not set for user in LDAP
           identityObjectAttribute.addValue(null);
@@ -805,6 +796,35 @@ public class ExoLDAPIdentityStoreImpl extends LDAPIdentityStoreImpl {
       }
       merged.put(SniAwareLdapSocketFactory.SOCKET_FACTORY_JNDI_PROPERTY, SniAwareLdapSocketFactory.class.getName());
       return merged;
+    }
+  }
+
+  /**
+   * Adds the values of an LDAP attribute to an IDM attribute: a binary value
+   * (thumbnailPhoto, jpegPhoto...) is kept lossless as Base64, the DN of
+   * another identity object becomes its name, anything else is added as is.
+   *
+   * @param ctx invocation context
+   * @param attr LDAP attribute to read
+   * @param target IDM attribute receiving the values
+   * @throws NamingException when the LDAP values can't be read
+   * @throws IdentityException when resolving a DN fails
+   */
+  void addAttributeValues(IdentityStoreInvocationContext ctx,
+                          Attribute attr,
+                          IdentityObjectAttribute target) throws NamingException, IdentityException {
+    NamingEnumeration<?> values = attr.getAll();
+    while (values.hasMoreElements()) {
+      Object rawValue = values.nextElement();
+      if (rawValue instanceof byte[] bytes) {
+        target.addValue(Base64.getEncoder().encodeToString(bytes));
+        continue;
+      }
+      String value = rawValue.toString();
+      // check if the value is the DN of another identity type
+      IdentityObject identityObject = findIdentityObject(ctx, value);
+      // If it is an identity object, let's add its ID, otherwise the String value as is
+      target.addValue(identityObject != null ? identityObject.getName() : value);
     }
   }
 }

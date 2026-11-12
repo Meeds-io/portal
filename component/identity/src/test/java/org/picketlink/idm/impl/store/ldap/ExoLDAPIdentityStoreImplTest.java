@@ -21,17 +21,28 @@ package org.picketlink.idm.impl.store.ldap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.naming.directory.BasicAttribute;
 
 import org.junit.After;
 import org.junit.Test;
 
 import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.services.organization.idm.ldap.SniAwareLdapSocketFactory;
+import org.picketlink.idm.impl.api.SimpleAttribute;
+import org.picketlink.idm.spi.model.IdentityObject;
 
 /**
  * Verifies that the failover/SRV/SNI support only alters the store
@@ -154,5 +165,33 @@ public class ExoLDAPIdentityStoreImplTest {
     Map<String, String> merged = result.getCustomJNDIConnectionParameters();
 
     assertEquals(originalParams, merged);
+  }
+
+  @Test
+  public void testBinaryAttributeValueIsBase64Encoded() throws Exception {
+    byte[] photo = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00, 0x7F };
+    ExoLDAPIdentityStoreImpl store = mock(ExoLDAPIdentityStoreImpl.class, CALLS_REAL_METHODS);
+    SimpleAttribute target = new SimpleAttribute("profilePicture");
+
+    store.addAttributeValues(null, new BasicAttribute("thumbnailPhoto", photo), target);
+
+    assertEquals(1, target.getValues().size());
+    assertEquals("/9j/AH8=", target.getValue());
+    verify(store, never()).findIdentityObject(any(), anyString());
+  }
+
+  @Test
+  public void testDnValueOfAnotherIdentityIsReplacedByItsName() throws Exception {
+    ExoLDAPIdentityStoreImpl store = mock(ExoLDAPIdentityStoreImpl.class, CALLS_REAL_METHODS);
+    IdentityObject jane = mock(IdentityObject.class);
+    when(jane.getName()).thenReturn("jane");
+    doReturn(jane).when(store).findIdentityObject(any(), eq("CN=Jane,DC=corp"));
+    doReturn(null).when(store).findIdentityObject(any(), eq("plain"));
+    SimpleAttribute target = new SimpleAttribute("reference");
+
+    store.addAttributeValues(null, new BasicAttribute("reference", "CN=Jane,DC=corp"), target);
+    store.addAttributeValues(null, new BasicAttribute("reference", "plain"), target);
+
+    assertEquals(java.util.List.of("jane", "plain"), new java.util.ArrayList<>(target.getValues()));
   }
 }
