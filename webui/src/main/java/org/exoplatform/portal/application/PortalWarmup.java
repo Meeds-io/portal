@@ -18,7 +18,6 @@
  */
 package org.exoplatform.portal.application;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -33,6 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -257,13 +259,22 @@ public class PortalWarmup implements Runnable {
   }
 
   /**
-   * Sends one GET, with no cookie and no credential, following no redirect.
+   * Sends one GET, with no cookie and no credential, following no redirect,
+   * and waits at most {@link #RESPONSE_TIMEOUT} for the whole response.
    *
    * @param loopback whether the URL is the derived loopback one, requested
    *          without proxy
    * @return the response's status, or -1 when the request failed
    */
   int request(URI uri, boolean loopback) throws InterruptedException {
+    return request(uri, loopback, RESPONSE_TIMEOUT);
+  }
+
+  /**
+   * @param timeout bounds the whole exchange, body included: past it, the
+   *          client is shut down, which closes the connection
+   */
+  int request(URI uri, boolean loopback, Duration timeout) throws InterruptedException {
     HttpClient.Builder builder = HttpClient.newBuilder()
                                            .followRedirects(HttpClient.Redirect.NEVER)
                                            .connectTimeout(CONNECT_TIMEOUT);
@@ -272,16 +283,26 @@ public class PortalWarmup implements Runnable {
     }
     long start = System.currentTimeMillis();
     try (HttpClient client = builder.build()) {
-      HttpResponse<Void> response = client.send(HttpRequest.newBuilder(uri).timeout(RESPONSE_TIMEOUT).GET().build(),
-                                                HttpResponse.BodyHandlers.discarding());
-      LOG.info("Portal warm-up request to {} answered {} within {}ms",
-               uri,
-               response.statusCode(),
-               System.currentTimeMillis() - start);
-      return response.statusCode();
-    } catch (IOException e) {
-      LOG.warn("Portal warm-up request to {} failed within {}ms: {}", uri, System.currentTimeMillis() - start, e.toString());
-      return -1;
+      try {
+        HttpResponse<Void> response = client.sendAsync(HttpRequest.newBuilder(uri).GET().build(),
+                                                       HttpResponse.BodyHandlers.discarding())
+                                            .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        LOG.info("Portal warm-up request to {} answered {} within {}ms",
+                 uri,
+                 response.statusCode(),
+                 System.currentTimeMillis() - start);
+        return response.statusCode();
+      } catch (ExecutionException e) {
+        LOG.warn("Portal warm-up request to {} failed within {}ms: {}",
+                 uri,
+                 System.currentTimeMillis() - start,
+                 String.valueOf(e.getCause()));
+        return -1;
+      } catch (TimeoutException e) {
+        client.shutdownNow();
+        LOG.warn("Portal warm-up request to {} got no complete response within {}ms", uri, timeout.toMillis());
+        return -1;
+      }
     }
   }
 

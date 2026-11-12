@@ -35,13 +35,18 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -180,6 +185,38 @@ public class PortalWarmupTest {
       names.replaceAll(String::toLowerCase);
       assertFalse(names.toString(), names.contains("cookie"));
       assertFalse(names.toString(), names.contains("authorization"));
+    }
+  }
+
+  @Test(timeout = 30000)
+  public void testStalledBodyIsAbandonedAfterTheTimeout() throws Exception {
+    CountDownLatch release = new CountDownLatch(1);
+    HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    ExecutorService executor = Executors.newCachedThreadPool();
+    server.setExecutor(executor);
+    server.createContext("/", exchange -> {
+      // Headers and a first chunk, then the body stalls
+      exchange.sendResponseHeaders(200, 0);
+      exchange.getResponseBody().write("<html>".getBytes(StandardCharsets.UTF_8));
+      exchange.getResponseBody().flush();
+      try {
+        release.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      exchange.close();
+    });
+    server.start();
+    try {
+      URI uri = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/portal/login");
+      long start = System.currentTimeMillis();
+      assertEquals(-1, new PortalWarmup(null, null, null).request(uri, true, Duration.ofSeconds(1)));
+      long elapsed = System.currentTimeMillis() - start;
+      assertTrue("returned after " + elapsed + "ms", elapsed < 10000);
+    } finally {
+      release.countDown();
+      server.stop(0);
+      executor.shutdownNow();
     }
   }
 
