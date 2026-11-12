@@ -18,12 +18,21 @@
  */
 package org.exoplatform.settings.impl;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
+import java.lang.reflect.Field;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
 import org.exoplatform.commons.api.settings.data.SettingKey;
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
+import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.testing.BaseTestCase;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
@@ -139,6 +148,61 @@ public class CacheSettingTest extends BaseTestCase {
     assertEquals(0, settingCache.getCacheSize());
     assertNull(settingService.get(Context.USER, Scope.PORTAL.id("name1"), "x1"));
     assertNull(settingService.get(Context.USER, Scope.PAGE.id("name4"), "x4"));
+  }
+
+  public void testSettingLoadInFlightDoesNotCacheWhatItReadBeforeASet() throws Exception {
+    SettingKey key = new SettingKey(Context.USER, Scope.SPACE, "inflight");
+    settingService.set(Context.USER, Scope.SPACE, "inflight", SettingValue.create("before"));
+
+    assertLoadInFlightIsNotCached(key,
+                                  () -> settingService.set(Context.USER,
+                                                           Scope.SPACE,
+                                                           "inflight",
+                                                           SettingValue.create("after")));
+    assertEquals("after", settingService.get(Context.USER, Scope.SPACE, "inflight").getValue());
+  }
+
+  public void testSettingLoadInFlightDoesNotCacheWhatItReadBeforeAScopeRemove() throws Exception {
+    SettingKey key = new SettingKey(Context.GLOBAL, Scope.PAGE.id("inflight"), "x");
+    settingService.set(Context.GLOBAL, Scope.PAGE.id("inflight"), "x", SettingValue.create("removed"));
+
+    assertLoadInFlightIsNotCached(key, () -> settingService.remove(Context.GLOBAL, Scope.PAGE.id("inflight")));
+    assertNull(settingService.get(Context.GLOBAL, Scope.PAGE.id("inflight"), "x"));
+  }
+
+  /**
+   * Starts a load of the key that read the former value and waits, runs the
+   * write, then lets the load end: the value it read must not be cached
+   */
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  private void assertLoadInFlightIsNotCached(SettingKey key, Runnable write) throws Exception {
+    Field field = CacheSettingServiceImpl.class.getDeclaredField("futureExoCache");
+    field.setAccessible(true);
+    Object original = field.get(settingService);
+    SettingValue<?> stale = SettingValue.create("stale");
+    CountDownLatch loading = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    FutureExoCache<SettingKey, SettingValue, SettingService> blocked = new FutureExoCache<>((service, k) -> {
+      loading.countDown();
+      release.await(10, SECONDS);
+      return stale;
+    }, (ExoCache) settingCache);
+    field.set(settingService, blocked);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<SettingValue> load = executor.submit(() -> blocked.get(settingService, key));
+      assertTrue(loading.await(10, SECONDS));
+
+      write.run();
+      release.countDown();
+      assertSame(stale, load.get(10, SECONDS));
+
+      assertNull(settingCache.get(key));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      field.set(settingService, original);
+    }
   }
 
   public void testSettingCachedAgainBeforeTheCommitOfASetIsEvictedAfterIt() {
