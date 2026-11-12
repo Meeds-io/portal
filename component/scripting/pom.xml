@@ -60,6 +60,13 @@
       <artifactId>groovy-dateutil</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- Groovy 6 moved its call-site classes to this module: a library compiled by an older groovyc, such as
+         ical4j's Groovy extension module, references them and could not be loaded without it -->
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-callsite</artifactId>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
