@@ -30,8 +30,8 @@ public interface TokenDAO extends GenericDAO<TokenEntity, Long> {
 
   List<TokenEntity> findByUsername(String username);
 
-  void deleteTokensByUsernameAndType(String username, String tokenType);
+  int deleteTokensByUsernameAndType(String username, String tokenType);
 
-  void cleanExpired();
+  int cleanExpired();
 
 }

@@ -81,6 +81,7 @@ class Retrieval<K, V, C> implements Callable<V> {
             // Return value
             return value;
         } else {
+            cache.missReport().onMiss(key);
             return null;
         }
     }
