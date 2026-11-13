@@ -40,7 +40,6 @@ import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.ComponentPlugin;
-import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.container.xml.ValueParam;
 import org.exoplatform.portal.config.model.Page;
@@ -126,8 +125,6 @@ public class UserPortalConfigService implements Startable {
   private String                         globalPortal;
 
   private final ImportMode               defaultImportMode;
-
-  private PortalConfig                   metaPortalConfig;
 
   protected final SiteFilter             portalSiteFilter               = new SiteFilter(SiteType.PORTAL,
                                                                                          null,
@@ -602,8 +599,6 @@ public class UserPortalConfigService implements Startable {
     } catch (Exception e) {
       LOG.error("Could not import initial data", e);
     }
-
-    loadMetaPortalConfig();
   }
 
   public String getMetaPortal() {
@@ -677,27 +672,22 @@ public class UserPortalConfigService implements Startable {
    * @return Skin name of the default portal
    */
   public String getMetaPortalSkinName() {
+    PortalConfig metaPortalConfig = getMetaPortalConfig();
     return metaPortalConfig != null && StringUtils.isNotBlank(metaPortalConfig.getSkin()) ?
                                                                                           metaPortalConfig.getSkin() :
                                                                                           null;
   }
 
   /**
-   * Get the PortalConfig object of the default portal
+   * Get the PortalConfig object of the default portal, read from the site
+   * storage at each call: its cache is invalidated on every node of a cluster,
+   * so a change of the default portal made on another node is read here too.
    * 
    * @return PortalConfig object of the default portal
    */
   public PortalConfig getMetaPortalConfig() {
-    return metaPortalConfig;
-  }
-
-  /**
-   * Set the PortalConfig object of the default portal
-   * 
-   * @param metaPortalConfig PortalConfig object of the default portal
-   */
-  public void setMetaPortalConfig(PortalConfig metaPortalConfig) {
-    this.metaPortalConfig = metaPortalConfig;
+    String metaPortal = getMetaPortal();
+    return metaPortal == null ? null : layoutService.getPortalConfig(SiteKey.portal(metaPortal));
   }
 
   private void keepSiteSettings(PortalConfig importedSite, PortalConfig previousSite) {
@@ -723,23 +713,6 @@ public class UserPortalConfigService implements Startable {
       return null;
     } else {
       return page;
-    }
-  }
-
-  /**
-   * Load the PortalConfig object of the default portal
-   */
-  private void loadMetaPortalConfig() {
-    String metaPortal = this.getMetaPortal();
-    if (metaPortal != null) {
-      try {
-        RequestLifeCycle.begin(ExoContainerContext.getCurrentContainer());
-        metaPortalConfig = getDataStorage().getPortalConfig(metaPortal);
-      } catch (Exception e) {
-        LOG.error("Cannot retrieve data of portal " + metaPortal, e);
-      } finally {
-        RequestLifeCycle.end();
-      }
     }
   }
 

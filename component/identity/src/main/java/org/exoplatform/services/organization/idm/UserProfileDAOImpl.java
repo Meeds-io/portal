@@ -99,6 +99,7 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
         }
 
         setProfile(profile.getUserName(), profile);
+        onUserProfileWritten(user.getUserName());
 
         if (broadcast) {
             postSave(profile, isNew);
@@ -109,13 +110,17 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
     public UserProfile removeUserProfile(String userName, boolean broadcast) throws Exception {
         UserProfile profile = getProfile(userName);
 
-        if (profile != null) {
+        if (profile == null) {
+            // Nothing to remove, but a cached copy may still hold a profile
+            onUserProfileWritten(userName);
+        } else {
             try {
                 if (broadcast) {
                     preDelete(profile);
                 }
 
                 removeProfile(userName, profile);
+                onUserProfileWritten(userName);
 
                 if (broadcast) {
                     postDelete(profile);
@@ -182,6 +187,17 @@ public class UserProfileDAOImpl extends AbstractDAOImpl implements UserProfileHa
 
     public void addDecoratorPlugin(UserProfileDecoratorPlugin decoratorPlugin) {
       decoratorPlugins.add(decoratorPlugin);
+    }
+
+    /**
+     * Called once a write of the profile is flushed to the IDM session and
+     * before its post listeners run. A handler that caches profiles evicts the
+     * profile here.
+     *
+     * @param userName the name of the profile's user
+     */
+    protected void onUserProfileWritten(String userName) {
+        // nothing is cached here
     }
 
     private void preSave(UserProfile profile, boolean isNew) throws Exception {

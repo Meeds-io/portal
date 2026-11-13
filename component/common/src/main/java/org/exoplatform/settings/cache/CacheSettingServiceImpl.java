@@ -23,14 +23,16 @@ import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.*;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
-import org.exoplatform.services.cache.future.FutureExoCache;
-import org.exoplatform.services.cache.future.Loader;
+import org.exoplatform.commons.cache.future.FutureExoCache;
+import org.exoplatform.commons.cache.future.Loader;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.settings.cache.selector.SettingCacheSelector;
 import org.exoplatform.settings.jpa.JPASettingServiceImpl;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+
+import io.meeds.common.TransactionCallbacks;
 
 import java.util.List;
 import java.util.Map;
@@ -92,7 +94,8 @@ public class CacheSettingServiceImpl implements SettingService {
 
   /**
    * Set the specified value with the key which is composed by context, scope,
-   * key. The value will be saved in the cache and the database
+   * key. The value is saved in the database, then evicted from the cache so
+   * that the next read loads it
    * 
    * @param context context with which the specified value is to be associated
    * @param scope scope with which the specified value is to be associated
@@ -102,9 +105,8 @@ public class CacheSettingServiceImpl implements SettingService {
    */
   @Override
   public void set(Context context, Scope scope, String key, SettingValue<?> value) {
-    SettingKey settingKey = new SettingKey(context, scope, key);
-    settingCache.put(settingKey, value);
     service.set(context, scope, key, value);
+    evict(new SettingKey(context, scope, key));
   }
 
   /**
@@ -151,9 +153,8 @@ public class CacheSettingServiceImpl implements SettingService {
    */
   @Override
   public void remove(Context context, Scope scope, String key) {
-    SettingKey settingKey = new SettingKey(context, scope, key);
-    settingCache.remove(settingKey);
     service.remove(context, scope, key);
+    evict(new SettingKey(context, scope, key));
   }
 
   /**
@@ -168,13 +169,8 @@ public class CacheSettingServiceImpl implements SettingService {
    */
   @Override
   public void remove(Context context, Scope scope) {
-    SettingScope settingScope = new SettingScope(context, scope);
-    try {
-      settingCache.select(new SettingCacheSelector(settingScope));
-    } catch (Exception e) {
-      LOG.error("Cannot get setting cache", e);
-    }
     service.remove(context, scope);
+    evict(new SettingCacheSelector(new SettingScope(context, scope)));
   }
 
   /**
@@ -187,13 +183,8 @@ public class CacheSettingServiceImpl implements SettingService {
    */
   @Override
   public void remove(Context context) {
-    SettingContext settingContext = new SettingContext(context);
-    try {
-      settingCache.select(new SettingCacheSelector(settingContext));
-    } catch (Exception e) {
-      LOG.error("cannot get setting context", e);
-    }
     service.remove(context);
+    evict(new SettingCacheSelector(new SettingContext(context)));
   }
 
   @Override
@@ -242,6 +233,38 @@ public class CacheSettingServiceImpl implements SettingService {
                                                                 String scopeType,
                                                                 String scopeName) {
     return service.getSettingsByContextAndScope(contextType, contextName, scopeType, scopeName);
+  }
+
+  private void evict(SettingKey settingKey) {
+    evict(() -> {
+      futureExoCache.removeFuture(settingKey);
+      futureExoCache.remove(settingKey);
+    });
+  }
+
+  private void evict(SettingCacheSelector selector) {
+    evict(() -> {
+      futureExoCache.clearFutures();
+      try {
+        settingCache.select(selector);
+      } catch (Exception e) {
+        LOG.error("Cannot remove the selected settings from the cache", e);
+      }
+    });
+  }
+
+  /**
+   * Evicts once the write is done, and again once the transaction completes:
+   * inside a transaction, a read made before the commit caches the former value
+   * again. The loads in flight on this node are invalidated first, so that none
+   * of them puts the former value back. Another node receives the eviction as a
+   * cache invalidation, which reaches its cache and not its loads in flight: a
+   * load already running there that read the former value keeps it until the
+   * entry expires.
+   */
+  private void evict(Runnable eviction) {
+    eviction.run();
+    TransactionCallbacks.afterCompletion(eviction);
   }
 
 }

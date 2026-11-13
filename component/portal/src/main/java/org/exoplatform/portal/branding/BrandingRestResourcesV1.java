@@ -64,7 +64,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   // 1 year
   private static final int    CACHE_IN_SECONDS       = 365 * 24 * 3600;
 
-  private static final int    CACHE_IN_MILLI_SECONDS = CACHE_IN_SECONDS * 1000;
+  private static final long   CACHE_IN_MILLI_SECONDS = CACHE_IN_SECONDS * 1000L;
 
   private BrandingService     brandingService;
 

@@ -22,16 +22,14 @@ import java.util.Objects;
 
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.navigation.NavigationData;
-import org.exoplatform.services.cache.CachedObjectSelector;
-import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.cache.ClusterCachedObjectSelector;
 import org.exoplatform.services.cache.ObjectCacheInfo;
 
-import lombok.Data;
+public class NavigationCacheSelector extends ClusterCachedObjectSelector<SiteKey, NavigationData> {
 
-@Data
-public class NavigationCacheSelector implements CachedObjectSelector<SiteKey, NavigationData> {
+  private static final long serialVersionUID = 1L;
 
-  private SiteKey key;
+  private final SiteKey     key;
 
   public NavigationCacheSelector(SiteKey key) {
     this.key = key;
@@ -43,10 +41,8 @@ public class NavigationCacheSelector implements CachedObjectSelector<SiteKey, Na
   }
 
   @Override
-  public void onSelect(ExoCache<? extends SiteKey, ? extends NavigationData> cache,
-                       SiteKey key,
-                       ObjectCacheInfo<? extends NavigationData> ocinfo) throws Exception {
-    cache.remove(key);
+  protected Object[] criteria() {
+    return new Object[] { key };
   }
 
 }
