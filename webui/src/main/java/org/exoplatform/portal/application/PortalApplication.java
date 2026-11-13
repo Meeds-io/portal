@@ -24,6 +24,7 @@ import java.util.ResourceBundle;
 import jakarta.servlet.ServletConfig;
 
 import org.exoplatform.container.ExoContainer;
+import org.exoplatform.container.PortalContainer;
 import org.exoplatform.resolver.ApplicationResourceResolver;
 import org.exoplatform.resolver.ServletResourceResolver;
 import org.exoplatform.services.log.ExoLogger;
@@ -80,6 +81,7 @@ public class PortalApplication extends WebuiApplication {
         for (int i = 0; i < applicationResourceBundleNames_.length; i++) {
             applicationResourceBundleNames_[i] = applicationResourceBundleNames_[i].trim();
         }
+        PortalWarmup.start(PortalContainer.getInstance(), this);
     }
 
     public ServletConfig getServletConfig() {

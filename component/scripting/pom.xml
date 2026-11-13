@@ -41,8 +41,31 @@
     </dependency>
 
     <dependency>
-      <groupId>org.codehaus.groovy</groupId>
-      <artifactId>groovy-all</artifactId>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-templates</artifactId>
+    </dependency>
+    <!-- Not used by the product. Groovy 2.4's groovy-all put them on every template's and script's classpath,
+         which a customer's template or script may still rely on -->
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-json</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-dateutil</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- Groovy 6 moved its call-site classes to this module: a library compiled by an older groovyc, such as
+         ical4j's Groovy extension module, references them and could not be loaded without it -->
+    <dependency>
+      <groupId>org.apache.groovy</groupId>
+      <artifactId>groovy-callsite</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
   <build>

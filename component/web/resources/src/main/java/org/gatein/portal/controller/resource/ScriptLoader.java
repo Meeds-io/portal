@@ -24,13 +24,19 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 
-import org.apache.commons.io.FileUtils;
 import org.gatein.common.io.IOTools;
 
 import com.google.javascript.jscomp.AbstractCommandLineRunner;
@@ -54,63 +60,121 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.web.application.javascript.JavascriptConfigService;
 
-import lombok.Getter;
-import lombok.SneakyThrows;
-
+/**
+ * Loads a script's served content: its composite source, minified unless
+ * developing, kept in a file named after the content's SHA-256, so that the
+ * same content is written once whatever the number of loaders and reloads.
+ */
 public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
+
+  private static final CompilationLevel             COMPILATION_LEVEL              = CompilationLevel.SIMPLE_OPTIMIZATIONS;
+
+  private static final CheckLevel                   NON_STANDARD_JSDOC             = CheckLevel.OFF;
+
+  private static final boolean                      STRICT_MODE_INPUT              = false;
+
+  private static final CompilerOptions.LanguageMode LANGUAGE_IN                    = CompilerOptions.LanguageMode.ECMASCRIPT_2021;
+
+  private static final CompilerOptions.LanguageMode LANGUAGE_OUT                   = CompilerOptions.LanguageMode.STABLE;
+
+  private static final CompilerOptions.Environment  EXTERNS                        = CompilerOptions.Environment.BROWSER;
+
+  /**
+   * Every option {@link #compile(String, String)} sets, part of each minified
+   * script's key: a script minified with other options is minified again.
+   */
+  private static final String                       COMPILER_OPTIONS               = COMPILATION_LEVEL + ";NON_STANDARD_JSDOC="
+      + NON_STANDARD_JSDOC + ";strictModeInput=" + STRICT_MODE_INPUT + ";in=" + LANGUAGE_IN + ";out=" + LANGUAGE_OUT + ";externs="
+      + EXTERNS;
 
   private static final boolean  DEVELOPPING                    = PropertyManager.isDevelopping();
 
-  private static final String   ERROR_MINIFYING_MODULE_MESSAGE = "Error while minifying module, retrieve it as is";
+  private static final String   ERROR_MINIFYING_MODULE_MESSAGE = "Error while minifying module {}, retrieve it as is: {}";
 
   protected static final Log    LOG                            = ExoLogger.getLogger(ScriptLoader.class);
 
-  @Getter
-  private Map<Integer, File>    files                          = new ConcurrentHashMap<>();
+  private static Path           servedDirectory;
 
-  private Map<Integer, Integer> hashes                         = new ConcurrentHashMap<>();
+  private final JavascriptConfigService service;
+
+  private final MinifiedScriptCache     minifiedScripts;
+
+  /**
+   * A loader that reads scripts from the container's
+   * {@link JavascriptConfigService} and minifies each one at each load.
+   */
+  public ScriptLoader() {
+    this(null, null);
+  }
+
+  /**
+   * @param service the service that builds the scripts' sources; when null,
+   *          the container's one
+   * @param minifiedScripts where minified scripts are kept; when null, each
+   *          load minifies again
+   */
+  public ScriptLoader(JavascriptConfigService service, MinifiedScriptCache minifiedScripts) {
+    this.service = service;
+    this.minifiedScripts = minifiedScripts;
+  }
 
   @Override
   public ScriptContent retrieve(Object context, ScriptKey key) throws Exception { // NOSONAR
+    byte[] fileContentBytes = getFileContent(key);
     if (DEVELOPPING) {
-      byte[] fileContentBytes = getFileContent(key);
       return new ScriptContent(fileContentBytes, 0);
+    } else if (fileContentBytes.length == 0) {
+      return null;
     } else {
-      File jsFile = files.computeIfAbsent(key.hashCode(),
-                                          k -> cacheFileContent(key));
-      if (jsFile == null) {
-        files.remove(key.hashCode());
-        return null;
-      } else {
-        return new ScriptContent(jsFile, hashes.get(key.hashCode()));
-      }
+      // The file and the hash are built together from the same bytes
+      return new ScriptContent(servedFile(fileContentBytes), Arrays.hashCode(fileContentBytes));
     }
   }
 
-  @SneakyThrows
-  private File cacheFileContent(ScriptKey key) {
-    byte[] fileContentBytes = getFileContent(key);
-    if (fileContentBytes.length == 0) {
-      return null;
-    } else {
-      hashes.put(key.hashCode(), Arrays.hashCode(fileContentBytes));
-      // Cache result into a temporary file
-      String name = key.getId().getName();
-      if (name.indexOf("/") >= 0) {
-        name = name.substring(name.lastIndexOf("/") + 1);
+  /**
+   * @return every option {@link #compile(String, String)} sets, part of each
+   *         minified script's key
+   */
+  public static String compilerOptions() {
+    return COMPILER_OPTIONS;
+  }
+
+  private static File servedFile(byte[] bytes) throws IOException {
+    Path file = servedDirectory().resolve(sha256(bytes) + ".js");
+    if (!Files.exists(file)) {
+      Path tmp = Files.createTempFile(file.getParent(), file.getFileName().toString(), ".tmp");
+      Files.write(tmp, bytes);
+      try {
+        Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE);
+      } catch (AtomicMoveNotSupportedException e) {
+        Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
       }
-      File file = File.createTempFile("javascript_cache_", name + ".js");
-      FileUtils.writeByteArrayToFile(file, fileContentBytes);
-      // Ensure to clean cached file on JVM
-      // exit
-      file.deleteOnExit();
-      return file;
+      // Ensure to clean cached file on JVM exit
+      file.toFile().deleteOnExit();
+    }
+    return file.toFile();
+  }
+
+  private static synchronized Path servedDirectory() throws IOException {
+    if (servedDirectory == null || !Files.isDirectory(servedDirectory)) {
+      servedDirectory = MinifiedScriptCache.ownerOnlyTemporaryDirectory("javascript_cache_");
+      servedDirectory.toFile().deleteOnExit();
+    }
+    return servedDirectory;
+  }
+
+  private static String sha256(byte[] bytes) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is a mandatory algorithm of every JVM", e);
     }
   }
 
   private byte[] getFileContent(ScriptKey key) throws Exception { // NOSONAR
-    CompositeReader script = ExoContainerContext.getService(JavascriptConfigService.class)
-                                                .getCompositeScript(key.id, key.locale);
+    JavascriptConfigService scriptService = service == null ? ExoContainerContext.getService(JavascriptConfigService.class)
+                                                            : service;
+    CompositeReader script = scriptService.getCompositeScript(key.id, key.locale);
     String sourceName = key.id.getScope() + "/" + key.id.getName() + ".js";
     if (script == null) {
       return new byte[0];
@@ -122,7 +186,7 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
         String errorMessage = minify(sourceName, script, minifiedReaders);
         if (errorMessage != null) {
           LOG.warn(ERROR_MINIFYING_MODULE_MESSAGE, sourceName, errorMessage);
-          result = script;
+          result = unminified(scriptService, key, script);
         }
       } else {
         List<Reader> readers = script.getCompounds();
@@ -131,7 +195,7 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
             String errorMessage = minify(sourceName, reader, minifiedReaders);
             if (errorMessage != null) {
               LOG.warn(ERROR_MINIFYING_MODULE_MESSAGE, sourceName, errorMessage);
-              result = script;
+              result = unminified(scriptService, key, script);
               break;
             }
           } else {
@@ -159,27 +223,61 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
     }
   }
 
-  private String minify(String sourceName, Reader reader, List<Reader> minifiedReaders) throws IOException {
-    CompilationLevel level = CompilationLevel.SIMPLE_OPTIMIZATIONS;
-    CompilerOptions options = new CompilerOptions();
-    options.setWarningLevel(DiagnosticGroups.NON_STANDARD_JSDOC, CheckLevel.OFF);
-    options.setStrictModeInput(false);
-    options.setLanguageIn(CompilerOptions.LanguageMode.ECMASCRIPT_2021);
-    options.setLanguageOut(CompilerOptions.LanguageMode.STABLE);
-    level.setOptionsForCompilationLevel(options);
+  /**
+   * @return the module as is, read again: the minification consumed the
+   *         readers of the script it was given
+   */
+  private static Reader unminified(JavascriptConfigService scriptService, ScriptKey key, CompositeReader consumed) throws Exception { // NOSONAR
+    consumed.close();
+    CompositeReader script = scriptService.getCompositeScript(key.id, key.locale);
+    return script == null ? new StringReader("") : script;
+  }
 
+  private String minify(String sourceName, Reader reader, List<Reader> minifiedReaders) throws IOException {
     StringWriter code = new StringWriter();
     IOTools.copy(reader, code);
-    SourceFile[] inputs = new SourceFile[] { SourceFile.fromCode(sourceName, code.toString()) };
+    String source = code.toString();
+    String[] errorMessage = new String[1];
+    UnaryOperator<String> minifier = s -> {
+      try {
+        Minification minification = compile(sourceName, s);
+        errorMessage[0] = minification.errorMessage();
+        return minification.code();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    };
+    String minified;
+    try {
+      minified = minifiedScripts == null ? minifier.apply(source) : minifiedScripts.get(source, minifier);
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
+    if (minified == null) {
+      return errorMessage[0];
+    } else {
+      minifiedReaders.add(new StringReader(minified));
+      return null;
+    }
+  }
+
+  private static Minification compile(String sourceName, String source) throws IOException {
+    CompilerOptions options = new CompilerOptions();
+    options.setWarningLevel(DiagnosticGroups.NON_STANDARD_JSDOC, NON_STANDARD_JSDOC);
+    options.setStrictModeInput(STRICT_MODE_INPUT);
+    options.setLanguageIn(LANGUAGE_IN);
+    options.setLanguageOut(LANGUAGE_OUT);
+    COMPILATION_LEVEL.setOptionsForCompilationLevel(options);
+
+    List<SourceFile> inputs = List.of(SourceFile.fromCode(sourceName, source));
 
     com.google.javascript.jscomp.Compiler compiler = new Compiler();
     compiler.setErrorManager(new LoggerErrorManager(java.util.logging.Logger.getLogger(ScriptLoader.class.getName())));
-    Result res = compiler.compile(AbstractCommandLineRunner.getBuiltinExterns(CompilerOptions.Environment.BROWSER),
-                                  Arrays.asList(inputs),
+    Result res = compiler.compile(AbstractCommandLineRunner.getBuiltinExterns(EXTERNS),
+                                  inputs,
                                   options);
     if (res.success) {
-      minifiedReaders.add(new StringReader(compiler.toSource()));
-      return null;
+      return new Minification(compiler.toSource(), null);
     } else {
       StringBuilder msg = new StringBuilder("Handle me gracefully JS errors\n");
       for (JSError error : res.errors) {
@@ -190,7 +288,7 @@ public class ScriptLoader implements Loader<ScriptKey, ScriptContent, Object> {
            .append(error.getDescription())
            .append("\n");
       }
-      return msg.toString();
+      return new Minification(null, msg.toString());
     }
   }
 

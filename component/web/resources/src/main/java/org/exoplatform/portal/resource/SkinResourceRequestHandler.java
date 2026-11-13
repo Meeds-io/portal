@@ -168,7 +168,7 @@ public class SkinResourceRequestHandler extends WebRequestHandler {
 
       public void setExpiration(long seconds) {
         if (seconds > 0) {
-          response.setHeader("Cache-Control", "public, " + seconds);
+          response.setHeader("Cache-Control", "public, max-age=" + seconds);
           response.setDateHeader(EXPIRES, (System.currentTimeMillis() + seconds * 1000L));
           response.setHeader("Etag", "W/\"" + ResourceRequestHandler.VERSION.hashCode() + "\"");
         } else {
