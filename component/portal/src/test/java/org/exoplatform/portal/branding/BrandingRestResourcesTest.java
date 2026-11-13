@@ -279,4 +279,27 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals(3, ((ByteArrayInputStream) entity).available());
   }
 
+  public void testGetVersionedBrandingLogoExpiresInAYear() throws Exception {
+    // Given
+    String path = "/v1/platform/branding/logo?v=test";
+    EnvironmentContext envctx = new EnvironmentContext();
+    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
+    envctx.put(HttpServletRequest.class, httpRequest);
+    when(brandingService.getLogo()).thenReturn(new Logo(null, 5, new byte[] {
+        1, 2, 3
+    }, 0, 0));
+
+    // When
+    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
+
+    // Then
+    assertEquals(200, resp.getStatus());
+    Object expires = resp.getHttpHeaders().getFirst("Expires");
+    assertNotNull(expires);
+    long expiresTime = expires instanceof Date date ? date.getTime()
+                                                    : new java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).parse(String.valueOf(expires)).getTime();
+    assertTrue("Expires must be a year ahead: " + expires,
+               expiresTime > System.currentTimeMillis() + 360L * 24 * 3600 * 1000);
+  }
+
 }

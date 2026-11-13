@@ -133,6 +133,12 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
       }
 
       if (getIdentitySession().getRoleManager().hasRole(user.getUserName(), groupId, mt.getName())) {
+        // Nothing to write, but a cached copy may still miss the membership
+        MembershipImpl existing = new MembershipImpl();
+        existing.setMembershipType(mt.getName());
+        existing.setUserName(user.getUserName());
+        existing.setGroupId(g.getId());
+        onMembershipWritten(existing, false);
         return;
       }
     }
@@ -160,6 +166,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
       orgService.flush();
     }
 
+    onMembershipWritten(membership, false);
+
     if (broadcast) {
       postSave(membership, true);
     }
@@ -186,6 +194,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     }
 
     if (hasRole) {
+      // Nothing to write, but a cached copy may still miss the membership
+      onMembershipWritten(m, false);
       return;
     }
 
@@ -228,6 +238,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     } finally {
       orgService.flush();
     }
+
+    onMembershipWritten(m, false);
 
     if (broadcast) {
       postSave(m, false);
@@ -275,7 +287,9 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
 
     if (!hasRole && !(isAssociationMapped() && getAssociationMapping().equals(m.getMembershipType()) && associated)) {
       // As test case expect, if meembership does not exist
-      // This method should return null
+      // This method should return null. Nothing to write, but a cached copy
+      // may still hold the membership
+      onMembershipWritten(m, false);
       return null;
       // return m;
     }
@@ -308,6 +322,8 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     } finally {
       orgService.flush();
     }
+
+    onMembershipWritten(m, false);
 
     if (broadcast) {
       postDelete(m);
@@ -354,11 +370,15 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
         orgService.flush();
       }
 
+      onMembershipWritten(m, true);
+
       if (broadcast) {
         postDelete(m);
       }
 
     }
+
+    String storedName = storedUserName(userName);
 
     if (isAssociationMapped()) {
 
@@ -381,9 +401,19 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
           // TODO:
           handleException("Identity operation error: ", e);
         }
+        MembershipImpl m = new MembershipImpl();
+        m.setGroupId(((GroupDAOImpl) orgService.getGroupHandler()).convertGroup(group).getId());
+        m.setUserName(storedName);
+        m.setMembershipType(getAssociationMapping());
+        onMembershipWritten(m, true);
       }
 
     }
+
+    // The user's list, which no removed role evicted when the user had none
+    MembershipImpl list = new MembershipImpl();
+    list.setUserName(storedName);
+    onMembershipWritten(list, true);
 
     // TODO: Exo UI has hardcoded casts to List
     return new LinkedList(memberships);
@@ -796,6 +826,33 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                       .flatMap(Set::stream)
                       .filter(m -> !memberships.contains(m))
                       .toList();
+  }
+
+  /**
+   * The user's name as the store holds it: the name as given when the store
+   * holds no such user or cannot be read
+   */
+  private String storedUserName(String userName) {
+    try {
+      org.picketlink.idm.api.User user = getIdentitySession().getPersistenceManager().findUser(userName);
+      return user == null ? userName : user.getId();
+    } catch (Exception e) {
+      log.warn("Cannot read the user '{}' of the removed memberships, which are evicted under the name as given", userName, e);
+      return userName;
+    }
+  }
+
+  /**
+   * Called once a write of the membership is flushed to the IDM session and
+   * before its post listeners run. A handler that caches memberships evicts the
+   * membership here.
+   *
+   * @param membership the membership written
+   * @param storedUserName whether the membership's user name was read from the
+   *          store, rather than given by the caller under any spelling
+   */
+  protected void onMembershipWritten(Membership membership, boolean storedUserName) {
+    // nothing is cached here
   }
 
   private void preSave(Membership membership, boolean isNew) throws Exception {
