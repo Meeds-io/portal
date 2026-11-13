@@ -23,7 +23,6 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,6 +68,7 @@ import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.portal.webui.portal.UISharedLayout;
 import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.portal.webui.util.Util;
+import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.listener.Asynchronous;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
@@ -194,7 +194,7 @@ public class UIPortalApplication extends UIApplication {
 
   protected UIWorkingWorkspace           uiWorkingWorkspace;                // NOSONAR
 
-  private Map<SiteKey, UIPortal>         all_UIPortals;                     // NOSONAR
+  private UIPortalCache                  uiPortalCache;                     // NOSONAR
 
   private UIComponentDecorator           uiViewWorkingWorkspace;            // NOSONAR
 
@@ -227,7 +227,8 @@ public class UIPortalApplication extends UIApplication {
     }
     context.setUIApplication(this);
 
-    this.all_UIPortals = new HashMap<>();
+    this.uiPortalCache = new UIPortalCache(ExoContainerContext.getService(CacheService.class)
+                                                              .getCacheInstance(UIPortalCache.CACHE_NAME));
     initWorkspaces(context.getPortalOwner());
     // Listen to storage to update cached pages when updated
     ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
@@ -265,7 +266,7 @@ public class UIPortalApplication extends UIApplication {
     if (key == null || isDraftSite() || isNoCache()) {
       return null;
     } else {
-      return this.all_UIPortals.get(key);
+      return this.uiPortalCache.get(key);
     }
   }
 
@@ -279,7 +280,7 @@ public class UIPortalApplication extends UIApplication {
     if (!isDraftSite()) {
       SiteKey siteKey = uiPortal.getSiteKey();
       if (siteKey != null) {
-        this.all_UIPortals.put(siteKey, uiPortal);
+        this.uiPortalCache.put(uiPortal);
       }
     }
   }
@@ -292,7 +293,7 @@ public class UIPortalApplication extends UIApplication {
    */
   public void removeCachedUIPortal(String ownerType, String ownerId) {
     if (ownerType != null && ownerId != null) {
-      this.all_UIPortals.remove(new SiteKey(ownerType, ownerId));
+      this.uiPortalCache.remove(new SiteKey(ownerType, ownerId));
     }
   }
 
@@ -302,13 +303,13 @@ public class UIPortalApplication extends UIApplication {
    * @param pageRef
    */
   public void invalidateUIPage(String pageRef) {
-    for (UIPortal tmp : all_UIPortals.values()) {
+    for (UIPortal tmp : uiPortalCache.getLocalSites()) {
       tmp.clearUIPage(pageRef);
     }
   }
 
   public void refreshCachedUI() {
-    all_UIPortals.clear();
+    uiPortalCache.clear();
   }
 
   public Orientation getOrientation() {
@@ -939,8 +940,8 @@ public class UIPortalApplication extends UIApplication {
       if (siteKey == null) {
         return;
       }
-      if (all_UIPortals != null && all_UIPortals.containsKey(siteKey)) {
-        all_UIPortals.remove(siteKey);
+      if (uiPortalCache != null) {
+        uiPortalCache.evictChanged(siteKey, portalConfigService.getMetaPortal());
       }
     }
   }
