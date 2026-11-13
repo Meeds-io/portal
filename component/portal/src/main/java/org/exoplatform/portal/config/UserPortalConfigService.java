@@ -716,7 +716,6 @@ public class UserPortalConfigService implements Startable {
     }
   }
 
-
   private UserNode getExactUserNode(UserNode rootUserNode, String nodePath, String username) { // NOSONAR
     UserNode globalRootUserNode = getSiteRootNode(PortalConfig.PORTAL_TYPE,
                                                   globalPortal,

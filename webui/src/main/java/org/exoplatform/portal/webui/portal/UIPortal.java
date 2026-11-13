@@ -27,21 +27,15 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.application.PortalRequestContext;
 import org.exoplatform.portal.config.UserACL;
-import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.Properties;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
-import org.exoplatform.portal.mop.page.PageKey;
-import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.user.UserNavigation;
 import org.exoplatform.portal.mop.user.UserNode;
 import org.exoplatform.portal.webui.container.UIContainer;
 import org.exoplatform.portal.webui.page.UIPage;
 import org.exoplatform.portal.webui.page.UIPageBody;
 import org.exoplatform.portal.webui.util.Util;
-import org.exoplatform.services.listener.Asynchronous;
-import org.exoplatform.services.listener.Listener;
-import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.web.application.RequestContext;
 import org.exoplatform.web.login.LoginUtils;
@@ -99,12 +93,6 @@ public class UIPortal extends UIContainer {
   @Getter
   @Setter
   private boolean               useDynamicLayout;
-
-  public UIPortal() {
-    // Listen to storage to update cached pages when updated
-    ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
-    listenerService.addListener(LayoutService.PAGE_UPDATED, new RefreshUIPageListener());
-  }
 
   @Override
   public boolean hasAccessPermission() {
@@ -220,25 +208,6 @@ public class UIPortal extends UIContainer {
         /* do not touch the page body */
       } else if (child.isRendered() != headerAndFooterRendered) {
         child.setRendered(headerAndFooterRendered);
-      }
-    }
-  }
-
-  @Asynchronous
-  public class RefreshUIPageListener extends Listener<LayoutService, Page> {
-    @Override
-    public void onEvent(org.exoplatform.services.listener.Event<LayoutService, Page> event) throws Exception {
-      Page page = event.getData();
-      if (page == null) {
-        return;
-      }
-      PageKey pageKey = page.getPageKey();
-      if (pageKey == null) {
-        return;
-      }
-      String pageReference = pageKey.format();
-      if (allUiPages != null && allUiPages.containsKey(pageReference)) {
-        allUiPages.remove(pageReference);
       }
     }
   }

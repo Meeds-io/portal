@@ -69,8 +69,6 @@ import org.exoplatform.portal.webui.portal.UISharedLayout;
 import org.exoplatform.portal.webui.util.PortalDataMapper;
 import org.exoplatform.portal.webui.util.Util;
 import org.exoplatform.services.cache.CacheService;
-import org.exoplatform.services.listener.Asynchronous;
-import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
@@ -228,11 +226,11 @@ public class UIPortalApplication extends UIApplication {
     context.setUIApplication(this);
 
     this.uiPortalCache = new UIPortalCache(ExoContainerContext.getService(CacheService.class)
-                                                              .getCacheInstance(UIPortalCache.CACHE_NAME));
+                                                              .getCacheInstance(UIPortalCache.CACHE_NAME),
+                                           portalConfigService::getMetaPortal);
     initWorkspaces(context.getPortalOwner());
-    // Listen to storage to update cached pages when updated
-    ListenerService listenerService = ExoContainerContext.getService(ListenerService.class);
-    listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, new RefreshUIPortalListener());
+    // Listen to storage to evict the built sites when their stored site or pages change
+    this.uiPortalCache.listenTo(ExoContainerContext.getService(ListenerService.class));
   }
 
   /**
@@ -309,7 +307,7 @@ public class UIPortalApplication extends UIApplication {
   }
 
   public void refreshCachedUI() {
-    uiPortalCache.clear();
+    uiPortalCache.clearLocal();
   }
 
   public Orientation getOrientation() {
@@ -926,23 +924,5 @@ public class UIPortalApplication extends UIApplication {
       requestContext.setUiPortlets(uiPortlets);
     }
     return uiPortlets;
-  }
-
-  @Asynchronous
-  public class RefreshUIPortalListener extends Listener<LayoutService, PortalConfig> {
-    @Override
-    public void onEvent(org.exoplatform.services.listener.Event<LayoutService, PortalConfig> event) throws Exception {
-      PortalConfig site = event.getData();
-      if (site == null) {
-        return;
-      }
-      SiteKey siteKey = site.getSiteKey();
-      if (siteKey == null) {
-        return;
-      }
-      if (uiPortalCache != null) {
-        uiPortalCache.evictChanged(siteKey, portalConfigService.getMetaPortal());
-      }
-    }
   }
 }

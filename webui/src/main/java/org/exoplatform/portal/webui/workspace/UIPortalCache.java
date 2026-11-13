@@ -19,26 +19,86 @@
 package org.exoplatform.portal.webui.workspace;
 
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import lombok.SneakyThrows;
 
+import org.exoplatform.portal.config.model.Page;
+import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.page.PageKey;
+import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.listener.Asynchronous;
+import org.exoplatform.services.listener.Event;
+import org.exoplatform.services.listener.Listener;
+import org.exoplatform.services.listener.ListenerService;
 
 /**
- * The sites a node built, by site key. Each node builds a site from the stored site and keeps its build: a build is
- * never sent to the other nodes, while a change of a site evicts its build on every node. A change of the meta site
- * evicts every build on every node, since a displayed site is built inside the meta site's layout.
+ * The sites a node built, with the pages each one built, by site key. Each
+ * node builds a site from the stored site and keeps its build: a build is
+ * never sent to the other nodes. A site created, saved or removed, or one of
+ * its pages saved or removed, evicts the site's build on every node; a change
+ * of the meta site evicts every build on every node, since a displayed site is
+ * built inside the meta site's layout.
  */
 public class UIPortalCache {
 
-  public static final String                CACHE_NAME = "portal.UIPortal";
+  public static final String                    CACHE_NAME               = "portal.UIPortal";
 
-  private final ExoCache<SiteKey, UIPortal> cache;
+  /**
+   * Delay, in seconds, of the second eviction of a changed site. A node can
+   * build the site from the stored site it read before the site's own cache
+   * was invalidated there, and keep that build after the first eviction: the
+   * two invalidations travel apart. The second eviction removes such a build.
+   */
+  public static final long                      SECOND_EVICTION_DELAY    = 10;
 
-  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache) {
+  private static final ScheduledExecutorService SECOND_EVICTION_EXECUTOR =
+                                                                         Executors.newSingleThreadScheduledExecutor(runnable -> {
+                                                                           Thread thread =
+                                                                                         new Thread(runnable,
+                                                                                                    "UIPortalCache-second-eviction");
+                                                                           thread.setDaemon(true);
+                                                                           return thread;
+                                                                         });
+
+  private final ExoCache<SiteKey, UIPortal>     cache;
+
+  private final Supplier<String>                metaPortal;
+
+  private final ScheduledExecutorService        secondEvictionExecutor;
+
+  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache, Supplier<String> metaPortal) {
+    this(cache, metaPortal, SECOND_EVICTION_EXECUTOR);
+  }
+
+  UIPortalCache(ExoCache<SiteKey, UIPortal> cache,
+                Supplier<String> metaPortal,
+                ScheduledExecutorService secondEvictionExecutor) {
     this.cache = cache;
+    this.metaPortal = metaPortal;
+    this.secondEvictionExecutor = secondEvictionExecutor;
+  }
+
+  /**
+   * Listens to the changes of sites and pages made on this node; the
+   * evictions they make reach every node
+   *
+   * @param listenerService the node's listener service
+   */
+  public void listenTo(ListenerService listenerService) {
+    SiteListener siteListener = new SiteListener(this);
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_CREATED, siteListener);
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, siteListener);
+    listenerService.addListener(LayoutService.PORTAL_CONFIG_REMOVED, siteListener);
+    PageListener pageListener = new PageListener(this);
+    listenerService.addListener(LayoutService.PAGE_UPDATED, pageListener);
+    listenerService.addListener(LayoutService.PAGE_REMOVED, pageListener);
   }
 
   public UIPortal get(SiteKey siteKey) {
@@ -46,8 +106,9 @@ public class UIPortalCache {
   }
 
   /**
-   * Keeps a site this node built, without notifying the other nodes: a notified put would evict the other nodes'
-   * builds of the site, and each of them would evict this one when it builds the site in turn.
+   * Keeps a site this node built, without notifying the other nodes: a
+   * notified put would evict the other nodes' builds of the site, and each of
+   * them would evict this one when it builds the site in turn.
    *
    * @param uiPortal the built site
    */
@@ -65,17 +126,28 @@ public class UIPortalCache {
   }
 
   /**
-   * Evicts, on every node, the builds a change of a site makes stale: the site's own build, or every build when the
-   * site is the meta site
+   * Evicts, on every node, the builds a change of a site makes stale: the
+   * site's own build, or every build when the site is the meta site; then
+   * evicts them a second time after {@link #SECOND_EVICTION_DELAY} seconds
    *
    * @param siteKey the changed site's key
-   * @param metaPortal the meta site's name
    */
-  public void evictChanged(SiteKey siteKey, String metaPortal) {
-    if (metaPortal != null && siteKey.equals(SiteKey.portal(metaPortal))) {
-      cache.clearCache();
-    } else {
-      cache.remove(siteKey);
+  public void evictChanged(SiteKey siteKey) {
+    evictNow(siteKey);
+    secondEvictionExecutor.schedule(() -> evictNow(siteKey), SECOND_EVICTION_DELAY, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Evicts the builds of this node only, leaving the other nodes' builds in
+   * place: a build found stale on this node says nothing of theirs, and a
+   * change made anywhere already evicts every node's build
+   */
+  public void clearLocal() {
+    for (UIPortal uiPortal : getLocalSites()) {
+      SiteKey siteKey = uiPortal.getSiteKey();
+      if (siteKey != null) {
+        cache.removeLocal(siteKey);
+      }
     }
   }
 
@@ -87,11 +159,51 @@ public class UIPortalCache {
     return cache.getCachedObjects();
   }
 
-  /**
-   * Evicts every build on every node
-   */
-  public void clear() {
-    cache.clearCache();
+  private void evictNow(SiteKey siteKey) {
+    String metaPortalName = metaPortal.get();
+    if (metaPortalName != null && siteKey.equals(SiteKey.portal(metaPortalName))) {
+      cache.clearCache();
+    } else {
+      cache.remove(siteKey);
+    }
+  }
+
+  @Asynchronous
+  public static class SiteListener extends Listener<LayoutService, PortalConfig> {
+
+    private final UIPortalCache uiPortalCache;
+
+    public SiteListener(UIPortalCache uiPortalCache) {
+      this.uiPortalCache = uiPortalCache;
+    }
+
+    @Override
+    public void onEvent(Event<LayoutService, PortalConfig> event) {
+      PortalConfig site = event.getData();
+      SiteKey siteKey = site == null ? null : site.getSiteKey();
+      if (siteKey != null) {
+        uiPortalCache.evictChanged(siteKey);
+      }
+    }
+  }
+
+  @Asynchronous
+  public static class PageListener extends Listener<LayoutService, Page> {
+
+    private final UIPortalCache uiPortalCache;
+
+    public PageListener(UIPortalCache uiPortalCache) {
+      this.uiPortalCache = uiPortalCache;
+    }
+
+    @Override
+    public void onEvent(Event<LayoutService, Page> event) {
+      Page page = event.getData();
+      PageKey pageKey = page == null ? null : page.getPageKey();
+      if (pageKey != null) {
+        uiPortalCache.evictChanged(pageKey.getSite());
+      }
+    }
   }
 
 }
