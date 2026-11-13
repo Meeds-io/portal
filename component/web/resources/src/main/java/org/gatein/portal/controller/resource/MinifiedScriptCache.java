@@ -225,11 +225,7 @@ public class MinifiedScriptCache {
     try {
       tmp = Files.createTempFile(directory, file.getFileName().toString(), ".tmp");
       Files.writeString(tmp, minified, StandardCharsets.UTF_8);
-      try {
-        Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE);
-      } catch (AtomicMoveNotSupportedException e) {
-        Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-      }
+      moveIntoPlace(tmp, file);
       if (temporary) {
         file.toFile().deleteOnExit();
       }
@@ -240,6 +236,18 @@ public class MinifiedScriptCache {
         LOG.debug("Can't keep minified script {}", file, e);
       }
       deleteQuietly(tmp);
+    }
+  }
+
+  /**
+   * Moves the written file to its name atomically, so that a reader never sees
+   * it half written; where the file system has no atomic move, replaces it.
+   */
+  private static void moveIntoPlace(Path tmp, Path file) throws IOException {
+    try {
+      Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE);
+    } catch (AtomicMoveNotSupportedException e) {
+      Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
     }
   }
 
