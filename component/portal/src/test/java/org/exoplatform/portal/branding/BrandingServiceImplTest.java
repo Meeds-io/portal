@@ -1022,6 +1022,90 @@ public class BrandingServiceImplTest {
   }
 
   @Test
+  public void testLoginTitleFollowsAWriteMadeOnAnotherNode() {
+    SettingService settingService = mock(SettingService.class);
+    LocaleConfigService localeConfigService = mock(LocaleConfigService.class);
+    when(localeConfigService.getDefaultLocaleConfig()).thenReturn(newLocaleConfig(Locale.ENGLISH));
+    when(localeConfigService.getLocalConfigs()).thenReturn(Arrays.asList(newLocaleConfig(Locale.ENGLISH),
+                                                                         newLocaleConfig(Locale.FRENCH)));
+    InitParams initParams = new InitParams();
+    ValueParam defaultTitleParam = new ValueParam();
+    defaultTitleParam.setName(BRANDING_LOGIN_TITLE_PARAM);
+    defaultTitleParam.setValue("Login Title");
+    initParams.addParam(defaultTitleParam);
+    // The stored values, which another node of a cluster writes too
+    Map<String, String> storedTitles = new HashMap<>();
+    when(settingService.get(eq(BRANDING_CONTEXT),
+                            eq(BRANDING_SCOPE),
+                            argThat(key -> StringUtils.startsWith(key, BRANDING_TITLE_SETTING_KEY)))).thenAnswer(invocation -> {
+                              String language = invocation.getArgument(2).toString().replace(BRANDING_TITLE_SETTING_KEY, "");
+                              return storedTitles.containsKey(language) ? SettingValue.create(storedTitles.get(language)) : null;
+                            });
+    AtomicReference<String> storedUpdateTime = new AtomicReference<>();
+    when(settingService.get(Context.GLOBAL,
+                            Scope.GLOBAL,
+                            BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> storedUpdateTime.get() == null ? null :
+                                                                                                 SettingValue.create(storedUpdateTime.get()));
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             localeConfigService,
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             initParams);
+    assertEquals("Login Title", brandingService.getLoginTitle(Locale.FRENCH));
+
+    // Written on another node: its own setters run there, the stored values change for every node
+    storedTitles.put(Locale.FRENCH.getLanguage(), "FR Title");
+    storedUpdateTime.set("1000");
+
+    assertEquals("FR Title", brandingService.getLoginTitle(Locale.FRENCH));
+  }
+
+  @Test
+  public void testLogoFollowsAWriteMadeOnAnotherNode() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    FileService fileService = mock(FileService.class);
+    AtomicReference<String> storedLogoId = new AtomicReference<>("2");
+    AtomicReference<String> storedUpdateTime = new AtomicReference<>();
+    when(settingService.get(Context.GLOBAL,
+                            Scope.GLOBAL,
+                            BRANDING_LOGO_ID_SETTING_KEY)).thenAnswer(invocation -> SettingValue.create(storedLogoId.get()));
+    when(settingService.get(Context.GLOBAL,
+                            Scope.GLOBAL,
+                            BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> storedUpdateTime.get() == null ? null :
+                                                                                                 SettingValue.create(storedUpdateTime.get()));
+    when(fileService.getFile(2l)).thenReturn(newLogoFile(2l, 3));
+    when(fileService.getFile(3l)).thenReturn(newLogoFile(3l, 5));
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             fileService,
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    assertEquals(2l, brandingService.getLogo().getFileId());
+
+    // Written on another node: its own setters run there, the stored values change for every node
+    storedLogoId.set("3");
+    storedUpdateTime.set("1000");
+
+    assertEquals(3l, brandingService.getLogo().getFileId());
+  }
+
+  private FileItem newLogoFile(long fileId, int size) throws Exception {
+    return new FileItem(fileId,
+                        "logo.png",
+                        "image/png",
+                        FILE_API_NAME_SPACE,
+                        size,
+                        new Date(),
+                        "testuser",
+                        false,
+                        new ByteArrayInputStream(new byte[size]));
+  }
+
+  @Test
   public void testUpdateLoginSubtitle() throws Exception {
     String defaultLoginTitle = "Login Subtitle";
 

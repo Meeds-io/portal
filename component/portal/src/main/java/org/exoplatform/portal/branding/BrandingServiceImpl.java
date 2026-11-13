@@ -357,6 +357,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Background           appTextHeaderBackground            = null;
 
+  /**
+   * The stored update time the memoised values above were read at: a write
+   * on any node of a cluster changes the stored time, and each node reads
+   * the values again
+   */
+  private volatile long        memoisedAt                         = Long.MIN_VALUE;
+
   private String               defaultPageWidth                   = null;
 
   private String               defaultPageBackgroundColor         = null;
@@ -403,6 +410,29 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public String getThemeCSSContent() {
     return getThemeStylesheet().css();
+  }
+
+  /**
+   * Drops the memoised values when the stored update time changed since they
+   * were read, by a write on this node or on another node of a cluster
+   */
+  private void dropStaleMemos() {
+    long lastUpdatedTime = getLastUpdatedTime();
+    if (lastUpdatedTime != memoisedAt) {
+      this.loginTitle = null;
+      this.loginSubtitle = null;
+      this.logo = null;
+      this.favicon = null;
+      this.loginBackground = null;
+      this.pageBackground = null;
+      this.topBarBackground = null;
+      this.sideBarBackground = null;
+      this.drawerBackground = null;
+      this.appBackground = null;
+      this.appTextTitleBackground = null;
+      this.appTextHeaderBackground = null;
+      memoisedAt = lastUpdatedTime;
+    }
   }
 
   private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {
@@ -774,6 +804,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Logo getLogo() {
+    dropStaleMemos();
     if (this.logo == null) {
       try {
         Long imageId = getLogoId();
@@ -791,6 +822,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Favicon getFavicon() {
+    dropStaleMemos();
     if (this.favicon == null) {
       try {
         Long imageId = getFaviconId();
@@ -811,6 +843,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getLoginBackground() {
+    dropStaleMemos();
     if (this.loginBackground == null) {
       try {
         Long imageId = getLoginBackgroundId();
@@ -833,6 +866,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getPageBackground() {
+    dropStaleMemos();
     if (this.pageBackground == null) {
       try {
         Long imageId = getPageBackgroundId();
@@ -850,6 +884,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getTopBarBackground() {
+    dropStaleMemos();
     if (this.topBarBackground == null) {
       try {
         Long imageId = getTopBarBackgroundId();
@@ -867,6 +902,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getSideBarBackground() {
+    dropStaleMemos();
     if (this.sideBarBackground == null) {
       try {
         Long imageId = getSideBarBackgroundId();
@@ -884,6 +920,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getDrawerBackground() {
+    dropStaleMemos();
     if (this.drawerBackground == null) {
       try {
         Long imageId = getDrawerBackgroundId();
@@ -901,6 +938,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getAppBackground() {
+    dropStaleMemos();
     if (this.appBackground == null) {
       try {
         Long imageId = getAppBackgroundId();
@@ -925,6 +963,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getAppTextTitleBackground() {
+    dropStaleMemos();
     if (this.appTextTitleBackground == null) {
       this.appTextTitleBackground = retrieveBackground(getAppTextTitleBackgroundId(), "application title background");
     }
@@ -940,6 +979,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getAppTextHeaderBackground() {
+    dropStaleMemos();
     if (this.appTextHeaderBackground == null) {
       this.appTextHeaderBackground = retrieveBackground(getAppTextHeaderBackgroundId(), "application header background");
     }
@@ -1116,6 +1156,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Map<String, String> getLoginTitle() {
+    dropStaleMemos();
     if (this.loginTitle == null) {
       Map<String, String> valuePerLanguage = new HashMap<>();
       for (String language : supportedLanguages.keySet()) {
@@ -1134,6 +1175,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Map<String, String> getLoginSubtitle() {
+    dropStaleMemos();
     if (this.loginSubtitle == null) {
       Map<String, String> valuePerLanguage = new HashMap<>();
       for (String language : supportedLanguages.keySet()) {
