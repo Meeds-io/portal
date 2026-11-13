@@ -34,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -259,6 +261,33 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private Background           drawerBackground                   = null;
 
+  /**
+   * The stored update time the memoised values above were read at: a write
+   * on any node of a cluster changes the stored time, and each node reads
+   * the values again
+   */
+  private volatile long        memoisedAt                         = Long.MIN_VALUE;
+
+  /**
+   * Delay, in milliseconds, after which the values memoised under a new
+   * stored update time are dropped once more. On another node of a cluster,
+   * the update time and each value are invalidated apart, in no set order: a
+   * value read before its own invalidation arrives would stay memoised under
+   * the new update time until the next write. The theme CSS is dropped too, on
+   * this node only: a browser that fetched it in between keeps it until the
+   * next branding write, since its URL and its ETag carry the update time,
+   * which the second drop does not change.
+   */
+  static final long            SECOND_DROP_DELAY                  = 10000L;
+
+  /**
+   * When the values memoised under the current update time are dropped once
+   * more, or 0 once done
+   */
+  private final AtomicLong     secondDropAt                       = new AtomicLong();
+
+  LongSupplier                 clock                              = System::currentTimeMillis;
+
   public BrandingServiceImpl(PortalContainer container, // NOSONAR
                              ConfigurationManager configurationManager,
                              SettingService settingService,
@@ -298,10 +327,45 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getThemeCSSContent() {
+    dropStaleMemos();
     if (themeCSSContent == null) {
       this.computeThemeCSS();
     }
     return themeCSSContent;
+  }
+
+  /**
+   * Drops the memoised values when the stored update time changed since they
+   * were read, by a write on this node or on another node of a cluster, then
+   * once more {@link #SECOND_DROP_DELAY} milliseconds later
+   */
+  private void dropStaleMemos() {
+    long lastUpdatedTime = getLastUpdatedTime();
+    if (lastUpdatedTime != memoisedAt) {
+      dropMemos();
+      memoisedAt = lastUpdatedTime;
+      secondDropAt.set(clock.getAsLong() + SECOND_DROP_DELAY);
+    } else {
+      long dropAt = secondDropAt.get();
+      // Only the deadline read here is cleared: a newer one, set meanwhile, stays
+      if (dropAt > 0 && clock.getAsLong() >= dropAt && secondDropAt.compareAndSet(dropAt, 0)) {
+        dropMemos();
+      }
+    }
+  }
+
+  private void dropMemos() {
+    this.loginTitle = null;
+    this.loginSubtitle = null;
+    this.logo = null;
+    this.favicon = null;
+    this.loginBackground = null;
+    this.pageBackground = null;
+    this.topBarBackground = null;
+    this.sideBarBackground = null;
+    this.drawerBackground = null;
+    this.themeCSSContent = null;
+    this.customCss = null;
   }
 
   /**
@@ -577,6 +641,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Logo getLogo() {
+    dropStaleMemos();
     if (this.logo == null) {
       try {
         Long imageId = getLogoId();
@@ -594,6 +659,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Favicon getFavicon() {
+    dropStaleMemos();
     if (this.favicon == null) {
       try {
         Long imageId = getFaviconId();
@@ -614,6 +680,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getLoginBackground() {
+    dropStaleMemos();
     if (this.loginBackground == null) {
       try {
         Long imageId = getLoginBackgroundId();
@@ -636,6 +703,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getPageBackground() {
+    dropStaleMemos();
     if (this.pageBackground == null) {
       try {
         Long imageId = getPageBackgroundId();
@@ -653,6 +721,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getTopBarBackground() {
+    dropStaleMemos();
     if (this.topBarBackground == null) {
       try {
         Long imageId = getTopBarBackgroundId();
@@ -670,6 +739,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getSideBarBackground() {
+    dropStaleMemos();
     if (this.sideBarBackground == null) {
       try {
         Long imageId = getSideBarBackgroundId();
@@ -687,6 +757,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Background getDrawerBackground() {
+    dropStaleMemos();
     if (this.drawerBackground == null) {
       try {
         Long imageId = getDrawerBackgroundId();
@@ -813,6 +884,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Map<String, String> getLoginTitle() {
+    dropStaleMemos();
     if (this.loginTitle == null) {
       Map<String, String> valuePerLanguage = new HashMap<>();
       for (String language : supportedLanguages.keySet()) {
@@ -831,6 +903,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Map<String, String> getLoginSubtitle() {
+    dropStaleMemos();
     if (this.loginSubtitle == null) {
       Map<String, String> valuePerLanguage = new HashMap<>();
       for (String language : supportedLanguages.keySet()) {
