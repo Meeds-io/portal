@@ -26,10 +26,8 @@ import java.util.function.Supplier;
 
 import lombok.SneakyThrows;
 
-import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
-import org.exoplatform.portal.mop.page.PageKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.webui.portal.UIPortal;
 import org.exoplatform.services.cache.ExoCache;
@@ -37,18 +35,22 @@ import org.exoplatform.services.listener.Asynchronous;
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.listener.Listener;
 import org.exoplatform.services.listener.ListenerService;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
 /**
- * The sites a node built, with the pages each one built, by site key. Each
- * node builds a site from the stored site and keeps its build: a build is
- * never sent to the other nodes. A site created, saved or removed, or one of
- * its pages saved or removed, evicts the site's build on every node; a change
- * of the meta site evicts every build on every node, since a displayed site is
- * built inside the meta site's layout.
+ * The sites a node built, by site key. Each node builds a site from the stored
+ * site and keeps its build: a build is never sent to the other nodes. A site
+ * created, saved or removed evicts the site's build on every node; a change of
+ * the meta site evicts every build on every node, since a displayed site is
+ * built inside the meta site's layout. A page is built at each request, so a
+ * page change leaves the builds in place.
  */
 public class UIPortalCache {
 
   public static final String                    CACHE_NAME               = "portal.UIPortal";
+
+  private static final Log                      LOG                      = ExoLogger.getLogger(UIPortalCache.class);
 
   /**
    * Delay, in seconds, of the second eviction of a changed site. A node can
@@ -86,8 +88,8 @@ public class UIPortalCache {
   }
 
   /**
-   * Listens to the changes of sites and pages made on this node; the
-   * evictions they make reach every node
+   * Listens to the changes of sites made on this node; the evictions they make
+   * reach every node
    *
    * @param listenerService the node's listener service
    */
@@ -96,9 +98,6 @@ public class UIPortalCache {
     listenerService.addListener(LayoutService.PORTAL_CONFIG_CREATED, siteListener);
     listenerService.addListener(LayoutService.PORTAL_CONFIG_UPDATED, siteListener);
     listenerService.addListener(LayoutService.PORTAL_CONFIG_REMOVED, siteListener);
-    PageListener pageListener = new PageListener(this);
-    listenerService.addListener(LayoutService.PAGE_UPDATED, pageListener);
-    listenerService.addListener(LayoutService.PAGE_REMOVED, pageListener);
   }
 
   public UIPortal get(SiteKey siteKey) {
@@ -134,7 +133,13 @@ public class UIPortalCache {
    */
   public void evictChanged(SiteKey siteKey) {
     evictNow(siteKey);
-    secondEvictionExecutor.schedule(() -> evictNow(siteKey), SECOND_EVICTION_DELAY, TimeUnit.SECONDS);
+    secondEvictionExecutor.schedule(() -> {
+      try {
+        evictNow(siteKey);
+      } catch (RuntimeException e) {
+        LOG.warn("Error while evicting the build of site {} a second time", siteKey, e);
+      }
+    }, SECOND_EVICTION_DELAY, TimeUnit.SECONDS);
   }
 
   /**
@@ -183,25 +188,6 @@ public class UIPortalCache {
       SiteKey siteKey = site == null ? null : site.getSiteKey();
       if (siteKey != null) {
         uiPortalCache.evictChanged(siteKey);
-      }
-    }
-  }
-
-  @Asynchronous
-  public static class PageListener extends Listener<LayoutService, Page> {
-
-    private final UIPortalCache uiPortalCache;
-
-    public PageListener(UIPortalCache uiPortalCache) {
-      this.uiPortalCache = uiPortalCache;
-    }
-
-    @Override
-    public void onEvent(Event<LayoutService, Page> event) {
-      Page page = event.getData();
-      PageKey pageKey = page == null ? null : page.getPageKey();
-      if (pageKey != null) {
-        uiPortalCache.evictChanged(pageKey.getSite());
       }
     }
   }

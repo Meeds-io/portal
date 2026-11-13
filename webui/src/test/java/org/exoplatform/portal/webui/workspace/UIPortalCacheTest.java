@@ -33,16 +33,16 @@ import static org.mockito.Mockito.when;
 
 import java.io.Serializable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-import org.exoplatform.portal.config.model.Page;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
@@ -120,18 +120,6 @@ public class UIPortalCacheTest {
   }
 
   @Test
-  public void testASavedOrRemovedPageEvictsItsSiteOnEveryNode() throws Exception {
-    build(SiteKey.portal("administration"));
-    fire(LayoutService.PAGE_UPDATED, page("portal::administration::home"));
-    assertNull(uiPortalCache.get(SiteKey.portal("administration")));
-    verify(replicated).put(eq(SiteKey.portal("administration")), any());
-
-    build(SiteKey.portal("administration"));
-    fire(LayoutService.PAGE_REMOVED, page("portal::administration::home"));
-    assertNull(uiPortalCache.get(SiteKey.portal("administration")));
-  }
-
-  @Test
   public void testAChangedMetaSiteEvictsEverySiteOnEveryNode() throws Exception {
     build(SiteKey.portal("administration"));
     build(SiteKey.portal(META_PORTAL));
@@ -176,14 +164,32 @@ public class UIPortalCacheTest {
   }
 
   @Test
-  public void testTheSiteAndPageChangesAreListenedTo() {
-    assertEquals(5, listeners.size());
-    assertTrue(listeners.keySet()
-                        .containsAll(List.of(LayoutService.PORTAL_CONFIG_CREATED,
-                                             LayoutService.PORTAL_CONFIG_UPDATED,
-                                             LayoutService.PORTAL_CONFIG_REMOVED,
-                                             LayoutService.PAGE_UPDATED,
-                                             LayoutService.PAGE_REMOVED)));
+  public void testAFailedSecondEvictionDoesNotEscapeItsTask() {
+    AtomicInteger calls = new AtomicInteger();
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> {
+      if (calls.incrementAndGet() > 1) {
+        throw new IllegalStateException("The meta site name cannot be read");
+      }
+      return META_PORTAL;
+    }, secondEvictionExecutor);
+    uiPortalCache.evictChanged(SiteKey.portal("administration"));
+    ArgumentCaptor<Runnable> secondEviction = ArgumentCaptor.forClass(Runnable.class);
+    verify(secondEvictionExecutor).schedule(secondEviction.capture(),
+                                            eq(UIPortalCache.SECOND_EVICTION_DELAY),
+                                            eq(TimeUnit.SECONDS));
+
+    secondEviction.getValue().run();
+
+    assertEquals(2, calls.get());
+  }
+
+  @Test
+  public void testTheSiteChangesAreListenedTo() {
+    // A page is built at each request: a page change leaves the builds in place
+    assertEquals(Set.of(LayoutService.PORTAL_CONFIG_CREATED,
+                        LayoutService.PORTAL_CONFIG_UPDATED,
+                        LayoutService.PORTAL_CONFIG_REMOVED),
+                 listeners.keySet());
   }
 
   private UIPortal build(SiteKey siteKey) {
@@ -191,12 +197,6 @@ public class UIPortalCacheTest {
     when(uiPortal.getSiteKey()).thenReturn(siteKey);
     uiPortalCache.put(uiPortal);
     return uiPortal;
-  }
-
-  private Page page(String pageId) {
-    Page page = new Page();
-    page.setPageId(pageId);
-    return page;
   }
 
   @SuppressWarnings({ "unchecked", "rawtypes" })
