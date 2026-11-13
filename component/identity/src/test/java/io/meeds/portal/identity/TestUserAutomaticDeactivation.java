@@ -18,6 +18,8 @@
  */
 package io.meeds.portal.identity;
 
+import static org.junit.Assert.assertThrows;
+
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -33,9 +35,11 @@ import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
+import org.exoplatform.services.organization.DisabledUserException;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
 import org.exoplatform.services.organization.idm.UserDAOImpl;
 
@@ -102,6 +106,52 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
   }
 
   @SuppressWarnings("deprecation")
+  public void testShouldNotReadADisabledUserAsEnabledFromTheCache() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+    assertTrue(userDao.findUserByName(userName, UserStatus.ANY).isEnabled());
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    restartTransaction();
+
+    assertNull(userDao.findUserByName(userName, UserStatus.ENABLED));
+    user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse(user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
+    assertThrows(DisabledUserException.class, () -> userDao.authenticate(userName, "any"));
+  }
+
+  @SuppressWarnings("deprecation")
+  public void testShouldNotKeepACopyCachedBeforeTheJobCommits() throws Exception {
+    User user = userDao.findUserByName(userName, UserStatus.ANY);
+    user.setLastLoginTime(Date.from(LocalDate.now()
+                                             .minusDays(6)
+                                             .atStartOfDay()
+                                             .atZone(ZoneId.systemDefault())
+                                             .toInstant()));
+    userDao.saveUser(user, true);
+    restartTransaction();
+    User committed = userDao.findUserByName(userName, UserStatus.ANY);
+    assertTrue(committed.isEnabled());
+
+    assertEquals(1, userDao.disableInactiveUsers(null, 5));
+    // Another thread or node reads the user before the job commits, and caches
+    // the committed state, still enabled
+    getContainer().getComponentInstanceOfType(OrganizationCacheHandler.class).getUserCache().put(userName, committed);
+    restartTransaction();
+
+    user = userDao.findUserByName(userName, UserStatus.ANY);
+    assertFalse(user.isEnabled());
+    assertTrue(user.isAutomaticDeactivation());
+  }
+
+  @SuppressWarnings("deprecation")
   public void testShouldNotDisableInactiveUsersOfExternalStore() throws Exception {
     User user = userDao.findUserByName(userName, UserStatus.ANY);
     user.setOriginatingStore(OrganizationService.EXTERNAL_STORE);
@@ -116,8 +166,6 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertEquals(0, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
 
-    // Read back only after the job: the job does not evict the user cache, so a
-    // read before it would leave a copy that no longer reflects the database
     user = userDao.findUserByName(userName, UserStatus.ANY);
     assertFalse(user.isInternalStore());
     assertTrue("External store user must stay enabled", user.isEnabled());
@@ -139,7 +187,6 @@ public class TestUserAutomaticDeactivation extends AbstractKernelTest {// NOSONA
     assertEquals(1, userDao.disableInactiveUsers(null, 5));
     restartTransaction();
 
-    // Read back only after the job, for the same reason as above
     user = userDao.findUserByName(userName, UserStatus.ANY);
     assertEquals(OrganizationService.INTERNAL_STORE, user.getOriginatingStore());
     assertFalse("Internal store user must be disabled", user.isEnabled());

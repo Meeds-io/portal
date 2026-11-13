@@ -86,21 +86,6 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       user = super.removeUser(userName, broadcast);
-
-      if (StringUtils.isNotBlank(userName)) {
-        userCache.remove(userName);
-        userProfileCache.remove(userName);
-      }
-
-      if (user != null) {
-        membershipCache.remove(new MembershipCacheKey(userName, null, null));
-        List<?> objects = membershipCache.getCachedObjects();
-        for (Object obj : objects) {
-          if (obj instanceof Membership membership && membership.getUserName().equals(userName)) {
-            membershipCache.remove(new MembershipCacheKey(membership));
-          }
-        }
-      }
     } finally {
       disableCacheInThread.set(false);
     }
@@ -125,7 +110,6 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.saveUser(user, broadcast);
-      userCache.remove(user.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
@@ -138,7 +122,6 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.createUser(user, broadcast);
-      userCache.remove(user.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
@@ -147,12 +130,11 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
   /**
    * {@inheritDoc}
    */
-  public User setEnabled(String userName, boolean enabled, boolean broadcast) throws Exception {
+  @Override
+  public User setEnabled(String userName, boolean enabled, boolean automaticDeactivation, boolean broadcast) throws Exception {
     disableCacheInThread.set(true);
     try {
-      User result = super.setEnabled(userName, enabled, broadcast);
-      userCache.remove(userName);
-      return result;
+      return super.setEnabled(userName, enabled, automaticDeactivation, broadcast);
     } finally {
       disableCacheInThread.set(false);
     }
@@ -165,10 +147,31 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
     User user = null;
     if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
       user = futureUserCache.get(status, userName);
+      if (user != null && !user.getUserName().equals(userName)) {
+        // Asked under another spelling than the stored one, which is the only
+        // name a write of the user evicts: keep no entry under it. The load
+        // put it on this node only, so no other node holds it
+        userCache.removeLocal(userName);
+      }
     } else {
       user = super.findUserByName(userName, status);
     }
     return user == null ? null : (status.matches(user.isEnabled()) ? (User) ((ExtendedCloneable) user).clone() : null);
+  }
+
+  @Override
+  protected void onUserRemoved(String userName) {
+    // The profile handler holds the loads of profiles in flight
+    orgService.runNowAndAfterTransaction(() -> {
+      evictUser(userName);
+      userProfileCache.remove(userName);
+    });
+    orgService.runNowAndAfterTransaction(() -> evictMemberships(userName));
+  }
+
+  @Override
+  protected void onUserWritten(String userName) {
+    orgService.runNowAndAfterTransaction(() -> evictUser(userName));
   }
 
   public void clearCache() {
@@ -177,8 +180,8 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
 
   /**
    * Evicts one account, by its stored login, so that the next read reaches
-   * the store: the entries are keyed by the login as it was requested, and a
-   * writer that bypassed this handler left the cached copy behind
+   * the store: a writer that bypassed this handler left the cached copy
+   * behind
    *
    * @param userName the stored login
    */
@@ -194,6 +197,26 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
 
   public void enableCache() {
     disableCacheInThread.remove();
+  }
+
+  private void evictUser(String userName) {
+    futureUserCache.removeFuture(userName);
+    userCache.remove(userName);
+  }
+
+  private void evictMemberships(String userName) {
+    membershipCache.remove(new MembershipCacheKey(userName, null, null));
+    List<?> objects;
+    try {
+      objects = membershipCache.getCachedObjects();
+    } catch (Exception e) {
+      throw new IllegalStateException("Cannot read the cached memberships of " + userName, e);
+    }
+    for (Object obj : objects) {
+      if (obj instanceof Membership membership && membership.getUserName().equals(userName)) {
+        membershipCache.remove(new MembershipCacheKey(membership));
+      }
+    }
   }
 
 }

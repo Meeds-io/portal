@@ -609,6 +609,28 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     }.execute(null);
   }
 
+  public void testGetMetaPortalConfigReadsAChangeSavedWithoutItsEvent() {
+    new UnitTest() {
+      public void execute() throws Exception {
+        assertNotNull(userPortalConfigService.getMetaPortalConfig());
+        // A copy of its own, as another node of a cluster reads the site
+        PortalConfig metaPortalConfig = layoutService.getPortalConfig(SiteKey.portal(userPortalConfigService.getMetaPortal()));
+        String label = metaPortalConfig.getLabel();
+        try {
+          // Saved as that node saves it: the site's event is broadcast on that
+          // node only, the site's cache is invalidated on every node
+          metaPortalConfig.setLabel("Saved on another node");
+          siteStorage.save(metaPortalConfig.build());
+
+          assertEquals("Saved on another node", userPortalConfigService.getMetaPortalConfig().getLabel());
+        } finally {
+          metaPortalConfig.setLabel(label);
+          siteStorage.save(metaPortalConfig.build());
+        }
+      }
+    }.execute(null);
+  }
+
   public void testNavigationOrder() {
     new UnitTest() {
       public void execute() throws Exception {
