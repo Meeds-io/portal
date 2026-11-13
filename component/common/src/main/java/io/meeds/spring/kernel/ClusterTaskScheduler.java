@@ -113,7 +113,13 @@ public class ClusterTaskScheduler implements TaskScheduler {
       throw new IllegalArgumentException("The scheduler '" + NAME + "' reads a cron expression in the server's time zone: "
           + task + " sets another one");
     }
-    String quartzExpression = toQuartzCron(cronTrigger.getExpression());
+    String quartzExpression;
+    try {
+      quartzExpression = toQuartzCron(cronTrigger.getExpression());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("The cron expression '" + cronTrigger.getExpression() + "' of the scheduled method "
+          + task + " cannot be written for Quartz: " + e.getMessage());
+    }
     if (!CronExpression.isValidExpression(quartzExpression)) {
       throw new IllegalArgumentException("The cron expression '" + cronTrigger.getExpression() + "' of the scheduled method "
           + task + " is not one Quartz accepts: '" + quartzExpression + "'");
@@ -170,8 +176,9 @@ public class ClusterTaskScheduler implements TaskScheduler {
    * the day of the month or the day of the week. A macro ({@code @daily}...) is
    * expanded as Spring expands it. Spring numbers the days of the week from
    * Monday, 0 and 7 being Sunday, Quartz from Sunday: a day of the week given by
-   * number, or with a step, is written as the list of the days' names it
-   * selects; {@code #} and {@code L} keep their meaning with the day's name.
+   * number, in a range or with a step, is written as the list of the days' names
+   * it selects, Sunday at the start of a range counting as 0, as in Spring;
+   * {@code #} and {@code L} keep their meaning with the day's name.
    *
    * @param expression a Spring cron expression, of six fields, or a macro
    * @return the Quartz cron expression
@@ -200,7 +207,7 @@ public class ClusterTaskScheduler implements TaskScheduler {
 
   private static String toQuartzDaysOfWeek(String field, String expression) {
     String days = field.toUpperCase(Locale.ROOT);
-    if ("?".equals(days) || "*".equals(days) || !days.matches(".*[\\d/].*")) {
+    if ("?".equals(days) || "*".equals(days) || !days.matches(".*[\\d/-].*")) {
       return days;
     }
     StringJoiner quartzDays = new StringJoiner(",");
@@ -222,7 +229,8 @@ public class ClusterTaskScheduler implements TaskScheduler {
           first = 1;
           last = 7;
         } else if (dash > 0) {
-          first = dayOfWeek(range.substring(0, dash), expression);
+          // Sunday starting a range is 0, as in Spring: SUN-SAT is every day
+          first = dayOfWeek(range.substring(0, dash), expression) % 7;
           last = dayOfWeek(range.substring(dash + 1), expression);
         } else {
           first = dayOfWeek(range, expression);

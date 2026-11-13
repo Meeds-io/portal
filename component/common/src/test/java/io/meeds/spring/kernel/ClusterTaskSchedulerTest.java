@@ -41,6 +41,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -53,6 +58,7 @@ import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.Trigger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
@@ -154,7 +160,9 @@ class ClusterTaskSchedulerTest {
   @Test
   void aSpringCronBecomesAQuartzCron() {
     assertEquals("0 15 5 * * ?", ClusterTaskScheduler.toQuartzCron("0 15 5 * * *"));
-    assertEquals("0 0 9 ? * MON-FRI", ClusterTaskScheduler.toQuartzCron("0 0 9 * * MON-FRI"));
+    assertEquals("0 0 9 ? * MON,TUE,WED,THU,FRI", ClusterTaskScheduler.toQuartzCron("0 0 9 * * MON-FRI"));
+    assertEquals("0 0 9 ? * SUN,MON,TUE,WED", ClusterTaskScheduler.toQuartzCron("0 0 9 * * 7-3"));
+    assertEquals("0 0 9 ? * SUN,MON,TUE,WED,THU,FRI,SAT", ClusterTaskScheduler.toQuartzCron("0 0 9 * * SUN-SUN"));
     assertEquals("0 0 1 1 * ?", ClusterTaskScheduler.toQuartzCron("0 0 1 1 * ?"));
     assertEquals("0 15 5 ? * *", ClusterTaskScheduler.toQuartzCron("0 15 5 ? * *"));
     // Spring and Quartz number the days of the week differently: written by name
@@ -211,6 +219,18 @@ class ClusterTaskSchedulerTest {
 
   @Test
   void aFailedRunIsReportedAndNotFiredAgainAtOnce() {
+    Logger jobLogger = (Logger) LoggerFactory.getLogger(ClusterTaskJob.class);
+    ListAppender<ILoggingEvent> failures = new ListAppender<>();
+    failures.start();
+    jobLogger.addAppender(failures);
+    try {
+      runAFailingMethod(failures);
+    } finally {
+      jobLogger.detachAppender(failures);
+    }
+  }
+
+  private void runAFailingMethod(ListAppender<ILoggingEvent> failures) {
     // One run at a time across the cluster
     assertTrue(ClusterTaskJob.class.isAnnotationPresent(DisallowConcurrentExecution.class));
     ClusterTaskScheduler.TASKS.put(DAILY, () -> {
@@ -224,6 +244,11 @@ class ClusterTaskSchedulerTest {
 
     assertFalse(e.refireImmediately());
     assertTrue(e.getCause() instanceof IllegalStateException);
+    // Logged as an error, which Quartz alone would log at INFO
+    assertTrue(failures.list.stream()
+                            .anyMatch(event -> event.getLevel() == Level.ERROR && event.getFormattedMessage().contains(DAILY)
+                                && event.getThrowableProxy() != null),
+               String.valueOf(failures.list));
   }
 
   @Test
@@ -259,6 +284,14 @@ class ClusterTaskSchedulerTest {
                                      "0 0 9 * * 0",
                                      "0 0 9 * * 7",
                                      "0 0 9 * * 5-7",
+                                     "0 0 9 * * 7-3",
+                                     "0 0 9 * * 7-7",
+                                     "0 0 9 * * 0-3",
+                                     "0 0 9 * * SUN-WED",
+                                     "0 0 9 * * SUN-SAT/2",
+                                     "0 0 9 * * SUN-SUN",
+                                     "0 0 9 * * 7/2",
+                                     "0 0 9 * * SUN/2",
                                      "0 0 9 * * */2",
                                      "0 0 9 * * 1/3",
                                      "0 0 9 * * MON/2",
@@ -312,6 +345,20 @@ class ClusterTaskSchedulerTest {
   }
 
   @Test
+  void aCronQuartzCannotWriteIsRefusedNamingItsMethod() {
+    context = new AnnotationConfigApplicationContext();
+    context.registerBean(JobSchedulerService.class, () -> mock(JobSchedulerService.class));
+    context.register(KernelSchedulingConfiguration.class, SchedulingConfiguration.class, BothDaysJobs.class);
+
+    Exception e = assertThrows(Exception.class, context::refresh);
+
+    Throwable cause = rootCause(e);
+    assertTrue(cause instanceof IllegalArgumentException, String.valueOf(cause));
+    assertTrue(cause.getMessage().contains(BothDaysJobs.class.getName() + ".firstMondays"), cause.getMessage());
+    assertTrue(ClusterTaskScheduler.TASKS.isEmpty());
+  }
+
+  @Test
   void springBootKeepsItsSchedulerAndItsTaskExecutor() {
     start(mock(JobSchedulerService.class));
 
@@ -358,6 +405,16 @@ class ClusterTaskSchedulerTest {
 
     @Scheduled(cron = "*/90 * * * * *", scheduler = ClusterTaskScheduler.NAME)
     public void everyNinetySeconds() {
+      // Refused
+    }
+  }
+
+  static class BothDaysJobs {
+
+    // Restricts both the day of the month and the day of the week, which a
+    // Quartz expression cannot
+    @Scheduled(cron = "0 0 9 1 * MON", scheduler = ClusterTaskScheduler.NAME)
+    public void firstMondays() {
       // Refused
     }
   }
