@@ -26,9 +26,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Date;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,9 +43,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.quartz.CronExpression;
+import org.quartz.DisallowConcurrentExecution;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.Trigger;
@@ -61,7 +70,9 @@ class ClusterTaskSchedulerTest {
 
   private static final String               DAILY  = Jobs.class.getName() + ".daily";
 
-  private static final String               HOURLY = Jobs.class.getName() + ".hourly";
+  private static final String               HOURLY     = Jobs.class.getName() + ".hourly";
+
+  private static final String               TWO_HOURLY = Jobs.class.getName() + ".twoHourly";
 
   private AnnotationConfigApplicationContext context;
 
@@ -83,9 +94,13 @@ class ClusterTaskSchedulerTest {
     assertEquals(DAILY, daily.getValue().getJobName());
     assertEquals(JobSchedulerService.RUNTIME_JOB_GROUP, daily.getValue().getGroupName());
     assertEquals(ClusterTaskJob.class, daily.getValue().getJob());
-    ArgumentCaptor<PeriodInfo> hourly = ArgumentCaptor.forClass(PeriodInfo.class);
-    verify(jobSchedulerService).addPeriodJob(any(), hourly.capture(), any());
-    assertEquals(TimeUnit.HOURS.toMillis(1), hourly.getValue().getRepeatInterval());
+    ArgumentCaptor<JobInfo> periodJobs = ArgumentCaptor.forClass(JobInfo.class);
+    ArgumentCaptor<PeriodInfo> periods = ArgumentCaptor.forClass(PeriodInfo.class);
+    verify(jobSchedulerService, times(2)).addPeriodJob(periodJobs.capture(), periods.capture(), any());
+    // A fixed rate, and a fixed delay run as a fixed rate
+    List<String> periodJobNames = periodJobs.getAllValues().stream().map(JobInfo::getJobName).toList();
+    assertEquals(TimeUnit.HOURS.toMillis(1), periods.getAllValues().get(periodJobNames.indexOf(HOURLY)).getRepeatInterval());
+    assertEquals(TimeUnit.HOURS.toMillis(2), periods.getAllValues().get(periodJobNames.indexOf(TWO_HOURLY)).getRepeatInterval());
     // A method that names no scheduler runs on this node, on the local scheduler
     assertTrue(jobs.local.await(10, TimeUnit.SECONDS));
     assertTrue(jobs.localThread.get().startsWith("scheduling-"), jobs.localThread.get());
@@ -117,7 +132,8 @@ class ClusterTaskSchedulerTest {
     ArgumentCaptor<Trigger> retry = ArgumentCaptor.forClass(Trigger.class);
     verify(scheduler).scheduleJob(retry.capture());
     assertEquals(new JobKey(DAILY, "portal:runtime"), retry.getValue().getJobKey());
-    assertTrue(retry.getValue().getJobDataMap().containsKey(ClusterTaskJob.RETRY_KEY));
+    // A string, which a store keeping the job data as properties accepts
+    assertTrue(retry.getValue().getJobDataMap().get(ClusterTaskJob.RETRY_KEY) instanceof String);
     assertTrue(retry.getValue().getStartTime().getTime() > System.currentTimeMillis() + 50_000);
 
     // Fired again, with no node that declares the method
@@ -184,6 +200,75 @@ class ClusterTaskSchedulerTest {
     return cause;
   }
 
+  @Test
+  void aFailedRunIsReportedAndNotFiredAgainAtOnce() {
+    // One run at a time across the cluster
+    assertTrue(ClusterTaskJob.class.isAnnotationPresent(DisallowConcurrentExecution.class));
+    ClusterTaskScheduler.TASKS.put(DAILY, () -> {
+      throw new IllegalStateException("failed");
+    });
+
+    JobExecutionException e = assertThrows(JobExecutionException.class,
+                                           () -> new ClusterTaskJob().execute(jobContext(DAILY,
+                                                                                         new JobDataMap(),
+                                                                                         mock(Scheduler.class))));
+
+    assertFalse(e.refireImmediately());
+    assertTrue(e.getCause() instanceof IllegalStateException);
+  }
+
+  @Test
+  void aCronWithItsOwnZoneAndAOneTimeTaskAreRefused() {
+    context = new AnnotationConfigApplicationContext();
+    context.registerBean(JobSchedulerService.class, () -> mock(JobSchedulerService.class));
+    context.register(KernelSchedulingConfiguration.class, SchedulingConfiguration.class, ZonedJobs.class);
+    Exception e = assertThrows(Exception.class, context::refresh);
+    assertTrue(rootCause(e) instanceof IllegalArgumentException, String.valueOf(rootCause(e)));
+    assertTrue(ClusterTaskScheduler.TASKS.isEmpty());
+
+    ClusterTaskScheduler scheduler = new ClusterTaskScheduler(() -> mock(JobSchedulerService.class));
+    assertThrows(UnsupportedOperationException.class, () -> scheduler.schedule(() -> {
+    }, Instant.now()));
+  }
+
+  @Test
+  void aMethodRegisteredTwiceUnderOneNameIsRefused() {
+    ClusterTaskScheduler scheduler = new ClusterTaskScheduler(() -> mock(JobSchedulerService.class));
+    NamedTask first = new NamedTask();
+    scheduler.scheduleAtFixedRate(first, java.time.Duration.ofMinutes(1));
+
+    assertThrows(IllegalStateException.class,
+                 () -> scheduler.scheduleAtFixedRate(new NamedTask(), java.time.Duration.ofMinutes(1)));
+    assertTrue(ClusterTaskScheduler.TASKS.get(NamedTask.NAME) == first);
+  }
+
+  @Test
+  void aConvertedCronIsValidForQuartzAndFiresWhenSpringWould() throws Exception {
+    ZoneId zone = ZoneId.systemDefault();
+    for (String expression : List.of("0 15 5 * * *",
+                                     "0 15 5 ? * *",
+                                     "0 15 23 ? * *",
+                                     "0 0 9 * * MON-FRI",
+                                     "0 0 1 1 * ?",
+                                     "15 */2 * * * ?",
+                                     "0 */5 * * * *",
+                                     "0 * * * * ?")) {
+      String quartzExpression = ClusterTaskScheduler.toQuartzCron(expression);
+      assertTrue(CronExpression.isValidExpression(quartzExpression), quartzExpression);
+      CronExpression quartz = new CronExpression(quartzExpression);
+      quartz.setTimeZone(java.util.TimeZone.getTimeZone(zone));
+      org.springframework.scheduling.support.CronExpression spring =
+                                                                   org.springframework.scheduling.support.CronExpression.parse(expression);
+      ZonedDateTime springTime = ZonedDateTime.of(2026, 1, 1, 0, 0, 0, 0, zone);
+      Date quartzTime = Date.from(springTime.toInstant());
+      for (int i = 0; i < 10; i++) {
+        springTime = spring.next(springTime);
+        quartzTime = quartz.getNextValidTimeAfter(quartzTime);
+        assertEquals(springTime.toInstant(), quartzTime.toInstant(), expression);
+      }
+    }
+  }
+
   private Jobs start(JobSchedulerService jobSchedulerService) {
     context = new AnnotationConfigApplicationContext();
     context.registerBean(JobSchedulerService.class, () -> jobSchedulerService);
@@ -212,6 +297,34 @@ class ClusterTaskSchedulerTest {
   static class SchedulingConfiguration {
   }
 
+  static class ZonedJobs {
+
+    @Scheduled(cron = "0 15 5 * * *", zone = "Pacific/Auckland", scheduler = ClusterTaskScheduler.NAME)
+    public void zoned() {
+      // Refused
+    }
+  }
+
+  static class NamedTask implements SchedulingAwareRunnable {
+
+    static final String NAME = "io.meeds.Example.run";
+
+    @Override
+    public void run() {
+      // Registered only
+    }
+
+    @Override
+    public String getQualifier() {
+      return ClusterTaskScheduler.NAME;
+    }
+
+    @Override
+    public String toString() {
+      return NAME;
+    }
+  }
+
   static class LocalJobs {
 
     @Scheduled(fixedDelay = 60_000)
@@ -235,6 +348,11 @@ class ClusterTaskSchedulerTest {
 
     @Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS, scheduler = ClusterTaskScheduler.NAME)
     public void hourly() {
+      // Registered only
+    }
+
+    @Scheduled(fixedDelay = 2, timeUnit = TimeUnit.HOURS, scheduler = ClusterTaskScheduler.NAME)
+    public void twoHourly() {
       // Registered only
     }
 

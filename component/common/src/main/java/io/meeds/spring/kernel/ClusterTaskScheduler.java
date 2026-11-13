@@ -52,6 +52,11 @@ import org.exoplatform.services.scheduler.PeriodInfo;
  * one, and belongs to {@link JobSchedulerService#RUNTIME_JOB_GROUP}, which the
  * job scheduler keeps when a node restarts. A cron expression is read as Spring
  * reads it; a fixed delay runs at a fixed rate, one run at a time.
+ * <p>
+ * A run missed while no node was up follows Quartz's misfire policy, not
+ * Spring's: a cron late by more than the store's misfire threshold fires once
+ * as soon as a node can; a fixed rate skips the runs it missed and goes on at
+ * its next time.
  */
 public class ClusterTaskScheduler implements TaskScheduler {
 
@@ -127,7 +132,8 @@ public class ClusterTaskScheduler implements TaskScheduler {
 
   @Override
   public ScheduledFuture<?> schedule(Runnable task, Instant startTime) {
-    throw new UnsupportedOperationException("The scheduler '" + NAME + "' runs scheduled methods only");
+    throw new UnsupportedOperationException("The scheduler '" + NAME + "' runs a cron or a fixed rate only, not the one-time task "
+        + task);
   }
 
   /**
@@ -169,7 +175,12 @@ public class ClusterTaskScheduler implements TaskScheduler {
     }
     // The qualified name of the method, the same on every node
     String name = task.toString();
-    TASKS.put(name, task);
+    Runnable registered = TASKS.putIfAbsent(name, task);
+    if (registered != null) {
+      // A method two beans inherit from one class would share its job
+      throw new IllegalStateException("The scheduled method " + name + " is registered already, by " + registered
+          + ": a method that two beans inherit names this scheduler from one bean only");
+    }
     return name;
   }
 
@@ -197,7 +208,8 @@ public class ClusterTaskScheduler implements TaskScheduler {
       zone.setAccessible(true); // NOSONAR
       return zone.get(trigger);
     } catch (ReflectiveOperationException | RuntimeException e) {
-      return null;
+      // A zone that cannot be read may be another one than the server's
+      throw new IllegalStateException("Cannot read the time zone of the cron trigger " + trigger, e);
     }
   }
 

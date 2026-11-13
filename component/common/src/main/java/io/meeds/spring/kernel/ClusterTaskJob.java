@@ -61,6 +61,9 @@ public class ClusterTaskJob implements Job {
       try {
         task.run();
       } catch (RuntimeException e) {
+        // Logged as Spring logs a scheduled method that fails: Quartz logs it at
+        // INFO only. The next run comes at the next trigger, not at once
+        LOG.error("The scheduled method {} failed", name, e);
         throw new JobExecutionException("The scheduled method " + name + " failed", e, false);
       }
     } else if (context.getTrigger().getJobDataMap().containsKey(RETRY_KEY)) {
@@ -78,7 +81,9 @@ public class ClusterTaskJob implements Job {
       context.getScheduler()
              .scheduleJob(TriggerBuilder.newTrigger()
                                         .forJob(jobKey)
-                                        .usingJobData(RETRY_KEY, Boolean.TRUE)
+                                        // A string, which a store that keeps
+                                        // the job data as properties accepts
+                                        .usingJobData(RETRY_KEY, Boolean.TRUE.toString())
                                         .startAt(new Date(System.currentTimeMillis() + RETRY_DELAY * 1000))
                                         .build());
     } catch (SchedulerException e) {
