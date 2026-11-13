@@ -149,8 +149,10 @@ class ClusterTaskSchedulerTest {
     assertEquals("0 0 9 ? * MON-FRI", ClusterTaskScheduler.toQuartzCron("0 0 9 * * MON-FRI"));
     assertEquals("0 0 1 1 * ?", ClusterTaskScheduler.toQuartzCron("0 0 1 1 * ?"));
     assertEquals("0 15 5 ? * *", ClusterTaskScheduler.toQuartzCron("0 15 5 ? * *"));
-    // Spring and Quartz number the days of the week differently
-    assertThrows(IllegalArgumentException.class, () -> ClusterTaskScheduler.toQuartzCron("0 0 9 * * 1-5"));
+    // Spring and Quartz number the days of the week differently: written by name
+    assertEquals("0 0 9 ? * MON,TUE,WED,THU,FRI", ClusterTaskScheduler.toQuartzCron("0 0 9 * * 1-5"));
+    assertEquals("0 0 9 ? * FRI#2", ClusterTaskScheduler.toQuartzCron("0 0 9 * * 5#2"));
+    assertEquals("0 0 0 ? * SUN", ClusterTaskScheduler.toQuartzCron("@weekly"));
     assertThrows(IllegalArgumentException.class, () -> ClusterTaskScheduler.toQuartzCron("0 0 9 1 * MON"));
   }
 
@@ -245,7 +247,26 @@ class ClusterTaskSchedulerTest {
   @Test
   void aConvertedCronIsValidForQuartzAndFiresWhenSpringWould() throws Exception {
     ZoneId zone = ZoneId.systemDefault();
-    for (String expression : List.of("0 15 5 * * *",
+    for (String expression : List.of("0 15 5 * * 1",
+                                     "0 0 9 * * 1-5",
+                                     "0 0 9 * * 0",
+                                     "0 0 9 * * 7",
+                                     "0 0 9 * * 5-7",
+                                     "0 0 9 * * */2",
+                                     "0 0 9 * * 1/3",
+                                     "0 0 9 * * MON/2",
+                                     "0 0 9 * * 1,3,SAT",
+                                     "0 0 9 ? * 5#2",
+                                     "0 0 9 ? * FRI#2",
+                                     "0 0 9 * * 5L",
+                                     "@yearly",
+                                     "@annually",
+                                     "@monthly",
+                                     "@weekly",
+                                     "@daily",
+                                     "@midnight",
+                                     "@hourly",
+                                     "0 15 5 * * *",
                                      "0 15 5 ? * *",
                                      "0 15 23 ? * *",
                                      "0 0 9 * * MON-FRI",
@@ -267,6 +288,20 @@ class ClusterTaskSchedulerTest {
         assertEquals(springTime.toInstant(), quartzTime.toInstant(), expression);
       }
     }
+  }
+
+  @Test
+  void aCronQuartzRejectsIsRefusedNamingItsMethod() {
+    context = new AnnotationConfigApplicationContext();
+    context.registerBean(JobSchedulerService.class, () -> mock(JobSchedulerService.class));
+    context.register(KernelSchedulingConfiguration.class, SchedulingConfiguration.class, InvalidJobs.class);
+
+    Exception e = assertThrows(Exception.class, context::refresh);
+
+    Throwable cause = rootCause(e);
+    assertTrue(cause instanceof IllegalArgumentException, String.valueOf(cause));
+    assertTrue(cause.getMessage().contains(InvalidJobs.class.getName() + ".everyNinetySeconds"), cause.getMessage());
+    assertTrue(ClusterTaskScheduler.TASKS.isEmpty());
   }
 
   private Jobs start(JobSchedulerService jobSchedulerService) {
@@ -295,6 +330,14 @@ class ClusterTaskSchedulerTest {
   @Configuration
   @EnableScheduling
   static class SchedulingConfiguration {
+  }
+
+  static class InvalidJobs {
+
+    @Scheduled(cron = "*/90 * * * * *", scheduler = ClusterTaskScheduler.NAME)
+    public void everyNinetySeconds() {
+      // Refused
+    }
   }
 
   static class ZonedJobs {
