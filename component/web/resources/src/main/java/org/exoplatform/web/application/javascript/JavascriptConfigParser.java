@@ -33,6 +33,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.exoplatform.commons.utils.I18N;
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.gatein.common.xml.XMLTools;
@@ -103,6 +104,12 @@ public class JavascriptConfigParser {
 
   /** . */
   public static final String     GROUP_TAG                        = "load-group";
+
+  /**
+   * Whether a script that its build already minified ({@code *.bundle.js}, {@code *.min.js}) and whose descriptor
+   * declares no {@code <minify>} is minified again at runtime. Read at each parse.
+   */
+  public static final String     MINIFY_PREBUILT_PROPERTY         = "exo.portal.js.minify.prebuilt";
 
   /** . */
   private final String           contextPath;
@@ -307,12 +314,11 @@ public class JavascriptConfigParser {
       for (Element scriptElt : XMLTools.getChildren(element, SCRIPT_TAG)) {
         String resourceBundle = parseOptString(scriptElt, "resource-bundle");
 
-        String minifyStr = parseOptString(scriptElt, "minify");
-        boolean minify = minifyStr == null || Boolean.parseBoolean(minifyStr);
+        String scriptPath = parseOptString(scriptElt, "path");
+        boolean minify = isMinify(parseOptString(scriptElt, "minify"), scriptPath);
 
         List<Content> contents = new LinkedList<Content>();
         Element adapter = XMLTools.getUniqueChild(scriptElt, ADAPTER_TAG, false);
-        String scriptPath = parseOptString(scriptElt, "path");
         if (scriptPath != null) {
           contents.add(new Content(scriptPath));
         } else if (adapter != null) {
@@ -365,5 +371,22 @@ public class JavascriptConfigParser {
   private String parseOptString(Element element, String childTag) {
     Element childElt = XMLTools.getUniqueChild(element, childTag, false);
     return childElt == null ? null : XMLTools.asString(childElt, true);
+  }
+
+  /**
+   * An explicit {@code <minify>} decides. Without one, a script is minified at runtime unless its path names a
+   * build's minified output, {@code *.bundle.js} or {@code *.min.js}, and {@link #MINIFY_PREBUILT_PROPERTY} is not
+   * true.
+   */
+  static boolean isMinify(String minifyValue, String scriptPath) {
+    return isMinify(minifyValue, scriptPath, Boolean.parseBoolean(PropertyManager.getProperty(MINIFY_PREBUILT_PROPERTY)));
+  }
+
+  static boolean isMinify(String minifyValue, String scriptPath, boolean minifyPrebuilt) {
+    if (minifyValue != null) {
+      return Boolean.parseBoolean(minifyValue);
+    }
+    boolean prebuilt = scriptPath != null && (scriptPath.endsWith(".bundle.js") || scriptPath.endsWith(".min.js"));
+    return !prebuilt || minifyPrebuilt;
   }
 }

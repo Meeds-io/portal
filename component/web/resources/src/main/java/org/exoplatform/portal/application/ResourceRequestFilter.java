@@ -19,12 +19,10 @@
 package org.exoplatform.portal.application;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Random;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.portal.controller.resource.ResourceRequestHandler;
 import org.gatein.portal.controller.resource.ResourceScope;
@@ -124,7 +122,13 @@ public class ResourceRequestFilter extends AbstractFilter {
           ScriptContent script = getScriptContent(httpRequest, scope, compress);
           if (script != null) {
             byte[] bytes = script.getContentAsBytes();
-            writeStaticResourceContent(httpResponse, bytes, "text/javascript");
+            StaticResourceResponse.write(httpResponse,
+                                         bytes,
+                                         "text/javascript",
+                                         StaticResourceResponse.isPubliclyCacheable(script,
+                                                                                    httpRequest.getParameter(ScriptKey.HASH_QUERY_PARAM),
+                                                                                    PropertyManager.isDevelopping()),
+                                         maxAge);
             return; // NOSONAR not redundant jump
           }
         }
@@ -141,7 +145,7 @@ public class ResourceRequestFilter extends AbstractFilter {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
     // All other static resources caching basic HTTP Headers
-    httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, " + maxAge);
+    httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, max-age=" + maxAge);
     httpResponse.setDateHeader(ResourceRequestFilter.LAST_MODIFIED, System.currentTimeMillis());
     httpResponse.setDateHeader(ResourceRequestFilter.EXPIRES,
                                System.currentTimeMillis() + maxAge * 1000);
@@ -149,15 +153,7 @@ public class ResourceRequestFilter extends AbstractFilter {
   }
 
   private void writeStaticResourceContent(HttpServletResponse httpResponse, byte[] bytes, String mimeType) throws IOException {
-    httpResponse.setContentType(mimeType);
-    httpResponse.setContentLength(bytes.length);
-    httpResponse.setHeader(CACHE_CONTROL_HEADER_NAME, "public, " + maxAge);
-    httpResponse.setDateHeader(ResourceRequestFilter.LAST_MODIFIED, System.currentTimeMillis());
-    httpResponse.setDateHeader(ResourceRequestFilter.EXPIRES,
-                               System.currentTimeMillis() + maxAge * 1000);
-    PrintWriter writer = httpResponse.getWriter();
-    IOUtils.write(bytes, writer, StandardCharsets.UTF_8);
-    writer.close();
+    StaticResourceResponse.write(httpResponse, bytes, mimeType, true, maxAge);
   }
 
   private ScriptContent getScriptContent(HttpServletRequest httpRequest, String scope, String compress) {

@@ -102,7 +102,7 @@ public class ResourceRequestHandler extends WebRequestHandler implements WebAppL
         byte[] bytes = script.getContentAsBytes();
         response.setContentType("text/javascript");
         response.setContentLength(bytes.length);
-        response.setHeader("Cache-Control", "public, " + MAX_AGE);
+        response.setHeader("Cache-Control", "public, max-age=" + MAX_AGE);
         response.setDateHeader(ResourceRequestFilter.LAST_MODIFIED, System.currentTimeMillis());
         response.setDateHeader(ResourceRequestFilter.EXPIRES,
                                System.currentTimeMillis() + ResourceRequestHandler.MAX_AGE * 1000);
