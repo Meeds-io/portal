@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -364,6 +365,23 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    */
   private volatile long        memoisedAt                         = Long.MIN_VALUE;
 
+  /**
+   * Delay, in milliseconds, after which the values memoised under a new
+   * stored update time are dropped once more. On another node of a cluster,
+   * the update time and each value are invalidated apart, in no set order: a
+   * value read before its own invalidation arrives would stay memoised under
+   * the new update time until the next write.
+   */
+  static final long            SECOND_DROP_DELAY                  = 10000L;
+
+  /**
+   * When the values memoised under the current update time are dropped once
+   * more, or 0 once done
+   */
+  private volatile long        secondDropAt                       = 0;
+
+  LongSupplier                 clock                              = System::currentTimeMillis;
+
   private String               defaultPageWidth                   = null;
 
   private String               defaultPageBackgroundColor         = null;
@@ -414,25 +432,35 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   /**
    * Drops the memoised values when the stored update time changed since they
-   * were read, by a write on this node or on another node of a cluster
+   * were read, by a write on this node or on another node of a cluster, then
+   * once more {@link #SECOND_DROP_DELAY} milliseconds later
    */
   private void dropStaleMemos() {
     long lastUpdatedTime = getLastUpdatedTime();
     if (lastUpdatedTime != memoisedAt) {
-      this.loginTitle = null;
-      this.loginSubtitle = null;
-      this.logo = null;
-      this.favicon = null;
-      this.loginBackground = null;
-      this.pageBackground = null;
-      this.topBarBackground = null;
-      this.sideBarBackground = null;
-      this.drawerBackground = null;
-      this.appBackground = null;
-      this.appTextTitleBackground = null;
-      this.appTextHeaderBackground = null;
+      dropMemos();
       memoisedAt = lastUpdatedTime;
+      secondDropAt = clock.getAsLong() + SECOND_DROP_DELAY;
+    } else if (secondDropAt > 0 && clock.getAsLong() >= secondDropAt) {
+      secondDropAt = 0;
+      dropMemos();
+      themeStylesheet.set(null);
     }
+  }
+
+  private void dropMemos() {
+    this.loginTitle = null;
+    this.loginSubtitle = null;
+    this.logo = null;
+    this.favicon = null;
+    this.loginBackground = null;
+    this.pageBackground = null;
+    this.topBarBackground = null;
+    this.sideBarBackground = null;
+    this.drawerBackground = null;
+    this.appBackground = null;
+    this.appTextTitleBackground = null;
+    this.appTextHeaderBackground = null;
   }
 
   private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {

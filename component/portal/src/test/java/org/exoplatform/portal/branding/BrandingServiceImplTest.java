@@ -74,6 +74,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -82,7 +83,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1091,6 +1094,108 @@ public class BrandingServiceImplTest {
     storedUpdateTime.set("1000");
 
     assertEquals(3l, brandingService.getLogo().getFileId());
+  }
+
+  @Test
+  public void testEveryMemoisedValueFollowsAWriteMadeOnAnotherNode() throws Exception {
+    Map<String, Function<BrandingServiceImpl, Object>> getters = new LinkedHashMap<>();
+    getters.put("loginTitle", BrandingServiceImpl::getLoginTitle);
+    getters.put("loginSubtitle", BrandingServiceImpl::getLoginSubtitle);
+    getters.put("logo", BrandingServiceImpl::getLogo);
+    getters.put("favicon", BrandingServiceImpl::getFavicon);
+    getters.put("loginBackground", BrandingServiceImpl::getLoginBackground);
+    getters.put("pageBackground", BrandingServiceImpl::getPageBackground);
+    getters.put("topBarBackground", BrandingServiceImpl::getTopBarBackground);
+    getters.put("sideBarBackground", BrandingServiceImpl::getSideBarBackground);
+    getters.put("drawerBackground", BrandingServiceImpl::getDrawerBackground);
+    getters.put("appBackground", BrandingServiceImpl::getAppBackground);
+    getters.put("appTextTitleBackground", BrandingServiceImpl::getAppTextTitleBackground);
+    getters.put("appTextHeaderBackground", BrandingServiceImpl::getAppTextHeaderBackground);
+    List<String> stale = new ArrayList<>();
+    for (Map.Entry<String, Function<BrandingServiceImpl, Object>> getter : getters.entrySet()) {
+      AtomicInteger valueReads = new AtomicInteger();
+      AtomicReference<String> storedUpdateTime = new AtomicReference<>();
+      BrandingServiceImpl brandingService = newBrandingServiceOverStoredFiles(valueReads, storedUpdateTime);
+      getter.getValue().apply(brandingService);
+      valueReads.set(0);
+      getter.getValue().apply(brandingService);
+      assertEquals(getter.getKey() + " is memoised", 0, valueReads.get());
+
+      // Written on another node: the stored update time changes for every node
+      storedUpdateTime.set("1000");
+      getter.getValue().apply(brandingService);
+
+      if (valueReads.get() == 0) {
+        stale.add(getter.getKey());
+      }
+    }
+    assertEquals(Collections.emptyList(), stale);
+  }
+
+  @Test
+  public void testAValueReadBeforeItsOwnInvalidationIsDroppedOnceMore() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    AtomicReference<String> storedLogoId = new AtomicReference<>("2");
+    AtomicReference<String> storedUpdateTime = new AtomicReference<>();
+    when(settingService.get(Context.GLOBAL,
+                            Scope.GLOBAL,
+                            BRANDING_LOGO_ID_SETTING_KEY)).thenAnswer(invocation -> SettingValue.create(storedLogoId.get()));
+    when(settingService.get(Context.GLOBAL,
+                            Scope.GLOBAL,
+                            BRANDING_LAST_UPDATED_TIME_KEY)).thenAnswer(invocation -> storedUpdateTime.get() == null ? null :
+                                                                                                 SettingValue.create(storedUpdateTime.get()));
+    FileService fileService = mock(FileService.class);
+    when(fileService.getFile(2l)).thenReturn(newLogoFile(2l, 3));
+    when(fileService.getFile(3l)).thenReturn(newLogoFile(3l, 5));
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             fileService,
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    AtomicLong now = new AtomicLong(100000L);
+    brandingService.clock = now::get;
+    assertEquals(2l, brandingService.getLogo().getFileId());
+
+    // On another node, the update time's invalidation arrives before the logo's
+    storedUpdateTime.set("1000");
+    assertEquals(2l, brandingService.getLogo().getFileId());
+    storedLogoId.set("3");
+    now.addAndGet(BrandingServiceImpl.SECOND_DROP_DELAY - 1);
+    assertEquals(2l, brandingService.getLogo().getFileId());
+
+    now.addAndGet(1);
+    assertEquals(3l, brandingService.getLogo().getFileId());
+  }
+
+  private BrandingServiceImpl newBrandingServiceOverStoredFiles(AtomicInteger valueReads,
+                                                                AtomicReference<String> storedUpdateTime) throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.get(any(), any(), any())).thenAnswer(invocation -> {
+      String key = invocation.getArgument(2);
+      if (BRANDING_LAST_UPDATED_TIME_KEY.equals(key)) {
+        return storedUpdateTime.get() == null ? null : SettingValue.create(storedUpdateTime.get());
+      }
+      valueReads.incrementAndGet();
+      // Every stored image is file 2; a login title is a plain value
+      return StringUtils.startsWithAny(key, BRANDING_TITLE_SETTING_KEY, BRANDING_SUBTITLE_SETTING_KEY) ? SettingValue.create("Title") :
+                                                                                                      SettingValue.create("2");
+    });
+    FileService fileService = mock(FileService.class);
+    when(fileService.getFile(2l)).thenAnswer(invocation -> newLogoFile(2l, 3));
+    LocaleConfigService localeConfigService = mock(LocaleConfigService.class);
+    when(localeConfigService.getDefaultLocaleConfig()).thenReturn(newLocaleConfig(Locale.ENGLISH));
+    when(localeConfigService.getLocalConfigs()).thenReturn(Arrays.asList(newLocaleConfig(Locale.ENGLISH)));
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             fileService,
+                                                             mock(UploadService.class),
+                                                             localeConfigService,
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    brandingService.clock = () -> 0L;
+    return brandingService;
   }
 
   private FileItem newLogoFile(long fileId, int size) throws Exception {
