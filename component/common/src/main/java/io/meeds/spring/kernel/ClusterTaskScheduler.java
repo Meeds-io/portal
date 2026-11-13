@@ -36,6 +36,7 @@ import java.util.function.Supplier;
 
 import org.quartz.CronExpression;
 import org.quartz.JobDataMap;
+import org.quartz.ObjectAlreadyExistsException;
 import org.springframework.scheduling.SchedulingAwareRunnable;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.Trigger;
@@ -133,10 +134,27 @@ public class ClusterTaskScheduler implements TaskScheduler {
     try {
       getJobSchedulerService().addCronJob(jobInfo(name), quartzExpression, jobData(name));
     } catch (Exception e) {
-      TASKS.remove(name, task);
-      throw new IllegalStateException("Cannot register the scheduled method " + name, e);
+      throw registrationFailed(name, task, e);
     }
     return new ClusterTask(name, task);
+  }
+
+  /**
+   * Fails the registration of a method. When the store refused the job because
+   * it holds it already, another node registered the same method at the same
+   * time, both having found no job: the message says so, since a restart of
+   * this node then finds the job stored and starts.
+   */
+  private static IllegalStateException registrationFailed(String name, Runnable task, Exception e) {
+    TASKS.remove(name, task);
+    for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ObjectAlreadyExistsException) {
+        return new IllegalStateException("Cannot register the scheduled method " + name
+            + ": another node of the cluster registered it at the same time. Restart this node: it then finds the job"
+            + " stored. Start one node alone on an empty database and after every upgrade to avoid it", e);
+      }
+    }
+    return new IllegalStateException("Cannot register the scheduled method " + name, e);
   }
 
   @Override
@@ -147,8 +165,7 @@ public class ClusterTaskScheduler implements TaskScheduler {
                                        new PeriodInfo(Date.from(startTime), null, 0, period.toMillis()),
                                        jobData(name));
     } catch (Exception e) {
-      TASKS.remove(name, task);
-      throw new IllegalStateException("Cannot register the scheduled method " + name, e);
+      throw registrationFailed(name, task, e);
     }
     return new ClusterTask(name, task);
   }

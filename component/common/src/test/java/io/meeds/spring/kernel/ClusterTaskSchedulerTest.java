@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -56,7 +57,9 @@ import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
+import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -274,6 +277,45 @@ class ClusterTaskSchedulerTest {
     assertThrows(IllegalStateException.class,
                  () -> scheduler.scheduleAtFixedRate(new NamedTask(), java.time.Duration.ofMinutes(1)));
     assertTrue(ClusterTaskScheduler.TASKS.get(NamedTask.NAME) == first);
+  }
+
+  @Test
+  void aJobAnotherNodeStoredAtTheSameTimeFailsTheStartSayingSo() throws Exception {
+    // Two nodes starting together: the other node's job is stored between this
+    // node's lookup and its store, which refuses this node's copy
+    JobSchedulerService jobSchedulerService = mock(JobSchedulerService.class);
+    doThrow(new SchedulerException("store", new ObjectAlreadyExistsException("job " + DAILY))).when(jobSchedulerService)
+                                                                                             .addCronJob(any(), any(), any());
+
+    Exception e = assertThrows(Exception.class, () -> start(jobSchedulerService));
+    IllegalStateException registration = registrationFailure(e);
+    assertTrue(registration.getMessage().contains(DAILY), registration.getMessage());
+    assertTrue(registration.getMessage().contains("another node of the cluster registered it at the same time"),
+               registration.getMessage());
+    assertTrue(registration.getMessage().contains("Restart this node"), registration.getMessage());
+    assertFalse(ClusterTaskScheduler.TASKS.containsKey(DAILY));
+  }
+
+  @Test
+  void anyOtherFailureToStoreAJobFailsTheStartWithoutNamingAnotherNode() throws Exception {
+    JobSchedulerService jobSchedulerService = mock(JobSchedulerService.class);
+    doThrow(new SchedulerException("store unavailable")).when(jobSchedulerService).addCronJob(any(), any(), any());
+
+    Exception e = assertThrows(Exception.class, () -> start(jobSchedulerService));
+    IllegalStateException registration = registrationFailure(e);
+    assertEquals("Cannot register the scheduled method " + DAILY, registration.getMessage());
+    assertFalse(ClusterTaskScheduler.TASKS.containsKey(DAILY));
+  }
+
+  private static IllegalStateException registrationFailure(Throwable e) {
+    for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+      if (cause instanceof IllegalStateException registration
+          && registration.getMessage() != null
+          && registration.getMessage().startsWith("Cannot register the scheduled method")) {
+        return registration;
+      }
+    }
+    throw new AssertionError("No registration failure in " + e, e);
   }
 
   @Test
