@@ -18,43 +18,73 @@
  */
 package io.meeds.spring.kernel;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
+import org.springframework.scheduling.config.TaskSchedulerRouter;
 
 import org.exoplatform.services.scheduler.JobSchedulerService;
 
 /**
- * The schedulers of the scheduled methods: {@link ClusterTaskScheduler} for a
- * method that names it, which runs once per cluster, and the local scheduler
- * every other method runs on, on each node.
+ * Routes a scheduled method that names {@link ClusterTaskScheduler#NAME} to the
+ * {@link ClusterTaskScheduler}, which runs it once per cluster. Every other
+ * scheduled method runs as Spring routes it, on each node: on the scheduler
+ * Spring Boot builds for the context ({@code spring.task.scheduling.*}), never
+ * on the kernel's job scheduler.
  * <p>
- * Spring runs a method that names no scheduler on the bean named
- * {@value #LOCAL_SCHEDULER} when the context holds several schedulers, and
- * Spring Boot builds its own local scheduler only when the context holds none:
- * the local one is therefore declared here, as Spring Boot would build it.
+ * The cluster scheduler is not a bean: Spring Boot builds its own scheduler,
+ * and its own task executor, only when the context holds no bean of their
+ * kind, so a scheduler bean declared here would take them from every context.
  */
 @Configuration
-public class KernelSchedulingConfiguration {
+public class KernelSchedulingConfiguration implements SchedulingConfigurer, BeanFactoryAware, DisposableBean {
 
-  /** The name Spring looks up for the scheduler of a method that names none. */
-  public static final String LOCAL_SCHEDULER = "taskScheduler";
+  private BeanFactory           beanFactory;
 
-  @Bean(ClusterTaskScheduler.NAME)
-  public TaskScheduler clusterScheduler(ObjectProvider<JobSchedulerService> jobSchedulerService) {
-    return new ClusterTaskScheduler(jobSchedulerService::getIfAvailable);
+  private ClusterSchedulerRouter router;
+
+  @Override
+  public void setBeanFactory(BeanFactory beanFactory) {
+    this.beanFactory = beanFactory;
   }
 
-  @Bean(LOCAL_SCHEDULER)
-  public ThreadPoolTaskScheduler taskScheduler(@Value("${spring.task.scheduling.pool.size:1}") int poolSize,
-                                               @Value("${spring.task.scheduling.thread-name-prefix:scheduling-}") String threadNamePrefix) {
-    ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-    scheduler.setPoolSize(poolSize);
-    scheduler.setThreadNamePrefix(threadNamePrefix);
-    return scheduler;
+  @Override
+  public void configureTasks(ScheduledTaskRegistrar registrar) {
+    ClusterTaskScheduler clusterScheduler =
+                                          new ClusterTaskScheduler(() -> beanFactory.getBeanProvider(JobSchedulerService.class)
+                                                                                    .getIfAvailable());
+    router = new ClusterSchedulerRouter(clusterScheduler);
+    router.setBeanFactory(beanFactory);
+    registrar.setTaskScheduler(router);
+  }
+
+  @Override
+  public void destroy() {
+    if (router != null) {
+      router.destroy();
+    }
+  }
+
+  /**
+   * Spring's router of the scheduled methods, which resolves the cluster
+   * scheduler by its name.
+   */
+  static class ClusterSchedulerRouter extends TaskSchedulerRouter {
+
+    private final TaskScheduler clusterScheduler;
+
+    ClusterSchedulerRouter(TaskScheduler clusterScheduler) {
+      this.clusterScheduler = clusterScheduler;
+    }
+
+    @Override
+    protected TaskScheduler determineQualifiedScheduler(String qualifier) {
+      return ClusterTaskScheduler.NAME.equals(qualifier) ? clusterScheduler : super.determineQualifiedScheduler(qualifier);
+    }
   }
 
 }

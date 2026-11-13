@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,11 +53,16 @@ import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.Trigger;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
+import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.scheduling.SchedulingAwareRunnable;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import org.exoplatform.services.scheduler.JobInfo;
 import org.exoplatform.services.scheduler.JobSchedulerService;
@@ -73,6 +79,8 @@ class ClusterTaskSchedulerTest {
   private static final String               HOURLY     = Jobs.class.getName() + ".hourly";
 
   private static final String               TWO_HOURLY = Jobs.class.getName() + ".twoHourly";
+
+  private static final int                  POOL_SIZE  = 5;
 
   private AnnotationConfigApplicationContext context;
 
@@ -101,7 +109,7 @@ class ClusterTaskSchedulerTest {
     List<String> periodJobNames = periodJobs.getAllValues().stream().map(JobInfo::getJobName).toList();
     assertEquals(TimeUnit.HOURS.toMillis(1), periods.getAllValues().get(periodJobNames.indexOf(HOURLY)).getRepeatInterval());
     assertEquals(TimeUnit.HOURS.toMillis(2), periods.getAllValues().get(periodJobNames.indexOf(TWO_HOURLY)).getRepeatInterval());
-    // A method that names no scheduler runs on this node, on the local scheduler
+    // A method that names no scheduler runs on this node, on the scheduler Spring Boot builds
     assertTrue(jobs.local.await(10, TimeUnit.SECONDS));
     assertTrue(jobs.localThread.get().startsWith("scheduling-"), jobs.localThread.get());
     assertEquals(0, jobs.dailyRuns.get());
@@ -184,7 +192,6 @@ class ClusterTaskSchedulerTest {
     context = new AnnotationConfigApplicationContext();
     context.register(KernelSchedulingConfiguration.class, SchedulingConfiguration.class, LocalJobs.class);
     context.refresh();
-    assertTrue(context.getBean(ClusterTaskScheduler.NAME) instanceof ClusterTaskScheduler);
     context.close();
 
     context = new AnnotationConfigApplicationContext();
@@ -304,8 +311,22 @@ class ClusterTaskSchedulerTest {
     assertTrue(ClusterTaskScheduler.TASKS.isEmpty());
   }
 
+  @Test
+  void springBootKeepsItsSchedulerAndItsTaskExecutor() {
+    start(mock(JobSchedulerService.class));
+
+    // Built by Spring Boot, which builds them only when the context holds none
+    assertTrue(context.getBean("applicationTaskExecutor") instanceof java.util.concurrent.Executor);
+    assertEquals(0, context.getBeansOfType(ClusterTaskScheduler.class).size());
+    ThreadPoolTaskScheduler taskScheduler = context.getBean("taskScheduler", ThreadPoolTaskScheduler.class);
+    assertEquals(POOL_SIZE, taskScheduler.getScheduledThreadPoolExecutor().getCorePoolSize());
+  }
+
   private Jobs start(JobSchedulerService jobSchedulerService) {
     context = new AnnotationConfigApplicationContext();
+    context.getEnvironment()
+           .getPropertySources()
+           .addFirst(new MapPropertySource("test", Map.of("spring.task.scheduling.pool.size", POOL_SIZE)));
     context.registerBean(JobSchedulerService.class, () -> jobSchedulerService);
     context.register(KernelSchedulingConfiguration.class, SchedulingConfiguration.class, Jobs.class);
     context.refresh();
@@ -329,6 +350,7 @@ class ClusterTaskSchedulerTest {
 
   @Configuration
   @EnableScheduling
+  @ImportAutoConfiguration({ TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class })
   static class SchedulingConfiguration {
   }
 
