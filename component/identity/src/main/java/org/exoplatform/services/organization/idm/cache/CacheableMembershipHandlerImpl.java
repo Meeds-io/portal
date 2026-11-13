@@ -28,6 +28,7 @@ import org.exoplatform.services.organization.Group;
 import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.MembershipType;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.cache.MembershipCacheKey;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.MembershipDAOImpl;
@@ -85,8 +86,11 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   @Override
   public Membership findMembership(String id) throws Exception {
     if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
+      MembershipImpl asked = new MembershipImpl(id);
       Membership membership = (Membership) futureMembershipCache.get(MembershipCacheOperationType.MEMBERSHIP_BY_ID,
-                                                                     new MembershipCacheKey(new MembershipImpl(id)));
+                                                                     new MembershipCacheKey(storedName(asked.getUserName()),
+                                                                                            asked.getGroupId(),
+                                                                                            asked.getMembershipType()));
       return membership == null ? null : (Membership) ((ExtendedCloneable) membership).clone();
     } else {
       return super.findMembership(id);
@@ -97,7 +101,7 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   public Membership findMembershipByUserGroupAndType(String userName, String groupId, String type) throws Exception {
     if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
       Membership membership = (Membership) futureMembershipCache.get(MembershipCacheOperationType.MEMBERSHIP_BY_ID,
-                                                                     new MembershipCacheKey(userName, groupId, type));
+                                                                     new MembershipCacheKey(storedName(userName), groupId, type));
       return membership == null ? null : (Membership) ((ExtendedCloneable) membership).clone();
     } else {
       return super.findMembershipByUserGroupAndType(userName, groupId, type);
@@ -107,7 +111,7 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
   @Override
   public Collection<Membership> findMembershipsByUser(String userName) throws Exception {
     if (useCacheList && (disableCacheInThread.get() == null || !disableCacheInThread.get())) {
-      MembershipCacheKey cacheKey = new MembershipCacheKey(userName, null, null);
+      MembershipCacheKey cacheKey = new MembershipCacheKey(storedName(userName), null, null);
       return (Collection<Membership>) futureMembershipCache.get(MembershipCacheOperationType.MEMBERSHIPS_FOR_USER, cacheKey);
     } else {
       try {
@@ -124,7 +128,6 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
     disableCacheInThread.set(true);
     try {
       membership = super.removeMembership(id, broadcast);
-      clearMembershipCache(membership);
     } finally {
       disableCacheInThread.remove();
     }
@@ -133,14 +136,14 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
 
   @Override
   public void saveMembership(Membership m, boolean broadcast) throws Exception {
-    super.saveMembership(m, broadcast);
-    clearMembershipCache(m);
-  }
-
-  @Override
-  public void createMembership(Membership m, boolean broadcast) throws Exception {
-    super.createMembership(m, broadcast);
-    clearMembershipCache(m);
+    try {
+      super.saveMembership(m, broadcast);
+    } catch (Exception e) {
+      // A failed write may have kept part of the membership, which the
+      // request commits: the hook did not run
+      evictAfterFailure(m, e);
+      throw e;
+    }
   }
 
   @Override
@@ -148,11 +151,18 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.linkMembership(user, g, mt, broadcast);
-    } finally {
+    } catch (Exception e) {
+      // A failed write may have kept part of the membership, which the
+      // request commits: the hook did not run
       if (user != null && g != null && mt != null) {
-        futureMembershipCache.remove(new MembershipCacheKey(user.getUserName(), g.getId(), mt.getName()));
-        clearMembershipCache(user.getUserName());
+        MembershipImpl membership = new MembershipImpl();
+        membership.setUserName(user.getUserName());
+        membership.setGroupId(g.getId());
+        membership.setMembershipType(mt.getName());
+        evictAfterFailure(membership, e);
       }
+      throw e;
+    } finally {
       disableCacheInThread.remove();
     }
   }
@@ -163,13 +173,15 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
     disableCacheInThread.set(true);
     try {
       memberships = super.removeMembershipByUser(username, broadcast);
-      for (Membership membership : memberships) {
-        clearMembershipCache(membership);
-      }
     } finally {
       disableCacheInThread.remove();
     }
     return memberships;
+  }
+
+  @Override
+  protected void onMembershipWritten(Membership membership, boolean storedUserName) {
+    evictMembership(membership, storedUserName);
   }
 
   public void clearCache() {
@@ -195,6 +207,63 @@ public class CacheableMembershipHandlerImpl extends MembershipDAOImpl {
     if (useCacheList) {
       membershipCache.remove(new MembershipCacheKey(username, null, null));
     }
+  }
+
+  /**
+   * Evicts a written membership and its user's list, now and once the IDM
+   * transaction ends, the loads of them in flight included, so that none of
+   * them caches what it read before the write
+   */
+  private void evictAfterFailure(Membership membership, Exception failure) {
+    try {
+      evictMembership(membership, false);
+    } catch (RuntimeException e) {
+      failure.addSuppressed(e);
+    }
+  }
+
+  private void evictMembership(Membership membership, boolean storedUserName) {
+    if (membership == null) {
+      return;
+    }
+    String userName = storedUserName ? membership.getUserName() : storedNameToEvict(membership.getUserName());
+    MembershipCacheKey key = new MembershipCacheKey(userName, membership.getGroupId(), membership.getMembershipType());
+    MembershipCacheKey listKey = new MembershipCacheKey(userName, null, null);
+    orgService.runNowAndAfterTransaction(() -> {
+      futureMembershipCache.removeFuture(key);
+      futureMembershipCache.removeFuture(listKey);
+      membershipCache.remove(key);
+      if (useCacheList) {
+        membershipCache.remove(listKey);
+      }
+    });
+  }
+
+  /**
+   * The stored name of a written membership's user, or the name as given when
+   * the store cannot be read: the write is already flushed, and its eviction
+   * must not fail it
+   */
+  private String storedNameToEvict(String userName) {
+    try {
+      return storedName(userName);
+    } catch (Exception e) {
+      log.warn("Cannot read the user '{}' of a written membership, which is evicted under the name as given", userName, e);
+      return userName;
+    }
+  }
+
+  /**
+   * The user's name as stored, which keys the entries of this cache: a name
+   * asked under another spelling, which the store finds too, would otherwise
+   * key an entry that no write of the user evicts
+   */
+  private String storedName(String userName) throws Exception {
+    if (userName == null) {
+      return null;
+    }
+    User user = orgService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    return user == null ? userName : user.getUserName();
   }
 
   public enum MembershipCacheOperationType {

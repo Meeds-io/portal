@@ -47,23 +47,25 @@ public class InMemoryTokenDAO extends AbstractInMemoryDAO<TokenEntity> implement
   }
 
   @Override
-  public void deleteTokensByUsernameAndType(String username, String tokenType) {
+  public int deleteTokensByUsernameAndType(String username, String tokenType) {
     List<TokenEntity> tokenList = entities.values()
                                           .stream()
                                           .filter(entity -> StringUtils.equals(entity.getUsername(), username)
                                               && StringUtils.equals(entity.getTokenType(), tokenType))
                                           .toList();
     deleteAll(tokenList);
+    return tokenList.size();
   }
 
   @Override
-  public void cleanExpired() {
+  public int cleanExpired() {
     List<TokenEntity> tokenList = entities.values()
                                           .stream()
                                           .filter(entity -> entity.getExpirationTime() != null
                                               && entity.getExpirationTime().getTime() <= System.currentTimeMillis())
                                           .toList();
     deleteAll(tokenList);
+    return tokenList.size();
   }
 
 }

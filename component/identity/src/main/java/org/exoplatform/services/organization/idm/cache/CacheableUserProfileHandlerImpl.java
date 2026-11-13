@@ -25,7 +25,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
 import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserProfile;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.organization.idm.PicketLinkIDMService;
@@ -86,7 +88,7 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
   public UserProfile findUserProfileByName(String userName) throws Exception {
     UserProfile userProfile = null;
     if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
-      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME_NO_NULL, userName);
+      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME_NO_NULL, storedName(userName));
     } else {
       return super.findUserProfileByName(userName);
     }
@@ -105,8 +107,20 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
   @Override
   public UserProfile getProfile(String userName) {
     UserProfile userProfile = null;
-    if (disableCacheInThread.get() == null || !disableCacheInThread.get()) {
-      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME, userName);
+    String key = null;
+    boolean cached = disableCacheInThread.get() == null || !disableCacheInThread.get();
+    if (cached) {
+      try {
+        key = storedName(userName);
+      } catch (Exception e) {
+        // An entry under a name not resolved to its stored spelling is evicted
+        // by no write: the profile is read from the store, uncached
+        log.warn("Cannot read the user '{}' of a profile read, which reads the store uncached", userName, e);
+        cached = false;
+      }
+    }
+    if (cached) {
+      userProfile = futureUserProfile.get(UserProfileCacheOperationType.PROFILE_BY_USERNAME, key);
     } else {
       userProfile = super.getProfile(userName);
     }
@@ -135,7 +149,6 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
     UserProfile userProfile = null;
     try {
       userProfile = super.removeUserProfile(userName, broadcast);
-      userProfileCache.remove(userName);
       return userProfile;
     } finally {
       disableCacheInThread.set(false);
@@ -149,10 +162,45 @@ public class CacheableUserProfileHandlerImpl extends UserProfileDAOImpl {
     disableCacheInThread.set(true);
     try {
       super.saveUserProfile(profile, broadcast);
-      userProfileCache.remove(profile.getUserName());
     } finally {
       disableCacheInThread.set(false);
     }
+  }
+
+  @Override
+  protected void onUserProfileWritten(String userName) {
+    String key = storedNameToEvict(userName);
+    orgService.runNowAndAfterTransaction(() -> {
+      futureUserProfile.removeFuture(key);
+      userProfileCache.remove(key);
+    });
+  }
+
+  /**
+   * The stored name of a written profile's user, or the name as given when the
+   * store cannot be read: the write is already flushed, and its eviction must
+   * not fail it
+   */
+  private String storedNameToEvict(String userName) {
+    try {
+      return storedName(userName);
+    } catch (Exception e) {
+      log.warn("Cannot read the user '{}' of a written profile, which is evicted under the name as given", userName, e);
+      return userName;
+    }
+  }
+
+  /**
+   * The user's name as stored, which keys the entries of this cache: a name
+   * asked under another spelling, which the store finds too, would otherwise
+   * key an entry that no write of the user evicts
+   */
+  private String storedName(String userName) throws Exception {
+    if (userName == null) {
+      return null;
+    }
+    User user = orgService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    return user == null ? userName : user.getUserName();
   }
 
   public void clearCache() {

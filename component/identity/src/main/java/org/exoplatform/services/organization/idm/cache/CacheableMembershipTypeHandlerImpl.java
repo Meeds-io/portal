@@ -22,10 +22,7 @@ import java.util.Collection;
 
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
-import org.exoplatform.services.cache.CachedObjectSelector;
 import org.exoplatform.services.cache.ExoCache;
-import org.exoplatform.services.cache.ObjectCacheInfo;
-import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.MembershipType;
 import org.exoplatform.services.organization.cache.MembershipCacheKey;
 import org.exoplatform.services.organization.cache.OrganizationCacheHandler;
@@ -142,36 +139,5 @@ public class CacheableMembershipTypeHandlerImpl extends MembershipTypeDAOImpl {
 
   public void enableCache() {
     disableCacheInThread.remove();
-  }
-
-  public static final class ClearMembershipCacheByMembershipTypeSelector
-      implements CachedObjectSelector<MembershipCacheKey, Object> {
-    private String membershipType;
-
-    public ClearMembershipCacheByMembershipTypeSelector(String membershipType) {
-      this.membershipType = membershipType;
-    }
-
-    @Override
-    public void onSelect(ExoCache<? extends MembershipCacheKey, ? extends Object> cache,
-                         MembershipCacheKey key,
-                         ObjectCacheInfo<? extends Object> ocinfo) throws Exception {
-      cache.remove(key);
-    }
-
-    @Override
-    public boolean select(MembershipCacheKey key, ObjectCacheInfo<? extends Object> ocinfo) {
-      Object obj = ocinfo.get();
-      if (obj instanceof Membership) {
-        Membership cachedMembership = (Membership) ocinfo.get();
-        if (cachedMembership.getMembershipType().equals(membershipType)) {
-          return true;
-        }
-      } else if (obj instanceof Collection) {
-        // Delete all cached user's memberships when deleting a membershipType
-        return true;
-      }
-      return false;
-    }
   }
 }
