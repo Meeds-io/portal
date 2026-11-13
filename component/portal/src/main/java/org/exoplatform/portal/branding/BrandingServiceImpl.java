@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.regex.Matcher;
@@ -370,7 +371,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    * stored update time are dropped once more. On another node of a cluster,
    * the update time and each value are invalidated apart, in no set order: a
    * value read before its own invalidation arrives would stay memoised under
-   * the new update time until the next write.
+   * the new update time until the next write. The compiled theme is dropped
+   * too, on this node only: a browser that fetched it in between keeps it
+   * until the next branding write, since its URL and its ETag carry the update
+   * time, which the second drop does not change.
    */
   static final long            SECOND_DROP_DELAY                  = 10000L;
 
@@ -378,7 +382,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    * When the values memoised under the current update time are dropped once
    * more, or 0 once done
    */
-  private volatile long        secondDropAt                       = 0;
+  private final AtomicLong     secondDropAt                       = new AtomicLong();
 
   LongSupplier                 clock                              = System::currentTimeMillis;
 
@@ -440,11 +444,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (lastUpdatedTime != memoisedAt) {
       dropMemos();
       memoisedAt = lastUpdatedTime;
-      secondDropAt = clock.getAsLong() + SECOND_DROP_DELAY;
-    } else if (secondDropAt > 0 && clock.getAsLong() >= secondDropAt) {
-      secondDropAt = 0;
-      dropMemos();
-      themeStylesheet.set(null);
+      secondDropAt.set(clock.getAsLong() + SECOND_DROP_DELAY);
+    } else {
+      long dropAt = secondDropAt.get();
+      // Only the deadline read here is cleared: a newer one, set meanwhile, stays
+      if (dropAt > 0 && clock.getAsLong() >= dropAt && secondDropAt.compareAndSet(dropAt, 0)) {
+        dropMemos();
+        themeStylesheet.set(null);
+      }
     }
   }
 

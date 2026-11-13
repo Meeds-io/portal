@@ -48,7 +48,9 @@ import static org.exoplatform.portal.branding.BrandingServiceImpl.SUPPORTED_FONT
 import static org.exoplatform.portal.branding.BrandingServiceImpl.THEME_FONT_FAMILY_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -1161,12 +1163,16 @@ public class BrandingServiceImplTest {
     // On another node, the update time's invalidation arrives before the logo's
     storedUpdateTime.set("1000");
     assertEquals(2l, brandingService.getLogo().getFileId());
+    // The theme compiled in between, under the new update time
+    ThemeStylesheet stylesheetInBetween = brandingService.getThemeStylesheet();
     storedLogoId.set("3");
     now.addAndGet(BrandingServiceImpl.SECOND_DROP_DELAY - 1);
     assertEquals(2l, brandingService.getLogo().getFileId());
+    assertSame(stylesheetInBetween, brandingService.getThemeStylesheet());
 
     now.addAndGet(1);
     assertEquals(3l, brandingService.getLogo().getFileId());
+    assertNotSame(stylesheetInBetween, brandingService.getThemeStylesheet());
   }
 
   private BrandingServiceImpl newBrandingServiceOverStoredFiles(AtomicInteger valueReads,
