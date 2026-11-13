@@ -68,7 +68,12 @@ import org.exoplatform.services.scheduler.PeriodInfo;
  * A run missed while no node was up follows Quartz's misfire policy, not
  * Spring's: a cron late by more than the store's misfire threshold fires once
  * as soon as a node can; a fixed rate skips the runs it missed and goes on at
- * its next time.
+ * the next time of its schedule. That includes its first run, which counts
+ * from the first registration of the method in the cluster's store: a stored
+ * job keeps its times while its period is unchanged, so a later change of its
+ * initial delay has no effect. A node that starts Quartz later than that time
+ * plus the misfire threshold runs the method first at the next time of its
+ * schedule, at most one period later.
  */
 public class ClusterTaskScheduler implements TaskScheduler {
 
