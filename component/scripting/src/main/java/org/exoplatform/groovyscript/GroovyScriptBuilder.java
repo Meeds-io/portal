@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class GroovyScriptBuilder {
 
@@ -78,7 +79,7 @@ public class GroovyScriptBuilder {
             case SCRIPTLET:
                 break;
             case EXPR:
-                script.appendGroovy(";out.print(\"${");
+                script.appendGroovy(script.hasStatement() ? ";out.print(\"${" : "out.print(\"${");
                 break;
         }
     }
@@ -195,6 +196,9 @@ public class GroovyScriptBuilder {
      */
     private static class Script {
 
+        /** A block or a line comment of the generated script. */
+        private static final Pattern COMMENTS = Pattern.compile("/\\*.*?\\*/|//[^\\n]*", Pattern.DOTALL);
+
         /** . */
         private StringBuilder out = new StringBuilder();
 
@@ -209,6 +213,9 @@ public class GroovyScriptBuilder {
 
         /** The current line number. */
         private int lineNumber = 1;
+
+        /** Whether {@link #out} holds a statement; once true, it stays true. */
+        private boolean statement;
 
         @Override
         public String toString() {
@@ -233,6 +240,17 @@ public class GroovyScriptBuilder {
 
         public void appendGroovy(String s) {
             out.append(s);
+        }
+
+        /**
+         * Whether the script holds a statement once its comments are removed. The parser of Groovy 3 and later
+         * refuses a ';' that no statement precedes, which Groovy 2.4 accepted.
+         */
+        public boolean hasStatement() {
+            if (!statement) {
+                statement = !COMMENTS.matcher(out).replaceAll("").isBlank();
+            }
+            return statement;
         }
     }
 

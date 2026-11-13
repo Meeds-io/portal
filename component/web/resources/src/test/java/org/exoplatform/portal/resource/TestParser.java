@@ -141,6 +141,20 @@ public class TestParser extends AbstractGateInTest {
         assertFalse(((Javascript.Local) local).isMinify());
     }
 
+    public void testPrebuiltScriptServedAsBuilt() throws Exception {
+        String config = "" + "<gatein-resources>" + "<module>" + "<name>foo</name>" + "<script>"
+                + "<path>/js/foo.bundle.js</path>" + "</script>" + "</module>" + "<module>" + "<name>bar</name>"
+                + "<script>" + "<minify>true</minify><path>/js/bar.bundle.js</path>" + "</script>" + "</module>"
+                + "<module>" + "<name>juu</name>" + "<script>" + "<path>/js/juu.js</path>" + "</script>" + "</module>"
+                + "</gatein-resources>";
+
+        JavascriptConfigParser parser = new JavascriptConfigParser("/mypath");
+        List<ScriptResourceDescriptor> scripts = parser.parseConfig(new ByteArrayInputStream(config.getBytes("UTF-8")));
+        assertFalse(((Javascript.Local) scripts.get(0).getModules().get(0)).isMinify());
+        assertTrue(((Javascript.Local) scripts.get(1).getModules().get(0)).isMinify());
+        assertTrue(((Javascript.Local) scripts.get(2).getModules().get(0)).isMinify());
+    }
+
     public void testResourceBundle() throws Exception {
         String config = "" + "<gatein-resources>" + "<portal>" + "<name>foo</name>" + "<module>" + "<script>"
                 + "<name>foo_module</name>" + "<path>/foo_module.js</path>" + "<resource-bundle>my_bundle</resource-bundle>"
