@@ -189,6 +189,21 @@
                 <isReadOnly>false</isReadOnly>
                 <isUnique>true</isUnique>
               </attribute>
+              <!-- Optional: not synchronized unless the mapping is set (empty by default).
+                   Set it to the LDAP attribute holding the picture bytes (thumbnailPhoto on Active Directory,
+                   jpegPhoto on OpenLDAP): it becomes the user avatar at each synchronization when it changed.
+                   - Only an attribute that JNDI returns as binary (jpegPhoto, thumbnailPhoto, photo) is read as picture bytes;
+                     any other attribute must be declared binary to JNDI (java.naming.ldap.attributes.binary).
+                   - A deployment that ships its own copy of this file must add this attribute block to it:
+                     without it the property does nothing. -->
+              <attribute>
+                <name>profilePicture</name>
+                <mapping>${exo.ldap.users.attributes.profilePicture.mapping:}</mapping>
+                <type>text</type>
+                <isRequired>false</isRequired>
+                <isMultivalued>false</isMultivalued>
+                <isReadOnly>false</isReadOnly>
+              </attribute>
             </attributes>
             <options>
               <option>
