@@ -38,7 +38,7 @@
   </component>
 
   <component>
-    <key>org.exoplatform.web.security.jpa.TokenDAO</key>
+    <key>io.meeds.web.security.dao.TokenDAO</key>
     <type>io.meeds.web.security.dao.TokenDAOImpl</type>
   </component>
   <component>

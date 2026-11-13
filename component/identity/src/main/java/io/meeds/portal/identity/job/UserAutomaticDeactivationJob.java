@@ -24,6 +24,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.exoplatform.services.organization.OrganizationService;
 
 import io.meeds.common.ContainerTransactional;
+import io.meeds.spring.kernel.ClusterTaskScheduler;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -67,7 +68,7 @@ public class UserAutomaticDeactivationJob {
   @Value("${social.user.inactive.groupId:}")
   private String              groupId;
 
-  @Scheduled(cron = "${social.UserAutomaticDeactivationJob.expression:0 15 23 ? * *}")
+  @Scheduled(cron = "${social.UserAutomaticDeactivationJob.expression:0 15 23 ? * *}", scheduler = ClusterTaskScheduler.NAME)
   @ContainerTransactional
   public void deactivateUsersInactive() {
     log.info("Starting automatic user deactivation job (inactiveDays={})", inactiveDays);

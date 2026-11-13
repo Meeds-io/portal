@@ -51,18 +51,18 @@ public class TokenDAOImpl extends GenericDAOJPAImpl<TokenEntity, Long> implement
 
     @Override
     @ExoTransactional
-    public void cleanExpired() {
+    public int cleanExpired() {
         Query query = getEntityManager().createNamedQuery("PortalToken.deleteExpiredTokens");
         query.setParameter("expireTime", System.currentTimeMillis());
-        query.executeUpdate();
+        return query.executeUpdate();
     }
 
     @Override
     @ExoTransactional
-    public void deleteTokensByUsernameAndType(String username, String tokenType) {
+    public int deleteTokensByUsernameAndType(String username, String tokenType) {
         Query query = getEntityManager().createNamedQuery("PortalToken.deleteTokensByUserAndType");
         query.setParameter("username", username);
         query.setParameter("tokenType", tokenType);
-        query.executeUpdate();
+        return query.executeUpdate();
     }
 }
