@@ -30,10 +30,15 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import org.apache.commons.fileupload2.core.FileUploadException;
+import org.apache.commons.lang3.StringUtils;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+
+import org.exoplatform.commons.utils.PropertyManager;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
 /**
  * Rejects unsafe SVG uploads without modifying the uploaded file.
@@ -45,9 +50,21 @@ public class SvgUploadValidator implements UploadFileValidator {
 
   public static final String INFECTED_SVG_MESSAGE = "Infected file detected. Uploading is forbidden";
 
+  /**
+   * The deepest element nesting an SVG may have, 0 for no limit (the default, as
+   * before JDK 25, whose {@code jaxp.properties} sets a limit of 100).
+   */
+  public static final String MAX_ELEMENT_DEPTH_PROPERTY = "exo.upload.svg.maxElementDepth";
+
+  private static final Log  LOG = ExoLogger.getLogger(SvgUploadValidator.class);
+
   private static final long DEFAULT_MAX_SVG_VALIDATION_SIZE = 10L * 1024L * 1024L;
 
+  private static final int  DEFAULT_MAX_ELEMENT_DEPTH = 0;
+
   private final long        maxSvgValidationSize;
+
+  private final int         maxElementDepth;
 
   public SvgUploadValidator() {
     this(DEFAULT_MAX_SVG_VALIDATION_SIZE);
@@ -55,6 +72,7 @@ public class SvgUploadValidator implements UploadFileValidator {
 
   public SvgUploadValidator(long maxSvgValidationSize) {
     this.maxSvgValidationSize = maxSvgValidationSize;
+    this.maxElementDepth = readMaxElementDepth();
   }
 
   @Override
@@ -98,7 +116,26 @@ public class SvgUploadValidator implements UploadFileValidator {
     configureSecureFeature(factory, "http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 
     SAXParser saxParser = factory.newSAXParser();
+    // The parse streams, so a deep drawing exhausts no stack
+    saxParser.setProperty("jdk.xml.maxElementDepth", String.valueOf(maxElementDepth));
     saxParser.parse(new InputSource(inputStream), new SvgSafetyHandler());
+  }
+
+  private static int readMaxElementDepth() {
+    String value = PropertyManager.getProperty(MAX_ELEMENT_DEPTH_PROPERTY);
+    if (StringUtils.isBlank(value)) {
+      return DEFAULT_MAX_ELEMENT_DEPTH;
+    }
+    try {
+      int depth = Integer.parseInt(value.trim());
+      if (depth >= 0) {
+        return depth;
+      }
+    } catch (NumberFormatException e) {
+      // Reported below
+    }
+    LOG.warn("{} is '{}', not a number of levels: no limit is used", MAX_ELEMENT_DEPTH_PROPERTY, value);
+    return DEFAULT_MAX_ELEMENT_DEPTH;
   }
 
   private void configureSecureFeature(SAXParserFactory factory, String feature, boolean value)
