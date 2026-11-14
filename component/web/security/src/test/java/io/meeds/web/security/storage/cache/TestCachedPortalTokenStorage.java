@@ -154,7 +154,7 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
     assertNull(cache.get("jdoe-token"));
   }
 
-  public void testAFailedDeleteOfAllTheTokensOfAUserDeletesNone() throws Exception {
+  public void testAFailedDeleteOfAllTheTokensOfAUserEvictsThemAll() throws Exception {
     // The store itself, whatever DAO the container the tests share was built with
     TokenDAO tokenDAO = new TokenDAOImpl();
     TokenDAO failingDAO = spy(tokenDAO);
@@ -171,6 +171,9 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
                                                                          failingDAO);
     failingStorage.createToken(token("owner-token", TOKEN_OWNER));
     failingStorage.createToken(token("owner-second-token", TOKEN_OWNER));
+    // Loaded, hence cached
+    assertNotNull(failingStorage.getToken("owner-token"));
+    assertNotNull(failingStorage.getToken("owner-second-token"));
     try {
       try {
         failingStorage.deleteTokenOfUser(TOKEN_OWNER);
@@ -179,10 +182,15 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
         // The second delete failed
       }
 
-      // Read from the store, not from the persistence context of the rolled
-      // back transaction: the tokens of the user are all kept
+      // No token of the user stays cached, deleted or not: a token kept by the
+      // store loads again from it
+      assertNull(cache.get("owner-token"));
+      assertNull(cache.get("owner-second-token"));
+      // The eXo transaction of this release commits what ran before the
+      // failure, unlike a release whose transaction rolls back on an
+      // exception: the first token is deleted, the second kept
       entityManagerService.getEntityManager().clear();
-      assertEquals(2, tokenDAO.findByUsername(TOKEN_OWNER).size());
+      assertEquals(1, tokenDAO.findByUsername(TOKEN_OWNER).size());
     } finally {
       tokenDAO.deleteTokensByUsernameAndType(TOKEN_OWNER, TOKEN_TYPE);
     }

@@ -18,6 +18,8 @@
  */
 package io.meeds.web.security.storage.cache;
 
+import java.util.List;
+
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.cache.future.FutureExoCache;
 import org.exoplatform.commons.cache.future.Loader;
@@ -27,6 +29,7 @@ import org.exoplatform.web.security.security.TokenExistsException;
 
 import io.meeds.common.TransactionCallbacks;
 import io.meeds.web.security.dao.TokenDAO;
+import io.meeds.web.security.entity.TokenEntity;
 import io.meeds.web.security.model.TokenData;
 import io.meeds.web.security.storage.PortalTokenStorage;
 
@@ -94,9 +97,20 @@ public class CachedPortalTokenStorage extends PortalTokenStorage {
   @Override
   @ExoTransactional
   public void deleteTokenOfUser(String username) {
-    // Only the tokens deleted go, from every node: a user who has none evicts
-    // nothing
-    deleteTokens(username).forEach(token -> clearKey(token.getTokenId()));
+    // Only the tokens of the user read here go, from every node: a user who
+    // has none evicts nothing. The transaction commits the deletes made
+    // before a failure, so every token read is evicted, whatever the store
+    // deleted, and a token created after the read is neither deleted nor
+    // evicted
+    List<TokenEntity> tokens = tokenDAO.findByUsername(username);
+    if (tokens == null || tokens.isEmpty()) {
+      return;
+    }
+    try {
+      tokenDAO.deleteAll(tokens);
+    } finally {
+      tokens.forEach(token -> clearKey(token.getTokenId()));
+    }
   }
 
   @Override
