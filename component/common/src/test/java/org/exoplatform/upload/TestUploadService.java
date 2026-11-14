@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.component.test.AbstractKernelTest;
 import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
@@ -159,6 +160,39 @@ public class TestUploadService extends AbstractKernelTest {
             fail("Unsafe SVG upload must be rejected");
         } catch (FileUploadException e) {
             assertEquals(SvgUploadValidator.INFECTED_SVG_MESSAGE, e.getMessage());
+        }
+    }
+
+    @Test
+    public void testShouldAcceptDeeplyNestedSvgUpload() throws Exception {
+        validateDeepSvg(new SvgUploadValidator(), 5000);
+    }
+
+    @Test
+    public void testShouldApplyTheConfiguredSvgDepthLimit() throws Exception {
+        try {
+            PropertyManager.setProperty(SvgUploadValidator.MAX_ELEMENT_DEPTH_PROPERTY, "100");
+            SvgUploadValidator validator = new SvgUploadValidator();
+            validateDeepSvg(validator, 99);
+            try {
+                validateDeepSvg(validator, 100);
+                fail("An SVG nested deeper than the configured limit must be rejected");
+            } catch (FileUploadException e) {
+                assertEquals("Invalid SVG file", e.getMessage());
+            }
+
+            PropertyManager.setProperty(SvgUploadValidator.MAX_ELEMENT_DEPTH_PROPERTY, "not a number");
+            validateDeepSvg(new SvgUploadValidator(), 5000);
+        } finally {
+            System.clearProperty(SvgUploadValidator.MAX_ELEMENT_DEPTH_PROPERTY);
+            PropertyManager.refresh();
+        }
+    }
+
+    private void validateDeepSvg(SvgUploadValidator validator, int groups) throws Exception {
+        String deepSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\">" + "<g>".repeat(groups) + "</g>".repeat(groups) + "</svg>";
+        try (InputStream inputStream = new ByteArrayInputStream(deepSvg.getBytes(StandardCharsets.UTF_8))) {
+            validator.validate("deep.svg", "image/svg+xml", inputStream);
         }
     }
 
