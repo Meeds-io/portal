@@ -41,7 +41,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -139,12 +138,7 @@ public class PortalRememberMeFilter extends AbstractFilter {
 
   private void clearInvalidToken(HttpServletRequest request, HttpServletResponse response) {
     if (request.getRemoteUser() == null) {
-      Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-      cookie.setPath("/");
-      cookie.setMaxAge(0);
-      cookie.setHttpOnly(true);
-      cookie.setSecure(request.isSecure());
-      response.addCookie(cookie);
+      LoginUtils.clearRememberMeCookie(request, response);
     }
   }
 
