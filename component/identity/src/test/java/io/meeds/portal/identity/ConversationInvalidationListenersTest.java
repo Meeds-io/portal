@@ -18,6 +18,7 @@
  */
 package io.meeds.portal.identity;
 
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,12 +26,18 @@ import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import jakarta.annotation.PostConstruct;
 
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.security.ConversationRegistry;
 
 import io.meeds.services.organization.listener.UserConversationInvalidationListener;
@@ -70,6 +77,38 @@ public class ConversationInvalidationListenersTest {
     userListener.postDelete(user(true));
 
     verify(conversationRegistry).invalidateUser("john");
+  }
+
+  @Test
+  public void testTheCommitActionInvalidatesTheUserOnAnIdmOrganizationService() {
+    PicketLinkIDMOrganizationServiceImpl idm = mock(PicketLinkIDMOrganizationServiceImpl.class);
+    UserConversationInvalidationListener listener = listenerOn(idm);
+
+    listener.postDelete(user(true));
+
+    ArgumentCaptor<Runnable> action = ArgumentCaptor.forClass(Runnable.class);
+    verify(idm).runNowAndAfterTransaction(action.capture());
+    verify(conversationRegistry, never()).invalidateUser("john");
+    action.getValue().run();
+    verify(conversationRegistry).invalidateUser("john");
+  }
+
+  @Test
+  public void testTheListenerRegistersItselfAtStartup() throws Exception {
+    UserHandler userHandler = mock(UserHandler.class);
+    when(organizationService.getUserHandler()).thenReturn(userHandler);
+
+    userListener.setup();
+
+    verify(userHandler).addUserEventListener(userListener);
+    assertNotNull(UserConversationInvalidationListener.class.getMethod("setup").getAnnotation(PostConstruct.class));
+  }
+
+  private UserConversationInvalidationListener listenerOn(OrganizationService service) {
+    UserConversationInvalidationListener listener = new UserConversationInvalidationListener();
+    ReflectionTestUtils.setField(listener, "conversationRegistry", conversationRegistry);
+    ReflectionTestUtils.setField(listener, "organizationService", service);
+    return listener;
   }
 
   private User user(boolean enabled) {
