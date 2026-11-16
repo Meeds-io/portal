@@ -82,19 +82,18 @@ public class JPASettingServiceImpl implements SettingService {
 
     try {
       if (context == null) {
-        LOG.warn("Context is null, can't save setting key={}, value={}", key, value.getValue());
+        LOG.warn("Context is null, can't save setting key={}", key);
         return;
       }
       if (scope == null) {
         scope = Scope.GLOBAL.id(null);
       }
-      LOG.debug("=== setting save, contextType={}, contextName={}, scopeType={} and scopeName={} and key={} and value={}",
+      LOG.debug("=== setting save, contextType={}, contextName={}, scopeType={} and scopeName={} and key={}",
                 context.getName(),
                 context.getId(),
                 scope.getName(),
                 scope.getId(),
-                key,
-                value.getValue());
+                key);
       ContextEntity contextEntity = settingContextDAO.getContextByTypeAndName(context.getName(), context.getId());
       boolean contextAndScopeFound = true;
       if (contextEntity == null) {
@@ -133,8 +132,7 @@ public class JPASettingServiceImpl implements SettingService {
       eventManager.broadcastEvent(new Event<JPASettingServiceImpl, SettingData>(data.getEventType().toString(), this, data));
     } catch (Exception e) {
       LOG.error("An error occurred while saving setting: contextType=" + context.getName() + ", contextName=" + context.getId()
-          + ", scopeType=" + scope.getName() + " and scopeName=" + scope.getId() + " and key=" + key + " and value="
-          + value.getValue(), e);
+          + ", scopeType=" + scope.getName() + " and scopeName=" + scope.getId() + " and key=" + key, e);
     }
   }
 
