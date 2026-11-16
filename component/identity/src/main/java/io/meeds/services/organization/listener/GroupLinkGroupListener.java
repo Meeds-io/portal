@@ -57,7 +57,11 @@ public class GroupLinkGroupListener extends GroupEventListener {
 
   private static final Log     LOG       = ExoLogger.getLogger(GroupLinkGroupListener.class);
 
-  private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
+  /**
+   * One thread reads the members: the invalidations queue up behind it, so no
+   * more than one store read runs at a time, whatever the number of events.
+   */
+  private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
                                            Thread thread = new Thread(runnable, "group-link-invalidation");
                                            thread.setDaemon(true);
                                            return thread;
