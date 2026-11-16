@@ -27,6 +27,7 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.web.AbstractFilter;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.Authenticator;
 import org.exoplatform.services.security.ConversationRegistry;
 import org.exoplatform.services.security.ConversationState;
@@ -35,12 +36,14 @@ import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.services.security.IdentityRegistry;
 import org.exoplatform.services.security.StateKey;
 import org.exoplatform.services.security.web.HttpSessionStateKey;
+import org.exoplatform.web.UserSessionGuard;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 /**
@@ -58,6 +61,8 @@ public class PortalIdentityFilter extends AbstractFilter {
 
   private static Authenticator        authenticator;
 
+  private static OrganizationService  organizationService;
+
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException,
                                                                                             ServletException {
 
@@ -68,7 +73,15 @@ public class PortalIdentityFilter extends AbstractFilter {
     ConversationState currentState = ConversationState.getCurrent();
     try {
       if (currentState == null) {
-        ConversationState.setCurrent(getCurrentState(container, httpRequest));
+        ConversationState state = getCurrentState(container, httpRequest);
+        ConversationState.setCurrent(state);
+        if (UserSessionGuard.endSessionOfAGoneUser(httpRequest,
+                                                   (HttpServletResponse) response,
+                                                   state,
+                                                   getOrganizationService(container),
+                                                   getConversationRegistry(container))) {
+          return;
+        }
       }
       chain.doFilter(request, response);
     } finally {
@@ -125,6 +138,13 @@ public class PortalIdentityFilter extends AbstractFilter {
       }
     }
     return identity;
+  }
+
+  private static OrganizationService getOrganizationService(ExoContainer container) {
+    if (organizationService == null) {
+      organizationService = container.getComponentInstanceOfType(OrganizationService.class);
+    }
+    return organizationService;
   }
 
   private static IdentityRegistry getIdentityRegistry(ExoContainer container) {

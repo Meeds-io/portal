@@ -18,10 +18,14 @@
  */
 package org.exoplatform.web;
 
+import java.io.IOException;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.exoplatform.container.component.RequestLifeCycle;
@@ -29,10 +33,8 @@ import org.exoplatform.container.web.AbstractFilter;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
-import org.exoplatform.services.organization.User;
-import org.exoplatform.services.organization.UserStatus;
+import org.exoplatform.services.security.ConversationRegistry;
 import org.exoplatform.services.security.ConversationState;
-import org.exoplatform.services.security.IdentityConstants;
 
 public class CacheUserProfileFilter extends AbstractFilter {
 
@@ -46,34 +48,24 @@ public class CacheUserProfileFilter extends AbstractFilter {
      */
     private static Log log = ExoLogger.getLogger(CacheUserProfileFilter.class);
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws ServletException, IOException {
         ConversationState state = ConversationState.getCurrent();
         try {
-            if (state != null && !state.getIdentity().getUserId().equals(IdentityConstants.ANONIM)) {
-                if (log.isDebugEnabled())
-                    log.debug("Conversation State found, save user profile to Conversation State.");
-
-                if (state.getAttribute(USER_PROFILE) == null) {
-                    OrganizationService orgService = (OrganizationService) getContainer().getComponentInstanceOfType(
-                            OrganizationService.class);
-
-                    begin(orgService);
-                    User user = null;
-                    try {
-                      user = orgService.getUserHandler().findUserByName(state.getIdentity().getUserId(), UserStatus.ANY);
-                    }
-                    finally {
-                      end(orgService);
-                    }
-                    state.setAttribute(USER_PROFILE, user);
-                }
-
+            OrganizationService orgService = getContainer().getComponentInstanceOfType(OrganizationService.class);
+            ConversationRegistry conversationRegistry = getContainer().getComponentInstanceOfType(ConversationRegistry.class);
+            if (UserSessionGuard.endSessionOfAGoneUser((HttpServletRequest) request,
+                                                       (HttpServletResponse) response,
+                                                       state,
+                                                       orgService,
+                                                       conversationRegistry)) {
+                return;
             }
-            chain.doFilter(request, response);
         } catch (Exception e) {
             log.warn("An error occured while cache user profile", e);
+            ((HttpServletResponse) response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            return;
         }
-
+        chain.doFilter(request, response);
     }
 
     public void destroy() {
