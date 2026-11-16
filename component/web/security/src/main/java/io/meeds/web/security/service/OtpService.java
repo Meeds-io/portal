@@ -19,6 +19,7 @@
 package io.meeds.web.security.service;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,8 @@ import lombok.SneakyThrows;
 public class OtpService {
 
   private static final String    OTP_TENTATIVES_CACHE_NAME = "otp.tentatives";
+
+  private static final char      EXPIRY_SEPARATOR          = ':';
 
   @Autowired
   private CacheService           cacheService;
@@ -60,7 +63,13 @@ public class OtpService {
   @Setter
   private long                   otpMaxTentatives;
 
-  private ExoCache<String, Long> otpTentativeCache;
+  private ExoCache<String, String> otpTentativeCache;
+
+  /**
+   * Striped locks under which an attempt is counted, so that wrong codes sent
+   * in parallel for one user each take an attempt
+   */
+  private final Object[]         attemptLocks              = IntStream.range(0, 64).mapToObj(i -> new Object()).toArray();
 
   @SneakyThrows
   public void sendOtpCode(String userName, String otpMethod) {
@@ -76,24 +85,45 @@ public class OtpService {
       throw new IllegalAccessException();
     }
     OtpPlugin otpPlugin = getOtpPlugin(otpMethod);
-    long tentativeCount = getOtpTentativeCount(userName);
-    if (tentativeCount >= otpMaxTentatives) {
-      throw new IllegalAccessException();
-    } else if (otpPlugin == null || !otpPlugin.validateOtp(userName, otpCode)) {
-      getOtpTentativeCache().put(userName, tentativeCount + 1);
+    // The attempt is counted before the code is checked, and the count is read
+    // and written under the user's lock: concurrent attempts each count once
+    synchronized (getAttemptLock(userName)) {
+      long tentativeCount = getOtpTentativeCount(userName);
+      if (tentativeCount >= otpMaxTentatives) {
+        throw new IllegalAccessException();
+      }
+      getOtpTentativeCache().put(userName,
+                                 String.valueOf(System.currentTimeMillis() + otpTentativesTtl * 60000) + EXPIRY_SEPARATOR
+                                     + (tentativeCount + 1));
+    }
+    if (otpPlugin == null || !otpPlugin.validateOtp(userName, otpCode)) {
       throw new IllegalAccessException();
     } else {
       getOtpTentativeCache().remove(userName);
     }
   }
 
+  /**
+   * The count carries its expiry, so the attempts window is this service's
+   * property as long as the cache keeps the entry at least
+   * meeds.apiKey.otp.maxTentatives.ttl: an entry the cache drops sooner
+   * counts no attempt
+   */
   private long getOtpTentativeCount(String userName) {
-    Long tentativeCount = getOtpTentativeCache().get(userName);
-    if (tentativeCount == null) {
-      return 0l;
-    } else {
-      return tentativeCount;
+    String storedCount = getOtpTentativeCache().get(userName);
+    if (storedCount == null) {
+      return 0;
     }
+    int separator = storedCount.indexOf(EXPIRY_SEPARATOR);
+    if (separator < 0) {
+      return Long.parseLong(storedCount);
+    }
+    long expiry = Long.parseLong(storedCount.substring(0, separator));
+    return expiry > System.currentTimeMillis() ? Long.parseLong(storedCount.substring(separator + 1)) : 0;
+  }
+
+  private Object getAttemptLock(String userName) {
+    return attemptLocks[Math.floorMod(userName.hashCode(), attemptLocks.length)];
   }
 
   private OtpPlugin getOtpPlugin(String otpMethod) {
@@ -103,10 +133,9 @@ public class OtpService {
                      .orElse(null);
   }
 
-  private ExoCache<String, Long> getOtpTentativeCache() {
+  private ExoCache<String, String> getOtpTentativeCache() {
     if (otpTentativeCache == null) {
       otpTentativeCache = cacheService.getCacheInstance(OTP_TENTATIVES_CACHE_NAME);
-      otpTentativeCache.setLiveTime(otpTentativesTtl * 60);
     }
     return otpTentativeCache;
   }
