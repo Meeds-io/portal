@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,6 +38,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+import org.exoplatform.container.PortalContainer;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
 import org.exoplatform.services.organization.UserHandler;
@@ -65,6 +67,13 @@ public class UserSessionGuardTest {
 
   private ConversationRegistry conversationRegistry;
 
+  private org.mockito.MockedStatic<PortalContainer> portalContainer;
+
+  @After
+  public void tearDown() {
+    portalContainer.close();
+  }
+
   @Before
   public void setUp() {
     request = mock(HttpServletRequest.class);
@@ -73,6 +82,8 @@ public class UserSessionGuardTest {
     when(session.getId()).thenReturn("session");
     when(request.getSession(false)).thenReturn(session);
     when(request.getContextPath()).thenReturn("/portal");
+    portalContainer = org.mockito.Mockito.mockStatic(PortalContainer.class);
+    portalContainer.when(PortalContainer::getCurrentPortalContainerName).thenReturn("portal");
     when(request.getRequestURI()).thenReturn("//other.example/dw");
     organizationService = mock(OrganizationService.class);
     userHandler = mock(UserHandler.class);
@@ -95,6 +106,18 @@ public class UserSessionGuardTest {
     verify(response).addCookie(cookie.capture());
     assertTrue(cookie.getValue().getMaxAge() == 0);
     verify(response).sendRedirect("/portal/");
+  }
+
+  @Test
+  public void testAGetOutsideThePortalWebappIsRefusedNotRedirected() throws Exception {
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getContextPath()).thenReturn("/rest");
+
+    assertTrue(guard(new ConversationState(new Identity("john"))));
+
+    verify(session).invalidate();
+    verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response, never()).sendRedirect(anyString());
   }
 
   @Test

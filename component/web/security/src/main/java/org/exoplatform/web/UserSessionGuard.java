@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.services.log.ExoLogger;
@@ -88,12 +89,21 @@ public final class UserSessionGuard {
       LOG.debug("Cannot log out the request of a disabled or deleted user", e);
     }
     LoginUtils.clearRememberMeCookie(request, response);
-    if ("GET".equalsIgnoreCase(request.getMethod())) {
+    if (isPortalNavigation(request)) {
       response.sendRedirect(request.getContextPath() + "/");
     } else {
       response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
     }
     return true;
+  }
+
+  /**
+   * Only a GET of the portal webapp is a page navigation redirected to the
+   * portal root; any other request is answered with 401.
+   */
+  private static boolean isPortalNavigation(HttpServletRequest request) {
+    return "GET".equalsIgnoreCase(request.getMethod())
+           && ("/" + PortalContainer.getCurrentPortalContainerName()).equals(request.getContextPath());
   }
 
   private static User findUser(OrganizationService organizationService, String userId) {
