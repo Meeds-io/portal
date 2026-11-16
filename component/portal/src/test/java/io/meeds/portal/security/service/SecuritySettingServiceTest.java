@@ -49,6 +49,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -56,6 +57,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -103,6 +105,29 @@ public class SecuritySettingServiceTest {
     lenient().when(localeConfigService.getLocalConfigs()).thenReturn(Arrays.asList(enLocaleConfig, frLocaleConfig));
     lenient().when(localeConfigService.getDefaultLocaleConfig()).thenReturn(enLocaleConfig);
     securitySettingService = new SecuritySettingService(settingService, listenerService, localeConfigService);
+  }
+
+  @Test
+  public void testGetRegistrationSettingSeesSaveMadeThroughAnotherInstance() {
+    Map<String, SettingValue<?>> store = new HashMap<>();
+    SettingService sharedSettingService = mock(SettingService.class);
+    lenient().when(sharedSettingService.get(any(), any(), anyString()))
+             .thenAnswer(invocation -> store.get((String) invocation.getArgument(2)));
+    lenient().doAnswer(invocation -> store.put((String) invocation.getArgument(2), invocation.getArgument(3)))
+             .when(sharedSettingService)
+             .set(any(), any(), anyString(), any());
+    SecuritySettingService nodeA = new SecuritySettingService(sharedSettingService, listenerService, localeConfigService);
+    SecuritySettingService nodeB = new SecuritySettingService(sharedSettingService, listenerService, localeConfigService);
+
+    assertEquals(DEFAULT_REGISTRATION_TYPE, nodeB.getRegistrationSetting().getType());
+    assertFalse(nodeB.getRegistrationSetting().isAccountDeactivationEnabled());
+
+    nodeA.saveRegistrationType(UserRegistrationType.RESTRICTED);
+    nodeA.saveAccountDeactivationEnabled(true);
+
+    RegistrationSetting seenByB = nodeB.getRegistrationSetting();
+    assertEquals(UserRegistrationType.RESTRICTED, seenByB.getType());
+    assertTrue(seenByB.isAccountDeactivationEnabled());
   }
 
   @Test

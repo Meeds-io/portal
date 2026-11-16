@@ -116,8 +116,6 @@ public class SecuritySettingService {
   private static final Log                    LOG                                =
                                                   ExoLogger.getLogger(SecuritySettingService.class);
 
-  private RegistrationSetting                 registrationSetting;
-
   private SettingService                      settingService;
 
   private ListenerService                     listenerService;
@@ -133,26 +131,18 @@ public class SecuritySettingService {
   }
 
   /**
-   * Memoized aggregate meant for display purposes only: the memoization is
-   * node-local (invalidated in the JVM that saved, the modification events
-   * being broadcast on the node-local ListenerService), so on a cluster the
-   * other nodes may serve a stale copy until they save in turn. A security
-   * check must call the direct readers instead
-   * ({@link #isAccountDeactivationEnabled()},
-   * {@link #isAccountDeletionEnabled()} ...), which go through the
-   * cluster-invalidated setting cache.
+   * Aggregate of the registration settings, built on each call from the
+   * direct readers, which go through the cluster-invalidated setting cache:
+   * every node of a cluster reads the value last saved by any node.
    */
   public RegistrationSetting getRegistrationSetting() {
-    if (registrationSetting == null) {
-      registrationSetting = new RegistrationSetting(getRegistrationType(),
-                                                    isRegistrationExternalUser(),
-                                                    getRegistrationGroupIds(),
-                                                    isAccountDeactivationEnabled(),
-                                                    isAccountDeletionEnabled(),
-                                                    isAccountDeletionAnonymizationEnabled(),
-                                                    getDeletedUserLabels());
-    }
-    return registrationSetting;
+    return new RegistrationSetting(getRegistrationType(),
+                                   isRegistrationExternalUser(),
+                                   getRegistrationGroupIds(),
+                                   isAccountDeactivationEnabled(),
+                                   isAccountDeletionEnabled(),
+                                   isAccountDeletionAnonymizationEnabled(),
+                                   getDeletedUserLabels());
   }
 
   public void saveRegistrationSetting(RegistrationSetting registrationSetting) {
@@ -193,15 +183,11 @@ public class SecuritySettingService {
     UserRegistrationType storedRegistrationType = getRegistrationType();
     boolean modified = registrationType != storedRegistrationType;
     if (modified) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           REGISTRATION_TYPE_PARAM,
-                           SettingValue.create(registrationType.toString()));
-        broadcastEvent(ACCESS_TYPE_MODIFIED, null, registrationType);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         REGISTRATION_TYPE_PARAM,
+                         SettingValue.create(registrationType.toString()));
+      broadcastEvent(ACCESS_TYPE_MODIFIED, null, registrationType);
     }
   }
 
@@ -216,15 +202,11 @@ public class SecuritySettingService {
 
   public void saveRegistrationExternalUser(boolean externalUser) {
     if (externalUser != isRegistrationExternalUser()) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           REGISTRATION_EXTERNAL_USER_PARAM,
-                           SettingValue.create(String.valueOf(externalUser)));
-        broadcastEvent(EXTERNAL_USER_REG_MODIFIED, null, externalUser);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         REGISTRATION_EXTERNAL_USER_PARAM,
+                         SettingValue.create(String.valueOf(externalUser)));
+      broadcastEvent(EXTERNAL_USER_REG_MODIFIED, null, externalUser);
     }
   }
 
@@ -239,15 +221,11 @@ public class SecuritySettingService {
 
   public void saveAccountDeactivationEnabled(boolean accountDeactivationEnabled) {
     if (accountDeactivationEnabled != isAccountDeactivationEnabled()) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           ACCOUNT_DEACTIVATION_ENABLED_PARAM,
-                           SettingValue.create(String.valueOf(accountDeactivationEnabled)));
-        broadcastEvent(ACCOUNT_DEACTIVATION_MODIFIED, null, accountDeactivationEnabled);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         ACCOUNT_DEACTIVATION_ENABLED_PARAM,
+                         SettingValue.create(String.valueOf(accountDeactivationEnabled)));
+      broadcastEvent(ACCOUNT_DEACTIVATION_MODIFIED, null, accountDeactivationEnabled);
       if (!accountDeactivationEnabled) {
         saveAccountDeletionEnabled(false);
       }
@@ -269,15 +247,11 @@ public class SecuritySettingService {
       accountDeletionEnabled = false;
     }
     if (accountDeletionEnabled != isAccountDeletionEnabled()) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           ACCOUNT_DELETION_ENABLED_PARAM,
-                           SettingValue.create(String.valueOf(accountDeletionEnabled)));
-        broadcastEvent(ACCOUNT_DELETION_MODIFIED, null, accountDeletionEnabled);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         ACCOUNT_DELETION_ENABLED_PARAM,
+                         SettingValue.create(String.valueOf(accountDeletionEnabled)));
+      broadcastEvent(ACCOUNT_DELETION_MODIFIED, null, accountDeletionEnabled);
       if (!accountDeletionEnabled) {
         saveAccountDeletionAnonymizationEnabled(false);
       }
@@ -301,15 +275,11 @@ public class SecuritySettingService {
       accountDeletionAnonymizationEnabled = false;
     }
     if (accountDeletionAnonymizationEnabled != isAccountDeletionAnonymizationEnabled()) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           ACCOUNT_DELETION_ANONYMIZATION_ENABLED_PARAM,
-                           SettingValue.create(String.valueOf(accountDeletionAnonymizationEnabled)));
-        broadcastEvent(ACCOUNT_DELETION_ANONYMIZATION_MODIFIED, null, accountDeletionAnonymizationEnabled);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         ACCOUNT_DELETION_ANONYMIZATION_ENABLED_PARAM,
+                         SettingValue.create(String.valueOf(accountDeletionAnonymizationEnabled)));
+      broadcastEvent(ACCOUNT_DELETION_ANONYMIZATION_MODIFIED, null, accountDeletionAnonymizationEnabled);
     }
   }
 
@@ -342,37 +312,29 @@ public class SecuritySettingService {
                                                                                                              label.getValue()),
                                                                                      HashMap::putAll);
     if (!Objects.equals(labels, readDeletedUserLabels())) {
-      try {
-        for (String language : getSupportedLanguages()) {
-          if (labels.containsKey(language)) {
-            settingService.set(SECURITY_CONTEXT,
-                               SECURITY_SCOPE,
-                               DELETED_USER_LABEL_PARAM_PREFIX + language,
-                               SettingValue.create(labels.get(language)));
-          } else {
-            settingService.remove(SECURITY_CONTEXT, SECURITY_SCOPE, DELETED_USER_LABEL_PARAM_PREFIX + language);
-          }
+      for (String language : getSupportedLanguages()) {
+        if (labels.containsKey(language)) {
+          settingService.set(SECURITY_CONTEXT,
+                             SECURITY_SCOPE,
+                             DELETED_USER_LABEL_PARAM_PREFIX + language,
+                             SettingValue.create(labels.get(language)));
+        } else {
+          settingService.remove(SECURITY_CONTEXT, SECURITY_SCOPE, DELETED_USER_LABEL_PARAM_PREFIX + language);
         }
-        broadcastEvent(DELETED_USER_LABELS_MODIFIED, null, labels);
-      } finally {
-        registrationSetting = null;
       }
+      broadcastEvent(DELETED_USER_LABELS_MODIFIED, null, labels);
     }
   }
 
   public void saveRegistrationGroupIds(String[] groupIds) {
-    try {
-      if (groupIds == null) {
-        groupIds = new String[0];
-      }
-      settingService.set(SECURITY_CONTEXT,
-                         SECURITY_SCOPE,
-                         REGISTRATION_EXTRA_GROUPS_PARAM,
-                         SettingValue.create(StringUtils.join(groupIds, EXTRA_GROUPS_SEPARATOR)));
-      broadcastEvent(DEFAULT_GROUPS_MODIFIED, null, groupIds);
-    } finally {
-      registrationSetting = null;
+    if (groupIds == null) {
+      groupIds = new String[0];
     }
+    settingService.set(SECURITY_CONTEXT,
+                       SECURITY_SCOPE,
+                       REGISTRATION_EXTRA_GROUPS_PARAM,
+                       SettingValue.create(StringUtils.join(groupIds, EXTRA_GROUPS_SEPARATOR)));
+    broadcastEvent(DEFAULT_GROUPS_MODIFIED, null, groupIds);
   }
 
   private Map<String, String> readDeletedUserLabels() {
