@@ -20,6 +20,7 @@ package org.exoplatform.web.login;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class LoginUtils {
 
@@ -46,6 +47,23 @@ public class LoginUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Deletes the remember me cookie from the browser. The cookie is written at
+   * path "/" and shared by every webapp, and a browser deletes a cookie only on
+   * a Set-Cookie naming the same path, so every deletion goes through here.
+   *
+   * @param request the incoming request
+   * @param response the response carrying the deletion
+   */
+  public static void clearRememberMeCookie(HttpServletRequest request, HttpServletResponse response) {
+    Cookie cookie = new Cookie(COOKIE_NAME, "");
+    cookie.setPath("/");
+    cookie.setMaxAge(0);
+    cookie.setHttpOnly(true);
+    cookie.setSecure(request.isSecure());
+    response.addCookie(cookie);
   }
 
 }
