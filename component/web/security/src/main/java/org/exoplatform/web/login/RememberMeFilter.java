@@ -28,7 +28,6 @@ import jakarta.servlet.FilterConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -89,12 +88,7 @@ public class RememberMeFilter extends AbstractFilter {
           } catch (Exception e) {
             // Clear token cookie if we did not authenticate
             if (request.getRemoteUser() == null) {
-              Cookie cookie = new Cookie(LoginUtils.COOKIE_NAME, "");
-              cookie.setPath("/");
-              cookie.setMaxAge(0);
-              cookie.setHttpOnly(true);
-              cookie.setSecure(request.isSecure());
-              response.addCookie(cookie);
+              LoginUtils.clearRememberMeCookie(request, response);
             }
           }
         }
