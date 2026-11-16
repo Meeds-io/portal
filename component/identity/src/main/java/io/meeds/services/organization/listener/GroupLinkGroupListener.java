@@ -26,11 +26,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import org.exoplatform.commons.utils.ListAccess;
+import org.exoplatform.container.ExoContainer;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.component.ComponentRequestLifecycle;
 import org.exoplatform.container.component.RequestLifeCycle;
 import org.exoplatform.services.log.ExoLogger;
@@ -44,6 +48,7 @@ import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServic
 import org.exoplatform.services.security.ConversationRegistry;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 @Component
 public class GroupLinkGroupListener extends GroupEventListener {
@@ -51,6 +56,12 @@ public class GroupLinkGroupListener extends GroupEventListener {
   private static final int     PAGE_SIZE = 100;
 
   private static final Log     LOG       = ExoLogger.getLogger(GroupLinkGroupListener.class);
+
+  private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
+                                           Thread thread = new Thread(runnable, "group-link-invalidation");
+                                           thread.setDaemon(true);
+                                           return thread;
+                                         });
 
   @Autowired
   private ConversationRegistry conversationRegistry;
@@ -86,13 +97,41 @@ public class GroupLinkGroupListener extends GroupEventListener {
   }
 
   private void refreshIdentitiesMemberships(NestedMembership nestedMembership) {
-    CompletableFuture.runAsync(() -> findMembers(nestedMembership).forEach(conversationRegistry::invalidateUser))
+    ExoContainer container = ExoContainerContext.getCurrentContainerIfPresent();
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    CompletableFuture.runAsync(() -> runInContext(container,
+                                                  classLoader,
+                                                  () -> findMembers(nestedMembership).forEach(conversationRegistry::invalidateUser)),
+                               executor)
                      .exceptionally(e -> {
                        LOG.warn("Cannot invalidate the conversations of the members of group {}",
                                 nestedMembership.getNestedGroupId(),
                                 e);
                        return null;
                      });
+  }
+
+  @PreDestroy
+  public void shutdown() {
+    executor.shutdown();
+  }
+
+  /**
+   * Runs the action with the container and the class loader of the thread that
+   * asked for it, which the threads of the executor do not hold.
+   */
+  private static void runInContext(ExoContainer container, ClassLoader classLoader, Runnable action) {
+    Thread thread = Thread.currentThread();
+    ClassLoader previousClassLoader = thread.getContextClassLoader();
+    ExoContainer previousContainer = ExoContainerContext.getCurrentContainerIfPresent();
+    ExoContainerContext.setCurrentContainer(container);
+    thread.setContextClassLoader(classLoader);
+    try {
+      action.run();
+    } finally {
+      thread.setContextClassLoader(previousClassLoader);
+      ExoContainerContext.setCurrentContainer(previousContainer);
+    }
   }
 
   /**
