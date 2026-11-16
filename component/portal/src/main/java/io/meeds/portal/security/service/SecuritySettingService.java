@@ -68,8 +68,6 @@ public class SecuritySettingService {
   private static final Log                    LOG                                =
                                                   ExoLogger.getLogger(SecuritySettingService.class);
 
-  private RegistrationSetting                 registrationSetting;
-
   private SettingService                      settingService;
 
   private ListenerService                     listenerService;
@@ -80,13 +78,15 @@ public class SecuritySettingService {
     this.listenerService = listenerService;
   }
 
+  /**
+   * Aggregate of the registration settings, built on each call from the
+   * direct readers, which go through the cluster-invalidated setting cache:
+   * every node of a cluster reads the value last saved by any node.
+   */
   public RegistrationSetting getRegistrationSetting() {
-    if (registrationSetting == null) {
-      registrationSetting = new RegistrationSetting(getRegistrationType(),
-                                                    isRegistrationExternalUser(),
-                                                    getRegistrationGroupIds());
-    }
-    return registrationSetting;
+    return new RegistrationSetting(getRegistrationType(),
+                                   isRegistrationExternalUser(),
+                                   getRegistrationGroupIds());
   }
 
   public void saveRegistrationSetting(RegistrationSetting registrationSetting) {
@@ -123,15 +123,11 @@ public class SecuritySettingService {
     UserRegistrationType storedRegistrationType = getRegistrationType();
     boolean modified = registrationType != storedRegistrationType;
     if (modified) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           REGISTRATION_TYPE_PARAM,
-                           SettingValue.create(registrationType.toString()));
-        broadcastEvent(ACCESS_TYPE_MODIFIED, null, registrationType);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         REGISTRATION_TYPE_PARAM,
+                         SettingValue.create(registrationType.toString()));
+      broadcastEvent(ACCESS_TYPE_MODIFIED, null, registrationType);
     }
   }
 
@@ -146,31 +142,23 @@ public class SecuritySettingService {
 
   public void saveRegistrationExternalUser(boolean externalUser) {
     if (externalUser != isRegistrationExternalUser()) {
-      try {
-        settingService.set(SECURITY_CONTEXT,
-                           SECURITY_SCOPE,
-                           REGISTRATION_EXTERNAL_USER_PARAM,
-                           SettingValue.create(String.valueOf(externalUser)));
-        broadcastEvent(EXTERNAL_USER_REG_MODIFIED, null, externalUser);
-      } finally {
-        registrationSetting = null;
-      }
+      settingService.set(SECURITY_CONTEXT,
+                         SECURITY_SCOPE,
+                         REGISTRATION_EXTERNAL_USER_PARAM,
+                         SettingValue.create(String.valueOf(externalUser)));
+      broadcastEvent(EXTERNAL_USER_REG_MODIFIED, null, externalUser);
     }
   }
 
   public void saveRegistrationGroupIds(String[] groupIds) {
-    try {
-      if (groupIds == null) {
-        groupIds = new String[0];
-      }
-      settingService.set(SECURITY_CONTEXT,
-                         SECURITY_SCOPE,
-                         REGISTRATION_EXTRA_GROUPS_PARAM,
-                         SettingValue.create(StringUtils.join(groupIds, EXTRA_GROUPS_SEPARATOR)));
-      broadcastEvent(DEFAULT_GROUPS_MODIFIED, null, groupIds);
-    } finally {
-      registrationSetting = null;
+    if (groupIds == null) {
+      groupIds = new String[0];
     }
+    settingService.set(SECURITY_CONTEXT,
+                       SECURITY_SCOPE,
+                       REGISTRATION_EXTRA_GROUPS_PARAM,
+                       SettingValue.create(StringUtils.join(groupIds, EXTRA_GROUPS_SEPARATOR)));
+    broadcastEvent(DEFAULT_GROUPS_MODIFIED, null, groupIds);
   }
 
   private void broadcastEvent(String eventName, Object source, Object data) {
