@@ -104,6 +104,21 @@ public class OtpService {
   }
 
   /**
+   * Consumes a code already validated, for a flow that writes between its
+   * validation and the consumption
+   *
+   * @param userName user login
+   * @param otpMethod OTP method name
+   * @param otpCode validated code
+   * @return true when this call consumed the code, false when it was no longer
+   *         there or the method is unknown
+   */
+  public boolean consumeOtp(String userName, String otpMethod, String otpCode) {
+    OtpPlugin otpPlugin = getOtpPlugin(otpMethod);
+    return otpPlugin != null && otpPlugin.consumeOtp(userName, otpCode);
+  }
+
+  /**
    * The count carries its expiry, so the attempts window is this service's
    * property as long as the cache keeps the entry at least
    * meeds.apiKey.otp.maxTentatives.ttl: an entry the cache drops sooner

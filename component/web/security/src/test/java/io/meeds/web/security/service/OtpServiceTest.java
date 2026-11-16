@@ -19,6 +19,7 @@
 package io.meeds.web.security.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -211,5 +212,23 @@ public class OtpServiceTest {
     doAnswer(invocation -> counts.remove(invocation.getArgument(0, String.class))).when(otpTentativeCache)
                                                                                   .remove(anyString());
     return counts;
+  }
+
+  @Test
+  public void testConsumeOtpOfUnknownMethodConsumesNothing() {
+    assertFalse(otpService.consumeOtp("john", "email", "1234"));
+    verify(otpPlugin, never()).consumeOtp(anyString(), anyString());
+  }
+
+  @Test
+  public void testConsumeOtpDelegatesToThePlugin() {
+    when(otpPlugin.consumeOtp("john", "1234")).thenReturn(true);
+    assertTrue(otpService.consumeOtp("john", "sms", "1234"));
+  }
+
+  @Test
+  public void testDefaultPluginConsumptionHasNothingToConsume() {
+    OtpPlugin plugin = org.mockito.Mockito.mock(OtpPlugin.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+    assertTrue(plugin.consumeOtp("john", "1234"));
   }
 }
