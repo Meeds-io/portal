@@ -18,6 +18,8 @@
  */
 package org.exoplatform.web;
 
+import java.io.IOException;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
@@ -46,7 +48,7 @@ public class CacheUserProfileFilter extends AbstractFilter {
      */
     private static Log log = ExoLogger.getLogger(CacheUserProfileFilter.class);
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws ServletException, IOException {
         ConversationState state = ConversationState.getCurrent();
         try {
             OrganizationService orgService = getContainer().getComponentInstanceOfType(OrganizationService.class);
@@ -58,11 +60,12 @@ public class CacheUserProfileFilter extends AbstractFilter {
                                                        conversationRegistry)) {
                 return;
             }
-            chain.doFilter(request, response);
         } catch (Exception e) {
             log.warn("An error occured while cache user profile", e);
+            ((HttpServletResponse) response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            return;
         }
-
+        chain.doFilter(request, response);
     }
 
     public void destroy() {
