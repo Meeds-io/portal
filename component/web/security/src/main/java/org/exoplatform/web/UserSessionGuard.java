@@ -99,11 +99,13 @@ public final class UserSessionGuard {
 
   /**
    * Only a GET of the portal webapp is a page navigation redirected to the
-   * portal root; any other request is answered with 401.
+   * portal root; any other request is answered with 401, the portal webapp's
+   * own REST servlet included.
    */
   private static boolean isPortalNavigation(HttpServletRequest request) {
     return "GET".equalsIgnoreCase(request.getMethod())
-           && ("/" + PortalContainer.getCurrentPortalContainerName()).equals(request.getContextPath());
+           && ("/" + PortalContainer.getCurrentPortalContainerName()).equals(request.getContextPath())
+           && !("/" + PortalContainer.getCurrentRestContextName()).equals(request.getServletPath());
   }
 
   private static User findUser(OrganizationService organizationService, String userId) {

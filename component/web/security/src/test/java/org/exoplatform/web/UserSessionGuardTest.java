@@ -84,6 +84,7 @@ public class UserSessionGuardTest {
     when(request.getContextPath()).thenReturn("/portal");
     portalContainer = org.mockito.Mockito.mockStatic(PortalContainer.class);
     portalContainer.when(PortalContainer::getCurrentPortalContainerName).thenReturn("portal");
+    portalContainer.when(PortalContainer::getCurrentRestContextName).thenReturn("rest");
     when(request.getRequestURI()).thenReturn("//other.example/dw");
     organizationService = mock(OrganizationService.class);
     userHandler = mock(UserHandler.class);
@@ -112,6 +113,19 @@ public class UserSessionGuardTest {
   public void testAGetOutsideThePortalWebappIsRefusedNotRedirected() throws Exception {
     when(request.getMethod()).thenReturn("GET");
     when(request.getContextPath()).thenReturn("/rest");
+
+    assertTrue(guard(new ConversationState(new Identity("john"))));
+
+    verify(session).invalidate();
+    verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response, never()).sendRedirect(anyString());
+  }
+
+  @Test
+  public void testAGetOfThePortalWebappRestServletIsRefusedNotRedirected() throws Exception {
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getContextPath()).thenReturn("/portal");
+    when(request.getServletPath()).thenReturn("/rest");
 
     assertTrue(guard(new ConversationState(new Identity("john"))));
 
