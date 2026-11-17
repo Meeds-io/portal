@@ -79,8 +79,7 @@
              The legacy <name>:<default> form is still accepted for extensions that redefine this component. -->
         <value>primaryColor=${exo.branding.theme.primaryColor:#3f8487}</value>
         <value>secondaryColor=${exo.branding.theme.secondaryColor:#e25d5d}</value>
-        <value>tertiaryColor=${exo.branding.theme.tertiaryColor:#e25d5d}</value>
-        <value>greyColorLighten1=${exo.branding.theme.greyColorLighten1:#707070}</value>
+        <value>greyColorLighten1=${exo.branding.theme.greyColorLighten1:#6B6B6B}</value>
         <value>textColor=${exo.branding.theme.textColor:#20282c}</value>
         <value>borderRadius=${exo.branding.theme.borderRadius:8px}</value>
         <value>fontFamily=${exo.branding.theme.fontFamily:Arimo}</value>
@@ -101,7 +100,7 @@
         <value>sideBarTextFontSize=${exo.branding.theme.sideBarTextFontSize:16px}</value>
         <value>sideBarTextFontStyle=${exo.branding.theme.sideBarTextFontStyle:normal}</value>
         <value>sideBarTextFontWeight=${exo.branding.theme.sideBarTextFontWeight:normal}</value>
-        <value>sideBarTextSubtitleColor=${exo.branding.theme.sideBarTextSubtitleColor:#707070}</value>
+        <value>sideBarTextSubtitleColor=${exo.branding.theme.sideBarTextSubtitleColor:#6B6B6B}</value>
         <value>sideBarTextSubtitleFontSize=${exo.branding.theme.sideBarTextSubtitleFontSize:12px}</value>
         <value>sideBarTextSubtitleFontStyle=${exo.branding.theme.sideBarTextSubtitleFontStyle:normal}</value>
         <value>sideBarTextSubtitleFontWeight=${exo.branding.theme.sideBarTextSubtitleFontWeight:normal}</value>
@@ -116,7 +115,7 @@
         <value>drawerTextTitleFontSize=${exo.branding.theme.drawerTextTitleFontSize:20px}</value>
         <value>drawerTextTitleFontStyle=${exo.branding.theme.drawerTextTitleFontStyle:normal}</value>
         <value>drawerTextTitleFontWeight=${exo.branding.theme.drawerTextTitleFontWeight:bold}</value>
-        <value>drawerTextHeaderColor=${exo.branding.theme.drawerTextHeaderColor:#707070}</value>
+        <value>drawerTextHeaderColor=${exo.branding.theme.drawerTextHeaderColor:#6B6B6B}</value>
         <value>drawerTextHeaderFontSize=${exo.branding.theme.drawerTextHeaderFontSize:18px}</value>
         <value>drawerTextHeaderFontStyle=${exo.branding.theme.drawerTextHeaderFontStyle:normal}</value>
         <value>drawerTextHeaderFontWeight=${exo.branding.theme.drawerTextHeaderFontWeight:normal}</value>
@@ -124,7 +123,7 @@
         <value>drawerTextFontSize=${exo.branding.theme.drawerTextFontSize:16px}</value>
         <value>drawerTextFontStyle=${exo.branding.theme.drawerTextFontStyle:normal}</value>
         <value>drawerTextFontWeight=${exo.branding.theme.drawerTextFontWeight:normal}</value>
-        <value>drawerTextSubtitleColor=${exo.branding.theme.drawerTextSubtitleColor:#707070}</value>
+        <value>drawerTextSubtitleColor=${exo.branding.theme.drawerTextSubtitleColor:#6B6B6B}</value>
         <value>drawerTextSubtitleFontSize=${exo.branding.theme.drawerTextSubtitleFontSize:12px}</value>
         <value>drawerTextSubtitleFontStyle=${exo.branding.theme.drawerTextSubtitleFontStyle:normal}</value>
         <value>drawerTextSubtitleFontWeight=${exo.branding.theme.drawerTextSubtitleFontWeight:normal}</value>

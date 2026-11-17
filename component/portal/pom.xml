@@ -77,6 +77,26 @@
       <type>test-jar</type>
     </dependency>
 
+    <!-- The @DataJpaTest slice: the theme statements run on HSQLDB through real
+         repository proxies, over the schema the theme changelog creates -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.vaadin.external.google</groupId>
+          <artifactId>android-json</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- The starter brings the JUnit Platform: the module's JUnit 4 suites run on it through the vintage engine -->
+    <dependency>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Used For BrandingService which compiles Less Files to CSS -->
     <dependency>
       <groupId>com.github.sommeri</groupId>
@@ -108,6 +128,10 @@
           <runOrder>alphabetical</runOrder>
           <includes>
             <include>**/*TestSuite.java</include>
+            <include>io/meeds/portal/theme/**/*Test.java</include>
+            <include>org/exoplatform/portal/branding/BrandingThemeRestTest.java</include>
+            <include>org/exoplatform/portal/branding/BrandingUtilsTest.java</include>
+            <include>org/exoplatform/portal/branding/MailDocumentShellTest.java</include>
           </includes>
         </configuration>
       </plugin>
