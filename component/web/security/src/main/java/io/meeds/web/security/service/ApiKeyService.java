@@ -68,7 +68,9 @@ public class ApiKeyService {
 
   @SneakyThrows
   public String getPassword(String userName, String otpMethod, String otpCode, boolean renew) throws IllegalAccessException {
-    otpService.validateOtp(userName, otpMethod, otpCode);
+    // Consumed with its validation: the code gives the password once, and a
+    // second request with it is refused
+    otpService.validateAndConsumeOtp(userName, otpMethod, otpCode);
     String password = renew ? null : getPassword(userName);
     if (password == null) {
       password = generatePassword();
