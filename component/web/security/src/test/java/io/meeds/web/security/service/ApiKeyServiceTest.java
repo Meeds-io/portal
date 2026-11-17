@@ -21,10 +21,12 @@ package io.meeds.web.security.service;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -94,7 +96,7 @@ public class ApiKeyServiceTest {
 
     String result = service.getPassword(USER1, "email", "otp123", false);
 
-    verify(otpService).validateOtp(USER1, "email", "otp123");
+    verify(otpService).validateAndConsumeOtp(USER1, "email", "otp123");
     assertEquals(PASSWORD, result);
     verify(apiKeyStorage, never()).saveKey(anyString(), anyString());
   }
@@ -109,10 +111,25 @@ public class ApiKeyServiceTest {
 
     String result = service.getPassword(USER2, "sms", "otp456", true);
 
-    verify(otpService).validateOtp(USER2, "sms", "otp456");
+    verify(otpService).validateAndConsumeOtp(USER2, "sms", "otp456");
     assertNotNull(result);
     assertEquals(20, result.length());
     verify(apiKeyStorage).saveKey(eq(USER2), startsWith("ENC("));
+  }
+
+  @Test
+  @SneakyThrows
+  public void testGetPasswordRefusesACodeAlreadyUsed() {
+    doThrow(IllegalAccessException.class).when(otpService).validateAndConsumeOtp(USER1, "email", "otp123");
+
+    try {
+      service.getPassword(USER1, "email", "otp123", true);
+      fail("A code already used must not give the password again");
+    } catch (IllegalAccessException e) {
+      // Expected
+    }
+    verify(apiKeyStorage, never()).saveKey(anyString(), anyString());
+    verify(apiKeyStorage, never()).getKey(anyString());
   }
 
   @Test
