@@ -262,9 +262,7 @@ public class PortalWarmup implements Runnable {
    * Sends one GET over HTTP/1.1, with no cookie and no credential, following
    * no redirect, and waits at most {@link #RESPONSE_TIMEOUT} for the whole
    * response. The client's default, HTTP/2, asks a cleartext connector that
-   * accepts it to upgrade to h2c; reproduced with Tomcat 11.0.24 and a JDK 25
-   * client, an upgraded response of 32 KB completed while responses from
-   * 64 KB to 2 MB stalled until Tomcat's stream write timeout cancelled them
+   * accepts it to upgrade to h2c, and large upgraded responses stall
    * (EXO-94550).
    *
    * @param loopback whether the URL is the derived loopback one, requested
