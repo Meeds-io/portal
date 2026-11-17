@@ -95,6 +95,8 @@ public class TestJspBasedWebHandler {
     when(brandingService.getCompanyName()).thenReturn(companyName);
     when(brandingService.getLastUpdatedTime()).thenReturn(brandingLastModifiedTime);
     when(brandingService.getThemeStyle()).thenReturn(Collections.singletonMap("primaryColor", primarycolor));
+    when(brandingService.getFaviconPath()).thenReturn("/favicon-light");
+    when(brandingService.getDarkFaviconPath()).thenReturn("/favicon-dark");
 
     JSONObject jsConfig = new JSONObject("{paths:{}}");
     JSONObject jsConfigPaths = jsConfig.getJSONObject("paths");
@@ -148,6 +150,8 @@ public class TestJspBasedWebHandler {
     assertTrue(inlineScripts.contains("brandingLogo"));
     assertTrue(attributes.get("brandingThemeUrl").toString().contains(String.valueOf(brandingLastModifiedTime)));
     assertEquals(attributes.get("brandingPrimaryColor").toString(), primarycolor);
+    assertEquals("/favicon-light", attributes.get("brandingFavicon"));
+    assertEquals("/favicon-dark", attributes.get("brandingDarkFavicon"));
     verify(response, times(1)).setContentType(JspBasedWebHandler.TEXT_HTML_CONTENT_TYPE);
   }
 }

@@ -23,6 +23,7 @@ import java.io.IOException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 
+import org.exoplatform.portal.branding.BrandingUtils;
 import org.exoplatform.container.PortalContainer;
 
 public class AccountSetupViewServlet extends HttpServlet {
@@ -45,6 +46,7 @@ public class AccountSetupViewServlet extends HttpServlet {
           return "/portal";
         }
       };
+      BrandingUtils.getDisplayMode(wrappedRequest);
       container.getPortalContext().getRequestDispatcher(AS_JSP_RESOURCE).forward(wrappedRequest, response);
     }
   }

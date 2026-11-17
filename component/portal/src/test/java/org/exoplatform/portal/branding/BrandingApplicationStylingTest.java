@@ -94,6 +94,14 @@ public class BrandingApplicationStylingTest {
 
   private static final String LINEAR_GRADIENT    = "linear-gradient(to right, #AABBCCFF 0%, #AABBCCFF 30%, #112233FF 100%)";
 
+  // the shades portal's branding.less derives per version for the skin (platform-ui variables.less)
+  private static final String[] DERIVED_SHADES = new String[] { "--allpagesprimarybackgroundhover",
+      "--allpagesprimarybackgroundlight", "--allpagesprimarybackgroundlighter", "--allpagesrevealbackgroundselected",
+      "--allpagesquoteprimarybackground", "--allpagesquoteprimaryborder", "--allpagesgreycolorlighten1opacity2",
+      "--allpagesgreycolorlighten1opacity3", "--allpagesgreycolorlighten1opacity4", "--allpagesgreycolorlighten1opacity5",
+      "--allpagesgreycoloropacity1", "--allpagesgreycoloropacity3", "--allpagesbtnborderbottom", "--allpagesinputfocusborder",
+      "--allpagesinputfocusshadow" };
+
   @Test
   public void shouldCompileTemplateWithRealLessCompilerUsingSkinEqualDefaults() throws Exception {
     File lessFile = new File(BRANDING_LESS_PATH);
@@ -139,7 +147,7 @@ public class BrandingApplicationStylingTest {
     assertTrue(css, css.contains("--allPagesAppBoxShadow: 0px 3px"));
     assertTrue(css, css.contains("--allPagesAppTextHeaderBackgroundColor: transparent;"));
     assertTrue(css, css.contains("--allPagesAppTextHeaderBackgroundPaddingTop: 0px;"));
-    assertTrue(css, css.contains("--allPagesAppTextHeaderColor: #707070;"));
+    assertTrue(css, css.contains("--allPagesAppTextHeaderColor: #6B6B6B;"));
     assertTrue(css, css.contains("--allPagesAppTextTitleBackgroundColor: transparent;"));
     // chained defaults follow the global variables (borderRadius stored, textColor configured)
     assertTrue(css, css.contains("--allPagesAppBorderRadiusTopLeft: 12px;"));
@@ -392,8 +400,10 @@ public class BrandingApplicationStylingTest {
 
     // template defaults: white application and drawer backgrounds keep the skin's default bubble colour
     String css = brandingService.getThemeCSSContent();
-    assertFalse(css, css.contains("--allPagesCommentBackgroundColor"));
-    assertFalse(css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+    // no bubble colour: declared initial, so a light scope never inherits a dark bubble and the skin's default applies
+    assertTrue(css, css.contains("--allPagesCommentBackgroundColor: initial;"));
+    assertTrue(css, css.contains("--allPagesDrawerCommentBackgroundColor: initial;"));
+    assertFalse(css, css.contains("--allPagesCommentBackgroundColor: color-mix"));
 
     long time = 1;
     stub(settingService, "appBackgroundColor", "#EBADCBFF");
@@ -408,15 +418,16 @@ public class BrandingApplicationStylingTest {
 
     // every spelling of white the colour grammar accepts, transparent (the keyword and a zero alpha), the unset value,
     // and the grammar's lengths that are not CSS colours (color-mix() would be invalid and the bubble transparent)
-    // emit nothing
+    // declare initial, so the skin's default bubble applies
     for (String white : new String[] { "#FFFFFF", "#ffffff", "#FFF", "#fff", "#FFFF", "#ffff", "#FFFFFFFF", "#ffffffff",
         "#FfFfFfFf", "transparent", "#00000000", "#AABBCC00", "#ABC0", "initial", "#AABBC", "#AABBCCD" }) {
       stub(settingService, "appBackgroundColor", white);
       stub(settingService, "drawerBackgroundColor", white);
       brandingService.updateLastUpdatedTime(time++);
       css = brandingService.getThemeCSSContent();
-      assertFalse(white + ": " + css, css.contains("--allPagesCommentBackgroundColor"));
-      assertFalse(white + ": " + css, css.contains("--allPagesDrawerCommentBackgroundColor"));
+      assertTrue(white + ": " + css, css.contains("--allPagesCommentBackgroundColor: initial;"));
+      assertTrue(white + ": " + css, css.contains("--allPagesDrawerCommentBackgroundColor: initial;"));
+      assertFalse(white + ": " + css, css.contains("color-mix(in srgb, " + white));
     }
 
     // any other colour compiles and is mixed (less4j writes a 3-digit hex out in 6 digits)
@@ -449,6 +460,370 @@ public class BrandingApplicationStylingTest {
     stub(settingService, "borderRadius", "8px; }");
     brandingService.updateLastUpdatedTime(1);
     assertEquals("the last compiled stylesheet is served, not nothing", goodCss, brandingService.getThemeCSSContent());
+  }
+
+  @Test
+  public void shouldDarkenTheShippedDefaultsAndFallBackToTheBuiltInDarkValues() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    // the shipped configuration alone: blank defaults included, nothing added by hand (resolved before the stubbing,
+    // which must not call another mock)
+    io.meeds.portal.theme.model.ResolvedTheme shipped =
+                                                      io.meeds.portal.theme.util.ThemeValueResolver.resolve(brandingService.getResolutionDefaults(),
+                                                                                                              Map.of(),
+                                                                                                              Map.of());
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(shipped);
+    String css = brandingService.compileThemeVersions(themeService);
+    int dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    int media = css.indexOf("@media (prefers-color-scheme: dark)");
+    int scope = css.indexOf("[data-display-mode=\"light\"]:not(:root) {\n");
+    String darkBlock = css.substring(dark, media).toLowerCase();
+    assertTrue(darkBlock, darkBlock.contains("--allpagesappbackgroundcolor: #1e2328"));
+    assertTrue(darkBlock, darkBlock.contains("--allpagesapptexttitlecolor: #e6e9eb"));
+    assertTrue("the light scope declares its own bubble", css.substring(scope).contains("--themeCommentBackgroundColor: initial"));
+
+    // a dark compile that fails with no earlier dark result serves the built-in dark values, never a light block
+    BrandingServiceImpl failing = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    Map<String, String> broken = new HashMap<>(io.meeds.portal.theme.util.ThemeValueResolver.resolve(failing.getResolutionDefaults(),
+                                                                                                         Map.of(),
+                                                                                                         Map.of())
+                                                                                                .getDark());
+    broken.put("borderRadius", "8px; }");
+    io.meeds.portal.theme.model.ResolvedTheme resolved = new io.meeds.portal.theme.model.ResolvedTheme();
+    resolved.setLight(io.meeds.portal.theme.util.ThemeValueResolver.resolve(failing.getResolutionDefaults(), Map.of(), Map.of()).getLight());
+    resolved.setDark(broken);
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+    css = failing.compileThemeVersions(themeService);
+    dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    media = css.indexOf("@media (prefers-color-scheme: dark)");
+    assertTrue(css.substring(dark, media).toLowerCase().contains("--allpagesappbackgroundcolor: #1e2328"));
+    assertTrue("and the template constants no theme sets, as the pristine dark values",
+               css.substring(dark, media).toLowerCase().contains("--allpagesprimarybackground: #14181b"));
+  }
+
+  @Test
+  public void shouldCheckEverythingBeforeTheFirstWriteOfTheFormerPage() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService, mock(ConfigurationManager.class), defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    brandingService.setThemeService(themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      Branding branding = new Branding();
+      branding.setSiteName("Site");
+      branding.setCustomCss("body { background: url(javascript:alert(1)) }");
+      assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding));
+      verify(settingService, never()).set(any(), any(), any(), any());
+
+      branding.setCustomCss(null);
+      when(themeService.publishLegacy(any(), eq(false))).thenThrow(new IllegalArgumentException("branding.theme.invalidValue:primaryColor"));
+      assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding));
+      verify(settingService, never()).set(any(), any(), any(), any());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void shouldGiveMailsThePaletteOfEachVersionCachedPerStamp() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService, mock(ConfigurationManager.class), defaultInitParams());
+    assertEquals("before the theme services, the built-in light palette",
+                 "#FFFFFF",
+                 brandingService.getMailPalette(true).get(org.exoplatform.portal.branding.MailDocumentShell.SURFACE));
+
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    brandingService.setThemeService(themeService);
+    io.meeds.portal.theme.model.ResolvedTheme resolved =
+                                                        io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("appBackgroundColor",
+                                                                                                                       "#FFFFFF",
+                                                                                                                       "primaryColor",
+                                                                                                                       "#3F8487"),
+                                                                                                                Map.of("primaryColor",
+                                                                                                                       "#AA3300",
+                                                                                                                       "pageBackgroundColor",
+                                                                                                                       "#FAFAFA"),
+                                                                                                                Map.of());
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+    when(themeService.getState()).thenReturn(new io.meeds.portal.theme.model.BrandingState(3, true, null, 7L, null, null, null, null, null, null, null, 0));
+    byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    when(themeService.readImage(7L)).thenReturn(new io.meeds.portal.theme.model.ImageBytes(svg, "image/svg+xml", 0));
+    when(themeService.getEffectiveDarkLogoFileId()).thenReturn(7L);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      Map<String, String> dark = brandingService.getMailPalette(true);
+      assertEquals("#1E2328", dark.get(org.exoplatform.portal.branding.MailDocumentShell.SURFACE));
+      assertEquals("#E6E9EB", dark.get(org.exoplatform.portal.branding.MailDocumentShell.TEXT));
+      assertEquals("true", dark.get(org.exoplatform.portal.branding.MailDocumentShell.LOGO_IS_SVG));
+      Map<String, String> light = brandingService.getMailPalette(false);
+      assertEquals("#FFFFFF", light.get(org.exoplatform.portal.branding.MailDocumentShell.SURFACE));
+      assertEquals("the theme's own values reach the palette", "#AA3300", light.get(org.exoplatform.portal.branding.MailDocumentShell.PRIMARY));
+      assertEquals("#FAFAFA", light.get(org.exoplatform.portal.branding.MailDocumentShell.BACKGROUND));
+      assertEquals(resolved.getLight().get("primaryTextColor"), light.get(org.exoplatform.portal.branding.MailDocumentShell.LINK));
+      verify(themeService, times(1)).resolve((io.meeds.portal.theme.model.Theme) null);
+      // a new stamp: computed again
+      when(themeService.getState()).thenReturn(new io.meeds.portal.theme.model.BrandingState(4, true, null, 7L, null, null, null, null, null, null, null, 0));
+      brandingService.getMailPalette(true);
+      verify(themeService, times(2)).resolve((io.meeds.portal.theme.model.Theme) null);
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void shouldLayerEachImageFileBeforeItsGradient() {
+    Map<String, String> values = BrandingServiceImpl.withImageUrls(Map.of("sideBarBackgroundImage",
+                                                                          "linear-gradient(#fff, #000)",
+                                                                          "sideBarBackgroundImageFile",
+                                                                          "12",
+                                                                          "appBackgroundImage",
+                                                                          "none",
+                                                                          "appBackgroundImageFile",
+                                                                          "13"),
+                                                                   4,
+                                                                   true);
+    assertEquals("url(/portal/rest/v1/platform/branding/themes/4/images/sideBarBackgroundImage?version=dark&v=12), linear-gradient(#fff, #000)",
+                 values.get("sideBarBackgroundImage"));
+    assertEquals("url(/portal/rest/v1/platform/branding/themes/4/images/appBackgroundImage?version=dark&v=13)",
+                 values.get("appBackgroundImage"));
+  }
+
+  @Test
+  public void shouldServeBothVersionsInOneStylesheet() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved =
+                                                        io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("primaryColor",
+                                                                                                                       "#3F8487",
+                                                                                                                       "appBackgroundColor",
+                                                                                                                       "#FFFFFF",
+                                                                                                                       // the template's literals, as the resolution defaults carry them
+                                                                                                                       "primaryBackground",
+                                                                                                                       "#f0f0f0",
+                                                                                                                       "greyColor",
+                                                                                                                       "#e1e8ee"),
+                                                                                                                Map.of(),
+                                                                                                                Map.of("primaryColor",
+                                                                                                                       "#5FA9AC"));
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+
+    String css = brandingService.compileThemeVersions(themeService);
+    assertTrue(css, css.contains(":root { color-scheme: light; "));
+    assertTrue(css, css.contains(":root[data-display-mode=\"dark\"] { color-scheme: dark; }"));
+    assertTrue(css, css.contains("@media (prefers-color-scheme: dark) {"));
+    assertTrue(css, css.contains(":root[data-display-mode=\"auto\"] {"));
+    assertTrue(css, css.contains("[data-display-mode=\"light\"]:not(:root) {"));
+    int dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    int auto = css.indexOf(":root[data-display-mode=\"auto\"] {\n");
+    int scope = css.indexOf("[data-display-mode=\"light\"]:not(:root) {\n");
+    assertTrue(css, dark > 0 && auto > dark && scope > auto);
+    assertTrue("the dark block holds the dark value", css.substring(dark, auto).toLowerCase().contains("--allpagesprimarycolor: #5fa9ac"));
+    assertTrue("the light scope repeats the light value", css.substring(scope).toLowerCase().contains("--allpagesprimarycolor: #3f8487"));
+    String bubble = "--themeCommentBackgroundColor: " + resolved.getDark().get("commentBubbleColor");
+    int media = css.indexOf("@media (prefers-color-scheme: dark)");
+    assertTrue("the dark block carries the calculated bubble", css.substring(dark, media).contains(bubble));
+    assertTrue("and so does the automatic block", css.substring(media, scope).contains(bubble));
+    assertFalse("no bare :root left in the dark and scope blocks", css.substring(dark).contains("\n:root {"));
+    assertTrue("template constants no theme sets take their dark value",
+               css.substring(dark, auto).toLowerCase().contains("--allpagesprimarybackground: #14181b"));
+    assertTrue(css.substring(dark, auto).toLowerCase().contains("--allpagesbordercolor: #3a424a"));
+    assertTrue("and keep their light literal in light", css.substring(0, dark).toLowerCase().contains("--allpagesprimarybackground: #f0f0f0"));
+    assertTrue(css.substring(scope).toLowerCase().contains("--allpagesbordercolor: #e1e8ee"));
+  }
+
+  @Test
+  public void shouldDeriveTheSkinShadesFromTheDarkColorsInTheDarkVersionOnly() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved =
+                                                        io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("primaryColor",
+                                                                                                                       "#3F8487",
+                                                                                                                       "primaryBackground",
+                                                                                                                       "#f0f0f0",
+                                                                                                                       "greyColor",
+                                                                                                                       "#e1e8ee"),
+                                                                                                                Map.of(),
+                                                                                                                Map.of("primaryColor",
+                                                                                                                       "#5FA9AC"));
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+
+    String css = brandingService.compileThemeVersions(themeService).toLowerCase();
+    int dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    int auto = css.indexOf(":root[data-display-mode=\"auto\"] {\n");
+    int scope = css.indexOf("[data-display-mode=\"light\"]:not(:root) {\n");
+    String light = css.substring(0, dark);
+    String darkBlock = css.substring(dark, auto);
+    String autoBlock = css.substring(auto, scope);
+    String scopeBlock = css.substring(scope);
+    for (String property : DERIVED_SHADES) {
+      assertTrue("the light version leaves " + property + " to the skin's light derivation", light.contains(property + ": initial"));
+      assertTrue("and so does a light scope", scopeBlock.contains(property + ": initial"));
+      assertFalse("the dark version derives " + property, darkBlock.contains(property + ": initial"));
+      assertTrue(property + " in the dark block", darkBlock.contains(property + ": "));
+      assertTrue(property + " in the automatic block", autoBlock.contains(property + ": "));
+      assertFalse(autoBlock.contains(property + ": initial"));
+    }
+    // a hover raises the dark page background clear of the application surface (#1E2328), never darkens it
+    assertTrue(darkBlock, darkBlock.contains("--allpagesprimarybackgroundhover: #252d32"));
+    // a tint mixes the dark Primary into the dark application surface, the Secondary likewise
+    assertTrue(darkBlock, darkBlock.contains("--allpagesrevealbackgroundselected: #2e4549"));
+    assertTrue(darkBlock, darkBlock.contains("--allpagesinputfocusborder: #374e6e"));
+    // an opacity of the Grey text colour, and a border raised from the dark grey
+    assertTrue(darkBlock, darkBlock.contains("--allpagesgreycolorlighten1opacity3: rgba(95, 112, 138, 0.2)"));
+    assertTrue(darkBlock, darkBlock.contains("--allpagesbtnborderbottom: #505c67"));
+  }
+
+  @Test
+  public void shouldDeclareThePageBackgroundAndTheDefaultBubbleOfEachVersionInItsBlock() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved =
+                                                        io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("pageBackgroundColor",
+                                                                                                                       "#F0F0F0",
+                                                                                                                       "pageBackgroundAttachment",
+                                                                                                                       "scroll",
+                                                                                                                       "pageWidth",
+                                                                                                                       "1320px"),
+                                                                                                                Map.of(),
+                                                                                                                Map.of("pageBackgroundColor",
+                                                                                                                       "#101418"));
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+
+    String css = brandingService.compileThemeVersions(themeService);
+    int dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    int media = css.indexOf("@media (prefers-color-scheme: dark)");
+    int scope = css.indexOf("[data-display-mode=\"light\"]:not(:root) {");
+    String light = css.substring(0, dark);
+    String darkBlock = css.substring(dark, media);
+    String auto = css.substring(media, scope);
+    String lightScope = css.substring(scope);
+    for (String block : List.of(light, lightScope)) {
+      assertTrue(block, block.contains("--allPagesBackgroundColor: #F0F0F0;"));
+      assertTrue(block, block.contains("--commentDefaultBackgroundColor: #f2f5f8;"));
+    }
+    String darkBubble = io.meeds.portal.theme.util.ThemeColorCalculator.commentBubble("#1E2328");
+    for (String block : List.of(darkBlock, auto)) {
+      assertTrue(block, block.contains("--allPagesBackgroundColor: #101418;"));
+      assertTrue(block, block.contains("--commentDefaultBackgroundColor: " + darkBubble + ";"));
+      assertFalse("the dark default bubble is never the light one", darkBubble.equalsIgnoreCase("#f2f5f8"));
+    }
+    assertTrue("the width is shared", darkBlock.contains("--allPagesWidth: 1320px;") && light.contains("--allPagesWidth: 1320px;"));
+    assertTrue("scroll follows the content", light.contains("--allPagesBackgroundAttachment: local;"));
+    assertTrue("an unset key is initial, never inherited from the other version",
+               light.contains("--allPagesBackgroundRepeat: initial;"));
+    // no page colour anywhere: the dark page sits below the dark application surface, the light one keeps the skin's
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null))
+                                                                       .thenReturn(io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of(),
+                                                                                                                                           Map.of(),
+                                                                                                                                           Map.of()));
+    css = brandingService.compileThemeVersions(themeService);
+    dark = css.indexOf(":root[data-display-mode=\"dark\"] {\n");
+    media = css.indexOf("@media (prefers-color-scheme: dark)");
+    assertTrue(css.substring(dark, media).contains("--allPagesBackgroundColor: #14181B;"));
+    assertTrue(css.substring(0, dark).contains("--allPagesBackgroundColor: initial;"));
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void shouldReadThePageSettingsFromTheThemeInUseOnceReady() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed: the theme stylesheet needs its template", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.get(org.exoplatform.commons.api.settings.data.Context.GLOBAL,
+                            org.exoplatform.commons.api.settings.data.Scope.GLOBAL,
+                            "page.backgroundColor")).thenReturn((SettingValue) SettingValue.create("#ABCDEF"));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved = new io.meeds.portal.theme.model.ResolvedTheme();
+    resolved.setLight(new HashMap<>(Map.of("pageBackgroundColor", "#123456", "pageBackgroundImage", "none", "pageWidth", "1320px")));
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+    when(themeService.getState()).thenReturn(new io.meeds.portal.theme.model.BrandingState(1, true, null, null, null, null, null, null, null, null, null, 0));
+    brandingService.setThemeService(themeService);
+    assertFalse("before the readiness flag, the inline page style stays", brandingService.isPageStyleInStylesheet());
+    assertEquals("#ABCDEF", brandingService.getPageBackgroundColor());
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      assertTrue(brandingService.isPageStyleInStylesheet());
+      BrandingServiceImpl noTemplate = newBrandingService(settingService, mock(ConfigurationManager.class), defaultInitParams());
+      noTemplate.setThemeService(themeService);
+      assertFalse("no template, no theme stylesheet: the page style stays inline", noTemplate.isPageStyleInStylesheet());
+      assertEquals("the published theme, not the former setting", "#123456", brandingService.getPageBackgroundColor());
+      assertEquals("1320px", brandingService.getPageWidth());
+      assertNull("no effect", brandingService.getPageBackgroundEffect());
+      assertNull(brandingService.getPageBackgroundRepeat());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void shouldReadTheStickyTopBarFromTheThemeInUseOnceReady() {
+    // the former setting says the opposite of the theme in use, in both directions
+    assertStickyTopBar("true", "false", true);
+    assertStickyTopBar(null, "true", false);
+    assertStickyTopBar("false", null, false);
+  }
+
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  private void assertStickyTopBar(String themeValue, String legacyValue, boolean expected) {
+    SettingService settingService = mock(SettingService.class);
+    if (legacyValue != null) {
+      when(settingService.get(org.exoplatform.commons.api.settings.data.Context.GLOBAL,
+                              org.exoplatform.commons.api.settings.data.Scope.GLOBAL,
+                              "topBarSticky")).thenReturn((SettingValue) SettingValue.create(legacyValue));
+    }
+    BrandingServiceImpl brandingService = newBrandingService(settingService, mock(ConfigurationManager.class), defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved = new io.meeds.portal.theme.model.ResolvedTheme();
+    if (themeValue != null) {
+      resolved.setLight(new HashMap<>(Map.of("topBarSticky", themeValue)));
+    }
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+    when(themeService.getState()).thenReturn(new io.meeds.portal.theme.model.BrandingState(1, true, null, null, null, null, null, null, null, null, null, 0));
+    brandingService.setThemeService(themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      assertEquals(expected, brandingService.isTopBarSticky());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void shouldCompileOneVersionsValuesOrRefuseThemWithTheCompilationCode() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    SettingService settingService = mock(SettingService.class);
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(settingService, configurationManager, defaultInitParams());
+
+    // a dark version's values, the page margins' overrides applied as in the real compile
+    String css = brandingService.compileThemeStyle(Map.of("primaryColor", "#9BB8E0", "pageMarginTop", "30px"));
+    assertTrue(css, css.contains("#9BB8E0") || css.contains("#9bb8e0"));
+    // a plain value the grammar would refuse never reaches here: Less refusing one is the trial compile's refusal
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> brandingService.compileThemeStyle(Map.of("borderRadius", "8px; }")));
+    assertEquals("branding.theme.stylesheetCompilationError", e.getMessage());
   }
 
   @Test
@@ -698,6 +1073,40 @@ public class BrandingApplicationStylingTest {
                                    mock(ListenerService.class),
                                    mock(UserACL.class),
                                    initParams);
+  }
+
+
+  @Test
+  public void shouldCompileTheLightBlockFromLessNotFromTheResolvedBubbleEntries() throws Exception {
+    File lessFile = new File(BRANDING_LESS_PATH);
+    assumeTrue("branding.less of web/portal is needed to run the real compilation", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream(LESS_FILE_PATH)).thenAnswer(invocation -> new FileInputStream(lessFile));
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class), configurationManager, defaultInitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    io.meeds.portal.theme.model.ResolvedTheme resolved =
+        io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("primaryColor", "#3F8487", "appBackgroundColor", "#EBADCBFF",
+                                                                     "drawerBackgroundColor", "#3F8487"),
+                                                              Map.of(),
+                                                              Map.of());
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
+    String lightBubble = resolved.getLight().get("commentBubbleColor");
+    assertEquals("color-mix(in srgb, #EBADCBFF 60%, white)", lightBubble);
+
+    String with = brandingService.compileThemeVersions(themeService);
+    resolved.getLight().remove("commentBubbleColor");
+    resolved.getLight().remove("drawerCommentBubbleColor");
+    String without = brandingService.compileThemeVersions(themeService);
+
+    String dark = ":root[data-display-mode=\"dark\"] { color-scheme: dark; }";
+    assertTrue(with, with.indexOf(dark) > 0);
+    assertEquals("the light block is the same with or without the resolved bubble entries",
+                 without.substring(0, without.indexOf(dark)),
+                 with.substring(0, with.indexOf(dark)));
+    assertEquals(without, with);
+    assertTrue(with, with.substring(0, with.indexOf(dark)).contains("--allPagesCommentBackgroundColor: " + lightBubble + ";"));
+    assertTrue(with, with.substring(0, with.indexOf(dark))
+                         .contains("--allPagesDrawerCommentBackgroundColor: color-mix(in srgb, #3F8487 60%, white);"));
   }
 
 }

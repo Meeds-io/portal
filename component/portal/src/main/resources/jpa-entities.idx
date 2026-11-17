@@ -7,3 +7,5 @@ org.exoplatform.portal.jdbc.entity.WindowEntity
 org.exoplatform.portal.jdbc.entity.NodeEntity
 org.exoplatform.portal.jdbc.entity.NavigationEntity
 org.exoplatform.portal.jdbc.entity.PageEntity
+io.meeds.portal.theme.entity.ThemeEntity
+io.meeds.portal.theme.entity.BrandingStateEntity
