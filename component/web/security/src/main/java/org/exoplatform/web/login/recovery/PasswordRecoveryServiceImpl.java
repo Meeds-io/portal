@@ -48,6 +48,7 @@ import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.xml.InitParams;
 import org.exoplatform.portal.Constants;
 import org.exoplatform.portal.branding.BrandingService;
+import org.exoplatform.portal.branding.MailDocumentShell;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.mail.MailService;
@@ -271,7 +272,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     mail.setFrom(from);
     mail.setTo(user.getEmail());
     mail.setSubject(emailSubject);
-    mail.setBody(emailBody);
+    mail.setBody(wrapInDocument(emailBody));
     mail.setMimeType("text/html");
 
     try {
@@ -455,7 +456,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     message.setFrom(from);
     message.setTo(email);
     message.setSubject(emailSubject);
-    message.setBody(emailBody);
+    message.setBody(wrapInDocument(emailBody));
     message.setMimeType("text/html");
 
     mailService.sendMessage(message);
@@ -514,7 +515,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       message.setFrom(from);
       message.setTo(email);
       message.setSubject(emailSubject);
-      message.setBody(emailBody);
+      message.setBody(wrapInDocument(emailBody));
       message.setMimeType("text/html");
 
       mailService.sendMessage(message);
@@ -555,7 +556,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       message.setFrom(from);
       message.setTo(user.getEmail());
       message.setSubject(emailSubject);
-      message.setBody(emailBody);
+      message.setBody(wrapInDocument(emailBody));
       message.setMimeType("text/html");
 
       mailService.sendMessage(message);
@@ -646,7 +647,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     message.setFrom(from);
     message.setTo(user.getEmail());
     message.setSubject(emailSubject);
-    message.setBody(emailBody);
+    message.setBody(wrapInDocument(emailBody));
     message.setMimeType("text/html");
 
     try {
@@ -769,6 +770,16 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   @Override
   public ChangePasswordConnector getActiveChangePasswordConnector() {
     return this.changePasswordConnectorMap.get(this.changePasswordConnectorName);
+  }
+
+
+  /**
+   * The mails of this service go to recipients who may have no mode yet: the
+   * modes offered decide, Automatic when both are offered.
+   */
+  private String wrapInDocument(String emailBody) {
+    String mode = brandingService.getDisplayMode(null);
+    return MailDocumentShell.wrap(emailBody, mode, "auto".equals(mode) ? brandingService.getMailPalette(true) : null);
   }
 
 }

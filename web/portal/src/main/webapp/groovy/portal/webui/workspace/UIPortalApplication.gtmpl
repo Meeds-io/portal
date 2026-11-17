@@ -64,6 +64,7 @@
   String siteName = siteKey.getName();
   String siteType = siteKey.getTypeName();
   String companyName = brandingService.getCompanyName();
+  String displayMode = brandingService.getDisplayMode(userName);
   String metaPortalName = rcontext.getMetaPortal();
   
   def title = rcontext.getTitle() + " - ";
@@ -87,29 +88,32 @@
     bodyClasses += " default-page-background-color";
   }
   def bodyStyle = "";
-  if (brandingService.getPageBackgroundColor() != null) {
-    bodyStyle += "--allPagesBackgroundColor: " + brandingService.getPageBackgroundColor() + ";";
-  }
-  if (brandingService.getPageBackgroundImageUrl() != null) {
-    bodyStyle += "--allPagesBackgroundImage: " + brandingService.getPageBackgroundImageUrl();
-  }
-  if (brandingService.getPageBackgroundRepeat() != null) {
-    bodyStyle += "--allPagesBackgroundRepeat: " + brandingService.getPageBackgroundRepeat() + ";";
-  }
-  if (brandingService.getPageBackgroundSize() != null) {
-    bodyStyle += "--allPagesBackgroundSize: " + brandingService.getPageBackgroundSize() + ";";
-  }
-  if (brandingService.getPageBackgroundPosition() != null) {
-    bodyStyle += "--allPagesBackgroundPosition: " + brandingService.getPageBackgroundPosition() + ";";
-  }
-  if (brandingService.getPageBackgroundAttachment() != null) {
-    /* The site background paints on the scroll container, where "scroll" would mean
-       fixed with regard to that box; "local" is what makes it follow the content. */
-    def pageBackgroundAttachment = brandingService.getPageBackgroundAttachment();
-    bodyStyle += "--allPagesBackgroundAttachment: " + (pageBackgroundAttachment == "scroll" ? "local" : pageBackgroundAttachment) + ";";
-  }
-  if (brandingService.getPageWidth() != null) {
-    bodyStyle += "--allPagesWidth: " + brandingService.getPageWidth() + ";";
+  // once the theme services are ready, the theme stylesheet declares the page background and width of each version
+  if (!brandingService.isPageStyleInStylesheet()) {
+    if (brandingService.getPageBackgroundColor() != null) {
+      bodyStyle += "--allPagesBackgroundColor: " + brandingService.getPageBackgroundColor() + ";";
+    }
+    if (brandingService.getPageBackgroundImageUrl() != null) {
+      bodyStyle += "--allPagesBackgroundImage: " + brandingService.getPageBackgroundImageUrl();
+    }
+    if (brandingService.getPageBackgroundRepeat() != null) {
+      bodyStyle += "--allPagesBackgroundRepeat: " + brandingService.getPageBackgroundRepeat() + ";";
+    }
+    if (brandingService.getPageBackgroundSize() != null) {
+      bodyStyle += "--allPagesBackgroundSize: " + brandingService.getPageBackgroundSize() + ";";
+    }
+    if (brandingService.getPageBackgroundPosition() != null) {
+      bodyStyle += "--allPagesBackgroundPosition: " + brandingService.getPageBackgroundPosition() + ";";
+    }
+    if (brandingService.getPageBackgroundAttachment() != null) {
+      /* The site background paints on the scroll container, where "scroll" would mean
+         fixed with regard to that box; "local" is what makes it follow the content. */
+      def pageBackgroundAttachment = brandingService.getPageBackgroundAttachment();
+      bodyStyle += "--allPagesBackgroundAttachment: " + (pageBackgroundAttachment == "scroll" ? "local" : pageBackgroundAttachment) + ";";
+    }
+    if (brandingService.getPageWidth() != null) {
+      bodyStyle += "--allPagesWidth: " + brandingService.getPageWidth() + ";";
+    }
   }
   def userHomeLink = uicomponent.getUserHomePage();
 
@@ -134,11 +138,12 @@
     defaultPath = "/portal/" + rcontext.getPortalOwner();
   }
 %>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="$language" lang="$language" dir="$dir">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="$language" lang="$language" dir="$dir" data-display-mode="$displayMode">
   <head id="head">
     <title><%=HTMLEntityEncoder.getInstance().encode(title)%></title>
     <%/* Metadatas */%>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <%
       if (metaInformation!= null) {
@@ -152,7 +157,17 @@
       if (!rcontext.isMaximizePortlet()) {
         _ctx.includeTemplates("UIPortalApplication-Start-head");
       }%>
-    <link rel="shortcut icon" href="<%= org.exoplatform.portal.branding.Utils.getFaviconPath() %>" />
+    <%
+      // the favicon of the page's version; in Automatic the light one, and the dark one on a dark device. Both paths are
+      // kept on the links, so a mode change without reload swaps them (social's display mode)
+      String lightFaviconPath = brandingService.getFaviconPath();
+      String darkFaviconPath = brandingService.getDarkFaviconPath();
+      String faviconPath = displayMode == "dark" ? darkFaviconPath : lightFaviconPath;
+    %>
+    <link rel="shortcut icon" id="brandingFavicon" href="<%= faviconPath %>" data-light-href="<%= lightFaviconPath %>" data-dark-href="<%= darkFaviconPath %>" />
+    <% if (darkFaviconPath != lightFaviconPath) { %>
+    <link rel="icon" id="brandingDarkFavicon" media="<%= displayMode == "auto" ? "(prefers-color-scheme: dark)" : "not all" %>" href="<%= darkFaviconPath %>" />
+    <% } %>
     <%/* Styles */%>
     <link id="brandingSkin" rel="stylesheet" type="text/css" href="<%=uicomponent.getBrandingUrl()%>">
     <% for (skinConfig in portalSkins) {

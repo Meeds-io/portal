@@ -222,18 +222,57 @@ public class SvgUploadValidator implements UploadFileValidator {
 
   private static class SvgSafetyHandler extends DefaultHandler {
 
+    private int           styleDepth;
+
+    private StringBuilder styleText = new StringBuilder();
+
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
       String tagName = normalizeXmlName(localName, qName);
       if (isDangerousSvgTag(tagName)) {
         throw new UnsafeSvgException("Unsafe SVG tag detected: " + tagName);
       }
+      if ("style".equals(tagName)) {
+        styleDepth++;
+      }
 
+      boolean animatesHref = false;
       for (int i = 0; i < attributes.getLength(); i++) {
         String attributeName = normalizeXmlName(attributes.getLocalName(i), attributes.getQName(i));
         String attributeValue = attributes.getValue(i);
         if (isDangerousSvgAttribute(attributeName, attributeValue)) {
           throw new UnsafeSvgException("Unsafe SVG attribute detected: " + attributeName);
+        }
+        animatesHref |= "attributename".equals(attributeName) && attributeValue != null
+                        && "href".equals(normalizeXmlName(null, removeAsciiWhitespaces(attributeValue)));
+      }
+      if (animatesHref && isAnimationTag(tagName)) {
+        for (int i = 0; i < attributes.getLength(); i++) {
+          String attributeName = normalizeXmlName(attributes.getLocalName(i), attributes.getQName(i));
+          if (isAnimatedValueAttribute(attributeName) && hasExternalAnimatedReference(attributes.getValue(i), "values".equals(attributeName))) {
+            throw new UnsafeSvgException("External reference animated on an href: " + attributeName);
+          }
+        }
+      }
+    }
+
+    @Override
+    public void characters(char[] chars, int start, int length) {
+      if (styleDepth > 0) {
+        styleText.append(chars, start, length);
+      }
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+      if (styleDepth > 0 && "style".equals(normalizeXmlName(localName, qName))) {
+        styleDepth--;
+        if (styleDepth == 0) {
+          String css = styleText.toString();
+          styleText = new StringBuilder();
+          if (hasExternalCssReference(css)) {
+            throw new UnsafeSvgException("External reference in a style element");
+          }
         }
       }
     }
@@ -277,11 +316,171 @@ public class SvgUploadValidator implements UploadFileValidator {
         return false;
       }
 
+      if (hasExternalCssReference(attributeValue)) {
+        // a style declaration or a presentation attribute (fill, filter, mask...) reaching a resource through CSS
+        return true;
+      }
       String normalizedValue = removeAsciiWhitespaces(attributeValue).toLowerCase(Locale.ROOT);
+      if ("href".equals(attributeName) && !normalizedValue.startsWith("#") && !normalizedValue.startsWith("data:image/")) {
+        // an external reference (href, xlink:href): a fragment of the same document or an inline image only
+        return true;
+      }
       return normalizedValue.startsWith("javascript:")
           || normalizedValue.contains("javascript:")
           || normalizedValue.startsWith("data:text/html")
           || normalizedValue.contains("data:text/html");
+    }
+
+    private static boolean isAnimationTag(String tagName) {
+      return "set".equals(tagName) || tagName.startsWith("animate");
+    }
+
+    private static boolean isAnimatedValueAttribute(String attributeName) {
+      return "to".equals(attributeName) || "from".equals(attributeName) || "by".equals(attributeName)
+          || "values".equals(attributeName);
+    }
+
+    /**
+     * @param animatedValues the value, or the ';' separated values, an
+     *          animation gives an href
+     * @param list true for a values list, whose items are separated by ';'
+     * @return true when one is not a fragment of the document nor an inline
+     *         image
+     */
+    private static boolean hasExternalAnimatedReference(String animatedValues, boolean list) {
+      if (animatedValues == null) {
+        return false;
+      }
+      for (String value : list ? animatedValues.split(";") : new String[] { animatedValues }) {
+        String normalized = removeAsciiWhitespaces(value).toLowerCase(Locale.ROOT);
+        if (!normalized.isEmpty() && !normalized.startsWith("#") && !normalized.startsWith("data:image/")) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * @param css a style declaration list, a style element's text or any
+     *          attribute value
+     * @return true when it imports a stylesheet, or holds a CSS function
+     *         (url, src, image, image-set) whose target is not a fragment of
+     *         the document nor an inline image. Comments and escapes are
+     *         resolved first, so that they cannot hide the function.
+     */
+    private static boolean hasExternalCssReference(String css) {
+      if (css.indexOf('\\') < 0 && css.indexOf('(') < 0 && css.indexOf('@') < 0) {
+        return false;
+      }
+      String normalized = resolveCssEscapes(stripCssComments(css)).toLowerCase(Locale.ROOT);
+      if (normalized.contains("@import")) {
+        return true;
+      }
+      for (String function : new String[] { "url(", "src(", "image(", "image-set(" }) {
+        int from = 0;
+        while ((from = normalized.indexOf(function, from)) >= 0) {
+          int argumentsStart = from + function.length();
+          from = argumentsStart;
+          if (hasExternalCssArgument(normalized, argumentsStart, "image-set(".equals(function))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    private static boolean hasExternalCssArgument(String css, int start, boolean stringsOnly) {
+      int position = start;
+      while (position < css.length() && css.charAt(position) != ')') {
+        char c = css.charAt(position);
+        if (Character.isWhitespace(c) || c == ',') {
+          position++;
+          continue;
+        }
+        int end;
+        String target;
+        if (c == '"' || c == '\'') {
+          end = css.indexOf(c, position + 1);
+          end = end < 0 ? css.length() : end;
+          target = css.substring(position + 1, end);
+          position = end + 1;
+        } else if (stringsOnly) {
+          // a nested function or a resolution descriptor of an image set: not a target
+          position = skipCssToken(css, position);
+          continue;
+        } else {
+          end = css.indexOf(')', position);
+          end = end < 0 ? css.length() : end;
+          target = css.substring(position, end).trim();
+          position = end;
+        }
+        if (!target.startsWith("#") && !target.startsWith("data:image/")) {
+          return true;
+        }
+        if (!stringsOnly) {
+          return false;
+        }
+      }
+      return false;
+    }
+
+    private static int skipCssToken(String css, int start) {
+      int position = start;
+      while (position < css.length() && !Character.isWhitespace(css.charAt(position)) && css.charAt(position) != ','
+             && css.charAt(position) != ')') {
+        position++;
+      }
+      return Math.max(position, start + 1);
+    }
+
+    private static String stripCssComments(String css) {
+      StringBuilder result = new StringBuilder(css.length());
+      int position = 0;
+      while (position < css.length()) {
+        int comment = css.indexOf("/*", position);
+        if (comment < 0) {
+          result.append(css, position, css.length());
+          break;
+        }
+        result.append(css, position, comment);
+        int end = css.indexOf("*/", comment + 2);
+        position = end < 0 ? css.length() : end + 2;
+      }
+      return result.toString();
+    }
+
+    private static String resolveCssEscapes(String css) {
+      if (css.indexOf('\\') < 0) {
+        return css;
+      }
+      StringBuilder result = new StringBuilder(css.length());
+      int position = 0;
+      while (position < css.length()) {
+        char c = css.charAt(position++);
+        if (c != '\\' || position >= css.length()) {
+          result.append(c);
+          continue;
+        }
+        int digits = 0;
+        int codePoint = 0;
+        while (digits < 6 && position < css.length() && Character.digit(css.charAt(position), 16) >= 0) {
+          codePoint = codePoint * 16 + Character.digit(css.charAt(position), 16);
+          position++;
+          digits++;
+        }
+        if (digits > 0) {
+          result.appendCodePoint(Character.isValidCodePoint(codePoint) && codePoint > 0 ? codePoint : 0xFFFD);
+          if (position < css.length() && Character.isWhitespace(css.charAt(position))) {
+            position++;
+          }
+        } else {
+          char escaped = css.charAt(position++);
+          if (escaped != '\n') {
+            result.append(escaped);
+          }
+        }
+      }
+      return result.toString();
     }
 
     private static String removeAsciiWhitespaces(String value) {

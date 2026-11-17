@@ -194,6 +194,35 @@ public class PasswordRecoveryServiceImplTest {
    * the password reminder's validity and no message
    */
   @Test
+  public void testTheOnboardingMailIsADocumentInTheModesOffered() throws Exception {
+    when(brandingService.getDisplayMode(null)).thenReturn("auto");
+    when(brandingService.getMailPalette(true)).thenReturn(java.util.Map.of(org.exoplatform.portal.branding.MailDocumentShell.SURFACE,
+                                                                          "#1E2328"));
+    try (MockedStatic<MailUtils> mailUtils = Mockito.mockStatic(MailUtils.class)) {
+      mailUtils.when(MailUtils::getSenderName).thenReturn("Acme");
+      mailUtils.when(MailUtils::getSenderEmail).thenReturn("noreply@acme.example");
+      passwordRecoveryService.sendOnboardingEmail(user(), Locale.ENGLISH, new StringBuilder("https://acme.example/portal"), "Hi");
+      ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+      verify(mailService).sendMessage(sent.capture());
+      String body = sent.getValue().getBody();
+      assertTrue(body, body.startsWith("<!DOCTYPE html>"));
+      assertTrue(body, body.contains("content=\"light dark\""));
+      assertTrue(body, body.contains("@media (prefers-color-scheme: dark)"));
+    }
+    when(brandingService.getDisplayMode(null)).thenReturn("light");
+    try (MockedStatic<MailUtils> mailUtils = Mockito.mockStatic(MailUtils.class)) {
+      mailUtils.when(MailUtils::getSenderName).thenReturn("Acme");
+      mailUtils.when(MailUtils::getSenderEmail).thenReturn("noreply@acme.example");
+      passwordRecoveryService.sendOnboardingEmail(user(), Locale.ENGLISH, new StringBuilder("https://acme.example/portal"), "Hi");
+      ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+      verify(mailService, org.mockito.Mockito.times(2)).sendMessage(sent.capture());
+      String body = sent.getValue().getBody();
+      assertTrue(body, body.contains("content=\"light\""));
+      assertFalse(body, body.contains("<style>"));
+    }
+  }
+
+  @Test
   public void testSendOnboardingEmailStatesTheOnboardingValidity() throws Exception {
     try (MockedStatic<MailUtils> mailUtils = Mockito.mockStatic(MailUtils.class)) {
       mailUtils.when(MailUtils::getSenderName).thenReturn("Acme");

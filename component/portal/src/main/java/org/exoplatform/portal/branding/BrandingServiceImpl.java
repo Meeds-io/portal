@@ -38,6 +38,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -56,10 +60,12 @@ import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
 import org.exoplatform.commons.api.settings.data.Context;
 import org.exoplatform.commons.api.settings.data.Scope;
+import org.exoplatform.commons.file.model.FileInfo;
 import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.commons.file.services.FileStorageException;
 import org.exoplatform.commons.utils.IOUtil;
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.container.xml.InitParams;
@@ -73,8 +79,23 @@ import org.exoplatform.portal.branding.model.Logo;
 import org.exoplatform.portal.branding.model.ThemeStylesheet;
 import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.services.listener.ListenerService;
+import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
+
+import io.meeds.portal.theme.ThemeReadiness;
+import io.meeds.portal.theme.constant.ThemeVariables;
+import io.meeds.portal.theme.model.BrandingState;
+import io.meeds.portal.theme.model.ImageBytes;
+import io.meeds.portal.theme.model.MailPalettes;
+import io.meeds.portal.theme.model.ResolvedThemeInUse;
+import io.meeds.portal.theme.model.ResolvedTheme;
+import io.meeds.portal.theme.model.Theme;
+import io.meeds.portal.theme.util.ThemeColorCalculator;
+import io.meeds.portal.theme.service.ThemeService;
+import io.meeds.portal.theme.util.ThemeValueResolver;
+import io.meeds.portal.theme.util.BrandingImageValidator;
 import org.exoplatform.services.resources.LocaleConfig;
 import org.exoplatform.services.resources.LocaleConfigService;
 import org.exoplatform.upload.UploadResource;
@@ -92,6 +113,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public static final String   BRANDING_LOGO_BASE_PATH            = "/portal/rest/v1/platform/branding/logo?v=";             // NOSONAR
 
   public static final String   BRANDING_FAVICON_BASE_PATH         = "/portal/rest/v1/platform/branding/favicon?v=";          // NOSONAR
+
+  public static final String   BRANDING_DARK_LOGO_BASE_PATH       = "/portal/rest/v1/platform/branding/darkLogo?v=";         // NOSONAR
+
+  public static final String   BRANDING_DARK_FAVICON_BASE_PATH    = "/portal/rest/v1/platform/branding/darkFavicon?v=";      // NOSONAR
 
   public static final String   BRANDING_LOGIN_BG_BASE_PATH        = "/portal/rest/v1/platform/branding/loginBackground?v=";  // NOSONAR
 
@@ -176,6 +201,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   public static final String   BRANDING_CUSTOM_CSS                = "page.customCss";
 
+  public static final String   CUSTOM_CSS_FORBIDDEN_MESSAGE       = "branding.customCss.forbiddenValue";
+
+  /** The longest a request waits for another one compiling the stylesheet, in milliseconds. */
+  public static final long     STYLESHEET_WAIT_MILLIS             = 2000;
+
+  /** How long a configured login background found missing is not looked up again, in milliseconds. */
+  public static final long     MISSING_FILE_RETRY_MILLIS          = 60000;
+
   public static final String   SIDEBAR_BG_IMAGE_THEME_STYLE_KEY   = "sideBarBackgroundImage";
 
   public static final String   DRAWER_BG_IMAGE_THEME_STYLE_KEY    = "drawerBackgroundImage";
@@ -224,6 +257,21 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private static final Pattern THEME_BG_EFFECT_PATTERN            = Pattern.compile("^(initial|none|" + GRADIENT_GRAMMAR + ")$");
 
   private static final Pattern IMAGE_LAYER_PATTERN                = Pattern.compile("url\\([^)]*(\\)|$)\\s*,?\\s*");
+
+  private static final Pattern ROOT_RULE                          = Pattern.compile(":root(?=\\s*\\{)");
+
+  /** A template variable whose value is a literal: a hex color, a size, a keyword. */
+  private static final Pattern TEMPLATE_LITERAL                   = Pattern.compile("(?m)^@([a-zA-Z0-9]+):\\s*(#[0-9a-fA-F]{3,8}|-?\\d+(?:px|%)?|[a-zA-Z][a-zA-Z -]*)\\s*;");
+
+  private static final String  IMAGE_FILE_SUFFIX                  = "BackgroundImageFile";
+
+  public static final String   THEME_IMAGE_BASE_PATH              = "/portal/rest/v1/platform/branding/themes/";       // NOSONAR
+
+  private static final String  DARK_SELECTOR                      = ":root[data-display-mode=\"dark\"]";
+
+  private static final String  AUTO_SELECTOR                      = ":root[data-display-mode=\"auto\"]";
+
+  private static final String  LIGHT_SCOPE_SELECTOR               = "[data-display-mode=\"light\"]:not(:root)";
 
   public static final String   BRANDING_PAGE_BG_COLOR_KEY         = "page.backgroundColor";
 
@@ -322,6 +370,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private String               defaultConfiguredLoginBgPath       = null;
 
+  /** Until when a configured login background found missing is not looked up again. */
+  private volatile long        configuredLoginBgRetryAt           = 0;
+
   private String               lessFilePath                       = null;
 
   private Map<String, String>  themeVariables                     = null;
@@ -338,11 +389,34 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private final AtomicReference<ThemeStylesheet> themeStylesheet  = new AtomicReference<>();
 
-  private final Object         themeCSSLock                       = new Object();
+  /** The last stylesheet compiled, kept when a write clears the current one: served while another request compiles. */
+  private final AtomicReference<ThemeStylesheet> lastCompiledStylesheet = new AtomicReference<>();
+
+  /** The pristine template, compiled once: served while the first compile runs. */
+  private final AtomicReference<ThemeStylesheet> pristineStylesheet = new AtomicReference<>();
+
+  /** Held by the one request compiling the stylesheet; the others wait at most {@link #STYLESHEET_WAIT_MILLIS}. */
+  private final ReentrantLock  themeCSSLock                       = new ReentrantLock();
 
   private String               lessThemeContent                   = null;
 
   private String               lastCompiledThemeCSS               = null;
+
+  private String               lastCompiledLightCSS               = null;
+
+  private String               lastCompiledDarkCSS                = null;
+
+  private Map<String, String>  templateDefaults                   = null;
+
+  private ThemeService         themeService                       = null;
+
+  private final AtomicReference<MailPalettes> mailPalettes        = new AtomicReference<>();
+
+  /** The theme in use resolved at one stamp: every page getter reads it, none resolves it again. */
+  private final AtomicReference<ResolvedThemeInUse> resolvedThemeInUse = new AtomicReference<>();
+
+  /** The parsed list of each light-only property, keyed by the raw string it was parsed from. */
+  private final Map<String, Map.Entry<String, List<String>>> csvProperties = new ConcurrentHashMap<>();
 
   private Long                 templateHash                       = null;
 
@@ -425,7 +499,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public void start() {
-    getThemeStylesheet();
     listenerService.addListener(ExoFeatureService.FEATURE_STATUS_CHANGED_EVENT, e -> {
       if (StringUtils.equals(BRANDING_CUSTOM_STYLE_FEATURE, (String) e.getSource())) {
         this.triggerBrandingUpdated(true, true);
@@ -443,46 +516,6 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return getThemeStylesheet().css();
   }
 
-  /**
-   * Drops the memoised values when the stored update time changed since they
-   * were read, by a write on this node or on another node of a cluster, then
-   * once more {@link #SECOND_DROP_DELAY} milliseconds later
-   */
-  private void dropStaleMemos() {
-    long lastUpdatedTime = getLastUpdatedTime();
-    if (lastUpdatedTime != memoisedAt) {
-      dropMemos();
-      memoisedAt = lastUpdatedTime;
-      secondDropAt.set(clock.getAsLong() + SECOND_DROP_DELAY);
-    } else {
-      long dropAt = secondDropAt.get();
-      // Only the deadline read here is cleared: a newer one, set meanwhile, stays
-      if (dropAt > 0 && clock.getAsLong() >= dropAt && secondDropAt.compareAndSet(dropAt, 0)) {
-        dropMemos();
-        themeStylesheet.set(null);
-      }
-    }
-  }
-
-  private void dropMemos() {
-    this.loginTitle = null;
-    this.loginSubtitle = null;
-    this.logo = null;
-    this.favicon = null;
-    this.loginBackground = null;
-    this.pageBackground = null;
-    this.topBarBackground = null;
-    this.sideBarBackground = null;
-    this.drawerBackground = null;
-    this.appBackground = null;
-    this.appTextTitleBackground = null;
-    this.appTextHeaderBackground = null;
-  }
-
-  private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {
-    return stylesheet != null && stylesheet.stamp() == lastUpdatedTime;
-  }
-
   @Override
   public ThemeStylesheet getThemeStylesheet() {
     long lastUpdatedTime = getLastUpdatedTime();
@@ -490,7 +523,19 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (isCurrent(stylesheet, lastUpdatedTime)) {
       return stylesheet;
     }
-    synchronized (themeCSSLock) {
+    boolean locked = false;
+    try {
+      locked = themeCSSLock.tryLock(STYLESHEET_WAIT_MILLIS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    if (!locked) {
+      // another request is compiling: the last compiled stylesheet meanwhile, the pristine template before the first
+      LOG.debug("The branding stylesheet is being compiled, the last compiled one is served");
+      ThemeStylesheet last = lastCompiledStylesheet.get();
+      return last == null ? getPristineStylesheet() : last;
+    }
+    try {
       lastUpdatedTime = getLastUpdatedTime();
       stylesheet = themeStylesheet.get();
       if (isCurrent(stylesheet, lastUpdatedTime)) {
@@ -498,7 +543,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       }
       stylesheet = new ThemeStylesheet(lastUpdatedTime, compileThemeCSS());
       themeStylesheet.set(stylesheet);
+      lastCompiledStylesheet.set(stylesheet);
       return stylesheet;
+    } finally {
+      themeCSSLock.unlock();
     }
   }
 
@@ -521,9 +569,18 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     branding.setCompanyName(getCompanyName());
     branding.setCompanyLink(getCompanyLink());
     branding.setSiteName(getSiteName());
-    branding.setLogo(getLogo());
-    branding.setFavicon(getFavicon());
-    branding.setLoginBackground(getLoginBackground());
+    ThemeService themeServiceInUse = retrieveBinaries ? null : getThemeService();
+    if (themeServiceInUse == null) {
+      branding.setLogo(getLogo());
+      branding.setFavicon(getFavicon());
+      branding.setLoginBackground(getLoginBackground());
+    } else {
+      // no byte is read for a caller that drops them: the file's reference and metadata only
+      branding.setLogo(readThemeFileInfo(getLogoId(), new Logo()));
+      branding.setFavicon(readThemeFileInfo(getFaviconId(), new Favicon()));
+      Long loginBackgroundId = getLoginBackgroundId();
+      branding.setLoginBackground(loginBackgroundId == null ? getLoginBackground() : readThemeFileInfo(loginBackgroundId, new Background()));
+    }
     branding.setTopBarBackground(getTopBarBackground());
     branding.setSideBarBackground(getSideBarBackground());
     branding.setDrawerBackground(getDrawerBackground());
@@ -607,7 +664,81 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     long storedTime = lastUpdatedTime == null ? DEFAULT_LAST_MODIFED : Long.parseLong(lastUpdatedTime);
     // The exposed time (v= parameter, ETag) also carries the shipped Less template: an upgrade that changes the
     // template changes the stylesheet URL with no write at startup, and a later save still changes it
-    return storedTime + getTemplateHash();
+    return storedTime + getTemplateHash() + getThemeStamp();
+  }
+
+  /**
+   * @param service the theme services, ready
+   * @return the theme in use resolved for both versions, computed once per
+   *         stamp: callers only read it
+   */
+  private ResolvedTheme getResolvedThemeInUse(ThemeService service) {
+    long stamp = getLastUpdatedTime();
+    ResolvedThemeInUse cached = resolvedThemeInUse.get();
+    if (cached == null || cached.stamp() != stamp) {
+      cached = new ResolvedThemeInUse(stamp, service.resolve(service.getThemeInUse()));
+      resolvedThemeInUse.set(cached);
+    }
+    return cached.resolved();
+  }
+
+  /**
+   * Once the theme services are ready, every theme write increments the
+   * state row's version, and a configuration changed at a restart changes its
+   * hash: both move the stylesheet's stamp, its v= parameter and its ETag.
+   */
+  private long getThemeStamp() {
+    ThemeService service = getThemeService();
+    return service == null ? 0 : service.getState().getVersion() + service.getConfigurationHash();
+  }
+
+  /**
+   * A new login background is checked before the form's first write: a
+   * refused upload leaves nothing half-saved.
+   */
+  private void validateLoginBackgroundUpload(Background background) {
+    String uploadId = background == null ? null : background.getUploadId();
+    if (StringUtils.isBlank(uploadId) || BRANDING_RESET_ATTACHMENT_ID.equals(uploadId)) {
+      return;
+    }
+    UploadResource resource = uploadService.getUploadResource(uploadId);
+    if (resource == null) {
+      // an expired or already consumed upload is refused here, before anything is written
+      throw new IllegalArgumentException("branding.upload.notFound");
+    }
+    try {
+      BrandingImageValidator.validateImage(Files.readAllBytes(new File(resource.getStoreLocation()).toPath()));
+    } catch (IOException e) {
+      throw new IllegalArgumentException("branding.upload.notFound", e);
+    }
+  }
+
+  private static void publishLegacy(ThemeService service, Branding branding, boolean themeStyleOnly) {
+    try {
+      service.publishLegacy(branding, themeStyleOnly);
+    } catch (ObjectNotFoundException e) {
+      throw new IllegalStateException("The theme in use no longer exists", e);
+    }
+  }
+
+  /** For tests: the theme service, still used only once the readiness flag is set. */
+  void setThemeService(ThemeService themeService) {
+    this.themeService = themeService;
+  }
+
+  private ThemeService getThemeService() {
+    if (!ThemeReadiness.isReady()) {
+      return null;
+    }
+    if (themeService != null) {
+      return themeService;
+    }
+    try {
+      return ExoContainerContext.getService(ThemeService.class);
+    } catch (Exception e) {
+      LOG.debug("The theme service is not reachable, the single-theme stylesheet is served", e);
+      return null;
+    }
   }
 
   /**
@@ -627,8 +758,78 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     return templateHash;
   }
 
+  /** Portlets of Time Tracking, Lead Capture Management and Document Cleanup: not adapted to dark */
+  static final String DEFAULT_LIGHT_ONLY_APPLICATIONS = "activityManagement,TimeTrackingPortlet,TimeSheetPortlet,leadsManagement,"
+      + "mailTemplatesManagement,resourcesManagement,compaignsManagement,leadCaptureSettings,DocumentCleanupAdmin";
+
+  /** Time Tracking's quick action, mounted outside its portlets */
+  static final String DEFAULT_LIGHT_ONLY_VUE_APPS     = "Time Tracker Quick Action";
+
   @Override
+  public List<String> getLightOnlyApplications() {
+    return csvProperty("exo.branding.lightOnlyApplications", DEFAULT_LIGHT_ONLY_APPLICATIONS);
+  }
+
+  @Override
+  public List<String> getLightOnlyVueApps() {
+    return csvProperty("exo.branding.lightOnlyVueApps", DEFAULT_LIGHT_ONLY_VUE_APPS);
+  }
+
+  private List<String> csvProperty(String name, String defaultValue) {
+    String raw = PropertyManager.getProperty(name);
+    String value = raw == null ? defaultValue : raw;
+    Map.Entry<String, List<String>> cached = csvProperties.get(name);
+    if (cached == null || !cached.getKey().equals(value)) {
+      cached = Map.entry(value,
+                         Arrays.stream(value.split(",")).map(String::trim).filter(StringUtils::isNotBlank).toList());
+      csvProperties.put(name, cached);
+    }
+    return cached.getValue();
+  }
+
+  /**
+   * The default comment bubble of each version (the skin's
+   * --commentDefaultBackgroundColor and --commentDefaultDrawerBackgroundColor,
+   * platform-ui variables.less): the light literal, and in dark the bubble
+   * computed on the default dark application and drawer backgrounds.
+   */
+  private static final String COMMENT_DEFAULT_LIGHT = "#f2f5f8";
+
+  static final String COMMENT_DEFAULTS_LIGHT = "--commentDefaultBackgroundColor: " + COMMENT_DEFAULT_LIGHT
+      + "; --commentDefaultDrawerBackgroundColor: " + COMMENT_DEFAULT_LIGHT + "; ";
+
+  static final String COMMENT_DEFAULTS_DARK = "--commentDefaultBackgroundColor: "
+      + ThemeColorCalculator.commentBubble(ThemeColorCalculator.DARK_APP_BACKGROUND)
+      + "; --commentDefaultDrawerBackgroundColor: "
+      + ThemeColorCalculator.commentBubble(ThemeColorCalculator.DARK_DRAWER_BACKGROUND) + "; ";
+
+  @Override
+  @Deprecated(since = "7.3", forRemoval = false)
   public void updateBrandingInformation(Branding branding) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // the fields that stay in the settings, then the theme values through the theme writer
+      // every check before the first write, then the theme values, then the settings. What can still fail after the
+      // theme is published: the login background's file write, an upload that vanished meanwhile, and any setting
+      // write or removal, each of which throws: the request then answers an error with the theme already published
+      validateCSSStyleValue(branding.getCustomCss());
+      validateCSSStyleValue(branding.getLoginBackgroundTextColor());
+      validateLoginBackgroundUpload(branding.getLoginBackground());
+      publishLegacy(service, branding, false);
+      try {
+        updateSiteName(branding.getSiteName(), false);
+        updateCompanyLink(branding.getCompanyLink(), false);
+        updateLoginBackground(branding.getLoginBackground(), false);
+        updateLoginBackgroundTextColor(branding.getLoginBackgroundTextColor(), false);
+        updateLoginBackgroundAltText(branding.getLoginBackgroundAltText(), false);
+        updateCustomCss(branding.getCustomCss(), false);
+        updateLoginTitle(branding.getLoginTitle());
+        updateLoginSubtitle(branding.getLoginSubtitle());
+      } finally {
+        triggerBrandingUpdated(true, false);
+      }
+      return;
+    }
     stripSubmittedImageLayers(branding.getThemeStyle());
     normalizeSubmittedSizeUnits(branding.getThemeStyle());
     validateCSSInputs(branding);
@@ -668,6 +869,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getCompanyName() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return StringUtils.defaultIfBlank(service.getState().getCompanyName(), defaultCompanyName);
+    }
     SettingValue<String> brandingCompanyName = (SettingValue<String>) settingService.get(Context.GLOBAL,
                                                                                          Scope.GLOBAL,
                                                                                          BRANDING_COMPANY_NAME_SETTING_KEY);
@@ -690,7 +895,8 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundColor() {
-    return getPropertyValue(BRANDING_PAGE_BG_COLOR_KEY, defaultPageBackgroundColor);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_COLOR_KEY, defaultPageBackgroundColor) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_COLOR);
   }
 
   @Override
@@ -702,12 +908,58 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundRepeat() {
-    return getPropertyValue(BRANDING_PAGE_BG_REPEAT_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_REPEAT_KEY) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_REPEAT);
   }
 
   @Override
   public String getPageBackgroundEffect() {
-    return getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY, defaultPageBackgroundEffect);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_EFFECT_KEY, defaultPageBackgroundEffect) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_IMAGE);
+  }
+
+  /**
+   * @return the theme in use's light value of a page key, null when blank or
+   *         none: the page settings are part of the theme once it is ready
+   */
+  private String themePageValue(ThemeService service, String key) {
+    String value = getResolvedThemeInUse(service).getLight().get(key);
+    return StringUtils.isBlank(value) || "none".equals(value) || "initial".equals(value) ? null : value;
+  }
+
+  /**
+   * @return the file the theme in use shows, in its light version, for an
+   *         image key; null when it has none
+   */
+  private Long getThemeInUseImageFileId(ThemeService service, String imageKey) {
+    Theme theme = service.getThemeInUse();
+    try {
+      return theme == null ? null : service.getThemeImageFileId(theme.getId(), imageKey, false);
+    } catch (ObjectNotFoundException e) {
+      return null;
+    }
+  }
+
+  /**
+   * @return the theme in use's light image of a key through the node's image
+   *         cache, an empty background when it has none
+   */
+  private Background readThemeInUseBackground(ThemeService service, String imageKey) {
+    Background background = readCachedThemeFile(service, getThemeInUseImageFileId(service, imageKey), new Background());
+    return background == null ? new Background() : background;
+  }
+
+  @Override
+  public boolean isPageStyleInStylesheet() {
+    return isThemeStylesheet(getThemeService());
+  }
+
+  /**
+   * @return true when the stylesheet is the theme's, in four blocks: the theme
+   *         services are ready and a template and its variables are configured
+   */
+  private boolean isThemeStylesheet(ThemeService service) {
+    return service != null && themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent());
   }
 
   @Override
@@ -734,11 +986,17 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageWidth() {
-    return getPropertyValue(BRANDING_PAGE_WIDTH_KEY, defaultPageWidth);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_WIDTH_KEY, defaultPageWidth) : themePageValue(service, ThemeVariables.PAGE_WIDTH);
   }
 
   @Override
   public boolean isTopBarSticky() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // a shared setting: the theme in use carries it, nothing writes the former setting once ready
+      return Boolean.parseBoolean(getResolvedThemeInUse(service).getLight().get(ThemeVariables.TOP_BAR_STICKY));
+    }
     if (themeVariables == null || !themeVariables.containsKey(TOP_BAR_STICKY_THEME_STYLE_KEY)) {
       return false;
     }
@@ -755,17 +1013,20 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundPosition() {
-    return getPropertyValue(BRANDING_PAGE_BG_POSITION_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_POSITION_KEY) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_POSITION);
   }
 
   @Override
   public String getPageBackgroundSize() {
-    return getPropertyValue(BRANDING_PAGE_BG_SIZE_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_SIZE_KEY) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_SIZE);
   }
 
   @Override
   public String getPageBackgroundAttachment() {
-    return getPropertyValue(BRANDING_PAGE_BG_ATTACHMENT_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValue(BRANDING_PAGE_BG_ATTACHMENT_KEY) : themePageValue(service, ThemeVariables.PAGE_BACKGROUND_ATTACHMENT);
   }
 
   @Override
@@ -779,7 +1040,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  @Deprecated(since = "7.3", forRemoval = false)
   public void updateCompanyName(String companyName) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      Branding branding = new Branding();
+      branding.setCompanyName(StringUtils.defaultString(companyName));
+      publishLegacy(service, branding, false);
+      return;
+    }
     updateCompanyName(companyName, true);
   }
 
@@ -805,12 +1074,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Long getLogoId() {
-    return getPropertyValueLong(BRANDING_LOGO_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_LOGO_ID_SETTING_KEY) : service.getState().getLogoFileId();
   }
 
   @Override
   public Long getFaviconId() {
-    return getPropertyValueLong(BRANDING_FAVICON_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_FAVICON_ID_SETTING_KEY) : service.getState().getFaviconFileId();
   }
 
   @Override
@@ -820,42 +1091,54 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public Long getPageBackgroundId() {
-    return getPropertyValueLong(BRANDING_PAGE_BG_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_PAGE_BG_ID_SETTING_KEY) : getThemeInUseImageFileId(service, ThemeVariables.PAGE_BACKGROUND_IMAGE);
   }
 
   @Override
   public Long getTopBarBackgroundId() {
-    return getPropertyValueLong(BRANDING_TOP_BAR_BG_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_TOP_BAR_BG_ID_SETTING_KEY) : getThemeInUseImageFileId(service, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
   }
 
   @Override
   public Long getSideBarBackgroundId() {
-    return getPropertyValueLong(BRANDING_SIDEBAR_BG_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_SIDEBAR_BG_ID_SETTING_KEY) : getThemeInUseImageFileId(service, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY);
   }
 
   @Override
   public Long getDrawerBackgroundId() {
-    return getPropertyValueLong(BRANDING_DRAWER_BG_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_DRAWER_BG_ID_SETTING_KEY) : getThemeInUseImageFileId(service, DRAWER_BG_IMAGE_THEME_STYLE_KEY);
   }
 
   @Override
   public Long getAppBackgroundId() {
-    return getPropertyValueLong(BRANDING_APP_BG_ID_SETTING_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_APP_BG_ID_SETTING_KEY) : getThemeInUseImageFileId(service, APP_BG_IMAGE_THEME_STYLE_KEY);
   }
 
   @Override
   public Long getAppTextTitleBackgroundId() {
-    return getPropertyValueLong(BRANDING_APP_TITLE_BG_ID_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_APP_TITLE_BG_ID_KEY) : getThemeInUseImageFileId(service, APP_TITLE_BG_IMAGE_THEME_KEY);
   }
 
   @Override
   public Long getAppTextHeaderBackgroundId() {
-    return getPropertyValueLong(BRANDING_APP_HEADER_BG_ID_KEY);
+    ThemeService service = getThemeService();
+    return service == null ? getPropertyValueLong(BRANDING_APP_HEADER_BG_ID_KEY) : getThemeInUseImageFileId(service, APP_HEADER_BG_IMAGE_THEME_KEY);
   }
 
   @Override
   public Logo getLogo() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // the state row's file, shared by every node; configured defaults are imported by the theme synchroniser
+      return readCachedThemeFile(service, getLogoId(), new Logo());
+    }
     if (this.logo == null) {
       try {
         Long imageId = getLogoId();
@@ -874,6 +1157,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Favicon getFavicon() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readCachedThemeFile(service, getFaviconId(), new Favicon());
+    }
     if (this.favicon == null) {
       try {
         Long imageId = getFaviconId();
@@ -895,6 +1182,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getLoginBackground() {
     dropStaleMemos();
+    if (getThemeService() != null) {
+      // read by the id its setting holds, on every node: no per-node copy
+      Long fileId = getLoginBackgroundId();
+      return fileId == null ? importConfiguredLoginBackground() : readThemeFile(fileId, new Background());
+    }
     if (this.loginBackground == null) {
       try {
         Long imageId = getLoginBackgroundId();
@@ -918,6 +1210,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getPageBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, ThemeVariables.PAGE_BACKGROUND_IMAGE);
+    }
     if (this.pageBackground == null) {
       try {
         Long imageId = getPageBackgroundId();
@@ -936,6 +1232,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getTopBarBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
+    }
     if (this.topBarBackground == null) {
       try {
         Long imageId = getTopBarBackgroundId();
@@ -954,6 +1254,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getSideBarBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY);
+    }
     if (this.sideBarBackground == null) {
       try {
         Long imageId = getSideBarBackgroundId();
@@ -972,6 +1276,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getDrawerBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, DRAWER_BG_IMAGE_THEME_STYLE_KEY);
+    }
     if (this.drawerBackground == null) {
       try {
         Long imageId = getDrawerBackgroundId();
@@ -990,6 +1298,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getAppBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, APP_BG_IMAGE_THEME_STYLE_KEY);
+    }
     if (this.appBackground == null) {
       try {
         Long imageId = getAppBackgroundId();
@@ -1007,6 +1319,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getAppBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, APP_BG_IMAGE_THEME_STYLE_KEY);
+      return fileId == null ? null : BRANDING_APP_BG_BASE_PATH + fileId;
+    }
     Background background = getAppBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_APP_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1015,6 +1333,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getAppTextTitleBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, APP_TITLE_BG_IMAGE_THEME_KEY);
+    }
     if (this.appTextTitleBackground == null) {
       this.appTextTitleBackground = retrieveBackground(getAppTextTitleBackgroundId(), "application title background");
     }
@@ -1023,6 +1345,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getAppTextTitleBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, APP_TITLE_BG_IMAGE_THEME_KEY);
+      return fileId == null ? null : BRANDING_APP_TITLE_BG_BASE_PATH + fileId;
+    }
     Background background = getAppTextTitleBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_APP_TITLE_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1031,6 +1359,10 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   @Override
   public Background getAppTextHeaderBackground() {
     dropStaleMemos();
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return readThemeInUseBackground(service, APP_HEADER_BG_IMAGE_THEME_KEY);
+    }
     if (this.appTextHeaderBackground == null) {
       this.appTextHeaderBackground = retrieveBackground(getAppTextHeaderBackgroundId(), "application header background");
     }
@@ -1039,9 +1371,88 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getAppTextHeaderBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, APP_HEADER_BG_IMAGE_THEME_KEY);
+      return fileId == null ? null : BRANDING_APP_HEADER_BG_BASE_PATH + fileId;
+    }
     Background background = getAppTextHeaderBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_APP_HEADER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
+  }
+
+  /**
+   * The login background stays in the settings: its configured default is
+   * imported as it always was, into the setting every node then reads.
+   */
+  private Background importConfiguredLoginBackground() {
+    // every login page asks: a missing or unreadable file is looked up again at most once per retry window
+    if (StringUtils.isBlank(defaultConfiguredLoginBgPath) || System.currentTimeMillis() < configuredLoginBgRetryAt) {
+      return null;
+    }
+    Background imported = null;
+    try {
+      Background background = retrieveDefaultBrandingFile(defaultConfiguredLoginBgPath,
+                                                          new Background(),
+                                                          LOGIN_BACKGROUND_NAME,
+                                                          BRANDING_LOGIN_BG_ID_SETTING_KEY);
+      imported = background == null || background.getData() == null ? null : background;
+    } catch (Exception e) {
+      LOG.warn("The configured login background {} could not be imported", defaultConfiguredLoginBgPath, e);
+    }
+    if (imported == null) {
+      configuredLoginBgRetryAt = System.currentTimeMillis() + MISSING_FILE_RETRY_MILLIS;
+    }
+    return imported;
+  }
+
+  private <T extends BrandingFile> T readThemeFileInfo(Long fileId, T brandingFile) {
+    if (fileId == null) {
+      return null;
+    }
+    try {
+      FileInfo info = fileService.getFileInfo(fileId);
+      if (info != null) {
+        brandingFile.setSize(info.getSize());
+        brandingFile.setUpdatedDate(info.getUpdatedDate().getTime());
+        brandingFile.setFileId(fileId);
+      }
+      return brandingFile;
+    } catch (Exception e) {
+      LOG.warn("Branding file {} could not be read", fileId, e);
+      return null;
+    }
+  }
+
+  /**
+   * Reads a branding file through the node's image cache, the one the REST
+   * endpoints use: a cached file costs no database nor storage read.
+   */
+  private <T extends BrandingFile> T readCachedThemeFile(ThemeService service, Long fileId, T brandingFile) {
+    if (fileId == null) {
+      return null;
+    }
+    ImageBytes image = service.readImage(fileId);
+    if (image != null) {
+      brandingFile.setData(image.data());
+      brandingFile.setSize(image.data().length);
+      brandingFile.setUpdatedDate(image.updatedDate());
+      brandingFile.setFileId(fileId);
+    }
+    return brandingFile;
+  }
+
+  private <T extends BrandingFile> T readThemeFile(Long fileId, T brandingFile) {
+    if (fileId == null) {
+      return null;
+    }
+    try {
+      return retrieveStoredBrandingFile(fileId, brandingFile);
+    } catch (Exception e) {
+      LOG.warn("Branding file {} could not be read", fileId, e);
+      return null;
+    }
   }
 
   private Background retrieveBackground(Long imageId, String label) {
@@ -1055,6 +1466,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getLogoPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id: a replacement is a new file, so the URL changes with it on every node
+      Long fileId = service.getState().getLogoFileId();
+      return fileId == null ? null : BRANDING_LOGO_BASE_PATH + fileId;
+    }
     Logo brandingLogo = getLogo();
     return brandingLogo == null
            || brandingLogo.getData() == null ? null : BRANDING_LOGO_BASE_PATH + Objects.hash(brandingLogo.getUpdatedDate());
@@ -1062,6 +1479,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getFaviconPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      Long fileId = service.getState().getFaviconFileId();
+      return fileId == null ? null : BRANDING_FAVICON_BASE_PATH + fileId;
+    }
     Favicon brandingFavicon = getFavicon();
     return brandingFavicon == null
            || brandingFavicon.getData() == null ? null :
@@ -1069,7 +1491,29 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  public String getDarkLogoPath() {
+    ThemeService service = getThemeService();
+    Long fileId = service == null ? null : service.getState().getDarkLogoFileId();
+    return fileId == null ? getLogoPath() : BRANDING_DARK_LOGO_BASE_PATH + fileId;
+  }
+
+  @Override
+  public String getDarkFaviconPath() {
+    ThemeService service = getThemeService();
+    Long fileId = service == null ? null : service.getState().getDarkFaviconFileId();
+    return fileId == null ? getFaviconPath() : BRANDING_DARK_FAVICON_BASE_PATH + fileId;
+  }
+
+  @Override
   public String getLoginBackgroundPath() {
+    if (getThemeService() != null) {
+      Long fileId = getLoginBackgroundId();
+      if (fileId == null) {
+        Background imported = importConfiguredLoginBackground();
+        fileId = imported == null ? null : imported.getFileId();
+      }
+      return fileId == null ? null : BRANDING_LOGIN_BG_BASE_PATH + fileId;
+    }
     Background background = getLoginBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_LOGIN_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1077,6 +1521,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getPageBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, ThemeVariables.PAGE_BACKGROUND_IMAGE);
+      return fileId == null ? null : BRANDING_PAGE_BG_BASE_PATH + fileId;
+    }
     Background background = getPageBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_PAGE_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1084,6 +1534,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getTopBarBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
+      return fileId == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + fileId;
+    }
     Background background = getTopBarBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_TOP_BAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1091,6 +1547,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getSideBarBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, SIDEBAR_BG_IMAGE_THEME_STYLE_KEY);
+      return fileId == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + fileId;
+    }
     Background background = getSideBarBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_SIDEBAR_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1098,6 +1560,12 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   @Override
   public String getDrawerBackgroundPath() {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // addressed by file id, which the image endpoint caches for good
+      Long fileId = getThemeInUseImageFileId(service, DRAWER_BG_IMAGE_THEME_STYLE_KEY);
+      return fileId == null ? null : BRANDING_DRAWER_BG_BASE_PATH + fileId;
+    }
     Background background = getDrawerBackground();
     return background == null
            || background.getData() == null ? null : BRANDING_DRAWER_BG_BASE_PATH + Objects.hash(background.getUpdatedDate());
@@ -1114,12 +1582,28 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  @Deprecated(since = "7.3", forRemoval = false)
   public void updateLogo(Logo logo) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      Branding branding = new Branding();
+      branding.setLogo(logo);
+      publishLegacy(service, branding, false);
+      return;
+    }
     updateLogo(logo, true);
   }
 
   @Override
+  @Deprecated(since = "7.3", forRemoval = false)
   public void updateFavicon(Favicon favicon) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      Branding branding = new Branding();
+      branding.setFavicon(favicon);
+      publishLegacy(service, branding, false);
+      return;
+    }
     updateFavicon(favicon, true);
   }
 
@@ -1129,7 +1613,16 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   @Override
+  @Deprecated(since = "7.3", forRemoval = false)
   public void updateThemeStyle(Map<String, String> themeStyle) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // a merge into the theme in use, validated: an absent key is kept
+      Branding branding = new Branding();
+      branding.setThemeStyle(themeStyle);
+      publishLegacy(service, branding, true);
+      return;
+    }
     updateThemeStyle(themeStyle, true);
   }
 
@@ -1137,6 +1630,14 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   public Map<String, String> getThemeStyle() {
     if (themeVariables == null || themeVariables.isEmpty()) {
       return Collections.emptyMap();
+    }
+    ThemeService service = getThemeService();
+    if (service != null) {
+      // the theme in use's resolved light values, under today's keys
+      Map<String, String> light = new HashMap<>(getResolvedThemeInUse(service).getLight());
+      light.keySet().retainAll(themeVariables.keySet());
+      light.values().removeIf(StringUtils::isBlank);
+      return light;
     }
 
     Map<String, String> themeStyleVariables = new HashMap<>();
@@ -1161,7 +1662,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
    * The picker always stores a plain colour (white by default) next to a
    * gradient, which is why the stored colour cannot take precedence.
    */
-  static void neutralizeTopBarGradient(Map<String, String> themeStyle) {
+  public static void neutralizeTopBarGradient(Map<String, String> themeStyle) {
     String backgroundImage = themeStyle.get(TOP_BAR_BG_IMAGE_THEME_STYLE_KEY);
     if (StringUtils.isBlank(backgroundImage) || !GRADIENT_PATTERN.matcher(backgroundImage).find()) {
       return;
@@ -1184,6 +1685,101 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   private static boolean isTransparent(String color) {
     return "transparent".equalsIgnoreCase(color)
            || (color.length() == 9 && color.startsWith("#") && color.toUpperCase().endsWith("00"));
+  }
+
+  @Override
+  public String getDisplayMode(String username) {
+    return BrandingUtils.getDisplayMode(username);
+  }
+
+  @Override
+  public Map<String, String> getTemplateDefaults() {
+    if (templateDefaults == null) {
+      Map<String, String> literals = new HashMap<>();
+      String template = getLessThemeContent();
+      if (StringUtils.isNotBlank(template)) {
+        Matcher matcher = TEMPLATE_LITERAL.matcher(template);
+        while (matcher.find()) {
+          literals.putIfAbsent(matcher.group(1), matcher.group(2).trim());
+        }
+      }
+      templateDefaults = Collections.unmodifiableMap(literals);
+    }
+    return templateDefaults;
+  }
+
+
+  @Override
+  public Map<String, String> getMailPalette(boolean dark) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      // before the theme services: the built-in light palette, never cached
+      Map<String, String> palette = new HashMap<>(MailDocumentShell.LIGHT_DEFAULTS);
+      putIfNotNull(palette, MailDocumentShell.LOGO_PATH, getLogoPath());
+      putIfNotNull(palette, MailDocumentShell.COMPANY_NAME, getCompanyName());
+      return palette;
+    }
+    long stamp = getLastUpdatedTime();
+    MailPalettes palettes = mailPalettes.get();
+    if (palettes == null || palettes.stamp() != stamp) {
+      ResolvedTheme resolved = getResolvedThemeInUse(service);
+      palettes = new MailPalettes(stamp, mailPalette(service, resolved.getLight(), false), mailPalette(service, resolved.getDark(), true));
+      mailPalettes.set(palettes);
+    }
+    return dark ? palettes.dark() : palettes.light();
+  }
+
+  private Map<String, String> mailPalette(ThemeService service, Map<String, String> values, boolean dark) {
+    Map<String, String> defaults = dark ? Map.of(MailDocumentShell.BACKGROUND,
+                                                 io.meeds.portal.theme.util.ThemeColorCalculator.DARK_PAGE_BACKGROUND,
+                                                 MailDocumentShell.SURFACE,
+                                                 io.meeds.portal.theme.util.ThemeColorCalculator.DARK_APP_BACKGROUND,
+                                                 MailDocumentShell.TEXT,
+                                                 io.meeds.portal.theme.util.ThemeColorCalculator.DARK_NEUTRAL,
+                                                 MailDocumentShell.SECONDARY_TEXT,
+                                                 io.meeds.portal.theme.util.ThemeColorCalculator.DARK_GREY,
+                                                 MailDocumentShell.BORDER,
+                                                 "#3A4148") :
+                                        MailDocumentShell.LIGHT_DEFAULTS;
+    Map<String, String> palette = new HashMap<>(defaults);
+    putColor(palette, MailDocumentShell.BACKGROUND, values.get("pageBackgroundColor"));
+    putColor(palette, MailDocumentShell.SURFACE, values.get("appBackgroundColor"));
+    putColor(palette, MailDocumentShell.TEXT, values.getOrDefault("appTextColor", values.get("textColor")));
+    putColor(palette, MailDocumentShell.SECONDARY_TEXT, values.get("appTextSubtitleColor"));
+    putColor(palette, MailDocumentShell.LINK, values.get(ThemeValueResolver.PRIMARY_TEXT_COLOR));
+    putColor(palette, MailDocumentShell.PRIMARY, values.get("primaryColor"));
+    putColor(palette, MailDocumentShell.BORDER, values.get("appBorderColor"));
+    BrandingState state = service.getState();
+    Long logoId = dark ? service.getEffectiveDarkLogoFileId() : state.getLogoFileId();
+    putIfNotNull(palette, MailDocumentShell.LOGO_PATH, dark ? getDarkLogoPath() : getLogoPath());
+    ImageBytes logo = logoId == null ? null : service.readImage(logoId);
+    // most mail clients show no SVG: the header writes the company name instead
+    palette.put(MailDocumentShell.LOGO_IS_SVG, String.valueOf(logo != null && BrandingImageValidator.SVG.equals(logo.type())));
+    putIfNotNull(palette, MailDocumentShell.COMPANY_NAME, getCompanyName());
+    return Collections.unmodifiableMap(palette);
+  }
+
+  private static void putColor(Map<String, String> palette, String role, String value) {
+    // an opaque hex only: a palette colour is written inline in every mail
+    if (value != null && value.matches("#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})")) {
+      palette.put(role, value);
+    }
+  }
+
+  private static void putIfNotNull(Map<String, String> map, String key, String value) {
+    if (value != null) {
+      map.put(key, value);
+    }
+  }
+
+  @Override
+  public String compileThemeStyle(Map<String, String> values) {
+    try {
+      return compileThemeCSS(toCompiledValues(values));
+    } catch (Less4jException e) {
+      LOG.debug("Theme values do not compile, refused", e);
+      throw new IllegalArgumentException("branding.theme.stylesheetCompilationError");
+    }
   }
 
   @Override
@@ -1388,6 +1984,62 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
   }
 
+  /**
+   * Drops the memoised values when the stored update time changed since they
+   * were read, by a write on this node or on another node of a cluster, then
+   * once more {@link #SECOND_DROP_DELAY} milliseconds later
+   */
+  private void dropStaleMemos() {
+    long lastUpdatedTime = getLastUpdatedTime();
+    if (lastUpdatedTime != memoisedAt) {
+      dropMemos();
+      memoisedAt = lastUpdatedTime;
+      secondDropAt.set(clock.getAsLong() + SECOND_DROP_DELAY);
+    } else {
+      long dropAt = secondDropAt.get();
+      // Only the deadline read here is cleared: a newer one, set meanwhile, stays
+      if (dropAt > 0 && clock.getAsLong() >= dropAt && secondDropAt.compareAndSet(dropAt, 0)) {
+        dropMemos();
+        themeStylesheet.set(null);
+      }
+    }
+  }
+
+  private void dropMemos() {
+    this.loginTitle = null;
+    this.loginSubtitle = null;
+    this.logo = null;
+    this.favicon = null;
+    this.loginBackground = null;
+    this.pageBackground = null;
+    this.topBarBackground = null;
+    this.sideBarBackground = null;
+    this.drawerBackground = null;
+    this.appBackground = null;
+    this.appTextTitleBackground = null;
+    this.appTextHeaderBackground = null;
+  }
+
+  private ThemeStylesheet getPristineStylesheet() {
+    ThemeStylesheet pristine = pristineStylesheet.get();
+    if (pristine == null) {
+      pristine = new ThemeStylesheet(0, compilePristineTemplate());
+      pristineStylesheet.compareAndSet(null, pristine);
+    }
+    return pristineStylesheet.get();
+  }
+
+  /**
+   * @return the lock the request compiling the stylesheet holds
+   */
+  ReentrantLock getThemeCSSLock() {
+    return themeCSSLock;
+  }
+
+  private boolean isCurrent(ThemeStylesheet stylesheet, long lastUpdatedTime) {
+    return stylesheet != null && stylesheet.stamp() == lastUpdatedTime;
+  }
+
   private Map<String, String> loadLanguages() {
     Locale defaultLocale = getDefaultLocale();
     this.supportedLanguages = localeConfigService.getLocalConfigs()
@@ -1466,6 +2118,24 @@ public class BrandingServiceImpl implements BrandingService, Startable {
 
   private void updatePageWidth(String value, boolean updateLastUpdatedTime) {
     updatePropertyValue(BRANDING_PAGE_WIDTH_KEY, value, updateLastUpdatedTime);
+  }
+
+  @Override
+  public void validateCustomCss(String customCss) {
+    try {
+      validateCSSStyleValue(customCss);
+    } catch (IllegalArgumentException e) {
+      // its own code: a theme value refused in the same publication carries the generic one
+      throw new IllegalArgumentException(CUSTOM_CSS_FORBIDDEN_MESSAGE, e);
+    }
+  }
+
+  @Override
+  public void updateCustomCss(String customCss) {
+    validateCustomCss(customCss);
+    // no event: the theme service moves the stylesheet stamp, evicts its snapshot and broadcasts the new version
+    updateCustomCss(customCss, false);
+    updateLastUpdatedTime(System.currentTimeMillis());
   }
 
   private void updateCustomCss(String value, boolean updateLastUpdatedTime) {
@@ -1616,6 +2286,9 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       } else if (StringUtils.isNotBlank(uploadId)) {
         updateBrandingFileByUploadId(uploadId, fileName, settingKey);
       }
+    } catch (IllegalArgumentException e) {
+      // a refused upload: answered 400 with its message code
+      throw e;
     } catch (Exception e) {
       throw new IllegalStateException("Error while updating login background", e);
     }
@@ -1638,6 +2311,15 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     if (inputStream == null) {
       throw new IllegalArgumentException("Cannot update " + fileName +
           ", the object must contain the image data or an upload id");
+    }
+    if (BRANDING_LOGIN_BG_ID_SETTING_KEY.equals(settingKey)) {
+      // the login background gets the background images' check: type by content, 2 MB
+      byte[] data;
+      try (InputStream uploaded = inputStream) {
+        data = uploaded.readAllBytes();
+      }
+      BrandingImageValidator.validateImage(data);
+      inputStream = new ByteArrayInputStream(data);
     }
     updateBrandingFileByInputStream(inputStream, fileName, settingKey);
   }
@@ -1753,15 +2435,13 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   }
 
   private String compileThemeCSS() {
+    ThemeService service = getThemeService();
+    if (isThemeStylesheet(service)) {
+      return withCustomCss(compileThemeVersions(service));
+    }
     String css = "";
     if (themeVariables != null && !themeVariables.isEmpty() && StringUtils.isNotBlank(getLessThemeContent())) {
-      Map<String, String> effectiveValues = new HashMap<>(getThemeStyle());
-      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
-        effectiveValues.put("pageNoMarginTop", "0px");
-      }
-      if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
-        effectiveValues.put("pageNoMarginBottom", "0px");
-      }
+      Map<String, String> effectiveValues = toCompiledValues(getThemeStyle());
       try {
         css = compileThemeCSS(effectiveValues);
         this.lastCompiledThemeCSS = css;
@@ -1773,13 +2453,175 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         css = this.lastCompiledThemeCSS;
       }
     }
+    return withCustomCss(css);
+  }
+
+  private String withCustomCss(String css) {
     String customCss = getCustomCss();
     if (StringUtils.isNotBlank(customCss)
         && getFeatureService() != null
         && getFeatureService().isActiveFeature(BRANDING_CUSTOM_STYLE_FEATURE)) {
-      css += "\n" + customCss;
+      return css + "\n" + customCss;
     }
     return css;
+  }
+
+  /**
+   * One stylesheet, both versions: the shipped template compiled once with the
+   * theme in use's resolved light values and once with its dark values, the
+   * dark declarations re-wrapped under the dark and automatic selectors, and
+   * the light ones repeated for the light scopes of the add-ons that stay
+   * light. Each version falls back to its own last compiled result, never to
+   * the other version's.
+   */
+  String compileThemeVersions(ThemeService service) {
+    io.meeds.portal.theme.model.Theme theme = service.getThemeInUse();
+    ResolvedTheme resolved = service.resolve(theme);
+    long themeId = theme == null ? 0 : theme.getId();
+    String light = compileVersion(withImageUrls(resolved.getLight(), themeId, false), false);
+    String dark = compileVersion(withImageUrls(resolved.getDark(), themeId, true), true);
+    String bubbles = String.format("--allPagesCommentBackgroundColor: %1$s; --allPagesDrawerCommentBackgroundColor: %2$s; "
+        + "--themeCommentBackgroundColor: %1$s;",
+                                   resolved.getDark().get(ThemeValueResolver.COMMENT_BUBBLE_COLOR),
+                                   resolved.getDark().get(ThemeValueResolver.DRAWER_COMMENT_BUBBLE));
+    String lightOwn = pageDeclarations(withImageUrls(resolved.getLight(), themeId, false)) + COMMENT_DEFAULTS_LIGHT;
+    Map<String, String> darkPage = withImageUrls(resolved.getDark(), themeId, true);
+    // no page colour set or configured: the dark page default of the note, below the dark application surface, as
+    // the mails use it; in light the skin keeps its own default
+    if (StringUtils.isBlank(darkPage.get(ThemeVariables.PAGE_BACKGROUND_COLOR))) {
+      darkPage.put(ThemeVariables.PAGE_BACKGROUND_COLOR, ThemeColorCalculator.DARK_PAGE_BACKGROUND);
+    }
+    String darkOwn = pageDeclarations(darkPage) + COMMENT_DEFAULTS_DARK + bubbles;
+    StringBuilder css = new StringBuilder();
+    css.append(":root { color-scheme: light; ").append(lightOwn).append(" }\n").append(light).append('\n');
+    css.append(DARK_SELECTOR).append(" { color-scheme: dark; }\n")
+       .append(rewrap(dark, DARK_SELECTOR))
+       .append('\n')
+       .append(DARK_SELECTOR).append(" { ").append(darkOwn).append(" }\n");
+    css.append("@media (prefers-color-scheme: dark) {\n")
+       .append(AUTO_SELECTOR).append(" { color-scheme: dark; }\n")
+       .append(rewrap(dark, AUTO_SELECTOR))
+       .append('\n')
+       .append(AUTO_SELECTOR).append(" { ").append(darkOwn).append(" }\n}\n");
+    css.append(LIGHT_SCOPE_SELECTOR)
+       .append(" { color-scheme: light; ")
+       .append(lightOwn)
+       .append(" }\n")
+       .append(rewrap(light, LIGHT_SCOPE_SELECTOR));
+    return css.toString();
+  }
+
+  /**
+   * The page background and width of one version, as the custom properties
+   * the skin reads on the page (platform-ui helpers.less, reset.less): each
+   * version declares every one, initial when unset, so a block never inherits
+   * the other version's value. Every value went through the page vocabulary
+   * of the theme validator when it was published.
+   */
+  static String pageDeclarations(Map<String, String> values) {
+    StringBuilder declarations = new StringBuilder();
+    appendDeclaration(declarations, "--allPagesBackgroundColor", values.get(ThemeVariables.PAGE_BACKGROUND_COLOR));
+    appendDeclaration(declarations, "--allPagesBackgroundImage", values.get(ThemeVariables.PAGE_BACKGROUND_IMAGE));
+    appendDeclaration(declarations, "--allPagesBackgroundRepeat", values.get(ThemeVariables.PAGE_BACKGROUND_REPEAT));
+    appendDeclaration(declarations, "--allPagesBackgroundSize", values.get(ThemeVariables.PAGE_BACKGROUND_SIZE));
+    appendDeclaration(declarations, "--allPagesBackgroundPosition", values.get(ThemeVariables.PAGE_BACKGROUND_POSITION));
+    // the site background paints on the scroll container, where scroll would mean fixed to that box: local follows the content
+    String attachment = values.get(ThemeVariables.PAGE_BACKGROUND_ATTACHMENT);
+    appendDeclaration(declarations, "--allPagesBackgroundAttachment", "scroll".equals(attachment) ? "local" : attachment);
+    appendDeclaration(declarations, "--allPagesWidth", values.get(ThemeVariables.PAGE_WIDTH));
+    return declarations.toString();
+  }
+
+  private static void appendDeclaration(StringBuilder declarations, String property, String value) {
+    declarations.append(property).append(": ").append(StringUtils.isBlank(value) ? "initial" : value.trim()).append("; ");
+  }
+
+  /**
+   * An image key keeps only its gradient: the image itself is served by the
+   * theme image endpoint, addressed by its file id, and layered first.
+   */
+  static Map<String, String> withImageUrls(Map<String, String> resolved, long themeId, boolean dark) {
+    Map<String, String> values = new HashMap<>(resolved);
+    resolved.forEach((key, fileId) -> {
+      if (key.endsWith(IMAGE_FILE_SUFFIX) && StringUtils.isNumeric(fileId)) {
+        String imageKey = key.substring(0, key.length() - "File".length());
+        String url = "url(" + THEME_IMAGE_BASE_PATH + themeId + "/images/" + imageKey + "?version=" + (dark ? "dark" : "light") + "&v="
+            + fileId + ")";
+        String effect = values.get(imageKey);
+        values.put(imageKey, StringUtils.isBlank(effect) || "none".equals(effect) || "initial".equals(effect) ? url : url + ", " + effect);
+      }
+    });
+    return values;
+  }
+
+  /**
+   * Template constants no theme sets, derived as their dark counterpart: the
+   * neutral background of headers, popups and tab items, and the border grey;
+   * their light literals would draw near-white surfaces and lines in dark.
+   */
+  static final Map<String, String> DARK_TEMPLATE_CONSTANTS = Map.of("primaryBackground",
+                                                                    ThemeColorCalculator.DARK_PAGE_BACKGROUND,
+                                                                    "greyColor",
+                                                                    "#3A424A");
+
+  private String compileVersion(Map<String, String> resolved, boolean dark) {
+    Map<String, String> values = new HashMap<>(resolved);
+    values.keySet().removeIf(key -> key.endsWith(IMAGE_FILE_SUFFIX));
+    if (dark) {
+      // the resolved values may carry the template's light literal for them: the dark value always wins
+      values.putAll(DARK_TEMPLATE_CONSTANTS);
+    }
+    try {
+      String css = compileThemeCSS(toCompiledValues(values));
+      if (dark) {
+        lastCompiledDarkCSS = css;
+      } else {
+        lastCompiledLightCSS = css;
+      }
+      return css;
+    } catch (Less4jException e) {
+      LOG.warn("Error compiling the {} version of the theme in use, its last compiled version is served", dark ? "dark" : "light", e);
+      String last = dark ? lastCompiledDarkCSS : lastCompiledLightCSS;
+      if (last == null) {
+        Map<String, String> pristine = new HashMap<>();
+        if (dark) {
+          // the built-in dark defaults, never a light block under the dark selectors
+          pristine.putAll(ThemeValueResolver.resolve(getResolutionDefaults(), Collections.emptyMap(), Collections.emptyMap()).getDark());
+          pristine.putAll(DARK_TEMPLATE_CONSTANTS);
+        }
+        try {
+          last = compileThemeCSS(toCompiledValues(pristine));
+        } catch (Less4jException pristineError) {
+          LOG.error("The shipped branding Less template does not compile, no {} stylesheet is served", dark ? "dark" : "light", pristineError);
+          last = "";
+        }
+      }
+      return last;
+    }
+  }
+
+  /**
+   * @return the compiled declarations, each :root rule moved under the selector,
+   *         the @supports groups kept around them
+   */
+  static String rewrap(String css, String selector) {
+    return ROOT_RULE.matcher(css).replaceAll(Matcher.quoteReplacement(selector));
+  }
+
+  /**
+   * The steps every compile applies to the effective values, the trial
+   * compile included, so that a value passing the trial compiles for real.
+   */
+  static Map<String, String> toCompiledValues(Map<String, String> values) {
+    Map<String, String> effectiveValues = new HashMap<>(values);
+    neutralizeTopBarGradient(effectiveValues);
+    if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
+      effectiveValues.put("pageNoMarginTop", "0px");
+    }
+    if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
+      effectiveValues.put("pageNoMarginBottom", "0px");
+    }
+    return effectiveValues;
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
@@ -1983,12 +2825,22 @@ public class BrandingServiceImpl implements BrandingService, Startable {
     }
   }
 
+  /**
+   * @return the version a branding update broadcasts: the published state's
+   *         version when the theme services are ready, else the time of the
+   *         update
+   */
+  private Long currentBrandingVersion() {
+    ThemeService service = getThemeService();
+    return service == null ? Long.valueOf(System.currentTimeMillis()) : Long.valueOf(service.getState().getVersion());
+  }
+
   private void triggerBrandingUpdated(boolean updateLastUpdatedTime, boolean triggerEvent) {
     if (updateLastUpdatedTime) {
       updateLastUpdatedTime(System.currentTimeMillis());
     }
     if (triggerEvent) {
-      listenerService.broadcast(BRANDING_UPDATED_EVENT, null, getBrandingInformation(false));
+      listenerService.broadcast(BRANDING_UPDATED_EVENT, null, currentBrandingVersion());
     }
   }
 

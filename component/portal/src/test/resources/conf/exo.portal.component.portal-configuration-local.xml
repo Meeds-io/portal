@@ -189,6 +189,7 @@
           <name>changelogs</name>
           <description>Change logs of Portal RDBMS</description>
           <value>db/changelog/portal-rdbms.db.changelog-1.0.0.xml</value>
+          <value>db/changelog/portal-theme.db.changelog-1.0.0.xml</value>
         </values-param>
       </init-params>
     </component-plugin>
