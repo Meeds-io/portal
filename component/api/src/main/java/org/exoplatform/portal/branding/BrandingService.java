@@ -29,6 +29,19 @@ import org.exoplatform.portal.branding.model.ThemeStylesheet;
 
 public interface BrandingService {
 
+  /**
+   * Broadcast through the {@code ListenerService} after every branding write,
+   * a publication, the custom CSS save and the deprecated writers alike. One
+   * payload: the event's source is the username of the administrator who
+   * wrote, or null when the writer carries no user (a deprecated writer, the
+   * custom style feature's toggle); its data is a {@link Long}: once the theme
+   * services are ready, the version of the published branding state after the
+   * write (a theme publication and the custom CSS save move it, a deprecated
+   * settings-only writer leaves it unchanged), and before they are ready the
+   * time of the write. A listener uses it as a change marker only, reads
+   * nothing else from the event and fetches the branding it needs from the
+   * service.
+   */
   static final String BRANDING_UPDATED_EVENT = "branding.updated";
 
   Branding getBrandingInformation();
@@ -40,7 +53,10 @@ public interface BrandingService {
    * are not updated.
    * 
    * @param branding The new branding information
+   * @deprecated since 7.3, not for removal: use {@code ThemeService.publish(BrandingPublication, String)}, which
+   *             validates and publishes the themes and the identity together
    */
+  @Deprecated(since = "7.3", forRemoval = false)
   void updateBrandingInformation(Branding branding);
 
   String getCompanyName();
@@ -49,6 +65,14 @@ public interface BrandingService {
 
   String getCompanyLink();
 
+  /**
+   * Updates the company name.
+   *
+   * @param companyName the new company name
+   * @deprecated since 7.3, not for removal: use {@code ThemeService.publish(BrandingPublication, String)}, which
+   *             validates and publishes the themes and the identity together
+   */
+  @Deprecated(since = "7.3", forRemoval = false)
   void updateCompanyName(String companyName);
 
   void updateCompanyLink(String companyLink);
@@ -147,6 +171,21 @@ public interface BrandingService {
   String getFaviconPath();
 
   /**
+   * @return the dark logo's URL, the light one's when no dark logo is set
+   */
+  default String getDarkLogoPath() {
+    return getLogoPath();
+  }
+
+  /**
+   * @return the dark favicon's URL, the light one's when no dark favicon is
+   *         set
+   */
+  default String getDarkFaviconPath() {
+    return getFaviconPath();
+  }
+
+  /**
    * @return {@link Background} URL to retrieve login background
    */
   String getLoginBackgroundPath();
@@ -184,7 +223,10 @@ public interface BrandingService {
    * resource. If there is no data, nor uploadId, the logo is deleted.
    * 
    * @param logo The logo object
+   * @deprecated since 7.3, not for removal: use {@code ThemeService.publish(BrandingPublication, String)}, which
+   *             validates and publishes the themes and the identity together
    */
+  @Deprecated(since = "7.3", forRemoval = false)
   void updateLogo(Logo logo);
 
   /**
@@ -194,7 +236,10 @@ public interface BrandingService {
    * deleted.
    * 
    * @param favicon The {@link Favicon} object to update
+   * @deprecated since 7.3, not for removal: use {@code ThemeService.publish(BrandingPublication, String)}, which
+   *             validates and publishes the themes and the identity together
    */
+  @Deprecated(since = "7.3", forRemoval = false)
   void updateFavicon(Favicon favicon);
 
   /**
@@ -240,7 +285,10 @@ public interface BrandingService {
    *
    * @param themeStyle {@link Map} with variable name as key and variable value
    *                      as map value
+   * @deprecated since 7.3, not for removal: use {@code ThemeService.publish(BrandingPublication, String)}, which
+   *             validates and publishes the themes and the identity together
    */
+  @Deprecated(since = "7.3", forRemoval = false)
   void updateThemeStyle(Map<String, String> themeStyle);
 
   /**
@@ -264,6 +312,62 @@ public interface BrandingService {
    *         value
    */
   Map<String, String> getDefaultThemeStyle();
+
+  /**
+   * @param username the signed-in user, null on an anonymous page
+   * @return the display mode the page renders in: auto, light or dark, the
+   *         value of the data-display-mode attribute of its &lt;html&gt;
+   */
+  default String getDisplayMode(String username) {
+    return "light";
+  }
+
+  /**
+   * @return the literal value the shipped Less template gives each theme
+   *         variable it declares, the skin's built-in default
+   */
+  default Map<String, String> getTemplateDefaults() {
+    return java.util.Collections.emptyMap();
+  }
+
+  /**
+   * @return the values every theme version resolves from: the template's
+   *         built-in literals, overridden by the configured defaults that are
+   *         set
+   */
+  default Map<String, String> getResolutionDefaults() {
+    Map<String, String> defaults = new java.util.HashMap<>(getTemplateDefaults());
+    getDefaultThemeStyle().forEach((key, value) -> {
+      if (value != null && !value.isBlank()) {
+        defaults.put(key, value);
+      }
+    });
+    return defaults;
+  }
+
+  /**
+   * @param dark true for the dark version
+   * @return the mail palette of the theme in use's version (role to colour,
+   *         see {@link MailDocumentShell}), its logo path and whether that
+   *         logo is an SVG; the built-in light palette by default
+   */
+  default Map<String, String> getMailPalette(boolean dark) {
+    return MailDocumentShell.LIGHT_DEFAULTS;
+  }
+
+  /**
+   * Compiles the shipped theme template with the values of one version.
+   *
+   * @param values effective values by theme variable, the template's own
+   *          default applying to a variable absent from the map
+   * @return the compiled CSS
+   * @throws IllegalArgumentException with the message code
+   *           branding.theme.stylesheetCompilationError when the template does
+   *           not compile with these values
+   */
+  default String compileThemeStyle(Map<String, String> values) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * @return {@link Map} of login titles per language
@@ -391,5 +495,66 @@ public interface BrandingService {
    */
   String getDrawerBackgroundPath();
 
+
+  /**
+   * @return true when the theme stylesheet declares the page background and
+   *         width of each version, so a page does not write them inline
+   */
+  default boolean isPageStyleInStylesheet() {
+    return false;
+  }
+
+  /**
+   * @return the portlet names whose block, and what it opens, keeps its light
+   *         display whatever the user's mode (exo.branding.lightOnlyApplications)
+   */
+  default java.util.List<String> getLightOnlyApplications() {
+    return java.util.Collections.emptyList();
+  }
+
+  /**
+   * @return the names of the Vue apps, mounted outside a portlet, that keep
+   *         their light display whatever the user's mode
+   *         (exo.branding.lightOnlyVueApps)
+   */
+  default java.util.List<String> getLightOnlyVueApps() {
+    return java.util.Collections.emptyList();
+  }
+
+  /**
+   * @param applicationId a portlet's application id, webapp/portlet
+   * @return true when that portlet keeps its light display
+   */
+  default boolean isLightOnlyApplication(String applicationId) {
+    if (applicationId == null) {
+      return false;
+    }
+    String portletName = applicationId.substring(applicationId.lastIndexOf('/') + 1);
+    return getLightOnlyApplications().contains(portletName);
+  }
+
+  /**
+   * @param customCss the custom CSS to save
+   * @throws IllegalArgumentException {@code branding.customCss.forbiddenValue}
+   *           when the CSS holds a forbidden construct
+   */
+  default void validateCustomCss(String customCss) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the custom CSS appended to the theme stylesheet, alone, the former
+   * whole-branding writer rewriting every other field. It is the setting
+   * write of the theme service's custom CSS save, which checks the
+   * administrator, moves the stylesheet stamp and broadcasts the branding
+   * update, so this method checks no access and broadcasts nothing.
+   *
+   * @param customCss the CSS, blank to remove it
+   * @throws IllegalArgumentException {@code branding.customCss.forbiddenValue}
+   *           when the CSS holds a forbidden construct
+   */
+  default void updateCustomCss(String customCss) {
+    throw new UnsupportedOperationException();
+  }
 
 }

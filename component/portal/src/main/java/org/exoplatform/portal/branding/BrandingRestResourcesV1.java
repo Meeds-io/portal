@@ -21,13 +21,17 @@ package org.exoplatform.portal.branding;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
@@ -43,9 +47,20 @@ import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.portal.branding.model.Branding;
 import org.exoplatform.portal.branding.model.BrandingFile;
 import org.exoplatform.portal.branding.model.ThemeStylesheet;
+import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.container.ExoContainerContext;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.rest.resource.ResourceContainer;
+
+import io.meeds.portal.theme.ThemeReadiness;
+import io.meeds.portal.theme.model.BrandingState;
+import io.meeds.portal.theme.model.ImageBytes;
+import io.meeds.portal.theme.rest.model.ThemesView;
+import io.meeds.portal.theme.rest.util.ThemeRestUtils;
+import io.meeds.portal.theme.service.ThemeService;
+import io.meeds.portal.theme.util.BrandingImageValidator;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -67,6 +82,8 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   private static final long   CACHE_IN_MILLI_SECONDS = CACHE_IN_SECONDS * 1000L;
 
   private BrandingService     brandingService;
+
+  private ThemeService        themeService;
 
   public BrandingRestResourcesV1(BrandingService brandingService) {
     this.brandingService = brandingService;
@@ -105,14 +122,275 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
   @ApiResponses(value = {
                           @ApiResponse(responseCode = "204", description = "Branding information updated"),
                           @ApiResponse(responseCode = "400", description = "Invalid value, the body is the message code"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
   })
   public Response updateBrandingInformation(Branding branding) {
+    if (getThemeService() == null) {
+      // before readiness no field is validated nor written: the writer needs the theme services
+      return themeServicesStarting();
+    }
     try {
       brandingService.updateBrandingInformation(branding);
       return Response.noContent().build();
     } catch (IllegalArgumentException e) {
       // expected refusal of an invalid theme or CSS value: the message code lets the Branding UI explain it
       LOG.debug("Branding update refused: {}", e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).type(MediaType.TEXT_PLAIN).build();
+    } catch (IllegalStateException e) {
+      int status = ThemeRestUtils.statusOf(e);
+      if (status == 500) {
+        LOG.warn("Branding update failed", e);
+      } else {
+        LOG.debug("Branding update refused: {}", e.getMessage());
+      }
+      return Response.status(status).entity(status == 500 ? ThemeService.PUBLISH_FAILED_MESSAGE : e.getMessage())
+                     .type(MediaType.TEXT_PLAIN)
+                     .build();
+    }
+  }
+
+  @GET
+  @Path("/themes")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("administrators")
+  @Operation(summary = "Get the themes and the published branding state",
+             description = "Every theme as stored, a configured theme's configured values beside its own, the published state and its version",
+             method = "GET")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response getThemes() {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    BrandingState state = service.getState();
+    ThemesView view = new ThemesView(state.getVersion(),
+                                     state.getCompanyName(),
+                                     brandingService.getCompanyName(),
+                                     state.getLogoFileId(),
+                                     state.getDarkLogoFileId(),
+                                     state.getFaviconFileId(),
+                                     state.getDarkFaviconFileId(),
+                                     state.getThemeInUseId(),
+                                     service.getThemeInUse().getId(),
+                                     state.getModesOffered(),
+                                     service.getModesOffered(),
+                                     viewThemes(service));
+    return Response.ok(ThemeRestUtils.toJson(view), MediaType.APPLICATION_JSON).cacheControl(noStore()).build();
+  }
+
+  @PUT
+  @Path("/publication")
+  @RolesAllowed("administrators")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Operation(summary = "Publish the Branding and Theme page",
+             description = "Publishes, in one transaction, every change the page made since it loaded the given version",
+             method = "PUT")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Published, the body holds the new version"),
+                          @ApiResponse(responseCode = "400", description = "Invalid value, the body is the message code"),
+                          @ApiResponse(responseCode = "403", description = "The user is not a platform administrator"),
+                          @ApiResponse(responseCode = "404", description = "A theme the publication names does not exist"),
+                          @ApiResponse(responseCode = "409", description = "The published state changed since the page loaded"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response publish(String body) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    try {
+      long version = service.publish(ThemeRestUtils.readPublication(body), getCurrentUsername());
+      return Response.ok("{\"version\":" + version + "}", MediaType.APPLICATION_JSON).build();
+    } catch (IllegalAccessException e) {
+      LOG.debug("Branding publication refused", e);
+      return Response.status(Response.Status.FORBIDDEN).build();
+    } catch (ObjectNotFoundException e) {
+      LOG.debug("Branding publication names an unknown theme", e);
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      int status = ThemeRestUtils.statusOf(e);
+      if (status == 500) {
+        // the engine's text stays at debug level, logged by the service
+        LOG.warn("Branding publication failed: {}", e.getMessage());
+      } else {
+        LOG.debug("Branding publication refused: {}", e.getMessage());
+      }
+      return Response.status(status).entity(status == 500 ? ThemeService.PUBLISH_FAILED_MESSAGE : e.getMessage())
+                     .type(MediaType.TEXT_PLAIN)
+                     .build();
+    }
+  }
+
+  @PUT
+  @Path("/customCss")
+  @RolesAllowed("administrators")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Operation(summary = "Save the custom CSS",
+             description = "Body {\"customCss\": \"<css, blank to remove it>\"}; saved apart from a publication, "
+                 + "which moves the stylesheet version",
+             method = "PUT")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "204", description = "Custom CSS saved"),
+                          @ApiResponse(responseCode = "400",
+                                       description = "Forbidden value (branding.customCss.forbiddenValue) or invalid body"),
+                          @ApiResponse(responseCode = "403", description = "The user is not a platform administrator"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response saveCustomCss(String body) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    try {
+      service.saveCustomCss(ThemeRestUtils.readCustomCss(body), getCurrentUsername());
+      return Response.noContent().build();
+    } catch (IllegalAccessException e) {
+      LOG.debug("Custom CSS save refused", e);
+      return Response.status(Response.Status.FORBIDDEN).build();
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      int status = ThemeRestUtils.statusOf(e);
+      if (status == 500) {
+        LOG.warn("Custom CSS save failed: {}", e.getMessage());
+      } else {
+        LOG.debug("Custom CSS save refused: {}", e.getMessage());
+      }
+      return Response.status(status).entity(status == 500 ? ThemeService.PUBLISH_FAILED_MESSAGE : e.getMessage())
+                     .type(MediaType.TEXT_PLAIN)
+                     .build();
+    }
+  }
+
+  @POST
+  @Path("/themes/resolve")
+  @RolesAllowed("administrators")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Operation(summary = "Resolve a theme being edited",
+             description = "Both versions' effective values, Auto and Automatic computed, and their contrast ratios, of a theme as the page holds it; nothing is stored",
+             method = "POST")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+                          @ApiResponse(responseCode = "400", description = "Invalid body, the body is the message code"),
+                          @ApiResponse(responseCode = "403", description = "The user is not a platform administrator"),
+                          @ApiResponse(responseCode = "404", description = "The theme or its source does not exist"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response resolveTheme(String body) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    try {
+      return Response.ok(ThemeRestUtils.toJson(service.resolve(ThemeRestUtils.readTheme(body), getCurrentUsername())),
+                         MediaType.APPLICATION_JSON)
+                     .cacheControl(noStore())
+                     .build();
+    } catch (IllegalAccessException e) {
+      LOG.debug("Theme preview refused", e);
+      return Response.status(Response.Status.FORBIDDEN).build();
+    } catch (ObjectNotFoundException e) {
+      LOG.debug("Theme preview names an unknown theme", e);
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (IllegalArgumentException e) {
+      LOG.debug("Theme preview refused: {}", e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).type(MediaType.TEXT_PLAIN).build();
+    }
+  }
+
+  @GET
+  @Path("/themes/{themeId}/images/{key}")
+  @Operation(summary = "Get a theme's background image",
+             description = "The image a theme's version shows for an image key; a dark version without its own image shares the light one",
+             method = "GET")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Image served"),
+                          @ApiResponse(responseCode = "404", description = "No such theme, key or image"),
+  })
+  public Response getThemeImage(@PathParam("themeId")
+                                long themeId,
+                                @PathParam("key")
+                                String key,
+                                @QueryParam("version")
+                                String version,
+                                @Parameter(description = "The file id the stylesheet references: the answer is cached a year when it is the current one")
+                                @QueryParam("v")
+                                String fileVersion) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    try {
+      Long fileId = service.getThemeImageFileId(themeId, key, "dark".equals(version));
+      ImageBytes image = fileId == null ? null : service.readImage(fileId);
+      if (image == null) {
+        return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      Response.ResponseBuilder builder = imageResponse(image.data(), image.type());
+      if (String.valueOf(fileId).equals(fileVersion)) {
+        // a file's content never changes: its id in the URL makes it cacheable for good
+        CacheControl cacheControl = new CacheControl();
+        cacheControl.setMaxAge(CACHE_IN_SECONDS);
+        return builder.tag(new EntityTag(String.valueOf(fileId)))
+                      .expires(new Date(System.currentTimeMillis() + CACHE_IN_MILLI_SECONDS))
+                      .cacheControl(cacheControl)
+                      .build();
+      }
+      return fallbackAnswer(builder);
+    } catch (ObjectNotFoundException e) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+  }
+
+  @GET
+  @Path("/displayMode")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("users")
+  @Operation(summary = "Get the current user's display mode",
+             description = "The mode the user chose, the page's effective mode and the modes offered",
+             method = "GET")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Request fulfilled"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response getDisplayMode() {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    String username = getCurrentUsername();
+    Map<String, String> answer = new LinkedHashMap<>();
+    answer.put("mode", service.getDisplayMode(username).name());
+    answer.put("effectiveMode", service.getEffectiveDisplayMode(username).name());
+    answer.put("modesOffered", service.getModesOffered().name());
+    return Response.ok(ThemeRestUtils.toJson(answer), MediaType.APPLICATION_JSON).cacheControl(noStore()).build();
+  }
+
+  @PUT
+  @Path("/displayMode")
+  @RolesAllowed("users")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Operation(summary = "Set the current user's display mode",
+             description = "Body {\"mode\": \"AUTOMATIC|LIGHT|DARK\"}; applies to the current user only",
+             method = "PUT")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "204", description = "Display mode saved"),
+                          @ApiResponse(responseCode = "400", description = "Not a display mode, the body is the message code"),
+                          @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
+  })
+  public Response setDisplayMode(String body) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return themeServicesStarting();
+    }
+    try {
+      service.setDisplayMode(getCurrentUsername(), ThemeRestUtils.readDisplayMode(body));
+      return Response.noContent().build();
+    } catch (IllegalArgumentException e) {
+      LOG.debug("Display mode refused: {}", e.getMessage());
       return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).type(MediaType.TEXT_PLAIN).build();
     }
   }
@@ -132,7 +410,43 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                   @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
                                   @QueryParam("v")
                                   String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, service.getState().getLogoFileId(), version);
+    }
     return getBrandingFileResponse(brandingService.getLogo(), request, version);
+  }
+
+  @GET
+  @Path("/darkLogo")
+  @Operation(summary = "Get the dark logo", description = "The dark logo, the light one when no dark logo is set", method = "GET")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Logo served"),
+                          @ApiResponse(responseCode = "404", description = "No logo"),
+  })
+  public Response getDarkLogo(@QueryParam("v")
+  String version) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    return stateFileResponse(service, service.getEffectiveDarkLogoFileId(), version);
+  }
+
+  @GET
+  @Path("/darkFavicon")
+  @Operation(summary = "Get the dark favicon", description = "The dark favicon, the light one when no dark favicon is set", method = "GET")
+  @ApiResponses(value = {
+                          @ApiResponse(responseCode = "200", description = "Favicon served"),
+                          @ApiResponse(responseCode = "404", description = "No favicon"),
+  })
+  public Response getDarkFavicon(@QueryParam("v")
+  String version) {
+    ThemeService service = getThemeService();
+    if (service == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    return stateFileResponse(service, service.getEffectiveDarkFaviconFileId(), version);
   }
 
   @GET
@@ -149,6 +463,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                     @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
                                     @QueryParam("v")
                                     String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getPageBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getPageBackground(), request, version);
   }
 
@@ -166,6 +484,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getTopBarBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getTopBarBackground(), request, version);
   }
 
@@ -183,6 +505,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getSideBarBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getSideBarBackground(), request, version);
   }
 
@@ -200,6 +526,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getDrawerBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getDrawerBackground(), request, version);
   }
 
@@ -217,6 +547,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getAppBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getAppBackground(), request, version);
   }
 
@@ -234,6 +568,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getAppTextTitleBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getAppTextTitleBackground(), request, version);
   }
 
@@ -251,6 +589,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
           @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
           @QueryParam("v")
           String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getAppTextHeaderBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getAppTextHeaderBackground(), request, version);
   }
 
@@ -269,6 +611,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                      @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
                                      @QueryParam("v")
                                      String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, service.getState().getFaviconFileId(), version);
+    }
     return getBrandingFileResponse(brandingService.getFavicon(), request, version);
   }
 
@@ -288,6 +634,10 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                      @Parameter(description = "The value of version parameter will determine whether the query should be cached by browser or not. If not set, no 'expires HTTP Header will be sent'")
                                      @QueryParam("v")
                                      String version) {
+    ThemeService service = getThemeService();
+    if (service != null) {
+      return stateFileResponse(service, brandingService.getLoginBackgroundId(), version);
+    }
     return getBrandingFileResponse(brandingService.getLoginBackground(), request, version);
   }
 
@@ -306,6 +656,20 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
                                  @QueryParam("v")
                                  String lastModified) {
     ThemeStylesheet stylesheet = brandingService.getThemeStylesheet();
+    ThemeService service = getThemeService();
+    if (service == null) {
+      // the single-theme stylesheet served while the theme services start: never cached for long
+      return fallbackAnswer(Response.ok(stylesheet.css(), "text/css"));
+    }
+    if (StringUtils.isNotBlank(lastModified) && !lastModified.equals(String.valueOf(stylesheet.stamp()))) {
+      // a page rendered by a node that already sees a newer stamp: re-read the state, at most once per window
+      if (service.refreshState()) {
+        stylesheet = brandingService.getThemeStylesheet();
+      }
+      if (!lastModified.equals(String.valueOf(stylesheet.stamp()))) {
+        return fallbackAnswer(Response.ok(stylesheet.css(), "text/css"));
+      }
+    }
     long lastUpdated = stylesheet.stamp();
     EntityTag eTag = new EntityTag(String.valueOf(lastUpdated));
     Response.ResponseBuilder builder = request.evaluatePreconditions(eTag);
@@ -330,6 +694,107 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     return builder.build();
   }
 
+  /**
+   * The themes as stored, the Default Theme with its configured dark values
+   * (exo.branding.theme.dark.*) as its configured settings: the page tells a
+   * configured dark value from an Automatic one by them, as for a theme bound
+   * to the configuration.
+   */
+  private List<io.meeds.portal.theme.model.Theme> viewThemes(ThemeService service) {
+    return service.getThemes().stream().map(theme -> {
+      if (!theme.isDefaultTheme()) {
+        return theme;
+      }
+      return new io.meeds.portal.theme.model.Theme(theme.getId(),
+                                                    theme.getName(),
+                                                    theme.isNameSetInUI(),
+                                                    theme.getOrigin(),
+                                                    theme.getConfigKey(),
+                                                    theme.getSettings(),
+                                                    service.getConfiguredSettings(theme),
+                                                    theme.getUpdatedDate());
+    }).toList();
+  }
+
+  private ThemeService getThemeService() {
+    if (!ThemeReadiness.isReady()) {
+      return null;
+    }
+    if (themeService == null) {
+      themeService = ExoContainerContext.getService(ThemeService.class);
+    }
+    return themeService;
+  }
+
+  /** For tests: the theme service, still answered only once the readiness flag is set. */
+  void setThemeService(ThemeService themeService) {
+    this.themeService = themeService;
+  }
+
+  /**
+   * An answer this node may not be able to give again under the same URL: no
+   * Expires, no ETag, kept a minute at most by any cache.
+   */
+  private static Response fallbackAnswer(Response.ResponseBuilder builder) {
+    CacheControl cacheControl = new CacheControl();
+    cacheControl.setMaxAge(60);
+    return builder.cacheControl(cacheControl).build();
+  }
+
+  /**
+   * A logo or favicon of the branding state, read by file id through the
+   * per-node image cache: the requested id is cacheable for good, any other
+   * id gets the current file briefly.
+   */
+  private static Response stateFileResponse(ThemeService service, Long fileId, String version) {
+    ImageBytes image = fileId == null ? null : service.readImage(fileId);
+    if (image == null) {
+      return Response.status(Response.Status.NOT_FOUND).build();
+    }
+    Response.ResponseBuilder builder = imageResponse(image.data(), image.type());
+    if (!String.valueOf(fileId).equals(version)) {
+      return fallbackAnswer(builder);
+    }
+    CacheControl cacheControl = new CacheControl();
+    cacheControl.setMaxAge(CACHE_IN_SECONDS);
+    return builder.tag(new EntityTag(String.valueOf(fileId)))
+                  .expires(new Date(System.currentTimeMillis() + CACHE_IN_MILLI_SECONDS))
+                  .cacheControl(cacheControl)
+                  .build();
+  }
+
+  /**
+   * Every branding image is served with the type its bytes are, never sniffed
+   * by the browser, and an SVG under a policy that runs no script.
+   */
+  static Response.ResponseBuilder imageResponse(byte[] data, String detectedType) {
+    String type = detectedType == null ? BrandingImageValidator.detectType(data) : detectedType;
+    if (type == null) {
+      type = "application/octet-stream";
+    }
+    Response.ResponseBuilder builder = Response.ok(new ByteArrayInputStream(data), type).header("X-Content-Type-Options", "nosniff");
+    if (BrandingImageValidator.SVG.equals(type)) {
+      builder.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'");
+    }
+    return builder;
+  }
+
+  private static Response themeServicesStarting() {
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE).header("Retry-After", "10").build();
+  }
+
+  private static CacheControl noStore() {
+    CacheControl cacheControl = new CacheControl();
+    cacheControl.setPrivate(true);
+    cacheControl.setNoStore(true);
+    return cacheControl;
+  }
+
+  private static String getCurrentUsername() {
+    ConversationState state = ConversationState.getCurrent();
+    return state == null || state.getIdentity() == null ? null : state.getIdentity().getUserId();
+  }
+
   private Response getBrandingFileResponse(BrandingFile iconFile,
                                            Request request,
                                            String version) {
@@ -340,8 +805,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     EntityTag eTag = new EntityTag(String.valueOf(lastUpdated));
     Response.ResponseBuilder builder = request.evaluatePreconditions(eTag);
     if (builder == null || StringUtils.isBlank(version)) {
-      InputStream stream = new ByteArrayInputStream(iconFile.getData());
-      builder = Response.ok(stream, IMAGE_MIME_TYPE);
+      builder = imageResponse(iconFile.getData(), null);
       // If the query has a lastModified parameter, it means that the client
       // will change the lastModified entry when it really changes
       // Which means that we can cache the image in browser side

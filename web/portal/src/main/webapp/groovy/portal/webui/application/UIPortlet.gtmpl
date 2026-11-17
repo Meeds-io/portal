@@ -26,8 +26,10 @@
   		cssStyle = " style=\"" + cssStyle + "\"";
     }
     String cssClass = uicomponent.getCssClass() == null ? "" : " " + uicomponent.getCssClass();
+    // an application not adapted to dark keeps its light display, and so does what it opens, whatever the page's mode
+    String displayModeAttribute = uicomponent.getApplicationComponent(org.exoplatform.portal.branding.BrandingService.class)?.isLightOnlyApplication(uicomponent.getSkinId()) ? " data-display-mode=\"light\"" : "";
  %><div id="$portletId" $hiddenClass>
-	<div class="PORTLET-FRAGMENT$cssClass" $cssStyle>
+	<div class="PORTLET-FRAGMENT$cssClass"$displayModeAttribute $cssStyle>
 		<% println portletContent; %>
 	</div>
 </div><% } %>
