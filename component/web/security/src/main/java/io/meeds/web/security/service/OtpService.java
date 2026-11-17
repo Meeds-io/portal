@@ -106,8 +106,9 @@ public class OtpService {
   /**
    * Validates the code as {@link #validateOtp(String, String, String)} does,
    * then consumes it, so that the same code never validates a second time.
-   * Two concurrent validations of one code see one winner: the loser is
-   * refused like a wrong code, without counting as a failed attempt.
+   * Two concurrent validations of one code on the same node see one winner:
+   * the loser is refused like a wrong code, without counting as a failed
+   * attempt.
    *
    * @param userName user login
    * @param otpMethod OTP method name
