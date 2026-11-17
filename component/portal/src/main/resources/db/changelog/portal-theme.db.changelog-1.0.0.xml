@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ This file is part of the Meeds project (https://meeds.io/).
+
+ Copyright (C) 2026 Meeds Association contact@meeds.io
+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 3 of the License, or (at your option) any later version.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program; if not, write to the Free Software Foundation,
+ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+-->
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+  <!-- MySQL and MariaDB draw ids from an auto-increment column, the other engines from a sequence (@PortableSequence) -->
+  <property name="autoIncrement" value="true" dbms="mysql,hsqldb" />
+  <property name="autoIncrement" value="false" dbms="postgresql" />
+
+  <!-- Themes: one row per theme. A stored map holds only what an administrator set from the UI -->
+  <changeSet author="portal" id="1.0.0-exip-7.3.0.53-01">
+    <createTable tableName="PORTAL_THEMES">
+      <column name="THEME_ID" type="BIGINT" autoIncrement="${autoIncrement}" startWith="2">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_THEMES" />
+      </column>
+      <column name="NAME" type="VARCHAR(200)">
+        <constraints nullable="false" />
+      </column>
+      <column name="NAME_SET_IN_UI" type="BOOLEAN" defaultValueBoolean="false">
+        <constraints nullable="false" />
+      </column>
+      <column name="NAME_KEY" type="VARCHAR(200)">
+        <constraints nullable="false" unique="true" uniqueConstraintName="UK_PORTAL_THEMES_NAME_KEY" />
+      </column>
+      <column name="ORIGIN" type="VARCHAR(20)">
+        <constraints nullable="false" />
+      </column>
+      <column name="CONFIG_KEY" type="VARCHAR(100)">
+        <constraints unique="true" uniqueConstraintName="UK_PORTAL_THEMES_CONFIG_KEY" />
+      </column>
+      <column name="CONFIG_SETTINGS" type="LONGTEXT" />
+      <column name="SHARED_SETTINGS" type="LONGTEXT" />
+      <column name="LIGHT_SETTINGS" type="LONGTEXT" />
+      <column name="DARK_SETTINGS" type="LONGTEXT" />
+      <column name="UPDATED_DATE" type="TIMESTAMP" />
+    </createTable>
+    <modifySql dbms="mysql">
+      <append value=" ENGINE=INNODB CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci" />
+    </modifySql>
+  </changeSet>
+
+  <!-- Starts at 2: THEME_ID 1 is the Default Theme the seed inserts -->
+  <changeSet author="portal" id="1.0.0-exip-7.3.0.53-02" dbms="postgresql,hsqldb">
+    <createSequence sequenceName="SEQ_PORTAL_THEME_ID" startValue="2" />
+  </changeSet>
+
+  <!-- Everything the Branding and Theme page publishes besides the themes: one row, ID = 1 -->
+  <changeSet author="portal" id="1.0.0-exip-7.3.0.53-03">
+    <createTable tableName="PORTAL_BRANDING_STATE">
+      <column name="ID" type="BIGINT">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="PK_PORTAL_BRANDING_STATE" />
+      </column>
+      <column name="VERSION" type="BIGINT" defaultValueNumeric="0">
+        <constraints nullable="false" />
+      </column>
+      <column name="LEGACY_IMPORTED" type="BOOLEAN" defaultValueBoolean="false">
+        <constraints nullable="false" />
+      </column>
+      <column name="COMPANY_NAME" type="VARCHAR(200)" />
+      <column name="LOGO_FILE_ID" type="BIGINT" />
+      <column name="DARK_LOGO_FILE_ID" type="BIGINT" />
+      <column name="FAVICON_FILE_ID" type="BIGINT" />
+      <column name="DARK_FAVICON_FILE_ID" type="BIGINT" />
+      <column name="DEFAULT_FILE_SOURCES" type="LONGTEXT" />
+      <column name="THEME_IN_USE_ID" type="BIGINT">
+        <constraints foreignKeyName="FK_PORTAL_BRANDING_STATE_THEME" references="PORTAL_THEMES(THEME_ID)" />
+      </column>
+      <column name="MODES_OFFERED" type="VARCHAR(20)" />
+      <column name="LAST_EFFECTIVE_THEME_ID" type="BIGINT" />
+      <column name="LAST_EFFECTIVE_MODES" type="VARCHAR(20)" />
+      <column name="MODES_GENERATION" type="INT" defaultValueNumeric="0">
+        <constraints nullable="false" />
+      </column>
+    </createTable>
+    <modifySql dbms="mysql">
+      <append value=" ENGINE=INNODB CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci" />
+    </modifySql>
+  </changeSet>
+
+  <!--
+    On MySQL every column holding typed text names utf8mb4 itself, so it stores emoji whatever the database default.
+    NAME_KEY is compared exactly (utf8mb4_bin): an accent-insensitive collation would make "Thème" and "Theme"
+    collide on MySQL only. The rollback of -01 and -03 drops the columns, so this one has nothing to undo.
+  -->
+  <changeSet author="portal" id="1.0.0-exip-7.3.0.53-04" dbms="mysql">
+    <sql>ALTER TABLE PORTAL_THEMES
+      MODIFY NAME VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      MODIFY NAME_KEY VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+      MODIFY CONFIG_SETTINGS LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+      MODIFY SHARED_SETTINGS LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+      MODIFY LIGHT_SETTINGS LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+      MODIFY DARK_SETTINGS LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci</sql>
+    <sql>ALTER TABLE PORTAL_BRANDING_STATE
+      MODIFY COMPANY_NAME VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci</sql>
+    <rollback />
+  </changeSet>
+
+  <!-- The Default Theme and the state row exist before any code runs, on a fresh install as on an upgrade -->
+  <changeSet author="portal" id="1.0.0-exip-7.3.0.53-05">
+    <insert tableName="PORTAL_THEMES">
+      <column name="THEME_ID" valueNumeric="1" />
+      <column name="NAME" value="Default Theme" />
+      <column name="NAME_SET_IN_UI" valueBoolean="false" />
+      <column name="NAME_KEY" value="default theme" />
+      <column name="ORIGIN" value="DEFAULT" />
+      <column name="SHARED_SETTINGS" value="{}" />
+      <column name="LIGHT_SETTINGS" value="{}" />
+      <column name="DARK_SETTINGS" value="{}" />
+      <column name="UPDATED_DATE" valueComputed="CURRENT_TIMESTAMP" />
+    </insert>
+    <insert tableName="PORTAL_BRANDING_STATE">
+      <column name="ID" valueNumeric="1" />
+      <column name="VERSION" valueNumeric="0" />
+      <column name="LEGACY_IMPORTED" valueBoolean="false" />
+      <column name="MODES_GENERATION" valueNumeric="0" />
+    </insert>
+    <rollback>
+      <delete tableName="PORTAL_BRANDING_STATE">
+        <where>ID = 1</where>
+      </delete>
+      <delete tableName="PORTAL_THEMES">
+        <where>THEME_ID = 1</where>
+      </delete>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

@@ -68,6 +68,10 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
 
   @Override
   public void tearDown() throws Exception {
+    io.meeds.portal.theme.ThemeReadiness.reset();
+    if (getContainer().getComponentAdapterOfType(io.meeds.portal.theme.service.ThemeService.class) != null) {
+      getContainer().unregisterComponent(io.meeds.portal.theme.service.ThemeService.class);
+    }
     getContainer().unregisterComponent("FileService");
     getContainer().unregisterComponent("SettingService");
     getContainer().unregisterComponent(BrandingService.class);
@@ -118,6 +122,7 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
   }
 
   public void testUpdateBrandingInformation() throws Exception {
+    themeServicesReady();
     // Given
     String path = "/v1/platform/branding/";
     EnvironmentContext envctx = new EnvironmentContext();
@@ -148,7 +153,26 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("test1", caturedBranding.getCompanyName());
   }
 
+  public void testTheDeprecatedPutAnswersUnavailableBeforeReadinessAndWritesNothing() throws Exception {
+    io.meeds.portal.theme.ThemeReadiness.reset();
+    String path = "/v1/platform/branding/";
+    EnvironmentContext envctx = new EnvironmentContext();
+    envctx.put(HttpServletRequest.class, new MockHttpServletRequest(path, null, 0, "PUT", null));
+    JSONObject jsonBranding = new JSONObject();
+    jsonBranding.put("companyName", "test1");
+    jsonBranding.put("logo", new JSONObject().put("uploadId", "upload-1"));
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Content-Type", Arrays.asList("application/json"));
+
+    ContainerResponse resp = launcher.service("PUT", path, "", headers, jsonBranding.toString().getBytes(), envctx);
+
+    assertEquals(503, resp.getStatus());
+    verify(brandingService, never()).updateBrandingInformation(any());
+    verify(fileService, never()).writeFile(any());
+  }
+
   public void testUpdateBrandingInformationRefusedWithMessageCode() throws Exception {
+    themeServicesReady();
     // Given: a value the service refuses (invalid theme value or a stylesheet that does not compile)
     String path = "/v1/platform/branding/";
     EnvironmentContext envctx = new EnvironmentContext();
@@ -169,7 +193,51 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("branding.theme.invalidValue:appMarginTop", resp.getEntity());
   }
 
+  public void testTheThemesViewShowsTheEffectiveCompanyNameBesideTheStoredOne() throws Exception {
+    // Given: no company name stored, the configured one applies
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    getContainer().registerComponentInstance(io.meeds.portal.theme.service.ThemeService.class, themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    io.meeds.portal.theme.model.BrandingState state = mock(io.meeds.portal.theme.model.BrandingState.class);
+    when(state.getVersion()).thenReturn(3L);
+    when(themeService.getState()).thenReturn(state);
+    io.meeds.portal.theme.model.Theme inUse = mock(io.meeds.portal.theme.model.Theme.class);
+    when(inUse.getId()).thenReturn(1L);
+    when(themeService.getThemeInUse()).thenReturn(inUse);
+    io.meeds.portal.theme.model.Theme defaultTheme = new io.meeds.portal.theme.model.Theme();
+    defaultTheme.setId(1L);
+    defaultTheme.setName("Default Theme");
+    defaultTheme.setOrigin(io.meeds.portal.theme.constant.ThemeOrigin.DEFAULT);
+    when(themeService.getThemes()).thenReturn(List.of(defaultTheme));
+    io.meeds.portal.theme.model.ThemeSettings configured = new io.meeds.portal.theme.model.ThemeSettings(new HashMap<>(),
+                                                                                                         new HashMap<>(),
+                                                                                                         new HashMap<>(Map.of("topBarBackgroundColor",
+                                                                                                                              "#101010")));
+    when(themeService.getConfiguredSettings(defaultTheme)).thenReturn(configured);
+    when(brandingService.getCompanyName()).thenReturn("Digital Workplace");
+    String path = "/v1/platform/branding/themes";
+    EnvironmentContext envctx = new EnvironmentContext();
+    envctx.put(HttpServletRequest.class, new MockHttpServletRequest(path, null, 0, "GET", null));
+
+    // When
+    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
+
+    // Then: the page shows the name in use, and knows none was stored
+    assertEquals(200, resp.getStatus());
+    JSONObject view = new JSONObject(String.valueOf(resp.getEntity()));
+    assertEquals("Digital Workplace", view.getString("effectiveCompanyName"));
+    assertTrue(view.isNull("companyName"));
+    // the Default Theme carries its configured dark values: the page reads them as configured, not Automatic
+    assertEquals("#101010",
+                 view.getJSONArray("themes")
+                     .getJSONObject(0)
+                     .getJSONObject("configSettings")
+                     .getJSONObject("dark")
+                     .getString("topBarBackgroundColor"));
+  }
+
   public void testUpdateBrandingInformationRefusesUnsupportedFontFamily() throws Exception {
+    themeServicesReady();
     String path = "/v1/platform/branding/";
     EnvironmentContext envctx = new EnvironmentContext();
     HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "PUT", null);
@@ -189,27 +257,44 @@ public class BrandingRestResourcesTest extends BaseRestServicesTestCase {
   }
 
   public void testGetBrandingCSSIsTaggedWithTheServedStylesheetStamp() throws Exception {
-    String path = "/v1/platform/branding/css?v=9";
-    EnvironmentContext envctx = new EnvironmentContext();
-    HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
-    envctx.put(HttpServletRequest.class, httpRequest);
+    themeServicesReady();
     when(brandingService.getLastUpdatedTime()).thenReturn(9L);
     when(brandingService.getThemeStylesheet()).thenReturn(new ThemeStylesheet(7L, ".served { color: red; }"));
 
-    ContainerResponse resp = launcher.service("GET", path, "", null, null, envctx);
-
+    // the served stylesheet's own stamp: tagged with it
+    ContainerResponse resp = getCss("/v1/platform/branding/css?v=7");
     assertEquals(200, resp.getStatus());
     assertEquals(".served { color: red; }", resp.getEntity());
     assertEquals("\"7\"", String.valueOf(resp.getHttpHeaders().getFirst("ETag")));
+
+    // another stamp than the node can serve: the short-lived answer, never tagged
+    resp = getCss("/v1/platform/branding/css?v=9");
+    assertEquals(200, resp.getStatus());
+    assertEquals(".served { color: red; }", resp.getEntity());
+    assertNull(resp.getHttpHeaders().getFirst("ETag"));
+    assertNull(resp.getHttpHeaders().getFirst("Expires"));
+  }
+
+  private void themeServicesReady() {
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    getContainer().registerComponentInstance(io.meeds.portal.theme.service.ThemeService.class, themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+  }
+
+  private ContainerResponse getCss(String path) throws Exception {
+    EnvironmentContext envctx = new EnvironmentContext();
+    envctx.put(HttpServletRequest.class, new MockHttpServletRequest(path, null, 0, "GET", null));
+    return launcher.service("GET", path, "", null, null, envctx);
   }
 
   public void testGetBrandingCssLastModifiedNeverInTheFuture() throws Exception {
     // Given: the exposed time carries the template fingerprint and may exceed now by up to 2^32 ms
-    String path = "/v1/platform/branding/css?v=1";
+    themeServicesReady();
+    long future = System.currentTimeMillis() + 40L * 24 * 3600 * 1000;
+    String path = "/v1/platform/branding/css?v=" + future;
     EnvironmentContext envctx = new EnvironmentContext();
     HttpServletRequest httpRequest = new MockHttpServletRequest(path, null, 0, "GET", null);
     envctx.put(HttpServletRequest.class, httpRequest);
-    long future = System.currentTimeMillis() + 40L * 24 * 3600 * 1000;
     when(brandingService.getThemeStylesheet()).thenReturn(new ThemeStylesheet(future, ":root {}"));
 
     // When

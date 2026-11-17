@@ -57,8 +57,10 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -94,6 +96,8 @@ import jakarta.servlet.ServletContext;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
+
+import org.exoplatform.commons.utils.PropertyManager;
 import org.mockito.ArgumentCaptor;
 
 import org.exoplatform.commons.api.settings.ExoFeatureService;
@@ -904,6 +908,137 @@ public class BrandingServiceImplTest {
   }
 
   @Test
+  public void testUpdateLoginBackgroundRefusesWhatIsNotAnImage() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    FileService fileService = mock(FileService.class);
+    UploadService uploadService = mock(UploadService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             fileService,
+                                                             uploadService,
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    java.io.File html = java.io.File.createTempFile("login-background", ".png");
+    html.deleteOnExit();
+    java.nio.file.Files.writeString(html.toPath(), "<html><script>alert(1)</script></html>");
+    UploadResource uploadResource = new UploadResource("htmlUpload", "background.png");
+    uploadResource.setStoreLocation(html.getPath());
+    when(uploadService.getUploadResource("htmlUpload")).thenReturn(uploadResource);
+
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> brandingService.updateLoginBackground(new Background("htmlUpload", 0, null, 0, 0)));
+    assertEquals("branding.upload.typeRefused", e.getMessage());
+    verify(fileService, never()).writeFile(any());
+  }
+
+  @Test
+  public void testTheFormerPageWritesNothingWhenItsLoginBackgroundIsRefused() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    UploadService uploadService = mock(UploadService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             uploadService,
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    brandingService.setThemeService(themeService);
+    java.io.File html = java.io.File.createTempFile("login-background", ".png");
+    html.deleteOnExit();
+    java.nio.file.Files.writeString(html.toPath(), "<html></html>");
+    UploadResource uploadResource = new UploadResource("htmlUpload", "background.png");
+    uploadResource.setStoreLocation(html.getPath());
+    when(uploadService.getUploadResource("htmlUpload")).thenReturn(uploadResource);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      Branding branding = new Branding();
+      branding.setSiteName("Site");
+      branding.setLoginBackground(new Background("htmlUpload", 0, null, 0, 0));
+      assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding));
+      verify(settingService, never()).set(any(), any(), any(), any());
+      verify(themeService, never()).publishLegacy(any(), org.mockito.ArgumentMatchers.anyBoolean());
+
+      // an upload already consumed or expired is refused before any write too
+      branding.setLoginBackground(new Background("goneUpload", 0, null, 0, 0));
+      assertEquals("branding.upload.notFound",
+                   assertThrows(IllegalArgumentException.class, () -> brandingService.updateBrandingInformation(branding)).getMessage());
+      verify(settingService, never()).set(any(), any(), any(), any());
+      verify(themeService, never()).publishLegacy(any(), org.mockito.ArgumentMatchers.anyBoolean());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testAMissingConfiguredLoginBackgroundIsNotLookedUpAgainOnEveryLoginPage() throws Exception {
+    InitParams initParams = new InitParams();
+    ValueParam param = new ValueParam();
+    param.setName(BrandingServiceImpl.BRANDING_LOGIN_BG_INIT_PARAM);
+    param.setValue("/no/such/login-background.png");
+    initParams.addParameter(param);
+    PortalContainer container = mock(PortalContainer.class);
+    ServletContext context = mock(ServletContext.class);
+    when(container.getPortalContext()).thenReturn(context);
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             container,
+                                                             initParams);
+    brandingService.setThemeService(mock(io.meeds.portal.theme.service.ThemeService.class));
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      for (int i = 0; i < 5; i++) {
+        assertNull(brandingService.getLoginBackgroundPath());
+        assertNull(brandingService.getLoginBackground());
+      }
+      verify(context, org.mockito.Mockito.times(1)).getResourceAsStream("/no/such/login-background.png");
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheConfiguredLoginBackgroundIsImportedOnceTheThemeServicesAreReady() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    FileService fileService = mock(FileService.class);
+    java.io.File background = java.io.File.createTempFile("configured-login-background", ".png");
+    background.deleteOnExit();
+    java.nio.file.Files.write(background.toPath(), new byte[] { (byte) 0x89, 'P', 'N', 'G', 1, 2, 3 });
+    InitParams initParams = new InitParams();
+    ValueParam param = new ValueParam();
+    param.setName(BrandingServiceImpl.BRANDING_LOGIN_BG_INIT_PARAM);
+    param.setValue(background.getPath());
+    initParams.addParameter(param);
+    when(fileService.writeFile(any())).thenAnswer(invocation -> {
+      FileItem fileItem = invocation.getArgument(0);
+      fileItem.getFileInfo().setId(42L);
+      return fileItem;
+    });
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             fileService,
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             initParams);
+    brandingService.setThemeService(mock(io.meeds.portal.theme.service.ThemeService.class));
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      assertEquals(BrandingServiceImpl.BRANDING_LOGIN_BG_BASE_PATH + "42", brandingService.getLoginBackgroundPath());
+      verify(settingService).set(any(),
+                                 any(),
+                                 eq(BRANDING_LOGIN_BG_ID_SETTING_KEY),
+                                 argThat(value -> value != null && "42".equals(String.valueOf(value.getValue()))));
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
   public void testRemoveLoginBackground() throws Exception {
     // Given
     SettingService settingService = mock(SettingService.class);
@@ -1226,6 +1361,47 @@ public class BrandingServiceImplTest {
   }
 
   @Test
+  public void testStartDoesNotCompileTheStylesheetTheFirstRequestDoes() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newFontBrandingService(settingService, lessConfigurationManager(), "Arimo");
+
+    brandingService.start();
+
+    verify(settingService, never()).get(BRANDING_CONTEXT, BRANDING_SCOPE, "primaryColor");
+    assertTrue(brandingService.getThemeCSSContent().contains("--allPagesPrimaryColor: #3f8487"));
+    verify(settingService, times(1)).get(BRANDING_CONTEXT, BRANDING_SCOPE, "primaryColor");
+  }
+
+  @Test
+  public void testBeforeTheFirstCompileARequestThatCannotLockGetsThePristineStylesheet() throws Exception {
+    BrandingServiceImpl brandingService = newFontBrandingService(mock(SettingService.class), lessConfigurationManager(), "Arimo");
+    brandingService.start();
+    java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    Thread compiling = new Thread(() -> {
+      brandingService.getThemeCSSLock().lock();
+      try {
+        held.countDown();
+        release.await(30, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } finally {
+        brandingService.getThemeCSSLock().unlock();
+      }
+    });
+    compiling.start();
+    try {
+      assertTrue(held.await(10, java.util.concurrent.TimeUnit.SECONDS));
+      org.exoplatform.portal.branding.model.ThemeStylesheet served = brandingService.getThemeStylesheet();
+      assertEquals(0L, served.stamp());
+      assertTrue(served.css().contains("--allPagesPrimaryColor"));
+    } finally {
+      release.countDown();
+      compiling.join(10000);
+    }
+  }
+
+  @Test
   public void shouldRecompileThemeCSSOncePerSharedLastUpdatedTime() throws Exception {
     SettingService settingService = mock(SettingService.class);
     AtomicReference<String> lastUpdatedTime = new AtomicReference<>("1");
@@ -1304,6 +1480,8 @@ public class BrandingServiceImplTest {
     });
     BrandingServiceImpl brandingService = newFontBrandingService(settingService, lessConfigurationManager(), "Arimo");
     brandingService.start();
+    // the first compile, which the synchroniser triggers
+    brandingService.getThemeStylesheet();
 
     storedFontFamily.set("Inter");
     lastUpdatedTime.set("2");
@@ -1476,6 +1654,339 @@ public class BrandingServiceImplTest {
                                    mock(ListenerService.class),
                                    mock(UserACL.class),
                                    initParams);
+  }
+
+  private BrandingServiceImpl readyBrandingService(FileService fileService,
+                                                   io.meeds.portal.theme.service.ThemeService themeService,
+                                                   io.meeds.portal.theme.model.BrandingState state) {
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+                                                             fileService,
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    io.meeds.portal.theme.model.Theme theme = new io.meeds.portal.theme.model.Theme(1,
+                                                                                    "Default Theme",
+                                                                                    false,
+                                                                                    io.meeds.portal.theme.constant.ThemeOrigin.DEFAULT,
+                                                                                    null,
+                                                                                    new io.meeds.portal.theme.model.ThemeSettings(),
+                                                                                    null,
+                                                                                    null);
+    when(themeService.getState()).thenReturn(state);
+    when(themeService.getThemeInUse()).thenReturn(theme);
+    when(themeService.resolve(any(io.meeds.portal.theme.model.Theme.class))).thenReturn(new io.meeds.portal.theme.model.ResolvedTheme());
+    brandingService.setThemeService(themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    return brandingService;
+  }
+
+  private static io.meeds.portal.theme.model.BrandingState brandingState(long version, Long logo, Long favicon) {
+    return new io.meeds.portal.theme.model.BrandingState(version, true, null, logo, null, favicon, null, null, null, null, null, 0);
+  }
+
+  @Test
+  public void testTheThemeInUseIsResolvedOncePerStampForEveryPageGetter() {
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    BrandingServiceImpl brandingService = readyBrandingService(mock(FileService.class), themeService, brandingState(1, null, null));
+    try {
+      brandingService.getBrandingInformation(false);
+      brandingService.getBrandingInformation(false);
+      verify(themeService, times(1)).resolve(any(io.meeds.portal.theme.model.Theme.class));
+
+      when(themeService.getState()).thenReturn(brandingState(2, null, null));
+      brandingService.getPageWidth();
+      brandingService.getPageWidth();
+      verify(themeService, times(2)).resolve(any(io.meeds.portal.theme.model.Theme.class));
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheBrandingInformationWithoutBinariesReadsNoFileBytes() throws Exception {
+    FileService fileService = mock(FileService.class);
+    java.util.Date updated = new java.util.Date(1234L);
+    when(fileService.getFileInfo(5L)).thenReturn(new org.exoplatform.commons.file.model.FileInfo(5L, "logo", "image/png", "branding", 8L, updated, "root", null, false));
+    when(fileService.getFileInfo(6L)).thenReturn(new org.exoplatform.commons.file.model.FileInfo(6L, "favicon", "image/png", "branding", 9L, updated, "root", null, false));
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    BrandingServiceImpl brandingService = readyBrandingService(fileService, themeService, brandingState(1, 5L, 6L));
+    try {
+      Branding branding = brandingService.getBrandingInformation(false);
+
+      assertEquals(5L, branding.getLogo().getFileId());
+      assertEquals(8L, branding.getLogo().getSize());
+      assertEquals(1234L, branding.getLogo().getUpdatedDate());
+      assertNull(branding.getLogo().getData());
+      assertEquals(6L, branding.getFavicon().getFileId());
+      verify(fileService, never()).getFile(org.mockito.ArgumentMatchers.anyLong());
+
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheBrandingInformationBackgroundsAreTheThemeInUsesLightImagesOnceReady() throws Exception {
+    byte[] png = { (byte) 0x89, 'P', 'N', 'G', 1 };
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    when(themeService.getThemeImageFileId(1L, "topBarBackgroundImage", false)).thenReturn(31L);
+    when(themeService.readImage(31L)).thenReturn(new io.meeds.portal.theme.model.ImageBytes(png, "image/png", 0, 4321L));
+    when(themeService.getThemeImageFileId(1L, "sideBarBackgroundImage", false)).thenReturn(null);
+    BrandingServiceImpl brandingService = readyBrandingService(mock(FileService.class), themeService, brandingState(1, null, null));
+    try {
+      Branding branding = brandingService.getBrandingInformation(true);
+
+      assertEquals(Long.valueOf(31L), brandingService.getTopBarBackgroundId());
+      assertEquals(31L, branding.getTopBarBackground().getFileId());
+      assertEquals(5, branding.getTopBarBackground().getData().length);
+      assertEquals(4321L, branding.getTopBarBackground().getUpdatedDate());
+      assertEquals("addressed by the file the endpoint caches", "/portal/rest/v1/platform/branding/topBarBackground?v=31",
+                   brandingService.getTopBarBackgroundPath());
+      // an image key the theme has none for: an empty background, no path
+      assertNull(brandingService.getSideBarBackgroundId());
+      assertNull(branding.getSideBarBackground().getData());
+      assertNull(brandingService.getSideBarBackgroundPath());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheBinaryReadsOfTheLogoAndFaviconGoThroughTheNodesImageCache() throws Exception {
+    FileService fileService = mock(FileService.class);
+    java.util.Date updated = new java.util.Date(1234L);
+    byte[] png = { (byte) 0x89, 'P', 'N', 'G', 1 };
+    when(fileService.getFile(5L)).thenAnswer(i -> new FileItem(5L, "logo", "image/png", io.meeds.portal.theme.storage.ThemeFileStorage.FILE_NAME_SPACE, 5L, updated, "root", false,
+                                                              new java.io.ByteArrayInputStream(png)));
+    when(fileService.getFile(6L)).thenAnswer(i -> new FileItem(6L, "favicon", "image/png", io.meeds.portal.theme.storage.ThemeFileStorage.FILE_NAME_SPACE, 5L, updated, "root", false,
+                                                              new java.io.ByteArrayInputStream(png)));
+    // the real per-node cache behind the theme service, as the REST endpoints use it
+    io.meeds.portal.theme.storage.ThemeFileStorage storage = new io.meeds.portal.theme.storage.ThemeFileStorage();
+    org.springframework.test.util.ReflectionTestUtils.setField(storage, "fileService", fileService);
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    when(themeService.readImage(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(i -> storage.readImage(i.getArgument(0)));
+    BrandingServiceImpl brandingService = readyBrandingService(fileService, themeService, brandingState(1, 5L, 6L));
+    try {
+      Logo logo = brandingService.getLogo();
+      assertEquals(5L, logo.getFileId());
+      assertEquals(5L, logo.getSize());
+      assertEquals(1234L, logo.getUpdatedDate());
+      assertEquals(5, logo.getData().length);
+      assertNotNull(brandingService.getFavicon().getData());
+      brandingService.getLogo();
+      brandingService.getFavicon();
+
+      verify(fileService, times(1)).getFile(5L);
+      verify(fileService, times(1)).getFile(6L);
+      verify(fileService, never()).getFileInfo(org.mockito.ArgumentMatchers.anyLong());
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheLightOnlyListIsParsedOnceUntilItsPropertyChanges() {
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    String previous = System.getProperty("exo.branding.lightOnlyApplications");
+    try {
+      System.setProperty("exo.branding.lightOnlyApplications", "a, b");
+      PropertyManager.refresh();
+      java.util.List<String> first = brandingService.getLightOnlyApplications();
+      assertEquals(java.util.List.of("a", "b"), first);
+      org.junit.Assert.assertSame("the same parsed list while the raw string is unchanged", first, brandingService.getLightOnlyApplications());
+
+      System.setProperty("exo.branding.lightOnlyApplications", "c");
+      PropertyManager.refresh();
+      assertEquals(java.util.List.of("c"), brandingService.getLightOnlyApplications());
+    } finally {
+      if (previous == null) {
+        System.clearProperty("exo.branding.lightOnlyApplications");
+      } else {
+        System.setProperty("exo.branding.lightOnlyApplications", previous);
+      }
+      PropertyManager.refresh();
+    }
+  }
+
+  @Test
+  public void testTheApplicationsNotAdaptedToDarkKeepTheirLightDisplay() {
+    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    String previous = System.getProperty("exo.branding.lightOnlyApplications");
+    try {
+      System.clearProperty("exo.branding.lightOnlyApplications");
+      PropertyManager.refresh();
+      assertTrue(brandingService.isLightOnlyApplication("time-tracker/TimeTrackingPortlet"));
+      assertTrue(brandingService.isLightOnlyApplication("documents-cleanup/DocumentCleanupAdmin"));
+      assertFalse(brandingService.isLightOnlyApplication("social-portlet/UserSettingLanguage"));
+      assertFalse(brandingService.isLightOnlyApplication(null));
+      assertEquals(List.of("Time Tracker Quick Action"), brandingService.getLightOnlyVueApps());
+
+      System.setProperty("exo.branding.lightOnlyApplications", " MyPortlet , ,Other");
+      PropertyManager.refresh();
+      assertEquals(List.of("MyPortlet", "Other"), brandingService.getLightOnlyApplications());
+      assertTrue(brandingService.isLightOnlyApplication("custom/MyPortlet"));
+      assertFalse(brandingService.isLightOnlyApplication("time-tracker/TimeTrackingPortlet"));
+    } finally {
+      if (previous == null) {
+        System.clearProperty("exo.branding.lightOnlyApplications");
+      } else {
+        System.setProperty("exo.branding.lightOnlyApplications", previous);
+      }
+      PropertyManager.refresh();
+    }
+  }
+
+  @Test
+  public void testTheCustomCssIsSavedAloneAndAForbiddenOneRefused() {
+    SettingService settingService = mock(SettingService.class);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             mock(ConfigurationManager.class),
+                                                             mock(PortalContainer.class),
+                                                             new InitParams());
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> brandingService.updateCustomCss("a { background: url(javascript:x) }"));
+    assertEquals(BrandingServiceImpl.CUSTOM_CSS_FORBIDDEN_MESSAGE, e.getMessage());
+    assertThrows(IllegalArgumentException.class, () -> brandingService.validateCustomCss("a { width: eval(1) }"));
+    verify(settingService, never()).set(any(), any(), eq(BrandingServiceImpl.BRANDING_CUSTOM_CSS), any());
+    brandingService.updateCustomCss(".a { color: red; }");
+    verify(settingService).set(any(), any(), eq(BrandingServiceImpl.BRANDING_CUSTOM_CSS), any());
+  }
+
+  @Test
+  public void testARequestWaitsAtMostTheStylesheetWaitThenGetsTheLastCompiledStylesheet() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    // the real template, so that serving the pristine stylesheet instead of the last compiled one is told apart
+    java.io.File lessFile = new java.io.File("../../web/portal/src/main/webapp/WEB-INF/conf/branding/branding.less");
+    org.junit.Assume.assumeTrue("branding.less of web/portal is needed", lessFile.exists());
+    ConfigurationManager configurationManager = mock(ConfigurationManager.class);
+    when(configurationManager.getInputStream("war:/conf/branding/branding.less")).thenAnswer(i -> new java.io.FileInputStream(lessFile));
+    InitParams initParams = new InitParams();
+    ValueParam lessPath = new ValueParam();
+    lessPath.setName(BrandingServiceImpl.BRANDING_THEME_LESS_PATH);
+    lessPath.setValue("war:/conf/branding/branding.less");
+    initParams.addParameter(lessPath);
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
+                                                             mock(FileService.class),
+                                                             mock(UploadService.class),
+                                                             mock(LocaleConfigService.class),
+                                                             configurationManager,
+                                                             mock(PortalContainer.class),
+                                                             initParams);
+    when(settingService.get(any(), any(), eq(BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY))).thenReturn((SettingValue) SettingValue.create("1000"));
+    org.exoplatform.portal.branding.model.ThemeStylesheet first = brandingService.getThemeStylesheet();
+
+    // a new stamp while another request holds the compile, the current stylesheet cleared as a write clears it
+    brandingService.updateLastUpdatedTime(2000);
+    when(settingService.get(any(), any(), eq(BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY))).thenReturn((SettingValue) SettingValue.create("2000"));
+    java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    Thread compiling = new Thread(() -> {
+      brandingService.getThemeCSSLock().lock();
+      try {
+        held.countDown();
+        release.await(30, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } finally {
+        brandingService.getThemeCSSLock().unlock();
+      }
+    });
+    compiling.start();
+    try {
+      assertTrue(held.await(10, java.util.concurrent.TimeUnit.SECONDS));
+      long start = System.currentTimeMillis();
+      org.exoplatform.portal.branding.model.ThemeStylesheet served = brandingService.getThemeStylesheet();
+      long waited = System.currentTimeMillis() - start;
+      org.junit.Assert.assertSame("the last compiled stylesheet is served while another request compiles", first, served);
+      assertTrue("waited " + waited + " ms",
+                 waited >= BrandingServiceImpl.STYLESHEET_WAIT_MILLIS - 100 && waited < BrandingServiceImpl.STYLESHEET_WAIT_MILLIS + 3000);
+    } finally {
+      release.countDown();
+      compiling.join(10000);
+    }
+    // the compile done, the next request gets the stylesheet of the new stamp
+    assertEquals(first.stamp() + 1000, brandingService.getThemeStylesheet().stamp());
+  }
+
+  @Test
+  public void testTheCustomCssWriteBroadcastsNothingAsItsPublicationDoes() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    ListenerService listenerService = mock(ListenerService.class);
+    BrandingServiceImpl brandingService = new BrandingServiceImpl(mock(PortalContainer.class),
+                                                                  mock(ConfigurationManager.class),
+                                                                  settingService,
+                                                                  mock(FileService.class),
+                                                                  mock(UploadService.class),
+                                                                  mock(LocaleConfigService.class),
+                                                                  listenerService,
+                                                                  mock(UserACL.class),
+                                                                  new InitParams());
+
+    brandingService.updateCustomCss(".a { color: red; }");
+
+    verify(settingService).set(any(), any(), eq(BrandingServiceImpl.BRANDING_CUSTOM_CSS), any());
+    // the stamp moves: a stylesheet compiled between the publication's commit and this write is not kept
+    verify(settingService).set(any(), any(), eq(BrandingServiceImpl.BRANDING_LAST_UPDATED_TIME_KEY), any());
+    verify(listenerService, never()).broadcast(anyString(), any(), any());
+  }
+
+  @Test
+  public void testALegacySettingsWriterBroadcastsThePublishedVersionNotTheBranding() {
+    ListenerService listenerService = mock(ListenerService.class);
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    when(themeService.getState()).thenReturn(brandingState(7, null, null));
+    BrandingServiceImpl brandingService = new BrandingServiceImpl(mock(PortalContainer.class),
+                                                                  mock(ConfigurationManager.class),
+                                                                  mock(SettingService.class),
+                                                                  mock(FileService.class),
+                                                                  mock(UploadService.class),
+                                                                  mock(LocaleConfigService.class),
+                                                                  listenerService,
+                                                                  mock(UserACL.class),
+                                                                  new InitParams());
+    brandingService.setThemeService(themeService);
+    io.meeds.portal.theme.ThemeReadiness.setReady();
+    try {
+      brandingService.updateSiteName("Site");
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+
+    verify(listenerService).broadcast(BrandingService.BRANDING_UPDATED_EVENT, null, Long.valueOf(7L));
+  }
+
+  @Test
+  public void testALegacySettingsWriterBroadcastsALongBeforeTheThemeServicesAreReady() {
+    ListenerService listenerService = mock(ListenerService.class);
+    BrandingServiceImpl brandingService = new BrandingServiceImpl(mock(PortalContainer.class),
+                                                                  mock(ConfigurationManager.class),
+                                                                  mock(SettingService.class),
+                                                                  mock(FileService.class),
+                                                                  mock(UploadService.class),
+                                                                  mock(LocaleConfigService.class),
+                                                                  listenerService,
+                                                                  mock(UserACL.class),
+                                                                  new InitParams());
+    brandingService.updateSiteName("Site");
+
+    verify(listenerService).broadcast(eq(BrandingService.BRANDING_UPDATED_EVENT), isNull(), any(Long.class));
   }
 
 }

@@ -163,6 +163,115 @@ public class TestUploadService extends AbstractKernelTest {
     }
 
     @Test
+    public void testShouldRejectAnSvgReferencingAnExternalResource() throws Exception {
+        SvgUploadValidator validator = new SvgUploadValidator();
+        String[] external = {
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><image xlink:href=\"https://tracker.example/p.png\"/></svg>",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><use href=\"other.svg#icon\"/></svg>",
+        };
+        for (String svg : external) {
+            try (InputStream inputStream = new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))) {
+                validator.validate("logo.svg", "image/svg+xml", inputStream);
+                fail("An external reference must be refused: " + svg);
+            } catch (FileUploadException e) {
+                assertEquals(SvgUploadValidator.INFECTED_SVG_MESSAGE, e.getMessage());
+            }
+        }
+        String[] internal = {
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><g id=\"a\"/></defs><use href=\"#a\"/></svg>",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><image xlink:href=\"data:image/png;base64,iVBORw0KGgo=\"/></svg>",
+        };
+        for (String svg : internal) {
+            try (InputStream inputStream = new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))) {
+                validator.validate("logo.svg", "image/svg+xml", inputStream);
+            }
+        }
+    }
+
+    @Test
+    public void testShouldRejectAnSvgReachingAnExternalResourceThroughCss() throws Exception {
+        String[] external = {
+            svg("<style>@import url(https://attacker.example/t.css);</style>"),
+            svg("<style>@import \"https://attacker.example/t.css\";</style>"),
+            svg("<style><![CDATA[ .a { fill: url(https://attacker.example/p#g); } ]]></style>"),
+            svg("<style>.a { background: url( 'https://attacker.example/p.png' ) }</style>"),
+            svg("<style>.a { background: image-set(\"https://attacker.example/p.png\" 1x) }</style>"),
+            svg("<style>.a { background: src(\"https://attacker.example/p.png\") }</style>"),
+            svg("<rect style=\"fill:url(https://attacker.example/p#g)\"/>"),
+            svg("<rect style=\"fill:url(&quot;//attacker.example/p#g&quot;)\"/>"),
+            svg("<rect fill=\"url(https://attacker.example/p#g)\"/>"),
+            svg("<rect filter=\"url(other.svg#blur)\"/>"),
+            svg("<rect mask=\"url(https://attacker.example/m#m)\"/>"),
+            svg("<rect style=\"fill:u\\72l(https://attacker.example/p#g)\"/>"),
+            svg("<rect style=\"fill:url(/**/https://attacker.example/p#g)\"/>"),
+            svg("<style>@\\69mport url(https://attacker.example/t.css);</style>"),
+        };
+        for (String svg : external) {
+            assertRefused(svg);
+        }
+    }
+
+    @Test
+    public void testShouldAcceptAnSvgReferencingOnlyItselfThroughCss() throws Exception {
+        String[] internal = {
+            svg("<defs><linearGradient id=\"g\"/></defs><rect fill=\"url(#g)\"/>"),
+            svg("<defs><linearGradient id=\"g\"/></defs><rect style=\"fill: url( '#g' ); stroke: url(&quot;#g&quot;)\"/>"),
+            svg("<defs><filter id=\"f\"/></defs><style>.a { filter: url(#f); fill: red; } /* url(https://x) */</style><rect class=\"a\"/>"),
+            svg("<style>.a { background: url(data:image/png;base64,iVBORw0KGgo=) }</style><rect class=\"a\"/>"),
+            svg("<rect style=\"background-image: url('data:image/svg+xml;utf8,&lt;svg/&gt;')\"/>"),
+            svg("<style>.a { fill: #333; stroke: rgb(1, 2, 3) }</style><rect class=\"a\" style=\"opacity: .5\"/>"),
+        };
+        for (String svg : internal) {
+            try (InputStream inputStream = new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))) {
+                new SvgUploadValidator().validate("logo.svg", "image/svg+xml", inputStream);
+            }
+        }
+    }
+
+    @Test
+    public void testShouldRejectAnAnimationGivingAnHrefAnExternalTarget() throws Exception {
+        String[] external = {
+            svg("<image><set attributeName=\"href\" to=\"https://attacker.example/p.png\"/></image>"),
+            svg("<image><set attributeName=\"xlink:href\" to=\"https://attacker.example/p.png\"/></image>"),
+            svg("<image><animate attributeName=\"href\" values=\"#a; https://attacker.example/p.png\" dur=\"1s\"/></image>"),
+            svg("<image><animate attributeName=\" href \" from=\"//attacker.example/p.png\" to=\"#a\" dur=\"1s\"/></image>"),
+            svg("<use><animate attributeName=\"href\" by=\"other.svg#a\" dur=\"1s\"/></use>"),
+        };
+        for (String svg : external) {
+            assertRefused(svg);
+        }
+    }
+
+    @Test
+    public void testShouldAcceptAnAnimationOfOtherAttributesAndOfHrefToItself() throws Exception {
+        String[] allowed = {
+            svg("<rect><set attributeName=\"fill\" to=\"red\"/></rect>"),
+            svg("<rect><animate attributeName=\"width\" values=\"1;5;9\" dur=\"1s\"/></rect>"),
+            svg("<defs><g id=\"a\"/><g id=\"b\"/></defs><use href=\"#a\"><set attributeName=\"href\" to=\"#b\"/></use>"),
+            svg("<defs><g id=\"a\"/><g id=\"b\"/></defs><use href=\"#a\"><animate attributeName=\"href\" values=\"#a;#b\" dur=\"1s\"/></use>"),
+            svg("<image><set attributeName=\"href\" to=\"data:image/png;base64,iVBORw0KGgo=\"/></image>"),
+        };
+        for (String svg : allowed) {
+            try (InputStream inputStream = new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))) {
+                new SvgUploadValidator().validate("logo.svg", "image/svg+xml", inputStream);
+            }
+        }
+    }
+
+    private static String svg(String content) {
+        return "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">" + content + "</svg>";
+    }
+
+    private static void assertRefused(String svg) throws IOException {
+        try (InputStream inputStream = new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))) {
+            new SvgUploadValidator().validate("logo.svg", "image/svg+xml", inputStream);
+            fail("An external reference must be refused: " + svg);
+        } catch (FileUploadException e) {
+            assertEquals(svg, SvgUploadValidator.INFECTED_SVG_MESSAGE, e.getMessage());
+        }
+    }
+
+    @Test
     public void testSvgValidatorShouldNotSupportNonSvgFiles() {
         SvgUploadValidator validator = new SvgUploadValidator();
 
