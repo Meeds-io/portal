@@ -35,7 +35,10 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -43,6 +46,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
+import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
@@ -80,7 +84,7 @@ public class UIPortalCacheTest {
     when(replicated.getMaxSize()).thenReturn(5000);
     when(replicated.getLiveTime()).thenReturn(86400L);
     secondEvictionExecutor = mock(ScheduledExecutorService.class);
-    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, secondEvictionExecutor);
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, null, secondEvictionExecutor);
     listeners = new HashMap<>();
     ListenerService listenerService = mock(ListenerService.class);
     doAnswer(invocation -> listeners.put(invocation.getArgument(0), invocation.getArgument(1))).when(listenerService)
@@ -171,7 +175,7 @@ public class UIPortalCacheTest {
         throw new IllegalStateException("The meta site name cannot be read");
       }
       return META_PORTAL;
-    }, secondEvictionExecutor);
+    }, null, secondEvictionExecutor);
     uiPortalCache.evictChanged(SiteKey.portal("administration"));
     ArgumentCaptor<Runnable> secondEviction = ArgumentCaptor.forClass(Runnable.class);
     verify(secondEvictionExecutor).schedule(secondEviction.capture(),
@@ -181,6 +185,54 @@ public class UIPortalCacheTest {
     secondEviction.getValue().run();
 
     assertEquals(2, calls.get());
+  }
+
+  @Test
+  public void testTheStopOfTheContainerStopsTheSecondEvictions() {
+    ExoContainer container = new ExoContainer();
+    container.start();
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated),
+                                      () -> META_PORTAL,
+                                      container,
+                                      secondEvictionExecutor);
+    uiPortalCache.stopWithContainer();
+    verify(secondEvictionExecutor, never()).shutdown();
+
+    container.stop();
+
+    verify(secondEvictionExecutor).shutdown();
+  }
+
+  @Test
+  public void testTheStopRunsTheWaitingSecondEvictionsThenEndsTheScheduler() {
+    ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1) {
+      @Override
+      public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+        // The delay of the cache, shortened for the test
+        return super.schedule(command, 200, TimeUnit.MILLISECONDS);
+      }
+    };
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, null, scheduler);
+    SiteKey siteKey = SiteKey.portal("administration");
+    uiPortalCache.evictChanged(siteKey);
+    build(siteKey);
+
+    uiPortalCache.stop();
+
+    assertTrue(scheduler.isTerminated());
+    assertNull("The waiting second eviction ran before the stop ended", uiPortalCache.get(siteKey));
+  }
+
+  @Test
+  public void testAChangeAfterTheStopIsEvictedOnceWithoutFailing() throws Exception {
+    build(SiteKey.portal("administration"));
+    when(secondEvictionExecutor.schedule(any(Runnable.class), eq(UIPortalCache.SECOND_EVICTION_DELAY), eq(TimeUnit.SECONDS)))
+      .thenThrow(new RejectedExecutionException());
+    uiPortalCache.stop();
+
+    uiPortalCache.evictChanged(SiteKey.portal("administration"));
+
+    assertNull(uiPortalCache.get(SiteKey.portal("administration")));
   }
 
   @Test

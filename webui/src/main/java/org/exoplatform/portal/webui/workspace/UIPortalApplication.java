@@ -227,10 +227,12 @@ public class UIPortalApplication extends UIApplication {
 
     this.uiPortalCache = new UIPortalCache(ExoContainerContext.getService(CacheService.class)
                                                               .getCacheInstance(UIPortalCache.CACHE_NAME),
-                                           portalConfigService::getMetaPortal);
+                                           portalConfigService::getMetaPortal,
+                                           ExoContainerContext.getCurrentContainer());
     initWorkspaces(context.getPortalOwner());
     // Listen to storage to evict the built sites when their stored site or pages change
     this.uiPortalCache.listenTo(ExoContainerContext.getService(ListenerService.class));
+    this.uiPortalCache.stopWithContainer();
   }
 
   /**

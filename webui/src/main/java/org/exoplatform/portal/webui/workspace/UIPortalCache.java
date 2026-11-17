@@ -20,12 +20,16 @@ package org.exoplatform.portal.webui.workspace;
 
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import lombok.SneakyThrows;
+import lombok.Synchronized;
 
+import org.exoplatform.container.BaseContainerLifecyclePlugin;
+import org.exoplatform.container.ExoContainer;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
@@ -60,30 +64,39 @@ public class UIPortalCache {
    */
   public static final long                      SECOND_EVICTION_DELAY    = 10;
 
-  private static final ScheduledExecutorService SECOND_EVICTION_EXECUTOR =
-                                                                         Executors.newSingleThreadScheduledExecutor(runnable -> {
-                                                                           Thread thread =
-                                                                                         new Thread(runnable,
-                                                                                                    "UIPortalCache-second-eviction");
-                                                                           thread.setDaemon(true);
-                                                                           return thread;
-                                                                         });
+  /**
+   * How long, in seconds, beyond the delay, the stop waits for the second
+   * evictions
+   */
+  static final long                             STOP_MARGIN              = 2;
 
   private final ExoCache<SiteKey, UIPortal>     cache;
 
   private final Supplier<String>                metaPortal;
 
+  /**
+   * The scheduler of the second evictions, owned by this cache and shut down
+   * at its stop, once the evictions waiting have run
+   */
   private final ScheduledExecutorService        secondEvictionExecutor;
 
-  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache, Supplier<String> metaPortal) {
-    this(cache, metaPortal, SECOND_EVICTION_EXECUTOR);
+  /**
+   * The container whose stop stops this cache, and whose lock guards the
+   * registration of that stop
+   */
+  private final ExoContainer                    container;
+
+  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache, Supplier<String> metaPortal, ExoContainer container) {
+    this(cache, metaPortal, container, newSecondEvictionScheduler());
   }
 
   UIPortalCache(ExoCache<SiteKey, UIPortal> cache,
                 Supplier<String> metaPortal,
+                ExoContainer container,
                 ScheduledExecutorService secondEvictionExecutor) {
     this.cache = cache;
     this.metaPortal = metaPortal;
+    this.container = container;
     this.secondEvictionExecutor = secondEvictionExecutor;
   }
 
@@ -133,13 +146,59 @@ public class UIPortalCache {
    */
   public void evictChanged(SiteKey siteKey) {
     evictNow(siteKey);
-    secondEvictionExecutor.schedule(() -> {
-      try {
-        evictNow(siteKey);
-      } catch (RuntimeException e) {
-        LOG.warn("Error while evicting the build of site {} a second time", siteKey, e);
+    try {
+      secondEvictionExecutor.schedule(() -> {
+        try {
+          evictNow(siteKey);
+        } catch (RuntimeException e) {
+          LOG.warn("Error while evicting the build of site {} a second time", siteKey, e);
+        }
+      }, SECOND_EVICTION_DELAY, TimeUnit.SECONDS);
+    } catch (RejectedExecutionException e) {
+      // The cache stopped: the eviction made at once is the only one
+      LOG.debug("The cache stopped: no second eviction of site {} is scheduled", siteKey, e);
+    }
+  }
+
+  /**
+   * Stops this cache when its container stops. The container reads its
+   * lifecycle plugins in its start and stop, synchronized on itself, but adds
+   * them without the lock: the add takes the same lock, the container's own.
+   */
+  @Synchronized("container")
+  protected void stopWithContainer() {
+    container.addContainerLifecylePlugin(new BaseContainerLifecyclePlugin() {
+      @Override
+      public void stopContainer(ExoContainer stoppedContainer) {
+        stop();
       }
-    }, SECOND_EVICTION_DELAY, TimeUnit.SECONDS);
+    });
+  }
+
+  /**
+   * Stops the scheduler of the second evictions once the evictions waiting
+   * have run: each is meant for the other nodes, which keep running, and the
+   * container stops its lifecycle plugins before its caches. The stop waits up
+   * to {@link #SECOND_EVICTION_DELAY} seconds, and only when a site changed
+   * within that delay.
+   */
+  public void stop() {
+    secondEvictionExecutor.shutdown();
+    try {
+      if (!secondEvictionExecutor.awaitTermination(SECOND_EVICTION_DELAY + STOP_MARGIN, TimeUnit.SECONDS)) {
+        LOG.warn("A second eviction of sites did not end within {} seconds of the stop", SECOND_EVICTION_DELAY + STOP_MARGIN);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private static ScheduledExecutorService newSecondEvictionScheduler() {
+    return Executors.newSingleThreadScheduledExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "UIPortalCache-second-eviction");
+      thread.setDaemon(true);
+      return thread;
+    });
   }
 
   /**
