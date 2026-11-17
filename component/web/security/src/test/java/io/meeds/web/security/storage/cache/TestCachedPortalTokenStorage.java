@@ -186,9 +186,8 @@ public class TestCachedPortalTokenStorage extends AbstractKernelTest {
       // store loads again from it
       assertNull(cache.get("owner-token"));
       assertNull(cache.get("owner-second-token"));
-      // The eXo transaction of this release commits what ran before the
-      // failure, unlike a release whose transaction rolls back on an
-      // exception: the first token is deleted, the second kept
+      // The eXo transaction commits what ran before the failure unless it
+      // is marked rollback-only: the first token is deleted, the second kept
       entityManagerService.getEntityManager().clear();
       assertEquals(1, tokenDAO.findByUsername(TOKEN_OWNER).size());
     } finally {
