@@ -191,9 +191,8 @@ public class PortalWarmupTest {
   /**
    * The request never asks a cleartext connector to upgrade to HTTP/2 (h2c):
    * the JDK client does by default, a Tomcat connector carrying
-   * {@code Http2Protocol} accepts, and upgraded responses from 64 KB to 2 MB
-   * then stalled (reproduced with Tomcat 11.0.24 and a JDK 25 client,
-   * EXO-94550). The JDK
+   * {@code Http2Protocol} accepts, and large upgraded responses stall
+   * (EXO-94550). The JDK
    * server used here speaks HTTP/1.1 only, so the test reads the headers that
    * would ask for the upgrade, for the loopback URL and for a configured one.
    */
