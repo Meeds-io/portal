@@ -41,6 +41,8 @@ import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
+import lombok.Synchronized;
+
 /**
  * The sites a node built, by site key. Each node builds a site from the stored
  * site and keeps its build: a build is never sent to the other nodes. A site
@@ -79,15 +81,23 @@ public class UIPortalCache {
    */
   private final ScheduledExecutorService        secondEvictionExecutor;
 
-  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache, Supplier<String> metaPortal) {
-    this(cache, metaPortal, newSecondEvictionScheduler());
+  /**
+   * The container whose stop stops this cache, and whose lock guards the
+   * registration of that stop
+   */
+  private final ExoContainer                    container;
+
+  public UIPortalCache(ExoCache<SiteKey, UIPortal> cache, Supplier<String> metaPortal, ExoContainer container) {
+    this(cache, metaPortal, container, newSecondEvictionScheduler());
   }
 
   UIPortalCache(ExoCache<SiteKey, UIPortal> cache,
                 Supplier<String> metaPortal,
+                ExoContainer container,
                 ScheduledExecutorService secondEvictionExecutor) {
     this.cache = cache;
     this.metaPortal = metaPortal;
+    this.container = container;
     this.secondEvictionExecutor = secondEvictionExecutor;
   }
 
@@ -152,22 +162,18 @@ public class UIPortalCache {
   }
 
   /**
-   * Stops this cache when the container stops
-   *
-   * @param container the container whose stop stops this cache
+   * Stops this cache when its container stops. The container reads its
+   * lifecycle plugins in its start and stop, synchronized on itself, but adds
+   * them without the lock: the add takes the same lock, the container's own.
    */
-  public void stopWith(ExoContainer container) {
-    // The container reads its lifecycle plugins in its start and stop,
-    // synchronized on itself, but adds them without the lock: the add takes
-    // the same lock
-    synchronized (container) {
-      container.addContainerLifecylePlugin(new BaseContainerLifecyclePlugin() {
-        @Override
-        public void stopContainer(ExoContainer stoppedContainer) {
-          stop();
-        }
-      });
-    }
+  @Synchronized("container")
+  protected void stopWithContainer() {
+    container.addContainerLifecylePlugin(new BaseContainerLifecyclePlugin() {
+      @Override
+      public void stopContainer(ExoContainer stoppedContainer) {
+        stop();
+      }
+    });
   }
 
   /**

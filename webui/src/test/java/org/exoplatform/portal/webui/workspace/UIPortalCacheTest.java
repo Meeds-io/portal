@@ -84,7 +84,7 @@ public class UIPortalCacheTest {
     when(replicated.getMaxSize()).thenReturn(5000);
     when(replicated.getLiveTime()).thenReturn(86400L);
     secondEvictionExecutor = mock(ScheduledExecutorService.class);
-    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, secondEvictionExecutor);
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, null, secondEvictionExecutor);
     listeners = new HashMap<>();
     ListenerService listenerService = mock(ListenerService.class);
     doAnswer(invocation -> listeners.put(invocation.getArgument(0), invocation.getArgument(1))).when(listenerService)
@@ -175,7 +175,7 @@ public class UIPortalCacheTest {
         throw new IllegalStateException("The meta site name cannot be read");
       }
       return META_PORTAL;
-    }, secondEvictionExecutor);
+    }, null, secondEvictionExecutor);
     uiPortalCache.evictChanged(SiteKey.portal("administration"));
     ArgumentCaptor<Runnable> secondEviction = ArgumentCaptor.forClass(Runnable.class);
     verify(secondEvictionExecutor).schedule(secondEviction.capture(),
@@ -191,7 +191,11 @@ public class UIPortalCacheTest {
   public void testTheStopOfTheContainerStopsTheSecondEvictions() {
     ExoContainer container = new ExoContainer();
     container.start();
-    uiPortalCache.stopWith(container);
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated),
+                                      () -> META_PORTAL,
+                                      container,
+                                      secondEvictionExecutor);
+    uiPortalCache.stopWithContainer();
     verify(secondEvictionExecutor, never()).shutdown();
 
     container.stop();
@@ -208,7 +212,7 @@ public class UIPortalCacheTest {
         return super.schedule(command, 200, TimeUnit.MILLISECONDS);
       }
     };
-    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, scheduler);
+    uiPortalCache = new UIPortalCache(new AsyncInvalidationExoCache<>(replicated), () -> META_PORTAL, null, scheduler);
     SiteKey siteKey = SiteKey.portal("administration");
     uiPortalCache.evictChanged(siteKey);
     build(siteKey);
