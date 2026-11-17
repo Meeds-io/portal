@@ -231,6 +231,7 @@ public class UIPortalApplication extends UIApplication {
     initWorkspaces(context.getPortalOwner());
     // Listen to storage to evict the built sites when their stored site or pages change
     this.uiPortalCache.listenTo(ExoContainerContext.getService(ListenerService.class));
+    this.uiPortalCache.stopWith(ExoContainerContext.getCurrentContainer());
   }
 
   /**
