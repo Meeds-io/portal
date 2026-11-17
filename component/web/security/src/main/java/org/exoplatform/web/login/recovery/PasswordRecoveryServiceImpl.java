@@ -23,10 +23,6 @@ import static org.exoplatform.web.security.security.CookieTokenService.EXTERNAL_
 import static org.exoplatform.web.security.security.CookieTokenService.FORGOT_PASSWORD_TOKEN;
 import static org.exoplatform.web.security.security.CookieTokenService.ONBOARD_TOKEN;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -35,12 +31,14 @@ import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
+
+import io.meeds.portal.mail.EmailBrand;
+import io.meeds.portal.mail.EmailLayout;
+import io.meeds.portal.mail.EmailModel;
 
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.commons.utils.MailUtils;
@@ -68,37 +66,7 @@ import org.exoplatform.web.security.security.RemindPasswordTokenService;
 
 public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
-  private static final String                  USER_FIRST_NAME_PARAM            = "${FIRST_NAME}";
-
-  private static final String                  LOGIN_LINK_PARAM                 = "${LOGIN_LINK}";
-
-  private static final String                  USERNAME_PARAM                   = "${USERNAME}";
-
-  private static final String                  DISPLAY_NAME_PARAM               = "${DISPLAY_NAME}";
-
-  private static final String                  EXTERNAL_REGISTRATION_LINK_PARAM = "${EXTERNAL_REGISTRATION_LINK}";
-
   private static final String                  EXTERNAL_REGISTRATION_NAME       = "external-registration";
-
-  private static final String                  SPACE_DISPLAY_NAME_PARAM         = "${SPACE_DISPLAY_NAME}";
-
-  private static final String                  SENDER_DISPLAY_NAME_PARAM        = "${SENDER_DISPLAY_NAME}";
-
-  private static final String                  RESET_PASSWORD_LINK_PARAM        = "${RESET_PASSWORD_LINK}";
-
-  private static final String                  USER_DISPLAY_NAME_PARAM          = "${USER_DISPLAY_NAME}";
-
-  private static final String                  COMPANY_NAME_PARAM               = "${COMPANY_NAME}";
-
-  private static final String                  ONBOARDING_MESSAGE_PARAM         = "ONBOARDING_MESSAGE";
-
-  private static final String                  LINK_VALIDITY_PARAM              = "LINK_VALIDITY";
-
-  /**
-   * Every placeholder of a template, filled in one pass so that a value
-   * holding a placeholder's form is rendered as text
-   */
-  private static final Pattern                 PLACEHOLDER_PATTERN              = Pattern.compile("\\$\\{(\\w+)\\}");
 
   public static final String                   AUTHENTICATION_ATTEMPTS          = "authenticationAttempts";
 
@@ -285,31 +253,30 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   }
 
   /**
-   * Builds the onboarding email from its template: the administrator's
-   * message, HTML its caller has sanitized, is inserted as is above the link,
-   * and the link's validity is written in days when it is a whole number of
-   * days from two up, in whole hours otherwise
+   * Builds the onboarding email: the administrator's message, HTML its caller
+   * has sanitized, is inserted as is above the link, and the link's
+   * validity is written in days when it is a whole number of days from two
+   * up, in whole hours otherwise
    */
   protected String buildOnboardingEmailBody(User user,
                                             ResourceBundle bundle,
                                             String link,
                                             String message,
                                             long validityMillis) {
-    String content;
-    InputStream input = this.getClass().getClassLoader().getResourceAsStream("conf/onBoarding_email_template.html");
-    if (input == null) {
-      content = "";
-    } else {
-      content = resolveLanguage(input, bundle);
+    String name = user == null || user.getDisplayName() == null ? "" : user.getDisplayName();
+    String company = brandingService.getCompanyName();
+    EmailModel.Builder email = emailOf(bundle).title(text(bundle, "onboarding.email.header").trim() + " " + company)
+                                              .paragraph(EmailLayout.greeting(text(bundle, "onboarding.email.hello"), name))
+                                              .paragraph(text(bundle, "onboarding.email.welcome").trim() + " " + company)
+                                              .lead(EmailLayout.leadIn(text(bundle, "onboarding.email.accessLink")))
+                                              .button(text(bundle, "onboarding.email.join"), link)
+                                              .note(text(bundle, "onboarding.email.linkValidity") + " "
+                                                  + buildValidityLabel(bundle, validityMillis))
+                                              .signoff(text(bundle, "onboarding.email.bye"));
+    if (StringUtils.isNotBlank(message)) {
+      email.trustedHtml(buildOnboardingMessageBlock(message));
     }
-
-    Map<String, String> values = new HashMap<>();
-    values.put(unwrap(USER_DISPLAY_NAME_PARAM), user == null || user.getDisplayName() == null ? "" : user.getDisplayName());
-    values.put(unwrap(COMPANY_NAME_PARAM), brandingService.getCompanyName());
-    values.put(unwrap(RESET_PASSWORD_LINK_PARAM), link);
-    values.put(ONBOARDING_MESSAGE_PARAM, buildOnboardingMessageBlock(message));
-    values.put(LINK_VALIDITY_PARAM, buildValidityLabel(bundle, validityMillis));
-    return fillTemplate(content, values);
+    return render(email);
   }
 
   /**
@@ -357,26 +324,6 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
       pattern = "{0}";
     }
     return pattern.replace("{0}", String.valueOf(value));
-  }
-
-  /**
-   * Fills every placeholder of the template in one pass: a value holding a
-   * placeholder's form stays text, and a placeholder with no value is
-   * removed
-   */
-  protected static String fillTemplate(String template, Map<String, String> values) {
-    Matcher matcher = PLACEHOLDER_PATTERN.matcher(template);
-    StringBuilder filled = new StringBuilder();
-    while (matcher.find()) {
-      String value = values.getOrDefault(matcher.group(1), "");
-      matcher.appendReplacement(filled, Matcher.quoteReplacement(value));
-    }
-    matcher.appendTail(filled);
-    return filled.toString();
-  }
-
-  private static String unwrap(String placeholder) {
-    return placeholder.substring(2, placeholder.length() - 1);
   }
 
   private CookieTokenService tokenService(String type) {
@@ -467,21 +414,17 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     return remindPasswordTokenService.createToken(email, EXTERNAL_REGISTRATION_TOKEN);
   }
 
-  private String buildExternalEmailBody(String sender, String space, String link, ResourceBundle bundle) {
-    String content;
-    InputStream input = this.getClass().getClassLoader().getResourceAsStream("conf/external_email_template.html");
-    if (input == null) {
-      content = "";
-    } else {
-      content = resolveLanguage(input, bundle);
-    }
-
-    content = content.replace(SENDER_DISPLAY_NAME_PARAM, sender);
-    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
-    content = content.replace(SPACE_DISPLAY_NAME_PARAM, space);
-    content = content.replace(EXTERNAL_REGISTRATION_LINK_PARAM, link);
-
-    return content;
+  protected String buildExternalEmailBody(String sender, String space, String link, ResourceBundle bundle) {
+    String company = brandingService.getCompanyName();
+    return render(emailOf(bundle).title(sender + " " + text(bundle, "external.email.invitedBy") + " " + space + " "
+        + text(bundle, "external.email.on") + " " + company)
+                                 .paragraph(EmailLayout.greeting(text(bundle, "external.email.hello"), ""))
+                                 .paragraph(text(bundle, "external.email.descriptionPart1"))
+                                 .paragraph(text(bundle, "external.email.descriptionPart2"))
+                                 .lead(text(bundle, "external.email.accessLink"))
+                                 .button(text(bundle, "external.email.create"), link)
+                                 .note(text(bundle, "external.email.note"))
+                                 .signoff(text(bundle, "external.email.bye")));
   }
 
   @Override
@@ -567,48 +510,32 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     return true;
   }
 
-  private String buildExternalConfirmationAccountEmailBody(String dispalyName,
+  protected String buildExternalConfirmationAccountEmailBody(String displayName,
                                                            String username,
                                                            String link,
                                                            ResourceBundle bundle) {
-    String content;
-    InputStream input = this.getClass()
-                            .getClassLoader()
-                            .getResourceAsStream("conf/external_confirmation_account_email_template.html");
-    if (input == null) {
-      content = "";
-    } else {
-      content = resolveLanguage(input, bundle);
-    }
-
-    content = content.replace(DISPLAY_NAME_PARAM, dispalyName);
-    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
-    content = content.replace(USERNAME_PARAM, username);
-    content = content.replace(LOGIN_LINK_PARAM, link);
-
-    return content;
+    return buildAccountCreatedEmailBody("external.confirmation.account.email.", displayName, username, link, bundle);
   }
 
   private String buildExternalVerificationAccountEmailBody(String displayName,
                                                            String username,
                                                            String link,
                                                            ResourceBundle bundle) {
-    String content;
-    InputStream input = this.getClass()
-        .getClassLoader()
-        .getResourceAsStream("conf/external_verification_account_email_template.html");
-    if (input == null) {
-      content = "";
-    } else {
-      content = resolveLanguage(input, bundle);
-    }
+    return buildAccountCreatedEmailBody("external.verification.account.email.", displayName, username, link, bundle);
+  }
 
-    content = content.replace(DISPLAY_NAME_PARAM, displayName);
-    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
-    content = content.replace(USERNAME_PARAM, username);
-    content = content.replace(LOGIN_LINK_PARAM, link);
-
-    return content;
+  protected String buildAccountCreatedEmailBody(String prefix,
+                                              String displayName,
+                                              String username,
+                                              String link,
+                                              ResourceBundle bundle) {
+    return render(emailOf(bundle).title(text(bundle, prefix + "header") + " " + brandingService.getCompanyName() + "!")
+                                 .paragraph(EmailLayout.greeting(text(bundle, prefix + "hi"), displayName))
+                                 .paragraph(text(bundle, prefix + "thanks") + ".")
+                                 .fact(text(bundle, prefix + "reminder"), username)
+                                 .lead(text(bundle, prefix + "necessary"))
+                                 .button(text(bundle, prefix + "signIn"), link)
+                                 .signoff(text(bundle, prefix + "bye")));
   }
 
   @Override
@@ -670,56 +597,14 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     }
   }
 
-  private String buildRecoverEmailBody(User user, ResourceBundle bundle, String link) {
-    String content;
-    InputStream input = this.getClass().getClassLoader().getResourceAsStream("conf/forgot_password_email_template.html");
-    if (input == null) {
-      content = "";
-    } else {
-      content = resolveLanguage(input, bundle);
-    }
-
-    content = content.replace(USER_FIRST_NAME_PARAM, user.getFirstName());
-    content = content.replace(COMPANY_NAME_PARAM, brandingService.getCompanyName());
-    content = content.replace(USERNAME_PARAM, user.getUserName());
-    content = content.replace(RESET_PASSWORD_LINK_PARAM, link);
-
-    return content;
-  }
-
-  private String resolveLanguage(InputStream input, ResourceBundle bundle) {
-    // Read from input string
-    StringBuffer content = new StringBuffer();
-    try {
-      BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (content.length() > 0) {
-          content.append("\n");
-        }
-        resolveLanguage(content, line, bundle);
-      }
-    } catch (IOException ex) {
-      log.error(ex);
-    }
-    return content.toString();
-  }
-
-  private static final Pattern PATTERN = Pattern.compile("&\\{([a-zA-Z0-9\\.]+)\\}");
-
-  private void resolveLanguage(StringBuffer sb, String input, ResourceBundle bundle) {
-    Matcher matcher = PATTERN.matcher(input);
-    while (matcher.find()) {
-      String key = matcher.group(1);
-      String resource;
-      try {
-        resource = bundle.getString(key);
-      } catch (MissingResourceException ex) {
-        resource = key;
-      }
-      matcher.appendReplacement(sb, resource);
-    }
-    matcher.appendTail(sb);
+  protected String buildRecoverEmailBody(User user, ResourceBundle bundle, String link) {
+    return render(emailOf(bundle).title(text(bundle, "gatein.forgotPassword.email.header"))
+                                 .paragraph(EmailLayout.greeting(text(bundle, "gatein.forgotPassword.email.hi"), user.getFirstName()))
+                                 .paragraph(text(bundle, "gatein.forgotPassword.email.message"))
+                                 .fact(text(bundle, "gatein.forgotPassword.email.username"), user.getUserName())
+                                 .lead(text(bundle, "gatein.forgotPassword.email.linkDescription"))
+                                 .button(text(bundle, "gatein.forgotPassword.email.button", "Reset password"), link)
+                                 .aside(text(bundle, "gatein.forgotPassword.email.helpMessage")));
   }
 
   // These method will be overwrite on Platform project
@@ -769,6 +654,30 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
   @Override
   public ChangePasswordConnector getActiveChangePasswordConnector() {
     return this.changePasswordConnectorMap.get(this.changePasswordConnectorName);
+  }
+
+  private EmailModel.Builder emailOf(ResourceBundle bundle) {
+    // a bundle that does not tell its locale, or tells the root one, gives an English document, never "und"
+    Locale locale = bundle.getLocale();
+    return EmailModel.builder()
+                     .lang(locale == null || locale.getLanguage().isEmpty() ? null : locale.toLanguageTag())
+                     .fallbackLabel(text(bundle, "email.button.fallback", "If the button does not work, copy this address into your browser:"));
+  }
+
+  private String render(EmailModel.Builder email) {
+    return EmailLayout.render(email.build(), EmailBrand.from(brandingService));
+  }
+
+  private static String text(ResourceBundle bundle, String key) {
+    return text(bundle, key, key);
+  }
+
+  private static String text(ResourceBundle bundle, String key, String defaultValue) {
+    try {
+      return bundle.getString(key);
+    } catch (MissingResourceException _) {
+      return defaultValue;
+    }
   }
 
 }
