@@ -188,6 +188,44 @@ public class PortalWarmupTest {
     }
   }
 
+  /**
+   * The request never asks a cleartext connector to upgrade to HTTP/2 (h2c):
+   * the JDK client does by default, a Tomcat connector carrying
+   * {@code Http2Protocol} accepts, and upgraded responses from 64 KB to 2 MB
+   * then stalled (reproduced with Tomcat 11.0.24 and a JDK 25 client,
+   * EXO-94550). The JDK
+   * server used here speaks HTTP/1.1 only, so the test reads the headers that
+   * would ask for the upgrade, for the loopback URL and for a configured one.
+   */
+  @Test
+  public void testRequestsHttp11WithoutAskingForAnUpgrade() throws Exception {
+    List<Map<String, List<String>>> headers = new CopyOnWriteArrayList<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    server.createContext("/", exchange -> {
+      headers.add(exchange.getRequestHeaders());
+      byte[] body = "<html></html>".getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.close();
+    });
+    server.start();
+    try {
+      URI uri = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/portal/login");
+      PortalWarmup warmup = new PortalWarmup(null, null, null);
+      assertEquals(200, warmup.request(uri, true));
+      assertEquals(200, warmup.request(uri, false));
+    } finally {
+      server.stop(0);
+    }
+    assertEquals(2, headers.size());
+    for (Map<String, List<String>> requestHeaders : headers) {
+      List<String> names = new ArrayList<>(requestHeaders.keySet());
+      names.replaceAll(String::toLowerCase);
+      assertFalse(names.toString(), names.contains("upgrade"));
+      assertFalse(names.toString(), names.contains("http2-settings"));
+    }
+  }
+
   @Test(timeout = 30000)
   public void testStalledBodyIsAbandonedAfterTheTimeout() throws Exception {
     CountDownLatch release = new CountDownLatch(1);
