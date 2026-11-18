@@ -31,14 +31,22 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.gatein.portal.controller.resource.MinifiedScriptCache;
 import org.gatein.portal.controller.resource.ResourceId;
 import org.gatein.portal.controller.resource.ResourceScope;
 import org.gatein.portal.controller.resource.ScriptContent;
@@ -58,11 +66,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.picocontainer.Startable;
 
-import org.exoplatform.commons.cache.future.FutureMap;
 import org.exoplatform.commons.utils.CompositeReader;
 import org.exoplatform.commons.utils.PropertyManager;
+import org.exoplatform.container.ExoContainer;
 import org.exoplatform.container.ExoContainerContext;
-import org.exoplatform.container.PortalContainer;
 import org.exoplatform.management.annotations.Impact;
 import org.exoplatform.management.annotations.ImpactType;
 import org.exoplatform.management.annotations.Managed;
@@ -75,8 +82,6 @@ import org.exoplatform.portal.resource.AbstractResourceService;
 import org.exoplatform.portal.resource.compressor.ResourceCompressor;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.services.resources.LocaleConfig;
-import org.exoplatform.services.resources.LocaleConfigService;
 
 import jakarta.servlet.ServletContext;
 import lombok.Getter;
@@ -107,11 +112,23 @@ public class JavascriptConfigService extends AbstractResourceService implements 
   @Getter
   private final ScriptGraph                                 scriptGraph;
 
-  private final Map<String, String>                         scriptURLs      = new ConcurrentHashMap<>();
+  private final ExoContainer                                container;
 
-  private final FutureMap<ScriptKey, ScriptContent, Object> scriptCache     = new FutureMap<>(new ScriptLoader());
+  private final ScriptLoader                                scriptLoader;
 
-  private JSONObject                                        jsConfig;
+  private final MinifiedScriptCache                         minifiedScripts;
+
+  /**
+   * The scripts, their URLs and the configuration every page embeds, replaced
+   * as a whole by a reload once its replacement is complete.
+   */
+  private final AtomicReference<ScriptHolder>               holder          = new AtomicReference<>();
+
+  /** Runs startup's initData and the reloads, one after the other. */
+  private final ThreadPoolExecutor                          reloadExecutor;
+
+  /** Builds the URLs of initData and of the reloads. */
+  private final ThreadPoolExecutor                          urlExecutor;
 
   public JavascriptConfigService(ExoContainerContext context, ResourceCompressor compressor) {
     super(compressor);
@@ -119,6 +136,12 @@ public class JavascriptConfigService extends AbstractResourceService implements 
     //
     this.scriptGraph = new ScriptGraph();
     this.deployer = new JavascriptConfigDeployer(context.getPortalContainerName(), this);
+    this.container = context.getContainer();
+    this.minifiedScripts = new MinifiedScriptCache(MinifiedScriptCache.configuredDirectory(), ScriptLoader.compilerOptions());
+    this.scriptLoader = new ScriptLoader(this, minifiedScripts);
+    this.holder.set(new ScriptHolder(scriptLoader));
+    this.reloadExecutor = daemonExecutor("javascript-reload", 1);
+    this.urlExecutor = daemonExecutor("javascript-url", Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
   }
 
   @Override
@@ -129,25 +152,34 @@ public class JavascriptConfigService extends AbstractResourceService implements 
   @Override
   public void stop() {
     ServletContainerFactory.getServletContainer().removeWebAppListener(deployer);
+    reloadExecutor.shutdownNow();
+    urlExecutor.shutdownNow();
   }
 
   /**
    * Cache data after startup
    */
   public void initData() {
-    long start = System.currentTimeMillis();
-    LOG.info("Start caching Javascript data");
-    ExecutorService executorService = Executors.newSingleThreadExecutor(); // NOSONAR
-    executorService.execute(() -> {
-      ExoContainerContext.setCurrentContainer(PortalContainer.getInstance());
-      try {
-        getAllResources().parallelStream().forEach(this::generateUrl);
-      } finally {
-        LOG.info("End caching Javascript data within {}ms", System.currentTimeMillis() - start);
-        ExoContainerContext.setCurrentContainer(null);
-        executorService.shutdownNow();
-      }
-    });
+    reloadExecutor.execute(() -> inContainer(() -> {
+      long start = System.currentTimeMillis();
+      LOG.info("Start caching Javascript data");
+      Queue<String> failures = buildUrls(holder.get());
+      failures.forEach(failure -> LOG.warn("Can't cache Javascript module {}", failure));
+      // The build has just read the minified scripts it serves: only the others can be old
+      minifiedScripts.deleteUnused();
+      LOG.info("End caching Javascript data within {}ms", System.currentTimeMillis() - start);
+    }));
+  }
+
+  /**
+   * Submits a rebuild of every script, URL and the configuration, swapped in
+   * once complete: until then, pages keep the previous ones. When a URL
+   * fails, the previous ones stay.
+   *
+   * @return the rebuild, done once swapped or dropped
+   */
+  public Future<Void> scheduleReload() {
+    return reloadExecutor.submit(() -> inContainer(this::reload), null);
   }
 
   @Managed
@@ -155,7 +187,7 @@ public class JavascriptConfigService extends AbstractResourceService implements 
   @Impact(ImpactType.READ)
   public Collection<String> getJavascriptKeys() {
     List<String> keys = new ArrayList<>();
-    Set<ScriptKey> cacheKeys = scriptCache.getKeys();
+    Set<ScriptKey> cacheKeys = holder.get().scriptCache.getKeys();
     for (ScriptKey scriptKey : cacheKeys) {
       keys.add(scriptKey.getId().toString());
     }
@@ -163,44 +195,45 @@ public class JavascriptConfigService extends AbstractResourceService implements 
   }
 
   @Managed
-  @ManagedDescription("Reload all javascript modules")
+  @ManagedDescription("Reload all javascript modules, in the background: pages keep the current ones until all are rebuilt."
+      + " A module gets a new URL only when its content changed, or that of another module of its load group")
   @Impact(ImpactType.WRITE)
   public void reloadJavascripts() {
-    scriptCache.clear();
+    scheduleReload();
   }
 
   @Managed
-  @ManagedDescription("Reload a selected javascript module by its ID")
+  @ManagedDescription("Check that a javascript module exists, then reload all javascript modules, in the background:"
+      + " pages keep the current ones until all are rebuilt. A module gets a new URL only when its content changed,"
+      + " or that of another module of its load group")
   @Impact(ImpactType.WRITE)
   public void reloadJavascript(
                                @ManagedDescription("JS Module: SCOPE/NAME")
                                @ManagedName("jsModule")
                                String jsModule) {
-    String[] scriptIdParts = jsModule.split("/");
+    String[] scriptIdParts = jsModule == null ? new String[0] : jsModule.split("/", 2);
     if (scriptIdParts.length != 2) {
       throw new IllegalArgumentException("js module have to be identified by 'SCOPE/id' like 'SHARED/jquery' ");
     }
-
-    ResourceId resource = new ResourceId(ResourceScope.valueOf(scriptIdParts[0]), scriptIdParts[1]);
-    LocaleConfigService localeService = ExoContainerContext.getCurrentContainer()
-                                                           .getComponentInstanceOfType(LocaleConfigService.class);
-    Collection<LocaleConfig> localConfigs = localeService.getLocalConfigs();
-    for (LocaleConfig localeConfig : localConfigs) {
-      ScriptKey key = new ScriptKey(resource, true, localeConfig.getLocale());
-      scriptCache.remove(key);
+    ResourceId resourceId = new ResourceId(ResourceScope.valueOf(scriptIdParts[0]), scriptIdParts[1]);
+    if (getScriptResource(resourceId) == null) {
+      throw new IllegalArgumentException("No javascript module " + jsModule);
     }
-    ScriptKey key = new ScriptKey(resource, true, null);
-    scriptCache.remove(key);
+    scheduleReload();
+  }
+
+  public ScriptContent getScriptContent(ResourceScope scope, String module, boolean compress) {
+    return getScriptContent(holder.get(), scope, module, compress);
   }
 
   @SneakyThrows
-  public ScriptContent getScriptContent(ResourceScope scope, String module, boolean compress) {
+  private ScriptContent getScriptContent(ScriptHolder scripts, ResourceScope scope, String module, boolean compress) {
     ResourceId resource = new ResourceId(scope, module);
     ScriptKey key = new ScriptKey(resource, compress, Locale.ENGLISH);
     if (DEVELOPPING) {
-      return scriptCache.getLoader().retrieve(null, key);
+      return scripts.scriptCache.getLoader().retrieve(null, key);
     } else {
-      return scriptCache.get(null, key);
+      return scripts.scriptCache.get(null, key);
     }
   }
 
@@ -320,24 +353,27 @@ public class JavascriptConfigService extends AbstractResourceService implements 
   }
 
   public String generateUrl(ScriptResource resource) {
+    return generateUrl(holder.get(), resource);
+  }
+
+  private String generateUrl(ScriptHolder scripts, ScriptResource resource) {
     if (resource.getGroup() != null) {
       ResourceId grpId = resource.getGroup().getId();
       String key = grpId.toString();
-      return scriptURLs.computeIfAbsent(key, k -> generateUrl(grpId));
+      return scripts.scriptURLs.computeIfAbsent(key, k -> generateUrl(scripts, grpId));
     } else {
       String key = resource.getId().toString();
-      return scriptURLs.computeIfAbsent(key, k -> generateUrl(resource.getId()));
+      return scripts.scriptURLs.computeIfAbsent(key, k -> generateUrl(scripts, resource.getId()));
     }
   }
 
   public String generateUrl(ResourceId id) {
+    return generateUrl(holder.get(), id);
+  }
+
+  private String generateUrl(ScriptHolder scripts, ResourceId id) {
     @SuppressWarnings("rawtypes")
-    BaseScriptResource resource = null;
-    if (ResourceScope.GROUP.equals(id.getScope())) {
-      resource = scriptGraph.getLoadGroup(id.getName());
-    } else {
-      resource = getResource(id);
-    }
+    BaseScriptResource resource = getScriptResource(id);
 
     //
     if (resource != null) {
@@ -348,7 +384,7 @@ public class JavascriptConfigService extends AbstractResourceService implements 
           return remoteModule.getURI();
         }
       }
-      ScriptContent scriptContent = getScriptContent(id.getScope(), id.getName(), !DEVELOPPING);
+      ScriptContent scriptContent = getScriptContent(scripts, id.getScope(), id.getName(), !DEVELOPPING);
       String fileName = id.getName();
       if (fileName.indexOf("/") >= 0) {
         fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
@@ -365,7 +401,12 @@ public class JavascriptConfigService extends AbstractResourceService implements 
     return scriptGraph.resolve(ids);
   }
 
-  public JSONObject getJSConfig() { // NOSONAR
+  public JSONObject getJSConfig() {
+    return getJSConfig(holder.get());
+  }
+
+  private JSONObject getJSConfig(ScriptHolder scripts) { // NOSONAR
+    JSONObject jsConfig = scripts.jsConfig;
     if (jsConfig == null) {
       JSONObject paths = new JSONObject();
       JSONObject shim = new JSONObject();
@@ -386,7 +427,7 @@ public class JavascriptConfigService extends AbstractResourceService implements 
               shim.put(name, new JSONObject().put("deps", deps));
             }
           }
-          paths.put(name, generateUrl(resource));
+          paths.put(name, generateUrl(scripts, resource));
         }
       }
 
@@ -394,6 +435,7 @@ public class JavascriptConfigService extends AbstractResourceService implements 
       config.put("paths", paths);
       config.put("shim", shim);
       jsConfig = config;
+      scripts.jsConfig = config;
     }
     return jsConfig;
   }
@@ -411,6 +453,89 @@ public class JavascriptConfigService extends AbstractResourceService implements 
       }
     }
     return null;
+  }
+
+  @SuppressWarnings("rawtypes")
+  private BaseScriptResource getScriptResource(ResourceId id) {
+    if (ResourceScope.GROUP.equals(id.getScope())) {
+      return scriptGraph.getLoadGroup(id.getName());
+    } else {
+      return getResource(id);
+    }
+  }
+
+  private void reload() {
+    long start = System.currentTimeMillis();
+    ScriptHolder next = new ScriptHolder(scriptLoader);
+    Queue<String> failures;
+    try {
+      failures = buildUrls(next);
+      if (failures.isEmpty()) {
+        getJSConfig(next);
+      }
+    } catch (Exception e) {
+      failures = new ConcurrentLinkedQueue<>(List.of(e.toString()));
+    }
+    if (failures.isEmpty()) {
+      holder.set(next);
+      LOG.info("Javascript modules reloaded within {}ms", System.currentTimeMillis() - start);
+    } else {
+      failures.forEach(failure -> LOG.warn("Javascript modules not reloaded, the current ones stay: {}", failure));
+    }
+  }
+
+  /**
+   * Builds every module's URL in the given holder, on the URL threads.
+   *
+   * @return each failed module with its error
+   */
+  private Queue<String> buildUrls(ScriptHolder scripts) {
+    Queue<String> failures = new ConcurrentLinkedQueue<>();
+    CompletableFuture<?>[] urls = getAllResources().stream()
+                                                   .map(resource -> CompletableFuture.runAsync(() -> buildUrl(scripts,
+                                                                                                              resource,
+                                                                                                              failures),
+                                                                                               urlExecutor))
+                                                   .toArray(CompletableFuture[]::new);
+    CompletableFuture.allOf(urls).join();
+    return failures;
+  }
+
+  private void buildUrl(ScriptHolder scripts, ScriptResource resource, Queue<String> failures) {
+    inContainer(() -> {
+      try {
+        generateUrl(scripts, resource);
+      } catch (Exception e) {
+        failures.add(resource.getId() + ": " + e);
+      }
+    });
+  }
+
+  private void inContainer(Runnable task) {
+    ExoContainer previousContainer = ExoContainerContext.getCurrentContainerIfPresent();
+    ExoContainerContext.setCurrentContainer(container);
+    try {
+      task.run();
+    } finally {
+      ExoContainerContext.setCurrentContainer(previousContainer);
+    }
+  }
+
+  private static ThreadPoolExecutor daemonExecutor(String name, int threads) {
+    AtomicInteger index = new AtomicInteger();
+    ThreadFactory threadFactory = runnable -> {
+      Thread thread = new Thread(runnable, name + "-" + index.incrementAndGet());
+      thread.setDaemon(true);
+      return thread;
+    };
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(threads,
+                                                         threads,
+                                                         1,
+                                                         TimeUnit.MINUTES,
+                                                         new LinkedBlockingQueue<>(),
+                                                         threadFactory);
+    executor.allowCoreThreadTimeOut(true);
+    return executor;
   }
 
   private List<ScriptResource> getAllResources() {

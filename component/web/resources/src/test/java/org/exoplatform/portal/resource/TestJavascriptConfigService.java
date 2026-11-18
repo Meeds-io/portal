@@ -18,18 +18,35 @@
  */
 package org.exoplatform.portal.resource;
 
+import static org.junit.Assert.assertNotEquals;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import jakarta.servlet.ServletContext;
 
+import org.exoplatform.commons.utils.PropertyManager;
 import org.exoplatform.component.test.web.WebAppImpl;
 import org.exoplatform.container.PortalContainer;
+import org.exoplatform.portal.resource.compressor.ResourceCompressor;
 import org.exoplatform.test.mocks.servlet.MockServletContext;
 import org.exoplatform.test.mocks.servlet.MockServletRequest;
 import org.exoplatform.web.ControllerContext;
@@ -40,8 +57,10 @@ import org.exoplatform.web.controller.router.URIWriter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.gatein.common.io.IOTools;
+import org.gatein.portal.controller.resource.MinifiedScriptCache;
 import org.gatein.portal.controller.resource.ResourceId;
 import org.gatein.portal.controller.resource.ResourceScope;
+import org.gatein.portal.controller.resource.ScriptContent;
 import org.gatein.portal.controller.resource.script.FetchMode;
 import org.gatein.portal.controller.resource.script.ScriptResource;
 import org.json.JSONObject;
@@ -55,13 +74,20 @@ public class TestJavascriptConfigService extends AbstractWebResourceTest {
 
     private static boolean isFirstStartup = true;
 
+    /** The mock webapp's files, which a test may change. */
+    private static Map<String, String> mockResources;
+
+    /** Runs when the mock webapp's file is read. */
+    private static final Map<String, Runnable> READ_HOOKS = new ConcurrentHashMap<>();
+
     @Override
     protected void setUp() throws Exception {
         final PortalContainer portalContainer = getContainer();
         jsService = (JavascriptConfigService) portalContainer.getComponentInstanceOfType(JavascriptConfigService.class);
 
         if (isFirstStartup) {
-            Map<String, String> resources = new HashMap<String, String>(6);
+            Map<String, String> resources = new ConcurrentHashMap<>();
+            mockResources = resources;
             resources.put("/js/script1.js", "aaa;");
             resources.put("/js/script2.js", "bbb;");
             resources.put("/js/module1.js", "ccc;");
@@ -214,6 +240,318 @@ public class TestJavascriptConfigService extends AbstractWebResourceTest {
         assertReader(normalizedJS, jsService.getScript(new ResourceId(ResourceScope.SHARED, "normalize_test"), null));
     }
 
+    public void testReloadServesTheChangedScriptOnly() throws Exception {
+        JSONObject paths = jsService.getJSConfig().getJSONObject("paths");
+        String script1Url = paths.getString("SHARED/script1");
+        String script2Url = paths.getString("SHARED/script2");
+        try {
+            mockResources.put("/js/script1.js", "aaa2;");
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+
+            JSONObject reloaded = jsService.getJSConfig().getJSONObject("paths");
+            assertNotEquals(script1Url, reloaded.getString("SHARED/script1"));
+            assertEquals(script2Url, reloaded.getString("SHARED/script2"));
+            assertTrue(content("script1").startsWith("aaa2;"));
+            assertTrue(reloaded.getString("SHARED/script1").contains("hash=" + scriptHash("script1")));
+        } finally {
+            restoreAndReload();
+        }
+        // Same content, same URL
+        assertEquals(script1Url, jsService.getJSConfig().getJSONObject("paths").getString("SHARED/script1"));
+    }
+
+    public void testReloadKeepsTheCurrentScriptsUntilTheSwap() throws Exception {
+        JSONObject config = jsService.getJSConfig();
+        String script1 = content("script1");
+        CountDownLatch reading = new CountDownLatch(1);
+        CountDownLatch gate = new CountDownLatch(1);
+        READ_HOOKS.put("/js/script1.js", () -> {
+            reading.countDown();
+            await(gate);
+        });
+        try {
+            mockResources.put("/js/script1.js", "aaa3;");
+            Future<?> reload = jsService.scheduleReload();
+            assertTrue(reading.await(30, TimeUnit.SECONDS));
+
+            // Pages neither wait for the rebuild nor see part of it
+            assertSame(config, CompletableFuture.supplyAsync(jsService::getJSConfig).get(5, TimeUnit.SECONDS));
+            assertEquals(script1, CompletableFuture.supplyAsync(() -> content("script1")).get(5, TimeUnit.SECONDS));
+
+            gate.countDown();
+            reload.get(30, TimeUnit.SECONDS);
+            assertNotSame(config, jsService.getJSConfig());
+            assertTrue(content("script1").startsWith("aaa3;"));
+        } finally {
+            gate.countDown();
+            READ_HOOKS.clear();
+            restoreAndReload();
+        }
+    }
+
+    public void testReloadKeepsTheCurrentScriptsWhenAModuleFails() throws Exception {
+        JSONObject config = jsService.getJSConfig();
+        String script1 = content("script1");
+        READ_HOOKS.put("/js/script2.js", () -> {
+            throw new IllegalStateException("unreadable");
+        });
+        try {
+            mockResources.put("/js/script1.js", "aaa4;");
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+            assertSame(config, jsService.getJSConfig());
+            assertEquals(script1, content("script1"));
+
+            // Once the module is fixed, the reload can run again
+            READ_HOOKS.clear();
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+            assertNotSame(config, jsService.getJSConfig());
+            assertTrue(content("script1").startsWith("aaa4;"));
+        } finally {
+            READ_HOOKS.clear();
+            restoreAndReload();
+        }
+    }
+
+    public void testReloadJavascriptChecksTheModule() throws Exception {
+        assertReloadRefused("script1", "SCOPE/id");
+        assertReloadRefused("SHARED/unknown", "No javascript module");
+        try {
+            jsService.reloadJavascript("UNKNOWN/script1");
+            fail("An unknown scope is refused");
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
+        jsService.reloadJavascript("SHARED/script1");
+
+        // A portlet module's name holds its context path
+        String descriptor = "<gatein-resources xmlns=\"http://www.exoplatform.org/xml/ns/gatein_resources_1_5\">"
+                + "<portlet><name>FooPortlet</name><module><script><path>/js/script1.js</path></script></module></portlet>"
+                + "</gatein-resources>";
+        JavascriptConfigParser.processConfigResource(new ByteArrayInputStream(descriptor.getBytes(StandardCharsets.UTF_8)),
+                                                     jsService,
+                                                     mockServletContext);
+        ResourceId portletModule = new ResourceId(ResourceScope.PORTLET, "mockwebapp/FooPortlet");
+        assertNotNull(jsService.getResource(portletModule));
+        try {
+            jsService.reloadJavascript("PORTLET/mockwebapp/FooPortlet");
+        } finally {
+            jsService.getScriptGraph().removeResource(portletModule);
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    public void testASecondReloadWaitsForTheFirst() throws Exception {
+        // Every minification is in the cache: a rebuild reads the files within milliseconds
+        jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+        CountDownLatch reading = new CountDownLatch(1);
+        CountDownLatch gate = new CountDownLatch(1);
+        AtomicInteger script1Reads = new AtomicInteger();
+        AtomicInteger reads = new AtomicInteger();
+        // The first rebuild's read of script1 waits for the gate
+        for (String path : mockResources.keySet()) {
+            READ_HOOKS.put(path, () -> {
+                reads.incrementAndGet();
+                if ("/js/script1.js".equals(path) && script1Reads.incrementAndGet() == 1) {
+                    reading.countDown();
+                    await(gate);
+                }
+            });
+        }
+        try {
+            Future<?> first = jsService.scheduleReload();
+            assertTrue(reading.await(30, TimeUnit.SECONDS));
+            int firstRebuildReads = awaitStable(reads);
+            Future<?> second = jsService.scheduleReload();
+
+            Thread.sleep(2000);
+            assertEquals("The second rebuild started during the first one", firstRebuildReads, reads.get());
+            assertFalse(second.isDone());
+
+            gate.countDown();
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+            assertEquals(2, script1Reads.get());
+        } finally {
+            gate.countDown();
+            READ_HOOKS.clear();
+        }
+    }
+
+    public void testManagedReloadsServeTheChangedScript() throws Exception {
+        // The current scripts serve script1 before it changes
+        assertTrue(content("script1").startsWith("aaa;"));
+        String url = jsService.getJSConfig().getJSONObject("paths").getString("SHARED/script1");
+        try {
+            mockResources.put("/js/script1.js", "aaa5;");
+            jsService.reloadJavascripts();
+            awaitServed("script1", "aaa5;");
+            assertNotEquals(url, jsService.getJSConfig().getJSONObject("paths").getString("SHARED/script1"));
+
+            mockResources.put("/js/script1.js", "aaa6;");
+            jsService.reloadJavascript("SHARED/script1");
+            awaitServed("script1", "aaa6;");
+        } finally {
+            restoreAndReload();
+        }
+    }
+
+    public void testAModuleTheCompilerRejectsIsServedAsIs() throws Exception {
+        JSONObject config = jsService.getJSConfig();
+        try {
+            mockResources.put("/js/script1.js", "var = ;");
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+
+            // The reload applies, and the module is served unminified
+            assertNotSame(config, jsService.getJSConfig());
+            assertTrue(content("script1"), content("script1").contains("var = ;"));
+            assertTrue(jsService.getJSConfig()
+                                .getJSONObject("paths")
+                                .getString("SHARED/script1")
+                                .contains("hash=" + scriptHash("script1")));
+        } finally {
+            restoreAndReload();
+        }
+    }
+
+    public void testAGroupedModuleTheCompilerRejectsIsServedAsIs() throws Exception {
+        JSONObject config = jsService.getJSConfig();
+        try {
+            mockResources.put("/js/module1.js", "var = ;");
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+
+            // The reload applies, and the group serves the module unminified
+            assertNotSame(config, jsService.getJSConfig());
+            ScriptContent group = jsService.getScriptContent(ResourceScope.GROUP, "fooGroup", true);
+            String content = new String(group.getContentAsBytes(), StandardCharsets.UTF_8);
+            assertTrue(content, content.contains("var = ;"));
+            ScriptResource module1 = jsService.getResource(new ResourceId(ResourceScope.SHARED, "module1"));
+            assertTrue(jsService.generateUrl(module1).contains("hash=" + group.getHash()));
+        } finally {
+            mockResources.put("/js/module1.js", "ccc;");
+            jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    public void testTheStartupBuildKeepsTheMinifiedScriptsItReads() throws Exception {
+        Path directory = Files.createTempDirectory("test-js-cache-startup");
+        String previousDirectory = PropertyManager.getProperty(MinifiedScriptCache.CACHE_DIR_PROPERTY);
+        PropertyManager.setProperty(MinifiedScriptCache.CACHE_DIR_PROPERTY, directory.toString());
+        try {
+            // A server's startup build writes the minified scripts
+            startedService().stop();
+
+            // No build read them for more than the retention: each is marked, to tell a cache hit from a new minification
+            FileTime old = FileTime.from(Instant.now().minus(MinifiedScriptCache.RETENTION).minus(Duration.ofDays(1)));
+            Map<Path, String> minified = new HashMap<>();
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path file : files.toList()) {
+                    String content = Files.readString(file) + "/*from the cache*/";
+                    Files.writeString(file, content);
+                    Files.setLastModifiedTime(file, old);
+                    minified.put(file, content);
+                }
+            }
+            assertFalse(minified.isEmpty());
+            Path unused = Files.writeString(directory.resolve("0".repeat(64) + ".js"), "unused;");
+            Files.setLastModifiedTime(unused, old);
+
+            // The next startup build reads them from the cache before the cleanup deletes the unused one
+            startedService().stop();
+            assertFalse(Files.exists(unused));
+            for (Map.Entry<Path, String> file : minified.entrySet()) {
+                assertEquals(file.getKey().toString(), file.getValue(), Files.readString(file.getKey()));
+            }
+        } finally {
+            if (previousDirectory == null) {
+                System.clearProperty(MinifiedScriptCache.CACHE_DIR_PROPERTY);
+                PropertyManager.refresh();
+            } else {
+                PropertyManager.setProperty(MinifiedScriptCache.CACHE_DIR_PROPERTY, previousDirectory);
+            }
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path file : files.toList()) {
+                    Files.deleteIfExists(file);
+                }
+            }
+            Files.deleteIfExists(directory);
+        }
+    }
+
+    /**
+     * @return a new service over the mock webapp, once its startup build ran
+     */
+    private JavascriptConfigService startedService() throws Exception {
+        PortalContainer container = getContainer();
+        JavascriptConfigService service = new JavascriptConfigService(container.getContext(),
+                                                                      container.getComponentInstanceOfType(ResourceCompressor.class));
+        service.registerContext(new WebAppImpl(mockServletContext, Thread.currentThread().getContextClassLoader()));
+        URL url = container.getPortalClassLoader().getResource("mockwebapp/gatein-resources.xml");
+        JavascriptConfigParser.processConfigResource(url.openStream(), service, mockServletContext);
+        service.initData();
+        // The reload thread runs one task at a time: once this one ran, the startup build had
+        service.scheduleReload().get(30, TimeUnit.SECONDS);
+        return service;
+    }
+
+    /**
+     * @return the counter's value once it stayed the same for half a second
+     */
+    private static int awaitStable(AtomicInteger counter) throws InterruptedException {
+        int value;
+        do {
+            value = counter.get();
+            Thread.sleep(500);
+        } while (value != counter.get());
+        return value;
+    }
+
+    /**
+     * Waits for a reload to serve the script's new content, under a URL
+     * naming its hash.
+     */
+    private void awaitServed(String script, String content) throws Exception {
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (!content(script).startsWith(content)
+                || !jsService.getJSConfig()
+                             .getJSONObject("paths")
+                             .getString("SHARED/" + script)
+                             .contains("hash=" + scriptHash(script))) {
+            assertTrue(script + " is not served with " + content, System.currentTimeMillis() < deadline);
+            Thread.sleep(50);
+        }
+    }
+
+    private void assertReloadRefused(String jsModule, String message) {
+        try {
+            jsService.reloadJavascript(jsModule);
+            fail(jsModule + " is refused");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage(), e.getMessage().contains(message));
+        }
+    }
+
+    private String content(String script) {
+        return new String(jsService.getScriptContent(ResourceScope.SHARED, script, true).getContentAsBytes(),
+                          StandardCharsets.UTF_8);
+    }
+
+    private long scriptHash(String script) {
+        return jsService.getScriptContent(ResourceScope.SHARED, script, true).getHash();
+    }
+
+    private void restoreAndReload() throws Exception {
+        mockResources.put("/js/script1.js", "aaa;");
+        jsService.scheduleReload().get(30, TimeUnit.SECONDS);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public void testResolveIDs() {
         Map<ResourceId, FetchMode> tmp = new HashMap<ResourceId, FetchMode>();
         tmp.put(new ResourceId(ResourceScope.SHARED, "script2"), null);
@@ -306,6 +644,10 @@ public class TestJavascriptConfigService extends AbstractWebResourceTest {
 
         @Override
         public InputStream getResourceAsStream(String s) {
+            Runnable hook = READ_HOOKS.get(s);
+            if (hook != null) {
+                hook.run();
+            }
             String input = resources.get(s);
             if (input != null) {
                 return new ByteArrayInputStream(input.getBytes());
