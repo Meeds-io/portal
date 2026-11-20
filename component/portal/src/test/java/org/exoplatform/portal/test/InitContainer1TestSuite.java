@@ -27,6 +27,7 @@ import org.exoplatform.account.setup.web.AccountSetupServiceTest;
 import org.exoplatform.portal.TestJIBXXmlMapping;
 import org.exoplatform.portal.TestXSDCorruption;
 import org.exoplatform.portal.branding.BrandingApplicationStylingTest;
+import org.exoplatform.portal.branding.BrandingEmailPreviewTest;
 import org.exoplatform.portal.branding.BrandingRestResourcesTest;
 import org.exoplatform.portal.branding.BrandingServiceImplTest;
 import org.exoplatform.portal.config.DefaultGroupVisibilityPluginTest;
@@ -111,6 +112,7 @@ import org.exoplatform.portal.mop.storage.cache.model.TestCacheSelectors;
     TestNavigationServiceUpdate.class,
     TestNavigationServiceWrapper.class,
     TestPageService.class,
+    BrandingEmailPreviewTest.class,
     BrandingRestResourcesTest.class,
     NavigationRestTest.class,
     GroupRestResourcesTest.class,
