@@ -273,6 +273,16 @@
    }%>
  </head>
  <body style="height: 100%;$bodyStyle" class="$bodyClasses" onload="eXo.env.portal.onLoad()">
+   <% if (selectedNodeUri != "login") { %>
+   <%
+     /* The container holds the focus on page load, so the first Tab reaches the link with or without NVDA: while the
+        document holds the focus, NVDA's browse mode moves Tab to the next focusable after its reading position,
+        which starts on the link itself (NVDA browseMode._tabOverride). */
+   %>
+   <div id="skipToContentContainer" tabindex="-1" autofocus style="outline: none;">
+     <a id="skipToContentLink" class="screen-reader-only-focusable" href="#UISiteBody"><%=_ctx.appRes("UIPortalApplication.msg.skipContent")%></a>
+   </div>
+   <% } %>
    <div class="visible-tablet"></div>
    <div class="visible-tabletL"></div>
    <div class="visible-phone"></div>
