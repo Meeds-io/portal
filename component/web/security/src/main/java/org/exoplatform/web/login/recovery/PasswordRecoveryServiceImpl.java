@@ -36,9 +36,10 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
 
-import io.meeds.portal.mail.EmailBrand;
-import io.meeds.portal.mail.EmailLayout;
-import io.meeds.portal.mail.EmailModel;
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailModel;
+import io.meeds.portal.mail.model.EmailModelBuilder;
+import io.meeds.portal.mail.util.EmailLayout;
 
 import org.exoplatform.commons.utils.I18N;
 import org.exoplatform.commons.utils.MailUtils;
@@ -265,7 +266,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
                                             long validityMillis) {
     String name = user == null || user.getDisplayName() == null ? "" : user.getDisplayName();
     String company = brandingService.getCompanyName();
-    EmailModel.Builder email = emailOf(bundle).title(text(bundle, "onboarding.email.header").trim() + " " + company)
+    EmailModelBuilder email = emailOf(bundle).title(text(bundle, "onboarding.email.header").trim() + " " + company)
                                               .paragraph(EmailLayout.greeting(text(bundle, "onboarding.email.hello"), name))
                                               .paragraph(text(bundle, "onboarding.email.welcome").trim() + " " + company)
                                               .lead(EmailLayout.leadIn(text(bundle, "onboarding.email.accessLink")))
@@ -656,7 +657,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     return this.changePasswordConnectorMap.get(this.changePasswordConnectorName);
   }
 
-  private EmailModel.Builder emailOf(ResourceBundle bundle) {
+  private EmailModelBuilder emailOf(ResourceBundle bundle) {
     // a bundle that does not tell its locale, or tells the root one, gives an English document, never "und"
     Locale locale = bundle.getLocale();
     return EmailModel.builder()
@@ -664,7 +665,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
                      .fallbackLabel(text(bundle, "email.button.fallback", "If the button does not work, copy this address into your browser:"));
   }
 
-  private String render(EmailModel.Builder email) {
+  private String render(EmailModelBuilder email) {
     return EmailLayout.render(email.build(), EmailBrand.from(brandingService));
   }
 

@@ -46,7 +46,8 @@ import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
-import io.meeds.portal.mail.EmailPreview;
+import io.meeds.portal.mail.model.EmailPreviewReader;
+import io.meeds.portal.mail.util.EmailPreview;
 
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.services.organization.OrganizationService;
@@ -153,8 +154,8 @@ public class BrandingEmailPreviewTest {
       }
 
       @Override
-      protected EmailPreview.Reader getReader() {
-        return new EmailPreview.Reader("Amal Haddad", "Amal", "ahaddad");
+      protected EmailPreviewReader getReader() {
+        return new EmailPreviewReader("Amal Haddad", "Amal", "ahaddad");
       }
     };
     String html = (String) resource.previewEmail(uriInfo, request("invitation")).getEntity();
@@ -195,7 +196,7 @@ public class BrandingEmailPreviewTest {
   public void testNothingSavedGivesTheDefaultBranding() {
     when(brandingService.getThemeStyle()).thenReturn(null);
     String html = (String) resource.previewEmail(uriInfo, request("invitation")).getEntity();
-    assertTrue(html, html.contains("background-color:" + new io.meeds.portal.mail.EmailBrand("x", null).getFillColor()));
+    assertTrue(html, html.contains("background-color:" + new io.meeds.portal.mail.model.EmailBrand("x", null).getFillColor()));
   }
 
   @Test
@@ -348,7 +349,7 @@ public class BrandingEmailPreviewTest {
     try (MockedStatic<ExoContainerContext> container = Mockito.mockStatic(ExoContainerContext.class)) {
       container.when(() -> ExoContainerContext.getService(OrganizationService.class)).thenReturn(organizationService);
       ConversationState.setCurrent(new ConversationState(new Identity("amal")));
-      assertEquals(new EmailPreview.Reader("Amal Haddad", "Amal", "amal"), real.getReader());
+      assertEquals(new EmailPreviewReader("Amal Haddad", "Amal", "amal"), real.getReader());
       when(user.getLastName()).thenReturn(null);
       assertEquals("a user without a last name", "Amal", real.getReader().fullName());
       when(userHandler.findUserByName("amal")).thenReturn(null);

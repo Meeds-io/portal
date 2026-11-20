@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.model;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -31,6 +31,8 @@ import java.util.Map;
 import org.junit.Test;
 
 import org.exoplatform.portal.branding.BrandingService;
+
+import io.meeds.portal.mail.util.EmailLayout;
 
 public class EmailBrandTest {
 
@@ -161,6 +163,30 @@ public class EmailBrandTest {
     assertEquals("12px", brand.getRadius());
     when(branding.getThemeStyle()).thenReturn(null);
     assertEquals(EmailBrand.DEFAULT_COLOR, EmailBrand.from(branding).getColor());
+  }
+
+  @Test
+  public void testTheTintOfOutlinedButtonsReadsOnTheDarkPage() {
+    assertTrue("the tint reads on the dark page", EmailBrand.contrast("#8ab4f8", "#16191c") >= 4.5d);
+  }
+
+  @Test
+  public void testALightColorIsDarkenedToBeSeenAndReadOnWhite() {
+    EmailBrand light = new EmailBrand("Acme", "#f2c230", null, null);
+    assertTrue(EmailBrand.contrast("#ffffff", light.getOutlineColor()) >= 3.0d);
+    assertTrue(EmailBrand.contrast("#ffffff", light.getLinkColor()) >= 4.5d);
+  }
+
+  @Test
+  public void testTextColorHasTheBetterContrast() {
+    assertEquals("#ffffff", new EmailBrand("A", "#000000").getTextColor());
+    assertEquals("#1d2327", new EmailBrand("A", "#ffffff").getTextColor());
+    assertEquals("#ffffff", new EmailBrand("A", "#476a9c").getTextColor());
+    assertEquals("#1d2327", new EmailBrand("A", "#f2c230").getTextColor());
+    for (String c : new String[] { "#476a9c", "#2f5d62", "#f2c230", "#d6d6d6", "#e53935", "#00897b" }) {
+      EmailBrand brand = new EmailBrand("A", c);
+      assertTrue(c, EmailBrand.contrast(brand.getTextColor(), brand.getColor()) >= 4.5d || c.equals("#e53935") || c.equals("#00897b"));
+    }
   }
 
 }

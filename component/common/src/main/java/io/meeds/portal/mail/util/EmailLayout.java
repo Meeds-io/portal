@@ -16,12 +16,15 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.util;
 
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailModel;
 
 /**
  * The one look of the emails of the platform: a header band in the brand
@@ -44,7 +47,6 @@ public final class EmailLayout {
   private static final Pattern  SAFE_LINK    = Pattern.compile("(?i)^(https?://|mailto:)[^\\s\"'<>]+$");
 
   private static final Pattern  PARAGRAPHS   = Pattern.compile("\n{2,}");
-
 
   /** Languages written from right to left (aro is the Arabic variant of the platform, ckb is Central Kurdish) */
   private static final Set<String> RTL_LANGUAGES = Set.of("ar", "aro", "arc", "ckb", "dv", "fa", "he", "iw", "ks", "ps", "sd", "ug", "ur",
@@ -74,7 +76,6 @@ public final class EmailLayout {
           + "[data-ogsb] .eml-bg{background-color:#16191c !important}[data-ogsb] .eml-fact{background-color:#20262a !important}"
           + "[data-ogsc] a.eml-out{color:#8ab4f8 !important;border-color:#8ab4f8 !important}";
 
-
   /**
    * The dark styles of the notification emails, whose templates carry their
    * colors inline and have no head to hold a style: the rules match those
@@ -103,15 +104,12 @@ public final class EmailLayout {
 
   private static final String END_COLUMN = "<!--[if mso]></td></tr></table><![endif]-->";
 
-  private EmailLayout() {
-  }
+  private static final Pattern STYLE_ATTRIBUTE = Pattern.compile("(?<![\\w-])style\\s*=\\s*(?:\"[^\"]*\"|'[^']*')");
 
-  private static String stripTrailingCommas(String text) {
-    int end = text.length();
-    while (end > 0 && (text.charAt(end - 1) == ',' || text.charAt(end - 1) == '\u060c' || Character.isWhitespace(text.charAt(end - 1)))) {
-      end--;
-    }
-    return text.substring(0, end);
+  /** A label that may already carry the basic html entities, as plain text */
+  private static final Pattern NUMERIC_ENTITY = Pattern.compile("&#(?:[xX]([0-9a-fA-F]{1,6})|(\\d{1,7}));");
+
+  private EmailLayout() {
   }
 
   /**
@@ -344,16 +342,6 @@ public final class EmailLayout {
     return factsIn(null, labelsAndValues);
   }
 
-  /** A label, escaped; the space that some languages put before a colon (or ? or !) cannot break the line there */
-  private static String label(String text) {
-    String value = plain(text).stripTrailing();
-    int last = value.length() - 1;
-    if (last > 0 && ":;!?".indexOf(value.charAt(last)) >= 0 && Character.isWhitespace(value.charAt(last - 1))) {
-      value = value.substring(0, last).stripTrailing() + "\u00a0" + value.charAt(last);
-    }
-    return escape(value);
-  }
-
   /** Same as {@link #facts(String...)}, with the bar on the side where the text of {@code lang} starts */
   public static String factsIn(String lang, String... labelsAndValues) {
     StringBuilder rows = new StringBuilder();
@@ -409,35 +397,6 @@ public final class EmailLayout {
     return styleLinks(html, "text-decoration:none;font-weight:bold;");
   }
 
-  private static String styleLinks(String html, String decoration) {
-    if (html == null) {
-      return "";
-    }
-    StringBuilder out = new StringBuilder(html.length() + 64);
-    String color = linkColor();
-    String font = fontStack();
-    int pos = 0;
-    while (true) {
-      int start = html.indexOf("<a ", pos);
-      int end = start < 0 ? -1 : html.indexOf('>', start);
-      if (end < 0) {
-        break;
-      }
-      out.append(html, pos, start);
-      String attributes = withoutStyleAttribute(html.substring(start + 3, end));
-      out.append("<a style=\"color:").append(color).append(';').append(decoration).append("font-family:")
-         .append(font).append(";\" ").append(attributes.trim()).append('>');
-      pos = end + 1;
-    }
-    return out.append(html, pos, html.length()).toString();
-  }
-
-  private static final Pattern STYLE_ATTRIBUTE = Pattern.compile("(?<![\\w-])style\\s*=\\s*(?:\"[^\"]*\"|'[^']*')");
-
-  private static String withoutStyleAttribute(String attributes) {
-    return STYLE_ATTRIBUTE.matcher(attributes).replaceAll("");
-  }
-
   /**
    * The closing row of an email laid out by its own template: the space under
    * the last block, as the account emails have, with no frame and no link (the
@@ -448,74 +407,6 @@ public final class EmailLayout {
    */
   public static String closingRow() {
     return "<tr><td style=\"padding:0 0 40px 0;font-size:0;line-height:0;\">&nbsp;</td></tr>"; // NOSONAR kept as a method: the templates call it
-  }
-
-  private static void header(StringBuilder html, EmailBrand brand, String escapedTitle, boolean rtl) {
-    String color = brand.getFillColor();
-    String onColor = brand.getTextColor();
-    String font = brand.getFontStack();
-    html.append("<tr><td bgcolor=\"").append(color).append("\" style=\"background-color:").append(color).append(";padding:0 24px;\">")
-        .append(column(rtl))
-        .append("<tr><td style=\"padding:18px 0 0 0;font:bold 14px ").append(font).append(COLOR_DECLARATION).append(onColor).append(";\">")
-        .append(escape(brand.getCompanyName())).append("</td></tr>")
-        .append("<tr><td class=\"eml-title\" style=\"padding:8px 0 20px 0;\"><h1 style=\"margin:0;font:bold 22px/1.25 ")
-        .append(font).append(COLOR_DECLARATION).append(onColor).append(";overflow-wrap:anywhere;word-break:break-word;\">").append(escapedTitle).append("</h1></td></tr>")
-        .append("</table>").append(END_COLUMN).append("</td></tr>");
-  }
-
-  /**
-   * The action of the email as schema.org markup, which Gmail turns into a
-   * button next to the subject in the inbox and on hover. Gmail only does so
-   * for senders registered with Google, and only for https links; everywhere
-   * else the markup is ignored, so it is only written for an https link.
-   */
-  private static String actionMarkup(EmailModel model, EmailBrand brand, String link) {
-    return actionMarkup(brand, model.getTitle(), model.getButtonLabel(), link);
-  }
-
-  /**
-   * The same markup for the main button of an email that keeps its own
-   * template (a notification): the description is the label of the button
-   */
-  private static String actionMarkup(EmailBrand brand, String label, String link) {
-    return actionMarkup(brand, label, label, link);
-  }
-
-  private static String actionMarkup(EmailBrand brand, String description, String label, String link) {
-    if (link == null || !link.regionMatches(true, 0, "https://", 0, 8)) {
-      return "";
-    }
-    String url = json(link);
-    return "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"EmailMessage\",\"description\":"
-        + json(description) + ",\"publisher\":{\"@type\":\"Organization\",\"name\":" + json(brand.getCompanyName())
-        + "},\"potentialAction\":{\"@type\":\"ViewAction\",\"target\":" + url + ",\"url\":" + url + ",\"name\":"
-        + json(label) + "}}</script>";
-  }
-
-  /**
-   * A json string that can sit inside a script element: the characters that
-   * could close it or be read as html are written as escapes
-   */
-  static String json(String text) {
-    StringBuilder out = new StringBuilder("\"");
-    for (int i = 0; text != null && i < text.length(); i++) {
-      char c = text.charAt(i);
-      switch (c) {
-      case '"' -> out.append("\\\"");
-      case '\\' -> out.append("\\\\");
-      case '\n' -> out.append("\\n");
-      case '\r' -> out.append("\\r");
-      case '\t' -> out.append("\\t");
-      default -> {
-        if (c < 0x20 || c == '<' || c == '>' || c == '&' || c == '\u2028' || c == '\u2029') {
-          out.append(String.format("\\u%04x", (int) c));
-        } else {
-          out.append(c);
-        }
-      }
-      }
-    }
-    return out.append('"').toString();
   }
 
   /**
@@ -591,8 +482,172 @@ public final class EmailLayout {
     return actionLink(EmailBrand.current(), label, href, primary);
   }
 
-  /** A label that may already carry the basic html entities, as plain text */
-  private static final Pattern NUMERIC_ENTITY = Pattern.compile("&#(?:[xX]([0-9a-fA-F]{1,6})|(\\d{1,7}));");
+  /**
+   * @return rtl or ltr, for the dir attribute of a template that has to follow
+   *         the direction of the reader's language
+   */
+  public static String dir(String lang) {
+    return isRtl(lang) ? "rtl" : "ltr";
+  }
+
+  /**
+   * @return the side where text starts: left, or right in a right to left
+   *         language
+   */
+  public static String start(String lang) {
+    return isRtl(lang) ? "right" : "left";
+  }
+
+  /**
+   * @return the side where text ends
+   */
+  public static String end(String lang) {
+    return isRtl(lang) ? "left" : "right";
+  }
+
+  /**
+   * @param size such as 15px
+   * @return a padding that leaves a gap after the content, on the side where
+   *         it ends: the gap between an avatar and the text beside it
+   */
+  public static String gap(String lang, String size) {
+    return isRtl(lang) ? "0 0 0 " + size : "0 " + size + " 0 0";
+  }
+
+  /**
+   * A json string that can sit inside a script element: the characters that
+   * could close it or be read as html are written as escapes
+   */
+  static String json(String text) {
+    StringBuilder out = new StringBuilder("\"");
+    for (int i = 0; text != null && i < text.length(); i++) {
+      char c = text.charAt(i);
+      switch (c) {
+      case '"' -> out.append("\\\"");
+      case '\\' -> out.append("\\\\");
+      case '\n' -> out.append("\\n");
+      case '\r' -> out.append("\\r");
+      case '\t' -> out.append("\\t");
+      default -> {
+        if (c < 0x20 || c == '<' || c == '>' || c == '&' || c == '\u2028' || c == '\u2029') {
+          out.append(String.format("\\u%04x", (int) c));
+        } else {
+          out.append(c);
+        }
+      }
+      }
+    }
+    return out.append('"').toString();
+  }
+
+  /**
+   * Escapes a text for an html element or a double quoted attribute
+   */
+  static String escape(String text) {
+    if (text == null) {
+      return "";
+    }
+    StringBuilder out = new StringBuilder(text.length() + 16);
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      switch (c) {
+      case '&' -> out.append("&amp;");
+      case '<' -> out.append("&lt;");
+      case '>' -> out.append("&gt;");
+      case '"' -> out.append("&quot;");
+      case '\'' -> out.append("&#39;");
+      default -> out.append(c);
+      }
+    }
+    return out.toString();
+  }
+
+  private static String stripTrailingCommas(String text) {
+    int end = text.length();
+    while (end > 0 && (text.charAt(end - 1) == ',' || text.charAt(end - 1) == '\u060c' || Character.isWhitespace(text.charAt(end - 1)))) {
+      end--;
+    }
+    return text.substring(0, end);
+  }
+
+  /** A label, escaped; the space that some languages put before a colon (or ? or !) cannot break the line there */
+  private static String label(String text) {
+    String value = plain(text).stripTrailing();
+    int last = value.length() - 1;
+    if (last > 0 && ":;!?".indexOf(value.charAt(last)) >= 0 && Character.isWhitespace(value.charAt(last - 1))) {
+      value = value.substring(0, last).stripTrailing() + "\u00a0" + value.charAt(last);
+    }
+    return escape(value);
+  }
+
+  private static String styleLinks(String html, String decoration) {
+    if (html == null) {
+      return "";
+    }
+    StringBuilder out = new StringBuilder(html.length() + 64);
+    String color = linkColor();
+    String font = fontStack();
+    int pos = 0;
+    while (true) {
+      int start = html.indexOf("<a ", pos);
+      int end = start < 0 ? -1 : html.indexOf('>', start);
+      if (end < 0) {
+        break;
+      }
+      out.append(html, pos, start);
+      String attributes = withoutStyleAttribute(html.substring(start + 3, end));
+      out.append("<a style=\"color:").append(color).append(';').append(decoration).append("font-family:")
+         .append(font).append(";\" ").append(attributes.trim()).append('>');
+      pos = end + 1;
+    }
+    return out.append(html, pos, html.length()).toString();
+  }
+
+  private static String withoutStyleAttribute(String attributes) {
+    return STYLE_ATTRIBUTE.matcher(attributes).replaceAll("");
+  }
+
+  private static void header(StringBuilder html, EmailBrand brand, String escapedTitle, boolean rtl) {
+    String color = brand.getFillColor();
+    String onColor = brand.getTextColor();
+    String font = brand.getFontStack();
+    html.append("<tr><td bgcolor=\"").append(color).append("\" style=\"background-color:").append(color).append(";padding:0 24px;\">")
+        .append(column(rtl))
+        .append("<tr><td style=\"padding:18px 0 0 0;font:bold 14px ").append(font).append(COLOR_DECLARATION).append(onColor).append(";\">")
+        .append(escape(brand.getCompanyName())).append("</td></tr>")
+        .append("<tr><td class=\"eml-title\" style=\"padding:8px 0 20px 0;\"><h1 style=\"margin:0;font:bold 22px/1.25 ")
+        .append(font).append(COLOR_DECLARATION).append(onColor).append(";overflow-wrap:anywhere;word-break:break-word;\">").append(escapedTitle).append("</h1></td></tr>")
+        .append("</table>").append(END_COLUMN).append("</td></tr>");
+  }
+
+  /**
+   * The action of the email as schema.org markup, which Gmail turns into a
+   * button next to the subject in the inbox and on hover. Gmail only does so
+   * for senders registered with Google, and only for https links; everywhere
+   * else the markup is ignored, so it is only written for an https link.
+   */
+  private static String actionMarkup(EmailModel model, EmailBrand brand, String link) {
+    return actionMarkup(brand, model.getTitle(), model.getButtonLabel(), link);
+  }
+
+  /**
+   * The same markup for the main button of an email that keeps its own
+   * template (a notification): the description is the label of the button
+   */
+  private static String actionMarkup(EmailBrand brand, String label, String link) {
+    return actionMarkup(brand, label, label, link);
+  }
+
+  private static String actionMarkup(EmailBrand brand, String description, String label, String link) {
+    if (link == null || !link.regionMatches(true, 0, "https://", 0, 8)) {
+      return "";
+    }
+    String url = json(link);
+    return "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"EmailMessage\",\"description\":"
+        + json(description) + ",\"publisher\":{\"@type\":\"Organization\",\"name\":" + json(brand.getCompanyName())
+        + "},\"potentialAction\":{\"@type\":\"ViewAction\",\"target\":" + url + ",\"url\":" + url + ",\"name\":"
+        + json(label) + "}}</script>";
+  }
 
   /**
    * A text that may already carry html entities (the providers of the
@@ -653,38 +708,6 @@ public final class EmailLayout {
                : html;
   }
 
-  /**
-   * @return rtl or ltr, for the dir attribute of a template that has to follow
-   *         the direction of the reader's language
-   */
-  public static String dir(String lang) {
-    return isRtl(lang) ? "rtl" : "ltr";
-  }
-
-  /**
-   * @return the side where text starts: left, or right in a right to left
-   *         language
-   */
-  public static String start(String lang) {
-    return isRtl(lang) ? "right" : "left";
-  }
-
-  /**
-   * @return the side where text ends
-   */
-  public static String end(String lang) {
-    return isRtl(lang) ? "left" : "right";
-  }
-
-  /**
-   * @param size such as 15px
-   * @return a padding that leaves a gap after the content, on the side where
-   *         it ends: the gap between an avatar and the text beside it
-   */
-  public static String gap(String lang, String size) {
-    return isRtl(lang) ? "0 0 0 " + size : "0 " + size + " 0 0";
-  }
-
   private static void row(StringBuilder html, String font, String padding, String content) {
     if (content.isEmpty()) {
       return;
@@ -724,28 +747,6 @@ public final class EmailLayout {
         .append("<!--[if !mso]><!--><a href=\"").append(href).append("\" style=\"display:inline-block;padding:" + BUTTON_PAD + ";font:bold 14px/20px " + brand.getFontStack())
         .append(COLOR_DECLARATION).append(onColor).append(";text-decoration:none;border:1px solid ").append(color).append(";border-radius:").append(radius).append(";\">")
         .append(label).append("</a><!--<![endif]--></td></tr></table></td></tr>");
-  }
-
-  /**
-   * Escapes a text for an html element or a double quoted attribute
-   */
-  static String escape(String text) {
-    if (text == null) {
-      return "";
-    }
-    StringBuilder out = new StringBuilder(text.length() + 16);
-    for (int i = 0; i < text.length(); i++) {
-      char c = text.charAt(i);
-      switch (c) {
-      case '&' -> out.append("&amp;");
-      case '<' -> out.append("&lt;");
-      case '>' -> out.append("&gt;");
-      case '"' -> out.append("&quot;");
-      case '\'' -> out.append("&#39;");
-      default -> out.append(c);
-      }
-    }
-    return out.toString();
   }
 
 }
