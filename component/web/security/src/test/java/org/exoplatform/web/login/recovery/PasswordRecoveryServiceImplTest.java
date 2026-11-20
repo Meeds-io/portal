@@ -119,7 +119,21 @@ public class PasswordRecoveryServiceImplTest {
                                                         "onboarding.email.validity.hours",
                                                         "{0} hours",
                                                         "onboarding.email.header",
-                                                        "Join");
+                                                        "Join",
+                                                        "onboarding.email.hello",
+                                                        "Hello",
+                                                        "gatein.forgotPassword.email.hi",
+                                                        "Hi",
+                                                        "gatein.forgotPassword.email.username",
+                                                        "Your login",
+                                                        "external.confirmation.account.email.reminder",
+                                                        "Your username is:",
+                                                        "external.confirmation.account.email.signIn",
+                                                        "Sign In",
+                                                        "email.button.fallback",
+                                                        "Copy this address:",
+                                                        "onboarding.email.accessLink",
+                                                        "Click the link");
 
       @Override
       protected Object handleGetObject(String key) {
@@ -153,7 +167,8 @@ public class PasswordRecoveryServiceImplTest {
                                                                    SEVEN_DAYS);
     assertTrue(body, body.contains("<p>Welcome ${RESET_PASSWORD_LINK} <b>Jane</b></p>"));
     assertTrue(body, body.contains("href=\"https://acme.example/on-boarding?token=tok.en\""));
-    assertEquals(body, 1, countOf(body, "https://acme.example/on-boarding?token=tok.en"));
+    // the button (twice, for Outlook and for the other clients), the plain address (twice) and the Gmail action (twice)
+    assertEquals(body, 6, countOf(body, "https://acme.example/on-boarding?token=tok.en"));
     // The only placeholder form left is the message's own text
     assertFalse(body, body.replace("Welcome ${RESET_PASSWORD_LINK}", "").contains("${"));
   }
@@ -181,13 +196,6 @@ public class PasswordRecoveryServiceImplTest {
     assertEquals("0 hours", PasswordRecoveryServiceImpl.buildValidityLabel(bundle, TimeUnit.MINUTES.toMillis(30)));
   }
 
-  @Test
-  public void testFillTemplateReplacesEveryPlaceholderOnce() {
-    String filled = PasswordRecoveryServiceImpl.fillTemplate("a ${ONE} b ${TWO} c ${NONE}",
-                                                             Map.of("ONE", "${TWO}", "TWO", "$2 \\ back"));
-    assertEquals("a ${TWO} b $2 \\ back c ", filled);
-  }
-
   /**
    * The onboarding email is sent with the onboarding token's validity and
    * the message; the external registration email shares the template with
@@ -207,7 +215,7 @@ public class PasswordRecoveryServiceImplTest {
       String body = sent.getValue().getBody();
       assertTrue(body, body.contains("7 days"));
       assertTrue(body, body.contains("Hello there"));
-      assertTrue(body, body.contains("https://acme.example/portal/on-boarding?lang=en&token=tok.en"));
+      assertTrue(body, body.contains("href=\"https://acme.example/portal/on-boarding?lang=en&amp;token=tok.en\""));
       assertEquals("jane@example.com", sent.getValue().getTo());
       verify(remindPasswordTokenService, never()).createToken(anyString(), anyString());
     }
@@ -274,6 +282,127 @@ public class PasswordRecoveryServiceImplTest {
     verify(onboardingTokenService).deleteToken("tok.en", CookieTokenService.ONBOARD_TOKEN);
     passwordRecoveryService.deleteToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN);
     verify(remindPasswordTokenService).deleteToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN);
+  }
+
+  @Test
+  public void testRecoverEmailSetsTheLoginApartAndOffersAResetButton() {
+    String body = passwordRecoveryService.buildRecoverEmailBody(user(), bundle, "https://acme.example/reset?token=t&lang=en");
+    assertTrue(body, body.contains("Hi Jane,"));
+    assertTrue(body, body.contains("Your login"));
+    assertTrue(body, body.contains(">jdoe</strong>"));
+    // no translation of the button yet: the English label stands in
+    assertTrue(body, body.contains(">Reset password</a>"));
+    assertTrue(body, body.contains("href=\"https://acme.example/reset?token=t&amp;lang=en\""));
+    assertTrue(body, body.contains("Copy this address:"));
+    assertFalse(body, body.contains("${"));
+  }
+
+  @Test
+  public void testAccountCreatedEmailsCarryTheUsernameAndTheSignInLink() {
+    String body = passwordRecoveryService.buildExternalConfirmationAccountEmailBody("Jane Doe",
+                                                                                    "jdoe",
+                                                                                    "https://acme.example/login",
+                                                                                    bundle);
+    assertTrue(body, body.contains("Your username is:"));
+    assertTrue(body, body.contains(">jdoe</strong>"));
+    assertTrue(body, body.contains(">Sign In</a>"));
+    assertTrue(body, body.contains("Acme!"));
+  }
+
+  @Test
+  public void testNamesAreEscapedInEveryEmail() {
+    String evil = "<script>alert(1)</script>";
+    User attacker = user();
+    ((UserImpl) attacker).setDisplayName(evil);
+    ((UserImpl) attacker).setFirstName(evil);
+    String[] bodies = { passwordRecoveryService.buildOnboardingEmailBody(attacker, bundle, "https://acme.example/x", null, SEVEN_DAYS),
+        passwordRecoveryService.buildRecoverEmailBody(attacker, bundle, "https://acme.example/x"),
+        passwordRecoveryService.buildExternalEmailBody(evil, evil, "https://acme.example/x", bundle),
+        passwordRecoveryService.buildExternalConfirmationAccountEmailBody(evil, evil, "https://acme.example/x", bundle) };
+    for (String body : bodies) {
+      assertFalse(body, body.contains("<script>"));
+      assertTrue(body, body.contains("&lt;script&gt;"));
+    }
+  }
+
+  @Test
+  public void testGreetingHasNoDanglingSpaceWhenTheReaderIsUnknown() {
+    String body = passwordRecoveryService.buildOnboardingEmailBody(null, bundle, "https://acme.example/x", null, SEVEN_DAYS);
+    assertTrue(body, body.contains("Hello,"));
+    assertFalse(body, body.contains("Hello ,"));
+  }
+
+  @Test
+  public void testLanguageOfTheReaderIsOnTheDocument() throws Exception {
+    try (MockedStatic<MailUtils> mailUtils = Mockito.mockStatic(MailUtils.class)) {
+      mailUtils.when(MailUtils::getSenderName).thenReturn("Acme");
+      mailUtils.when(MailUtils::getSenderEmail).thenReturn("noreply@acme.example");
+      assertTrue(passwordRecoveryService.sendOnboardingEmail(user(), Locale.FRENCH, new StringBuilder("https://acme.example/portal")));
+      ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+      verify(mailService).sendMessage(sent.capture());
+      // the test bundle has no locale, so the document falls back to English
+      assertTrue(sent.getValue().getBody(), sent.getValue().getBody().startsWith("<!doctype html><html lang=\"en\""));
+    }
+  }
+
+  @Test
+  public void testDocumentFollowsTheLocaleOfTheBundle() {
+    ResourceBundle arabic = new ResourceBundle() {
+      @Override
+      protected Object handleGetObject(String key) {
+        return bundle.containsKey(key) ? bundle.getObject(key) : null;
+      }
+
+      @Override
+      public java.util.Enumeration<String> getKeys() {
+        return bundle.getKeys();
+      }
+
+      @Override
+      public Locale getLocale() {
+        return Locale.forLanguageTag("ar");
+      }
+    };
+    String body = passwordRecoveryService.buildRecoverEmailBody(user(), arabic, "https://acme.example/x");
+    assertTrue(body, body.startsWith("<!doctype html><html lang=\"ar\" dir=\"rtl\""));
+    ResourceBundle root = new ResourceBundle() {
+      @Override
+      protected Object handleGetObject(String key) {
+        return bundle.containsKey(key) ? bundle.getObject(key) : null;
+      }
+
+      @Override
+      public java.util.Enumeration<String> getKeys() {
+        return bundle.getKeys();
+      }
+
+      @Override
+      public Locale getLocale() {
+        return Locale.ROOT;
+      }
+    };
+    assertTrue(passwordRecoveryService.buildRecoverEmailBody(user(), root, "https://acme.example/x").startsWith("<!doctype html><html lang=\"en\""));
+  }
+
+  @Test
+  public void testLeadInEndsWithAColonUnlessTheTranslationAlreadyHasPunctuation() {
+    assertTrue(passwordRecoveryService.buildOnboardingEmailBody(user(), bundle, "https://acme.example/x", null, SEVEN_DAYS)
+                                      .contains("Click the link:"));
+    for (String done : new String[] { "Click the link.", "Click the link:", "Cliquez sur le lien\u00a0:", "\u0627\u0646\u0642\u0631 \u0647\u0646\u0627\u060c" }) {
+      ResourceBundle custom = new ResourceBundle() {
+        @Override
+        protected Object handleGetObject(String key) {
+          return "onboarding.email.accessLink".equals(key) ? done : null;
+        }
+
+        @Override
+        public Enumeration<String> getKeys() {
+          return new Vector<String>().elements();
+        }
+      };
+      String body = passwordRecoveryService.buildOnboardingEmailBody(user(), custom, "https://acme.example/x", null, SEVEN_DAYS);
+      assertTrue(body, body.contains(">" + done + "<"));
+    }
   }
 
   private static User user() {
