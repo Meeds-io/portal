@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -29,6 +29,9 @@ import java.util.ResourceBundle;
 import java.util.Vector;
 
 import org.junit.Test;
+
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailPreviewReader;
 
 public class EmailPreviewTest {
 
@@ -64,7 +67,7 @@ public class EmailPreviewTest {
   @Test
   public void testInvitationIsTheEmailOfTheLayoutWithTheTypedBranding() {
     String html = EmailPreview.render(EmailPreview.INVITATION, BRAND, BUNDLE, "en", "https://acme.example/portal",
-                                      new EmailPreview.Reader("Amal Haddad", "Amal", "ahaddad"));
+                                      new EmailPreviewReader("Amal Haddad", "Amal", "ahaddad"));
     assertTrue(html, html.contains("<h1 "));
     assertTrue(html, html.contains("Create your account and join Acme Corp</h1>"));
     assertTrue(html, html.contains("Hello Amal Haddad,"));
@@ -79,10 +82,10 @@ public class EmailPreviewTest {
 
   @Test
   public void testGreetingIsTheOneOfTheReader() {
-    String invitation = EmailPreview.render(EmailPreview.INVITATION, BRAND, BUNDLE, "en", null, new EmailPreview.Reader("Amal <b>Haddad</b>", "Amal", "ahaddad"));
+    String invitation = EmailPreview.render(EmailPreview.INVITATION, BRAND, BUNDLE, "en", null, new EmailPreviewReader("Amal <b>Haddad</b>", "Amal", "ahaddad"));
     assertTrue(invitation, invitation.contains("Hello Amal &lt;b&gt;Haddad&lt;/b&gt;,"));
     assertFalse(invitation, invitation.contains("Sam"));
-    String reset = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreview.Reader("Amal Haddad", "Amal", "ahaddad"));
+    String reset = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreviewReader("Amal Haddad", "Amal", "ahaddad"));
     assertTrue(reset, reset.contains("Hi Amal,"));
     assertTrue(reset, reset.contains("ahaddad"));
     assertFalse(reset, reset.contains("srivera"));
@@ -90,18 +93,18 @@ public class EmailPreviewTest {
 
   @Test
   public void testNoReaderLeavesTheGreetingWithoutAName() {
-    String reset = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreview.Reader(" ", null, ""));
+    String reset = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreviewReader(" ", null, ""));
     assertTrue(reset, reset.contains("Hi,"));
     assertFalse("no login is made up", reset.contains("Your login"));
     assertTrue(EmailPreview.render(EmailPreview.INVITATION, BRAND, BUNDLE, "en", null, null).contains("Hello,"));
-    String onlyFullName = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreview.Reader("Amal", null, null));
+    String onlyFullName = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "en", null, new EmailPreviewReader("Amal", null, null));
     assertTrue("a reader known by one name is greeted by it", onlyFullName.contains("Hi Amal,"));
   }
 
   @Test
   public void testPasswordResetHasTheLoginApartAndTheResetButton() {
     String html = EmailPreview.render(EmailPreview.PASSWORD_RESET, BRAND, BUNDLE, "fr", "https://acme.example",
-                                      new EmailPreview.Reader("Amal Haddad", "Amal", "ahaddad"));
+                                      new EmailPreviewReader("Amal Haddad", "Amal", "ahaddad"));
     assertTrue(html, html.contains("<html lang=\"fr\""));
     assertTrue(html, html.contains("Password Reset</h1>"));
     assertTrue(html, html.contains("Hi Amal,"));

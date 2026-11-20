@@ -16,12 +16,17 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.util;
 
 import java.util.List;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.regex.Pattern;
+
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailModel;
+import io.meeds.portal.mail.model.EmailModelBuilder;
+import io.meeds.portal.mail.model.EmailPreviewReader;
 
 /**
  * A sample of an email of the platform, with the saved branding,
@@ -81,7 +86,7 @@ public final class EmailPreview {
                               ResourceBundle bundle,
                               String lang,
                               String siteUrl,
-                              Reader reader) {
+                              EmailPreviewReader reader) {
     // the connected user: nothing is made up, a name that is not known leaves the greeting without one
     String full = clean(reader == null ? null : reader.fullName());
     String first = clean(reader == null ? null : reader.firstName());
@@ -93,7 +98,7 @@ public final class EmailPreview {
                                                                                  : "https://example.com";
     // the links of the real emails: the address of the site, the page and a token that is not valid
     String langParam = "lang=" + (lang == null || lang.isBlank() ? "en" : lang.trim());
-    EmailModel.Builder email = EmailModel.builder()
+    EmailModelBuilder email = EmailModel.builder()
                                          .lang(lang)
                                          .fallbackLabel(text(bundle, "email.button.fallback", "If the button does not work, copy this address into your browser:"));
     switch (template == null ? "" : template) {
@@ -117,16 +122,6 @@ public final class EmailPreview {
       email.fact(text(bundle, "gatein.forgotPassword.email.username"), user);
     }
     return EmailLayout.render(email.build(), brand);
-  }
-
-  /**
-   * The person who reads the preview.
-   *
-   * @param fullName the full name, for the invitation
-   * @param firstName the first name, for the password reset
-   * @param login the user name, for the password reset
-   */
-  public record Reader(String fullName, String firstName, String login) {
   }
 
   private static String withoutTrailingSlashes(String address) {
