@@ -47,8 +47,9 @@ import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.lang3.StringUtils;
 
-import io.meeds.portal.mail.EmailBrand;
-import io.meeds.portal.mail.EmailPreview;
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailPreviewReader;
+import io.meeds.portal.mail.util.EmailPreview;
 
 import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.portal.branding.model.Branding;
@@ -167,7 +168,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     // the saved branding only: nothing of the request is written in the preview
     EmailBrand brand = EmailBrand.from(brandingService);
     String lang = getLanguage();
-    EmailPreview.Reader reader = getReader();
+    EmailPreviewReader reader = getReader();
     String html = EmailPreview.render(preview.getTemplate(),
                                       brand,
                                       getBundle(lang),
@@ -221,7 +222,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
    *
    * @return the reader, a value is null when it is not known
    */
-  protected EmailPreview.Reader getReader() {
+  protected EmailPreviewReader getReader() {
     try {
       ConversationState state = ConversationState.getCurrent();
       String userName = state == null || state.getIdentity() == null ? null : state.getIdentity().getUserId();
@@ -229,12 +230,12 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
       User user = userName == null || organizationService == null ? null : organizationService.getUserHandler().findUserByName(userName);
       if (user != null) {
         String full = (StringUtils.defaultString(user.getFirstName()) + " " + StringUtils.defaultString(user.getLastName())).trim();
-        return new EmailPreview.Reader(full, user.getFirstName(), user.getUserName());
+        return new EmailPreviewReader(full, user.getFirstName(), user.getUserName());
       }
     } catch (Exception e) {
       LOG.debug("Cannot get the user who previews the email, a sample name is used", e);
     }
-    return new EmailPreview.Reader(null, null, null);
+    return new EmailPreviewReader(null, null, null);
   }
 
   /**

@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.model;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,12 +34,15 @@ public final class EmailBrand {
   /** Used when the site has no valid primary color: the default primary color of the platform theme */
   public static final String   DEFAULT_COLOR = "#3f8487";
 
+  /** Used when the site has no valid border radius, as the platform does */
+  public static final String   DEFAULT_RADIUS = "8px";
+
+  /** Used when the site has no valid font, the default font of the platform */
+  public static final String   DEFAULT_FONT_FAMILY = "Arimo";
+
   static final long            CACHE_MILLIS  = 5000L;
 
-  private static final AtomicReference<Cached> CACHED = new AtomicReference<>();
-
-  private record Cached(EmailBrand brand, long expires) {
-  }
+  private static final AtomicReference<CachedEmailBrand> CACHED = new AtomicReference<>();
 
   private static final String  DARK_TEXT     = "#1d2327";
 
@@ -52,6 +55,11 @@ public final class EmailBrand {
 
   private static final Pattern HEX_ALPHA     = Pattern.compile("#[0-9a-fA-F]{8}");
 
+  // a font name as the platform lists them: letters, digits, spaces and hyphens, never a quote or a separator
+  private static final Pattern FONT_NAME      = Pattern.compile("[A-Za-z0-9][A-Za-z0-9 \\-]{0,59}");
+
+  private static final Pattern RADIUS_PATTERN = Pattern.compile("(?:\\d|1\\d|2\\d)px");
+
   private final String         companyName;
 
   private final String         color;
@@ -61,17 +69,6 @@ public final class EmailBrand {
   private final String         fontFamily;
 
   private final String         radius;
-
-  /** Used when the site has no valid border radius, as the platform does */
-  public static final String   DEFAULT_RADIUS = "8px";
-
-  /** Used when the site has no valid font, the default font of the platform */
-  public static final String   DEFAULT_FONT_FAMILY = "Arimo";
-
-  // a font name as the platform lists them: letters, digits, spaces and hyphens, never a quote or a separator
-  private static final Pattern FONT_NAME      = Pattern.compile("[A-Za-z0-9][A-Za-z0-9 \\-]{0,59}");
-
-  private static final Pattern RADIUS_PATTERN = Pattern.compile("(?:\\d|1\\d|2\\d)px");
 
   /**
    * @param companyName the name shown in the header of the email
@@ -100,34 +97,6 @@ public final class EmailBrand {
   }
 
   /**
-   * The color itself when text on it can reach 4.5:1 (white or dark ink,
-   * whichever is better), otherwise the color moved as little as needed
-   * toward black or white to reach it, so that the text of the header and of
-   * the buttons can be read
-   */
-  private static String readableFill(String color) {
-    boolean light = contrast(LIGHT_TEXT, color) >= contrast(DARK_TEXT, color);
-    String target = light ? "#000000" : LIGHT_TEXT;
-    String ink = light ? LIGHT_TEXT : DARK_TEXT;
-    String fill = color;
-    for (int step = 1; contrast(ink, fill) < 4.5d && step <= 30; step++) {
-      fill = mix(color, target, step * 0.02d);
-    }
-    return fill;
-  }
-
-  private static String valid(String color, String fallback) {
-    String value = color == null ? "" : color.trim();
-    if (HEX_SHORT.matcher(value).matches()) {
-      // #rgb and #rgba: each digit is doubled, the alpha is dropped
-      value = "#" + value.substring(1, 4).replaceAll("(.)", "$1$1");
-    } else if (HEX_ALPHA.matcher(value).matches()) {
-      value = value.substring(0, 7);
-    }
-    return HEX_COLOR.matcher(value).matches() ? value.toLowerCase() : fallback;
-  }
-
-  /**
    * The brand of the site, for a template that has no branding service at
    * hand; the default brand when the site cannot be reached. The brand is
    * kept a few seconds, so that the many helper calls of one rendering (and
@@ -137,28 +106,6 @@ public final class EmailBrand {
    */
   public static EmailBrand current() {
     return current(System.currentTimeMillis());
-  }
-
-  /**
-   * The same as {@link #current()} at a given time, so that the expiry of the
-   * kept brand can be tested
-   */
-  static EmailBrand current(long now) {
-    Cached last = CACHED.get();
-    if (last != null && now < last.expires()) {
-      return last.brand();
-    }
-    try {
-      BrandingService brandingService = PortalContainer.getInstance().getComponentInstanceOfType(BrandingService.class);
-      if (brandingService == null) {
-        return new EmailBrand("", null);
-      }
-      EmailBrand brand = from(brandingService);
-      CACHED.set(new Cached(brand, now + CACHE_MILLIS));
-      return brand;
-    } catch (RuntimeException | LinkageError _) {
-      return new EmailBrand("", null);
-    }
   }
 
   /**
@@ -235,18 +182,6 @@ public final class EmailBrand {
     return readableOnWhite(color);
   }
 
-  private static String readableOnWhite(String base) {
-    return readableOnWhite(base, 4.5d);
-  }
-
-  private static String readableOnWhite(String base, double minimum) {
-    String text = base;
-    for (int step = 1; contrast(LIGHT_TEXT, text) < minimum && step <= 20; step++) {
-      text = mix(base, "#000000", step * 0.05d);
-    }
-    return text;
-  }
-
   /**
    * @return the rounding of the buttons, such as 8px
    */
@@ -260,6 +195,37 @@ public final class EmailBrand {
    */
   public String getTextColor() {
     return contrast(LIGHT_TEXT, fill) >= contrast(DARK_TEXT, fill) ? LIGHT_TEXT : DARK_TEXT;
+  }
+
+  /**
+   * WCAG contrast ratio between two #rrggbb colors
+   */
+  static double contrast(String first, String second) {
+    double a = luminance(first);
+    double b = luminance(second);
+    return (Math.max(a, b) + 0.05d) / (Math.min(a, b) + 0.05d);
+  }
+
+  /**
+   * The same as {@link #current()} at a given time, so that the expiry of the
+   * kept brand can be tested
+   */
+  static EmailBrand current(long now) {
+    CachedEmailBrand last = CACHED.get();
+    if (last != null && now < last.expires()) {
+      return last.brand();
+    }
+    try {
+      BrandingService brandingService = PortalContainer.getInstance().getComponentInstanceOfType(BrandingService.class);
+      if (brandingService == null) {
+        return new EmailBrand("", null);
+      }
+      EmailBrand brand = from(brandingService);
+      CACHED.set(new CachedEmailBrand(brand, now + CACHE_MILLIS));
+      return brand;
+    } catch (RuntimeException | LinkageError _) {
+      return new EmailBrand("", null);
+    }
   }
 
   /**
@@ -277,12 +243,43 @@ public final class EmailBrand {
   }
 
   /**
-   * WCAG contrast ratio between two #rrggbb colors
+   * The color itself when text on it can reach 4.5:1 (white or dark ink,
+   * whichever is better), otherwise the color moved as little as needed
+   * toward black or white to reach it, so that the text of the header and of
+   * the buttons can be read
    */
-  static double contrast(String first, String second) {
-    double a = luminance(first);
-    double b = luminance(second);
-    return (Math.max(a, b) + 0.05d) / (Math.min(a, b) + 0.05d);
+  private static String readableFill(String color) {
+    boolean light = contrast(LIGHT_TEXT, color) >= contrast(DARK_TEXT, color);
+    String target = light ? "#000000" : LIGHT_TEXT;
+    String ink = light ? LIGHT_TEXT : DARK_TEXT;
+    String fill = color;
+    for (int step = 1; contrast(ink, fill) < 4.5d && step <= 30; step++) {
+      fill = mix(color, target, step * 0.02d);
+    }
+    return fill;
+  }
+
+  private static String valid(String color, String fallback) {
+    String value = color == null ? "" : color.trim();
+    if (HEX_SHORT.matcher(value).matches()) {
+      // #rgb and #rgba: each digit is doubled, the alpha is dropped
+      value = "#" + value.substring(1, 4).replaceAll("(.)", "$1$1");
+    } else if (HEX_ALPHA.matcher(value).matches()) {
+      value = value.substring(0, 7);
+    }
+    return HEX_COLOR.matcher(value).matches() ? value.toLowerCase() : fallback;
+  }
+
+  private static String readableOnWhite(String base) {
+    return readableOnWhite(base, 4.5d);
+  }
+
+  private static String readableOnWhite(String base, double minimum) {
+    String text = base;
+    for (int step = 1; contrast(LIGHT_TEXT, text) < minimum && step <= 20; step++) {
+      text = mix(base, "#000000", step * 0.05d);
+    }
+    return text;
   }
 
   private static double luminance(String hex) {
