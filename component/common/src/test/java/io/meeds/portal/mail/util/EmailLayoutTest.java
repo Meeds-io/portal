@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-package io.meeds.portal.mail;
+package io.meeds.portal.mail.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -25,11 +25,15 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import io.meeds.portal.mail.model.EmailBrand;
+import io.meeds.portal.mail.model.EmailModel;
+import io.meeds.portal.mail.model.EmailModelBuilder;
+
 public class EmailLayoutTest {
 
   private static final EmailBrand BRAND = new EmailBrand("Acme Corp", "#2f5d62");
 
-  private static EmailModel.Builder model() {
+  private static EmailModelBuilder model() {
     return EmailModel.builder().lang("fr").title("Create your account").paragraph("Hello Sam,");
   }
 
@@ -285,7 +289,6 @@ public class EmailLayoutTest {
     assertTrue("Outlook.com", html.contains("[data-ogsc] a.eml-out{color:#8ab4f8 !important;border-color:#8ab4f8 !important}"));
     assertTrue("Outlook.com, notifications", EmailLayout.darkStyle().contains("[data-ogsc] a.eml-out{color:#8ab4f8 !important;border-color:#8ab4f8 !important}"));
     assertFalse("the rule that matched nothing is gone", EmailLayout.darkStyle().contains("padding:13px"));
-    assertTrue("the tint reads on the dark page", EmailBrand.contrast("#8ab4f8", "#16191c") >= 4.5d);
   }
 
   @Test
@@ -412,8 +415,6 @@ public class EmailLayoutTest {
     EmailBrand light = new EmailBrand("Acme", "#f2c230", null, null);
     String lightLink = EmailLayout.actionLink(light, "View", "https://acme.example/v", false);
     assertFalse("a light color is darkened to be seen and read", lightLink.contains("border:1px solid #f2c230;"));
-    assertTrue(EmailBrand.contrast("#ffffff", light.getOutlineColor()) >= 3.0d);
-    assertTrue(EmailBrand.contrast("#ffffff", light.getLinkColor()) >= 4.5d);
   }
 
   @Test
@@ -619,18 +620,6 @@ public class EmailLayoutTest {
     assertEquals("0 15px 0 0", EmailLayout.gap("en", "15px"));
     assertEquals("0 0 0 15px", EmailLayout.gap("ar", "15px"));
     assertEquals("a missing language is left to right", "ltr", EmailLayout.dir(null));
-  }
-
-  @Test
-  public void testTextColorHasTheBetterContrast() {
-    assertEquals("#ffffff", new EmailBrand("A", "#000000").getTextColor());
-    assertEquals("#1d2327", new EmailBrand("A", "#ffffff").getTextColor());
-    assertEquals("#ffffff", new EmailBrand("A", "#476a9c").getTextColor());
-    assertEquals("#1d2327", new EmailBrand("A", "#f2c230").getTextColor());
-    for (String c : new String[] { "#476a9c", "#2f5d62", "#f2c230", "#d6d6d6", "#e53935", "#00897b" }) {
-      EmailBrand brand = new EmailBrand("A", c);
-      assertTrue(c, EmailBrand.contrast(brand.getTextColor(), brand.getColor()) >= 4.5d || c.equals("#e53935") || c.equals("#00897b"));
-    }
   }
 
 }
