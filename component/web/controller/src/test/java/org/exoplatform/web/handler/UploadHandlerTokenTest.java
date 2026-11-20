@@ -533,7 +533,9 @@ public class UploadHandlerTokenTest {
     assertEquals("", responseBody.toString());
     assertEquals("mary", uploadService.getUploadResource(uploadId).getOwner());
     handler.execute(request("delete", uploadId, null, "paul", null, null), mock(HttpServletResponse.class));
-    assertNull("the browser delete keeps answering any authenticated user", uploadService.getUploadResource(uploadId));
+    assertNotNull("another user's browser delete is refused", uploadService.getUploadResource(uploadId));
+    handler.execute(request("delete", uploadId, null, "mary", null, null), mock(HttpServletResponse.class));
+    assertNull("the owner's browser delete removes it", uploadService.getUploadResource(uploadId));
   }
 
   /**
