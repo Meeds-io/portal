@@ -49,6 +49,9 @@ public class CookieTokenService extends AbstractTokenService<PortalToken, String
 
   public static final String SEPARATOR_CHAR              = ".";
 
+  /** The type of a remember-me token, created by {@link #createToken(String)} */
+  public static final String REMEMBER_ME_TOKEN           = "";
+
   private PortalTokenStorage tokenStore;
 
   private SaltedHashService  saltedHashService;
@@ -68,7 +71,7 @@ public class CookieTokenService extends AbstractTokenService<PortalToken, String
   }
 
   public String createToken(String username) {
-    return createToken(username, "");
+    return createToken(username, REMEMBER_ME_TOKEN);
   }
 
   public String createToken(String username, String type) {
