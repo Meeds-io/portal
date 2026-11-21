@@ -162,6 +162,16 @@ public class LoginHandler extends JspBasedWebHandler {
     });
   }
 
+  /**
+   * Deletes the user's forgot-password and onboarding tokens, to invalidate the
+   * recover password and onboarding email links once the user signed in
+   */
+  static void deleteEmailLinkTokens(String username) {
+    CookieTokenService tokenService = AbstractTokenService.getInstance(CookieTokenService.class);
+    tokenService.deleteTokensByUsernameAndType(username, CookieTokenService.FORGOT_PASSWORD_TOKEN);
+    tokenService.deleteTokensByUsernameAndType(username, CookieTokenService.ONBOARD_TOKEN);
+  }
+
   @Override
   public boolean execute(ControllerContext context) throws Exception { // NOSONAR
     HttpServletRequest request = new HttpRequestLocaleWrapper(context.getRequest());
@@ -242,10 +252,7 @@ public class LoginHandler extends JspBasedWebHandler {
       }
       if (request.getRemoteUser() != null) {
         status = LoginStatus.AUTHENTICATED;
-        // Delete user forgot-password tokens to invalidate recover password
-        // email link
-        CookieTokenService tokenService = AbstractTokenService.getInstance(CookieTokenService.class);
-        tokenService.deleteTokensByUsernameAndType(username, CookieTokenService.FORGOT_PASSWORD_TOKEN);
+        deleteEmailLinkTokens(username);
       }
     } else {
       LOG.debug("User already authenticated. Will redirect to initialURI");
