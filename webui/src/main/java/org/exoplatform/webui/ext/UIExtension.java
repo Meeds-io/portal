@@ -248,9 +248,8 @@ public class UIExtension implements Comparable<UIExtension> {
    * @param targetClass the expected class
    * @return <code>true</code> if type equals target class, <code>false</code> otherwise
    */
-  @SuppressWarnings("unchecked")
-  private boolean typeEquals(Type type, Class targetClass) {
-    return type instanceof Class && ((Class) type).getName().equals(targetClass.getName());
+  private boolean typeEquals(Type type, Class<?> targetClass) {
+    return targetClass.equals(type);
   }
   
   public boolean isEnable() {
