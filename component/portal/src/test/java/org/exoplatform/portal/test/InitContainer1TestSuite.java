@@ -24,6 +24,7 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 import org.exoplatform.account.setup.web.AccountSetupServiceTest;
+import org.exoplatform.account.setup.web.AccountSetupTest;
 import org.exoplatform.portal.TestJIBXXmlMapping;
 import org.exoplatform.portal.TestXSDCorruption;
 import org.exoplatform.portal.branding.BrandingApplicationStylingTest;
@@ -82,6 +83,7 @@ import org.exoplatform.portal.mop.storage.cache.model.TestCacheSelectors;
     DefaultUserMembershipListenerTest.class,
     PermanentLinkServiceTest.class,
     AccountSetupServiceTest.class,
+    AccountSetupTest.class,
     BrandingServiceImplTest.class,
     BrandingApplicationStylingTest.class,
     DefaultGroupVisibilityPluginTest.class,

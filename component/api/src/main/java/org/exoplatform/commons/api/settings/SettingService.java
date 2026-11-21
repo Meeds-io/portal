@@ -89,6 +89,42 @@ public interface SettingService {
   public SettingValue<?> get(Context context, Scope scope, String key);
 
   /**
+   * Gets the value associated with a specified composite key (context, scope,
+   * key) like {@link #get(Context, Scope, String)}, but a read that could not
+   * be completed raises an exception instead of being answered as an absent
+   * value. A returned null always means that the key is absent. This default
+   * delegates to {@link #get(Context, Scope, String)}: an implementation whose
+   * {@code get} answers a failed read with null overrides this method.
+   *
+   * @param context The context with which the specified value is associated.
+   * @param scope The scope with which the specified value is associated.
+   * @param key The key with which the specified value is associated.
+   * @return the value, or null when the key is absent
+   * @LevelAPI Experimental
+   */
+  default SettingValue<?> getOrThrow(Context context, Scope scope, String key) {
+    return get(context, scope, key);
+  }
+
+  /**
+   * Gets the value associated with a specified composite key (context, scope,
+   * key) from the store, never from a cache, like
+   * {@link #getOrThrow(Context, Scope, String)} for a read that could not be
+   * completed. This default delegates to
+   * {@link #getOrThrow(Context, Scope, String)}: an implementation that reads a
+   * cache there overrides this method.
+   *
+   * @param context The context with which the specified value is associated.
+   * @param scope The scope with which the specified value is associated.
+   * @param key The key with which the specified value is associated.
+   * @return the value, or null when the key is absent
+   * @LevelAPI Experimental
+   */
+  default SettingValue<?> getFromStore(Context context, Scope scope, String key) {
+    return getOrThrow(context, scope, key);
+  }
+
+  /**
    * Returns the total count of contexts by type
    *
    * @param contextType context type name ('USER' OR 'GLOBAL')

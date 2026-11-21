@@ -42,6 +42,7 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.settings.cache.CacheSettingServiceImpl;
+import org.exoplatform.settings.cache.NullSettingValue;
 
 import jakarta.persistence.EntityTransaction;
 
@@ -148,6 +149,26 @@ public class CacheSettingTest extends BaseTestCase {
     assertEquals(0, settingCache.getCacheSize());
     assertNull(settingService.get(Context.USER, Scope.PORTAL.id("name1"), "x1"));
     assertNull(settingService.get(Context.USER, Scope.PAGE.id("name4"), "x4"));
+  }
+
+  public void testGetOrThrowCachesAnAbsentKeyAndSeesALaterSet() {
+    SettingKey key = new SettingKey(Context.GLOBAL, Scope.GLOBAL, "absentThrow");
+    assertNull(settingService.getOrThrow(Context.GLOBAL, Scope.GLOBAL, "absentThrow"));
+    assertSame(NullSettingValue.getInstance(), settingCache.get(key));
+
+    settingService.set(Context.GLOBAL, Scope.GLOBAL, "absentThrow", SettingValue.create("v"));
+    assertEquals("v", settingService.getOrThrow(Context.GLOBAL, Scope.GLOBAL, "absentThrow").getValue());
+    settingService.remove(Context.GLOBAL, Scope.GLOBAL, "absentThrow");
+  }
+
+  public void testGetFromStoreIgnoresAnAbsentValueHeldByTheCache() {
+    SettingKey key = new SettingKey(Context.GLOBAL, Scope.GLOBAL, "storedKey");
+    settingService.set(Context.GLOBAL, Scope.GLOBAL, "storedKey", SettingValue.create("stored"));
+    settingCache.put(key, NullSettingValue.getInstance());
+
+    assertNull(settingService.getOrThrow(Context.GLOBAL, Scope.GLOBAL, "storedKey"));
+    assertEquals("stored", settingService.getFromStore(Context.GLOBAL, Scope.GLOBAL, "storedKey").getValue());
+    settingService.remove(Context.GLOBAL, Scope.GLOBAL, "storedKey");
   }
 
   public void testSettingLoadInFlightDoesNotCacheWhatItReadBeforeASet() throws Exception {
