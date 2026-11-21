@@ -49,4 +49,14 @@
       </values-param>
     </init-params>
   </component>
+
+  <external-component-plugins>
+    <target-component>org.exoplatform.services.listener.ListenerService</target-component>
+    <component-plugin>
+      <name>exo.core.security.ConversationRegistry.register</name>
+      <set-method>addListener</set-method>
+      <type>org.exoplatform.web.login.recovery.OnboardingLinkSignInListener</type>
+      <description>ends the pending onboarding links of an account that signs in</description>
+    </component-plugin>
+  </external-component-plugins>
 </configuration>
