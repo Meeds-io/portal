@@ -56,6 +56,8 @@ import org.exoplatform.services.mail.MailService;
 import org.exoplatform.services.mail.Message;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserHandler;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.idm.UserImpl;
 import org.exoplatform.services.resources.ResourceBundleService;
 import org.exoplatform.web.WebAppController;
@@ -259,7 +261,8 @@ public class PasswordRecoveryServiceImplTest {
    * other types through the password reminder's
    */
   @Test
-  public void testTokensAreRoutedByType() {
+  public void testTokensAreRoutedByType() throws Exception {
+    when(organizationService.getUserHandler()).thenReturn(mock(UserHandler.class));
     PortalToken onboard = mock(PortalToken.class);
     when(onboard.isExpired()).thenReturn(false);
     when(onboard.getUsername()).thenReturn("jdoe");
@@ -274,6 +277,76 @@ public class PasswordRecoveryServiceImplTest {
     verify(onboardingTokenService).deleteToken("tok.en", CookieTokenService.ONBOARD_TOKEN);
     passwordRecoveryService.deleteToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN);
     verify(remindPasswordTokenService).deleteToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN);
+  }
+
+  @Test
+  public void testAnOnboardingLinkEndsOnceItsAccountHasSignedIn() throws Exception {
+    long now = System.currentTimeMillis();
+    long expiration = now + SEVEN_DAYS - TimeUnit.HOURS.toMillis(1);
+    long issued = expiration - SEVEN_DAYS;
+    PortalToken onboard = mock(PortalToken.class);
+    when(onboard.isExpired()).thenReturn(false);
+    when(onboard.getUsername()).thenReturn("jdoe");
+    when(onboard.getExpirationTimeMillis()).thenReturn(expiration);
+    when(onboardingTokenService.getToken("tok.en", CookieTokenService.ONBOARD_TOKEN)).thenReturn(onboard);
+    UserHandler userHandler = mock(UserHandler.class);
+    when(organizationService.getUserHandler()).thenReturn(userHandler);
+    User user = user();
+    user.setCreatedDate(new Date(issued - TimeUnit.DAYS.toMillis(1)));
+    when(userHandler.findUserByName("jdoe", UserStatus.ANY)).thenReturn(user);
+
+    user.setLastLoginTime(new Date(now - TimeUnit.HOURS.toMillis(2)));
+    assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
+    // an account whose last sign-in is its creation, at the time the link is issued
+    user.setLastLoginTime(new Date(issued));
+    assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
+    verify(onboardingTokenService, never()).deleteToken(anyString(), anyString());
+
+    // the sign-in account creation records, after an issue time a raised
+    // validity moves back
+    user.setCreatedDate(new Date(issued + TimeUnit.MINUTES.toMillis(1)));
+    user.setLastLoginTime(user.getCreatedDate());
+    assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
+    verify(onboardingTokenService, never()).deleteToken(anyString(), anyString());
+
+    user.setCreatedDate(new Date(issued - TimeUnit.DAYS.toMillis(1)));
+    user.setLastLoginTime(new Date(now));
+    assertNull(passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
+    verify(onboardingTokenService).deleteToken("tok.en", CookieTokenService.ONBOARD_TOKEN);
+    verify(onboardingTokenService, never()).deleteTokensByUsernameAndType(anyString(), anyString());
+  }
+
+  @Test
+  public void testAnOnboardingLinkIsRefusedAndKeptWhenItsAccountCannotBeRead() throws Exception {
+    PortalToken onboard = mock(PortalToken.class);
+    when(onboard.isExpired()).thenReturn(false);
+    when(onboard.getUsername()).thenReturn("jdoe");
+    when(onboard.getExpirationTimeMillis()).thenReturn(System.currentTimeMillis() + SEVEN_DAYS);
+    when(onboardingTokenService.getToken("tok.en", CookieTokenService.ONBOARD_TOKEN)).thenReturn(onboard);
+    UserHandler userHandler = mock(UserHandler.class);
+    when(organizationService.getUserHandler()).thenReturn(userHandler);
+    when(userHandler.findUserByName("jdoe", UserStatus.ANY)).thenThrow(new IllegalStateException("store down"));
+
+    assertNull(passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
+    verify(onboardingTokenService, never()).deleteToken(anyString(), anyString());
+    verify(onboardingTokenService, never()).deleteTokensByUsernameAndType(anyString(), anyString());
+  }
+
+  @Test
+  public void testAForgotPasswordLinkIsNotEndedByASignIn() throws Exception {
+    long now = System.currentTimeMillis();
+    PortalToken forgot = mock(PortalToken.class);
+    when(forgot.isExpired()).thenReturn(false);
+    when(forgot.getUsername()).thenReturn("jdoe");
+    when(remindPasswordTokenService.getToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN)).thenReturn(forgot);
+    UserHandler userHandler = mock(UserHandler.class);
+    lenient().when(organizationService.getUserHandler()).thenReturn(userHandler);
+    User user = user();
+    user.setCreatedDate(new Date(now - TimeUnit.DAYS.toMillis(1)));
+    user.setLastLoginTime(new Date(now));
+    lenient().when(userHandler.findUserByName("jdoe", UserStatus.ANY)).thenReturn(user);
+
+    assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.FORGOT_PASSWORD_TOKEN));
   }
 
   private static User user() {
