@@ -38,6 +38,28 @@ public abstract class AbstractCookieTokenServiceTest extends AbstractTokenServic
         service.deleteToken(tokenId);
     }
 
+    public void testTheTokensOfADisabledOrDeletedUserGo() throws Exception {
+        String rememberMe = service.createToken("jdoe");
+        String onboard = service.createToken("jdoe", CookieTokenService.ONBOARD_TOKEN);
+        String othersRememberMe = service.createToken("mary");
+        try {
+            // what the listener does when the user is disabled
+            service.deleteTokensByUsernameAndType("jdoe", "");
+            assertNull(service.getToken(rememberMe));
+            assertNotNull(service.getToken(onboard, CookieTokenService.ONBOARD_TOKEN));
+            assertNotNull(service.getToken(othersRememberMe));
+
+            // what the listener does when the user is deleted
+            service.deleteTokensOfUser("jdoe");
+            assertNull(service.getToken(onboard, CookieTokenService.ONBOARD_TOKEN));
+            assertNotNull(service.getToken(othersRememberMe));
+        } finally {
+            service.deleteToken(rememberMe);
+            service.deleteToken(onboard, CookieTokenService.ONBOARD_TOKEN);
+            service.deleteToken(othersRememberMe);
+        }
+    }
+
     @Override
     public void testGetAllToken() throws Exception {
         /* Do nothing there is no CookieTokenService.getAllTokens(); */
