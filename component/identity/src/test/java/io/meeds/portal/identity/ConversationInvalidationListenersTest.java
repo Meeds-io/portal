@@ -19,6 +19,7 @@
 package io.meeds.portal.identity;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.stereotype.Component;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import jakarta.annotation.PostConstruct;
@@ -40,7 +44,7 @@ import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.security.ConversationRegistry;
 
-import io.meeds.services.organization.listener.UserConversationInvalidationListener;
+import io.meeds.portal.identity.listener.UserConversationInvalidationListener;
 
 /**
  * A disabled or deleted user is no longer served its conversations, on
@@ -48,6 +52,9 @@ import io.meeds.services.organization.listener.UserConversationInvalidationListe
  */
 @RunWith(MockitoJUnitRunner.class)
 public class ConversationInvalidationListenersTest {
+
+  // the portal package root the platform's Spring application scans
+  private static final String                        PORTAL_SCANNED_PACKAGE = "io.meeds.portal";
 
   @Mock
   private ConversationRegistry                       conversationRegistry;
@@ -102,6 +109,16 @@ public class ConversationInvalidationListenersTest {
 
     verify(userHandler).addUserEventListener(userListener);
     assertNotNull(UserConversationInvalidationListener.class.getMethod("setup").getAnnotation(PostConstruct.class));
+  }
+
+  @Test
+  public void testTheListenerIsAComponentOfThePortalPackagesThePlatformLoads() {
+    ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
+    scanner.addIncludeFilter(new AnnotationTypeFilter(Component.class));
+
+    assertTrue(scanner.findCandidateComponents(PORTAL_SCANNED_PACKAGE)
+                      .stream()
+                      .anyMatch(bean -> UserConversationInvalidationListener.class.getName().equals(bean.getBeanClassName())));
   }
 
   private UserConversationInvalidationListener listenerOn(OrganizationService service) {
