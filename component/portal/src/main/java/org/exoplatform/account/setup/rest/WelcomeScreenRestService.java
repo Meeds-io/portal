@@ -21,7 +21,7 @@ package org.exoplatform.account.setup.rest;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import org.exoplatform.container.PortalContainer;
+import org.exoplatform.account.setup.web.AccountSetupService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
@@ -34,17 +34,30 @@ import javax.ws.rs.core.*;
 @Path("/welcomeScreen")
 public class WelcomeScreenRestService implements ResourceContainer {
 
-  private static final Log LOG = ExoLogger.getLogger(WelcomeScreenRestService.class);
+  private static final Log      LOG = ExoLogger.getLogger(WelcomeScreenRestService.class);
+
+  private AccountSetupService   accountSetupService;
+
+  private OrganizationService   organizationService;
+
+  public WelcomeScreenRestService(AccountSetupService accountSetupService, OrganizationService organizationService) {
+    this.accountSetupService = accountSetupService;
+    this.organizationService = organizationService;
+  }
 
   /**
    * This method checks if username entered by user in Account Setup Screen
-   * already exists
+   * already exists. It answers only while the platform is not set up yet,
+   * with the same decision as the Account Setup Screen.
    */
   @GET
   @Path("/checkUsername")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   public Response checkUsername(@QueryParam("username") String username) {
+    if (accountSetupService.mustSkipAccountSetup()) {
+      return Response.status(Response.Status.FORBIDDEN).build();
+    }
 
     CacheControl cacheControl = new CacheControl();
     cacheControl.setNoCache(true);
@@ -52,9 +65,7 @@ public class WelcomeScreenRestService implements ResourceContainer {
 
     boolean userExists = false;
     JSONObject jsonObject = new JSONObject();
-    OrganizationService orgService = (OrganizationService) PortalContainer.getInstance()
-                                                                          .getComponentInstanceOfType(OrganizationService.class);
-    UserHandler userHandler = orgService.getUserHandler();
+    UserHandler userHandler = organizationService.getUserHandler();
     try {
       if (userHandler.findUserByName(username) != null) {
         userExists = true;
