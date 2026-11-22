@@ -79,6 +79,25 @@ public class UserFieldValidatorTest {
   }
 
   @Test
+  public void testValidatePersonalNameLastCharacter() {
+    UserFieldValidator fieldValidator = new UserFieldValidator("field", false, true);
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "Smith2"));
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "Martin Jr."));
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "aaa@"));
+    assertNull(fieldValidator.validate(Locale.ENGLISH, "Smith"));
+    assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa-"));
+    assertNull(fieldValidator.validate(Locale.ENGLISH, "aaa'"));
+  }
+
+  @Test
+  public void testValidateOneCharacterPersonalName() {
+    UserFieldValidator fieldValidator = new UserFieldValidator("field", false, true, 1, 255);
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "1"));
+    assertNotNull(fieldValidator.validate(Locale.ENGLISH, "."));
+    assertNull(fieldValidator.validate(Locale.ENGLISH, "A"));
+  }
+
+  @Test
   public void testValidateEmail() {
     UserFieldValidator fieldValidator = new UserFieldValidator("email", false, false);
     assertNotNull(fieldValidator.validate(Locale.ENGLISH, ""));
