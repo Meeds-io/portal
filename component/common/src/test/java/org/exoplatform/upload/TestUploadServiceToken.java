@@ -636,7 +636,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
-   * A token upload the parser has marked uploaded, but whose file is not yet
+   * A token upload whose file is not yet
    * written and validated, is seen by an owner-checked consumer as uploading,
    * with no store location, and cannot be removed by it. A mime type plugin
    * holds the upload in that window: it runs after the parser's last progress
@@ -659,7 +659,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
       assertTrue("the upload reaches the window", inWindow.await(30, TimeUnit.SECONDS));
 
       UploadResource registered = service.getUploadResource(uploadId);
-      assertEquals("the parser has marked it uploaded", UploadResource.UPLOADED_STATUS, registered.getStatus());
+      assertEquals("it is not reported uploaded yet", UploadResource.UPLOADING_STATUS, registered.getStatus());
       assertFalse("its file is not written yet", new File(registered.getStoreLocation()).exists());
       UploadResource seen = service.getUploadResource(uploadId, "john");
       assertNotNull(seen);
@@ -735,7 +735,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
   }
 
   /**
-   * A browser upload in the same window is handed out as before: the
+   * A browser upload in the same window is handed out as uploading: the
    * receiving view applies to token uploads only.
    */
   public void testBrowserUploadInTheWindowIsHandedOutAsBefore() throws Exception {
@@ -756,7 +756,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
       assertTrue(inWindow.await(30, TimeUnit.SECONDS));
       UploadResource seen = service.getUploadResource(uploadId, "john");
       assertSame(service.getUploadResource(uploadId), seen);
-      assertEquals(UploadResource.UPLOADED_STATUS, seen.getStatus());
+      assertEquals(UploadResource.UPLOADING_STATUS, seen.getStatus());
       release.countDown();
       upload.get(30, TimeUnit.SECONDS);
       service.removeUploadResource(uploadId);

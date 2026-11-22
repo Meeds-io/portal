@@ -24,7 +24,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -37,8 +40,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import org.apache.commons.fileupload2.core.DiskFileItem;
@@ -84,6 +89,8 @@ public class UploadService {
 
   private static final int            UPLOAD_TOKEN_BYTE_LENGTH              = 32;
 
+  private static final String         STAGED_FILE_SUFFIX                    = ".staged";
+
   /**
    * These are list ascii-codes of special characters. We should not enable
    * these characters in fileName. They are control codes - that can not
@@ -118,8 +125,9 @@ public class UploadService {
   private Map<String, UploadLimit>    uploadLimits           = Collections.synchronizedMap(new LinkedHashMap<>());
 
   /**
-   * Token uploads registered but not yet written and validated: the
-   * owner-checked accessors never hand them out as uploaded.
+   * Token uploads registered whose token size check has not passed yet: the
+   * owner-checked accessors hand out a copy that hides the store location and
+   * blocks removal.
    */
   private final Set<UploadResource>   receivingTokenUploads  = ConcurrentHashMap.newKeySet();
 
@@ -422,13 +430,60 @@ public class UploadService {
       uploadRootPath.mkdirs();
     }
 
-    DiskFileItem fileItem = getFileItem(request, upResource);
+    AtomicLong receivedLength = new AtomicLong(-1);
+    DiskFileItem fileItem = getFileItem(request, upResource, receivedLength);
     upResource.setFileName(fileItem.getName());
     upResource.setMimeType(fileItem.getContentType());
     applyMimeTypeUploadPlugins(upResource, fileItem.getName());
-    if (upResource.getStatus() == UploadResource.UPLOADED_STATUS) {
-      writeFile(upResource, fileItem);
-      validateUploadedFile(upResource);
+    if (receivedLength.get() >= 0) {
+      completeUpload(upResource, fileItem, receivedLength.get());
+    }
+  }
+
+  /**
+   * Stages the received file outside its store location, runs the
+   * {@link UploadFileValidator}s on the staged file, and only then moves it to
+   * the store location and reports the resource uploaded. The resource stays
+   * in {@link UploadResource#UPLOADING_STATUS}, with its received size below
+   * the estimated one, until every check has passed; a refused upload ends in
+   * {@link UploadResource#FAILED_STATUS} with no file left.
+   *
+   * @param upResource the registered resource
+   * @param fileItem the parsed file
+   * @param receivedLength the request length the parser reported once the body
+   *          was read, which stays exact above the range of an int
+   * @throws FileUploadException when a validator refuses the file
+   */
+  private void completeUpload(UploadResource upResource, DiskFileItem fileItem, long receivedLength) throws FileUploadException {
+    Path stagedFile = Paths.get(uploadLocation_, upResource.getUploadId() + "." + UUID.randomUUID() + STAGED_FILE_SUFFIX);
+    try {
+      writeFile(stagedFile, fileItem, upResource.getUploadId());
+      validateUploadedFile(upResource, stagedFile.toFile());
+      if (uploadResources.get(upResource.getUploadId()) != upResource) {
+        // removed or replaced meanwhile: nothing to publish
+        return;
+      }
+      Files.move(stagedFile, Paths.get(upResource.getStoreLocation()), StandardCopyOption.REPLACE_EXISTING);
+      upResource.addUploadedBytes(receivedLength - upResource.getUploadedSize());
+      upResource.setStatus(UploadResource.UPLOADED_STATUS);
+    } catch (FileUploadException e) {
+      upResource.setStatus(UploadResource.FAILED_STATUS);
+      removeRefusedUpload(upResource);
+      throw e;
+    } catch (IOException e) {
+      upResource.setStatus(UploadResource.FAILED_STATUS);
+      removeRefusedUpload(upResource);
+      throw new FileUploadException("Unable to store the uploaded file", e);
+    } catch (RuntimeException e) {
+      upResource.setStatus(UploadResource.FAILED_STATUS);
+      removeRefusedUpload(upResource);
+      throw e;
+    } finally {
+      try {
+        Files.deleteIfExists(stagedFile);
+      } catch (IOException e) {
+        stagedFile.toFile().deleteOnExit();
+      }
     }
   }
 
@@ -588,9 +643,14 @@ public class UploadService {
   }
 
   private void validateUploadedFile(UploadResource upResource) throws FileUploadException {
-    if (getUploadFileValidators().isEmpty()
-        || upResource == null
-        || upResource.getStoreLocation() == null) {
+    if (upResource == null || upResource.getStoreLocation() == null) {
+      return;
+    }
+    validateUploadedFile(upResource, new File(upResource.getStoreLocation()));
+  }
+
+  private void validateUploadedFile(UploadResource upResource, File file) throws FileUploadException {
+    if (getUploadFileValidators().isEmpty()) {
       return;
     }
 
@@ -598,7 +658,7 @@ public class UploadService {
       if (!uploadFileValidator.supports(upResource.getFileName(), upResource.getMimeType())) {
         continue;
       }
-      try (InputStream inputStream = new FileInputStream(upResource.getStoreLocation())) {
+      try (InputStream inputStream = new FileInputStream(file)) {
         uploadFileValidator.validate(upResource.getFileName(), upResource.getMimeType(), inputStream);
       } catch (FileUploadException e) {
         upResource.setStatus(UploadResource.FAILED_STATUS);
@@ -637,11 +697,10 @@ public class UploadService {
 
   /**
    * Returns the resource registered under the upload id only when the given
-   * user owns it. A token upload still being written or validated is returned
-   * as a detached copy in {@link UploadResource#UPLOADING_STATUS}, without its
-   * store location: the parser marks it uploaded before its file is written and
-   * validated, and the copy cannot be removed through
-   * {@link #removeUploadResource(String, String)}.
+   * user owns it. A token upload is returned as a detached copy in
+   * {@link UploadResource#UPLOADING_STATUS}, without its store location, until
+   * the token's own size check has passed: the copy hides the store location
+   * and cannot be removed through {@link #removeUploadResource(String, String)}.
    *
    * @param uploadId upload id
    * @param username the user the caller acts for
@@ -861,8 +920,9 @@ public class UploadService {
     return limit;
   }
 
-  private DiskFileItem getFileItem(HttpServletRequest request, UploadResource upResource) throws FileUploadException {
-    List<DiskFileItem> itemList = new ArrayList<>();
+  private DiskFileItem getFileItem(HttpServletRequest request,
+                                   UploadResource upResource,
+                                   AtomicLong receivedLength) throws FileUploadException {
     // Create a factory for disk-based file items
     DiskFileItemFactory factory = DiskFileItemFactory.builder()
                                                      .setBufferSize(0)
@@ -874,11 +934,8 @@ public class UploadService {
     servletUpload.setHeaderCharset(StandardCharsets.UTF_8);
     ProgressListener listener = (bytesRead, contentLength, items) -> {
       if (bytesRead == contentLength) {
-        if (itemList.size() == 1) {
-          writeFile(upResource, itemList.get(items));
-        }
-        upResource.addUploadedBytes(contentLength - upResource.getUploadedSize());
-        upResource.setStatus(UploadResource.UPLOADED_STATUS);
+        // the resource is reported uploaded by completeUpload, once its checks passed
+        receivedLength.set(contentLength);
       } else {
         upResource.addUploadedBytes(bytesRead - upResource.getUploadedSize());
       }
@@ -890,16 +947,15 @@ public class UploadService {
       throw new FileUploadException("You can upload 1 file per request");
     }
     DiskFileItem fileItem = fileItems.get(0);
-    itemList.add(fileItem);
     return fileItem;
   }
 
-  private void writeFile(UploadResource upResource, DiskFileItem diskFileItem) {
+  private void writeFile(Path target, DiskFileItem diskFileItem, String uploadId) {
     DiskFileItem fileItem = null;
     try {
-      fileItem = diskFileItem.write(Paths.get(upResource.getStoreLocation()));
+      fileItem = diskFileItem.write(target);
     } catch (IOException e) {
-      throw new IllegalStateException("Upload id " + upResource.getUploadId() + " can't be uploaded", e);
+      throw new IllegalStateException("Upload id " + uploadId + " can't be uploaded", e);
     } finally {
       if (fileItem != null
           && fileItem.getPath() != null) {
