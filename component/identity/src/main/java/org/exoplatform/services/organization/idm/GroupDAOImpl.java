@@ -1171,28 +1171,9 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   @Override
   public void linkGroups(NestedMembership nestedMembership) throws Exception {
     try {
-      if (nestedMembership == null) {
-        throw new IllegalArgumentException("'nestedMembership' is mandatory");
-      } else if (StringUtils.isBlank(nestedMembership.getNestedGroupId())) {
-        throw new IllegalArgumentException("'nestedMembership' is mandatory");
-      } else if (StringUtils.isBlank(nestedMembership.getGroupId())) {
-        throw new IllegalArgumentException("'parentMembership' is mandatory");
-      } else if (nestedMembership.getGroupId().equals(nestedMembership.getNestedGroupId())) {
-        throw new IllegalStateException("Cannot link a group to itself");
-      }
-      String enclosingGroupId = nestedMembership.getGroupId();
-      String nestedGroupId = nestedMembership.getNestedGroupId();
-
-      Group parentGroup = findGroupById(enclosingGroupId);
-      Group nestedGroup = findGroupById(nestedGroupId);
-      if (parentGroup == null) {
-        throw new ObjectNotFoundException("Parent group not found: %s".formatted(enclosingGroupId));
-      } else if (nestedGroup == null) {
-        throw new ObjectNotFoundException("Member group not found: %s".formatted(nestedGroupId));
-      } else if (isNestedIn(nestedMembership.getGroupId(), nestedMembership.getNestedGroupId())) {
-        throw new IllegalStateException("A circular dependency has been detected between groups '%s' and '%s'".formatted(enclosingGroupId,
-                                                                                                                         nestedGroupId));
-      }
+      String enclosingGroupId = nestedMembership == null ? null : nestedMembership.getGroupId();
+      String nestedGroupId = nestedMembership == null ? null : nestedMembership.getNestedGroupId();
+      Group nestedGroup = checkLinkable(nestedMembership);
       Set<NestedMembership> existingNestedMemberships = getNestedMemberships(enclosingGroupId);
       Set<NestedMembership> nestedMemberships = new HashSet<>(existingNestedMemberships);
       Set<NestedMembership> enclosingMemberships = nestedGroup.getEnclosingMemberships();
@@ -1201,14 +1182,7 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
       } else {
         enclosingMemberships = new HashSet<>(enclosingMemberships);
       }
-      String enclosingMembershipType = nestedMembership.isInheritMembershipType() ? NestedMembership.INHERIT_MEMBERSHIP_TYPE :
-                                                                                  nestedMembership.getMembershipType();
-      String nestedMembershipType = nestedMembership.isIncludeAllMembershipTypes() ? NestedMembership.ALL_MEMBERSHIP_TYPE :
-                                                                                   nestedMembership.getNestedMembershipType();
-      NestedMembership nestedMembershipToStore = nestedMembership.toBuilder()
-                                                                 .nestedMembershipType(nestedMembershipType)
-                                                                 .membershipType(enclosingMembershipType)
-                                                                 .build();
+      NestedMembership nestedMembershipToStore = normalize(nestedMembership);
       nestedMemberships.add(nestedMembershipToStore);
       enclosingMemberships.add(nestedMembershipToStore);
       updateMembershipAttributes(enclosingGroupId,
@@ -1224,14 +1198,7 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   @Override
   public void unlinkGroups(NestedMembership nestedMembership) throws Exception {
     try {
-      String enclosingMembershipType = nestedMembership.isInheritMembershipType() ? NestedMembership.INHERIT_MEMBERSHIP_TYPE :
-                                                                                  nestedMembership.getMembershipType();
-      String nestedMembershipType = nestedMembership.isIncludeAllMembershipTypes() ? NestedMembership.ALL_MEMBERSHIP_TYPE :
-                                                                                   nestedMembership.getNestedMembershipType();
-      nestedMembership = nestedMembership.toBuilder()
-                                         .nestedMembershipType(nestedMembershipType)
-                                         .membershipType(enclosingMembershipType)
-                                         .build();
+      nestedMembership = normalize(nestedMembership);
 
       boolean updated = false;
       Group parentGroup = findGroupById(nestedMembership.getGroupId());
@@ -1365,11 +1332,12 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
 
   /**
    * Updates enclosing (inherited) memberships by calculating the difference between
-   * current and new state.
+   * current and new state. Both sides are normalized before the comparison, so that
+   * an unchanged link sent with empty roles is neither removed nor added again.
    */
   private void updateEnclosingMemberships(Group existingGroup, Group updatedGroup) {
-    Set<NestedMembership> oldMemberships = toSet(existingGroup.getEnclosingMemberships());
-    Set<NestedMembership> newMemberships = toSet(updatedGroup.getEnclosingMemberships());
+    Set<NestedMembership> oldMemberships = normalizeEnclosing(existingGroup.getEnclosingMemberships(), updatedGroup.getId());
+    Set<NestedMembership> newMemberships = normalizeEnclosing(updatedGroup.getEnclosingMemberships(), updatedGroup.getId());
 
     Set<NestedMembership> toRemove = new HashSet<>(oldMemberships);
     toRemove.removeAll(newMemberships);
@@ -1380,11 +1348,56 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     updateNestedMemberships(toAdd, toRemove);
   }
 
+  protected Set<NestedMembership> normalizeEnclosing(Collection<NestedMembership> memberships, String nestedGroupId) {
+    return toSet(memberships).stream()
+                             .map(m -> normalize(m.toBuilder().nestedGroupId(nestedGroupId).build()))
+                             .collect(Collectors.toSet());
+  }
+
+  private NestedMembership normalize(NestedMembership nestedMembership) {
+    return nestedMembership.toBuilder()
+                           .membershipType(nestedMembership.isInheritMembershipType() ? NestedMembership.INHERIT_MEMBERSHIP_TYPE :
+                                                                                      nestedMembership.getMembershipType())
+                           .nestedMembershipType(nestedMembership.isIncludeAllMembershipTypes() ? NestedMembership.ALL_MEMBERSHIP_TYPE :
+                                                                                                nestedMembership.getNestedMembershipType())
+                           .build();
+  }
+
+  /**
+   * Checks that a link can be stored and returns its nested group.
+   */
+  private Group checkLinkable(NestedMembership nestedMembership) throws Exception {
+    if (nestedMembership == null) {
+      throw new IllegalArgumentException("'nestedMembership' is mandatory");
+    } else if (StringUtils.isBlank(nestedMembership.getNestedGroupId())) {
+      throw new IllegalArgumentException("'nestedMembership' is mandatory");
+    } else if (StringUtils.isBlank(nestedMembership.getGroupId())) {
+      throw new IllegalArgumentException("'parentMembership' is mandatory");
+    } else if (nestedMembership.getGroupId().equals(nestedMembership.getNestedGroupId())) {
+      throw new IllegalStateException("Cannot link a group to itself");
+    }
+    String enclosingGroupId = nestedMembership.getGroupId();
+    String nestedGroupId = nestedMembership.getNestedGroupId();
+
+    Group parentGroup = findGroupById(enclosingGroupId);
+    Group nestedGroup = findGroupById(nestedGroupId);
+    if (parentGroup == null) {
+      throw new ObjectNotFoundException("Parent group not found: %s".formatted(enclosingGroupId));
+    } else if (nestedGroup == null) {
+      throw new ObjectNotFoundException("Member group not found: %s".formatted(nestedGroupId));
+    } else if (isNestedIn(nestedMembership.getGroupId(), nestedMembership.getNestedGroupId())) {
+      throw new IllegalStateException("A circular dependency has been detected between groups '%s' and '%s'".formatted(enclosingGroupId,
+                                                                                                                       nestedGroupId));
+    }
+    return nestedGroup;
+  }
+
   private void updateNestedMemberships(Set<NestedMembership> toAdd, Set<NestedMembership> toRemove) {
-    if (CollectionUtils.isNotEmpty(toAdd)) {
+    if (CollectionUtils.isNotEmpty(toRemove) && CollectionUtils.isNotEmpty(toAdd)) {
+      // A refused addition must stop the update before any removal is applied and broadcast
       toAdd.forEach(nestedMembership -> {
         try {
-          linkGroups(nestedMembership);
+          checkLinkable(nestedMembership);
         } catch (Exception e) {
           handleException(String.format("Cannot link group %s as nested to %s", nestedMembership.getNestedGroupId(), nestedMembership.getGroupId()), e);
         }
@@ -1396,6 +1409,15 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
           unlinkGroups(nestedMembership);
         } catch (Exception e) {
           handleException(String.format("Cannot unlink group %s as nested from %s", nestedMembership.getNestedGroupId(), nestedMembership.getGroupId()), e);
+        }
+      });
+    }
+    if (CollectionUtils.isNotEmpty(toAdd)) {
+      toAdd.forEach(nestedMembership -> {
+        try {
+          linkGroups(nestedMembership);
+        } catch (Exception e) {
+          handleException(String.format("Cannot link group %s as nested to %s", nestedMembership.getNestedGroupId(), nestedMembership.getGroupId()), e);
         }
       });
     }

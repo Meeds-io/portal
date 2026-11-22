@@ -20,9 +20,11 @@ package io.meeds.portal.identity;
 
 import static org.junit.Assert.assertThrows;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -32,11 +34,13 @@ import org.exoplatform.component.test.ConfigurationUnit;
 import org.exoplatform.component.test.ConfiguredBy;
 import org.exoplatform.component.test.ContainerScope;
 import org.exoplatform.services.organization.Group;
+import org.exoplatform.services.organization.GroupEventListener;
 import org.exoplatform.services.organization.Membership;
 import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.idm.GroupDAOImpl;
 import org.exoplatform.services.organization.idm.MembershipDAOImpl;
+import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 
 @ConfiguredBy({
   @ConfigurationUnit(scope = ContainerScope.ROOT, path = "conf/configuration.xml"),
@@ -418,6 +422,160 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                            .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
     assertFalse(memberships.stream()
                            .anyMatch(m -> m.getGroupId().equals(parentOfParentGroup.getId())));
+  }
+
+  public void testUpdateGroupKeepsUnchangedLinkSentWithEmptyRoles() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership link = NestedMembership.builder()
+                                            .groupId(GROUP_1)
+                                            .nestedGroupId(GROUP_2)
+                                            .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                            .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                            .build();
+    try {
+      groupDao.linkGroups(link);
+      groupDao.addGroupEventListener(recorder);
+      Group nestedGroup = groupDao.findGroupById(GROUP_2);
+      assertEquals(1, nestedGroup.getEnclosingMemberships().size());
+
+      // When the same link is sent back with empty roles
+      nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                              .groupId(GROUP_1)
+                                                                                              .nestedGroupId(GROUP_2)
+                                                                                              .membershipType("")
+                                                                                              .nestedMembershipType("")
+                                                                                              .build())));
+      groupDao.updateGroup(nestedGroup, true);
+
+      // Then
+      Set<NestedMembership> enclosingMemberships = groupDao.findGroupById(GROUP_2).getEnclosingMemberships();
+      assertNotNull(enclosingMemberships);
+      assertEquals(Collections.singleton(link), enclosingMemberships);
+      assertEquals(Collections.singleton(link), groupDao.getNestedMemberships(GROUP_1));
+      assertTrue(recorder.events.isEmpty());
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      groupDao.unlinkGroups(link);
+    }
+  }
+
+  public void testUpdateGroupReplacesLinkRemovingBeforeAdding() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership oldLink = NestedMembership.builder()
+                                               .groupId(GROUP_1)
+                                               .nestedGroupId(GROUP_2)
+                                               .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                               .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                               .build();
+    NestedMembership newLink = oldLink.toBuilder().groupId(GROUP_3).build();
+    try {
+      groupDao.linkGroups(oldLink);
+      groupDao.addGroupEventListener(recorder);
+      Group nestedGroup = groupDao.findGroupById(GROUP_2);
+
+      // When
+      nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                              .groupId(GROUP_3)
+                                                                                              .nestedGroupId(GROUP_2)
+                                                                                              .build())));
+      groupDao.updateGroup(nestedGroup, true);
+
+      // Then
+      assertEquals(Collections.singleton(newLink), groupDao.findGroupById(GROUP_2).getEnclosingMemberships());
+      assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
+      assertEquals(Collections.singleton(newLink), groupDao.getNestedMemberships(GROUP_3));
+      assertEquals(List.of("unlink:" + GROUP_1, "link:" + GROUP_3), recorder.events);
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      groupDao.unlinkGroups(oldLink);
+      groupDao.unlinkGroups(newLink);
+    }
+  }
+
+  private static class GroupEventRecorder extends GroupEventListener {
+
+    private final List<String> events = new ArrayList<>();
+
+    @Override
+    public void linkGroups(NestedMembership nestedMembership) {
+      events.add("link:" + nestedMembership.getGroupId());
+    }
+
+    @Override
+    public void unlinkGroups(NestedMembership nestedMembership) {
+      events.add("unlink:" + nestedMembership.getGroupId());
+    }
+  }
+
+  public void testUpdateGroupRefusingAddedLinkKeepsStoredLinkAndFiresNoEvent() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership storedLink = NestedMembership.builder()
+                                                  .groupId(GROUP_1)
+                                                  .nestedGroupId(GROUP_2)
+                                                  .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                                  .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                                  .build();
+    NestedMembership reverseLink = NestedMembership.builder()
+                                                   .groupId(GROUP_2)
+                                                   .nestedGroupId(GROUP_3)
+                                                   .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                                   .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                                   .build();
+    try {
+      groupDao.linkGroups(storedLink);
+      groupDao.linkGroups(reverseLink);
+      // Commit the stored links, as a previous request would have, since a refused update rolls the open transaction back
+      PicketLinkIDMOrganizationServiceImpl idmService = (PicketLinkIDMOrganizationServiceImpl) organizationService;
+      idmService.endRequest(getContainer());
+      idmService.startRequest(getContainer());
+      groupDao.addGroupEventListener(recorder);
+      Group nestedGroup = groupDao.findGroupById(GROUP_2);
+
+      // When the stored link is replaced by one that would create a cycle
+      nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                              .groupId(GROUP_3)
+                                                                                              .nestedGroupId(GROUP_2)
+                                                                                              .build())));
+      assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(nestedGroup, true));
+
+      // Then
+      assertEquals(Collections.singleton(storedLink), groupDao.findGroupById(GROUP_2).getEnclosingMemberships());
+      assertEquals(Collections.singleton(storedLink), groupDao.getNestedMemberships(GROUP_1));
+      assertTrue(recorder.events.isEmpty());
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      groupDao.unlinkGroups(storedLink);
+      groupDao.unlinkGroups(reverseLink);
+    }
+  }
+
+  public void testUpdateGroupKeepsUnchangedLinkSentWithoutNestedGroupId() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership link = NestedMembership.builder()
+                                            .groupId(GROUP_1)
+                                            .nestedGroupId(GROUP_2)
+                                            .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                            .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                            .build();
+    try {
+      groupDao.linkGroups(link);
+      groupDao.addGroupEventListener(recorder);
+      Group nestedGroup = groupDao.findGroupById(GROUP_2);
+
+      // When the same link is sent back with no nested group id and empty roles
+      nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                              .groupId(GROUP_1)
+                                                                                              .build())));
+      groupDao.updateGroup(nestedGroup, true);
+
+      // Then
+      assertEquals(Collections.singleton(link), groupDao.findGroupById(GROUP_2).getEnclosingMemberships());
+      assertEquals(Collections.singleton(link), groupDao.getNestedMemberships(GROUP_1));
+      assertTrue(recorder.events.isEmpty());
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      groupDao.unlinkGroups(link);
+    }
   }
 
   public void testUpdateGroupAsMembership() throws Exception {

@@ -323,8 +323,8 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
   }
 
   private void clearAffectedNestedMembershipsCache(Group existingGroup, Group updatedGroup) {
-    Set<NestedMembership> oldMemberships = super.toSet(existingGroup.getEnclosingMemberships());
-    Set<NestedMembership> newMemberships = super.toSet(updatedGroup.getEnclosingMemberships());
+    Set<NestedMembership> oldMemberships = super.normalizeEnclosing(existingGroup.getEnclosingMemberships(), updatedGroup.getId());
+    Set<NestedMembership> newMemberships = super.normalizeEnclosing(updatedGroup.getEnclosingMemberships(), updatedGroup.getId());
 
     Set<NestedMembership> toRemove = new HashSet<>(oldMemberships);
     toRemove.removeAll(newMemberships);
