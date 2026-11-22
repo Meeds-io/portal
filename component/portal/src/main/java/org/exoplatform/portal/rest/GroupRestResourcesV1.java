@@ -330,6 +330,10 @@ public class GroupRestResourcesV1 implements ResourceContainer {
                      .entity("ID:NOT_FOUND")
                      .build();
     }
+    Collection<Group> children = organizationService.getGroupHandler().findGroups(group);
+    if (CollectionUtils.isNotEmpty(children)) {
+      return Response.status(Response.Status.BAD_REQUEST).entity("GroupHasChildren").build();
+    }
     organizationService.getGroupHandler().removeGroup(group, true);
     return Response.noContent().build();
   }

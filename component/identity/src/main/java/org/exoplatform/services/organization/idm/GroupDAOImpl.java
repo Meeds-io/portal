@@ -296,10 +296,6 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     if (log.isTraceEnabled()) {
       Tools.logMethodIn(log, LogLevel.TRACE, "removeGroup", new Object[] { "group", group, "broadcast", broadcast });
     }
-    // unlink groups before removing
-    updateNestedMemberships(null, group.getEnclosingMemberships());
-    updateNestedMemberships(null, getNestedMemberships(group.getId()));
-
     org.picketlink.idm.api.Group jbidGroup = null;
 
     String plGroupName = getPLIDMGroupName(group.getGroupName());
@@ -334,6 +330,10 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
         throw new IllegalStateException("Group " + group.getGroupName() + " has at least one child group");
       }
     }
+
+    // unlink groups once every check that can refuse the removal passed
+    updateNestedMemberships(null, group.getEnclosingMemberships());
+    updateNestedMemberships(null, getNestedMemberships(group.getId()));
 
     // preDelete event should be raise here, when group will be really removed
     if (broadcast) {

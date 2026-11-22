@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -250,6 +251,41 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
     response = launcher.service("DELETE", "/v1/groups?groupId=/unknown", "", null, null, confirmedContext(ADMIN));
     assertEquals(404, response.getStatus());
     verify(groupHandler, never()).removeGroup(any(), anyBoolean());
+  }
+
+  public void testDeleteGroupWithChildIsRefused() throws Exception {
+    startUserSession(ADMIN);
+    Group parent = mockGroup(PARENT_GROUP_ID);
+    Group child = mockGroup(PARENT_GROUP_ID + "/child");
+    when(groupHandler.findGroupById(PARENT_GROUP_ID)).thenReturn(parent);
+    when(groupHandler.findGroups(parent)).thenReturn(Arrays.asList(child));
+
+    ContainerResponse response = launcher.service("DELETE",
+                                                  "/v1/groups?groupId=" + PARENT_GROUP_ID,
+                                                  "",
+                                                  null,
+                                                  null,
+                                                  confirmedContext(ADMIN));
+
+    assertEquals(400, response.getStatus());
+    assertEquals("GroupHasChildren", response.getEntity());
+    verify(groupHandler, never()).removeGroup(any(), anyBoolean());
+  }
+
+  public void testDeleteGroupWithoutChildRemovesIt() throws Exception {
+    startUserSession(ADMIN);
+    Group group = mockGroup(PARENT_GROUP_ID);
+    when(groupHandler.findGroups(group)).thenReturn(Collections.emptyList());
+
+    ContainerResponse response = launcher.service("DELETE",
+                                                  "/v1/groups?groupId=" + PARENT_GROUP_ID,
+                                                  "",
+                                                  null,
+                                                  null,
+                                                  confirmedContext(ADMIN));
+
+    assertEquals(204, response.getStatus());
+    verify(groupHandler).removeGroup(group, true);
   }
 
   public void testCreateMembershipRequiresConfirmedSessionAfterPermissionCheck() throws Exception {
