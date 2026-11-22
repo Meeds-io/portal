@@ -800,26 +800,33 @@ public class GroupRestResourcesV1 implements ResourceContainer {
     if (parentGroup == null) {
       return Response.status(Response.Status.NOT_FOUND).build();
     }
-    List<Group> groups = organizationService.getGroupHandler()
-                                            .getNestedMemberships(groupId)
-                                            .stream()
-                                            .map(NestedMembership::getNestedGroupId)
-                                            .sorted(String.CASE_INSENSITIVE_ORDER)
-                                            .map(id -> {
-                                              try {
-                                                return organizationService.getGroupHandler().findGroupById(id);
-                                              } catch (Exception e) {
-                                                LOG.debug("Error retrieving nested group with id {} of parent group {}",
-                                                          id,
-                                                          groupId,
-                                                          e);
-                                                return null;
-                                              }
-                                            })
-                                            .filter(Objects::nonNull)
-                                            .toList();
-    int totalSize = groups.size();
-    List<GroupRestEntity> groupRestEntities = groups.stream().skip(offset).limit(limit).map(GroupRestEntity::new).toList();
+    // Ids are sorted and paged first: only the requested page is resolved.
+    // A nested group id that no longer resolves is dropped from its page, so a page may be shorter than the limit
+    // and the total counts the ids, not the resolved groups.
+    List<String> nestedGroupIds = organizationService.getGroupHandler()
+                                                     .getNestedMemberships(groupId)
+                                                     .stream()
+                                                     .map(NestedMembership::getNestedGroupId)
+                                                     .sorted(String.CASE_INSENSITIVE_ORDER)
+                                                     .toList();
+    int totalSize = nestedGroupIds.size();
+    List<GroupRestEntity> groupRestEntities = nestedGroupIds.stream()
+                                                            .skip(offset)
+                                                            .limit(limit)
+                                                            .map(id -> {
+                                                              try {
+                                                                return organizationService.getGroupHandler().findGroupById(id);
+                                                              } catch (Exception e) {
+                                                                LOG.debug("Error retrieving nested group with id {} of parent group {}",
+                                                                          id,
+                                                                          groupId,
+                                                                          e);
+                                                                return null;
+                                                              }
+                                                            })
+                                                            .filter(Objects::nonNull)
+                                                            .map(GroupRestEntity::new)
+                                                            .toList();
     CollectionEntity<GroupRestEntity> result = new CollectionEntity<>(groupRestEntities, offset, limit, returnSize ? totalSize : 0);
     return Response.ok(result).build();
   }

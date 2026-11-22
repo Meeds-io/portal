@@ -201,6 +201,70 @@ public class GroupRestResourcesTest extends BaseRestServicesTestCase {
     assertEquals("/company/sales", collection.getEntities().get(0).getId());
   }
 
+  public void testGetNestedGroupsLooksUpOnlyRequestedPage() throws Exception {
+    startUserSession("root");
+    mockGroup(PARENT_GROUP_ID);
+    String[] ids = { "/company/e", "/company/b", "/company/d", "/company/a", "/company/c" };
+    Set<NestedMembership> nestedMemberships = new LinkedHashSet<>();
+    for (String id : ids) {
+      mockGroup(id);
+      nestedMemberships.add(new NestedMembership(null, PARENT_GROUP_ID, null, id));
+    }
+    when(groupHandler.getNestedMemberships(PARENT_GROUP_ID)).thenReturn(nestedMemberships);
+
+    ContainerResponse resp = launcher.service("GET",
+                                              "/v1/groups/nested?groupId=" + PARENT_GROUP_ID + "&offset=1&limit=2&returnSize=true",
+                                              "",
+                                              null,
+                                              null,
+                                              null);
+
+    assertEquals(200, resp.getStatus());
+    @SuppressWarnings("unchecked")
+    CollectionEntity<GroupRestEntity> collection = (CollectionEntity<GroupRestEntity>) resp.getEntity();
+    assertEquals(5, collection.getSize());
+    assertEquals(2, collection.getEntities().size());
+    assertEquals("/company/b", collection.getEntities().get(0).getId());
+    assertEquals("/company/c", collection.getEntities().get(1).getId());
+    // Only the page's groups are looked up, plus the parent group
+    verify(groupHandler).findGroupById("/company/b");
+    verify(groupHandler).findGroupById("/company/c");
+    verify(groupHandler, never()).findGroupById("/company/a");
+    verify(groupHandler, never()).findGroupById("/company/d");
+    verify(groupHandler, never()).findGroupById("/company/e");
+  }
+
+  public void testGetNestedGroupsDanglingIdDroppedFromItsPage() throws Exception {
+    startUserSession("root");
+    mockGroup(PARENT_GROUP_ID);
+    String[] ids = { "/company/e", "/company/b", "/company/d", "/company/a", "/company/c" };
+    Set<NestedMembership> nestedMemberships = new LinkedHashSet<>();
+    for (String id : ids) {
+      if (!"/company/b".equals(id)) {
+        mockGroup(id);
+      }
+      nestedMemberships.add(new NestedMembership(null, PARENT_GROUP_ID, null, id));
+    }
+    when(groupHandler.findGroupById("/company/b")).thenReturn(null);
+    when(groupHandler.getNestedMemberships(PARENT_GROUP_ID)).thenReturn(nestedMemberships);
+
+    ContainerResponse resp = launcher.service("GET",
+                                              "/v1/groups/nested?groupId=" + PARENT_GROUP_ID + "&offset=1&limit=2&returnSize=true",
+                                              "",
+                                              null,
+                                              null,
+                                              null);
+
+    assertEquals(200, resp.getStatus());
+    @SuppressWarnings("unchecked")
+    CollectionEntity<GroupRestEntity> collection = (CollectionEntity<GroupRestEntity>) resp.getEntity();
+    // The total is the id count, not the number of resolved groups
+    assertEquals(5, collection.getSize());
+    // The page is shorter than the limit: the id that does not resolve is dropped from it
+    assertEquals(1, collection.getEntities().size());
+    assertEquals("/company/c", collection.getEntities().get(0).getId());
+  }
+
   private Group mockGroup(String groupId) throws Exception {
     Group group = mock(Group.class);
     when(group.getId()).thenReturn(groupId);
