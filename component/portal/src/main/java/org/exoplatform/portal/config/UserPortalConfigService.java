@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -94,6 +95,8 @@ public class UserPortalConfigService implements Startable {
 
   public static final String             HOME_PAGE_URI_PREFERENCE_KEY   = "HOME_PAGE_URI";
 
+  public static final int                HOME_PAGE_URI_MAX_LENGTH       = 2048;
+
   public static final String             DEFAULT_GLOBAL_PORTAL          = "global";
 
   public static final String             DEFAULT_GROUP_SITE_TEMPLATE    = "group";
@@ -103,6 +106,15 @@ public class UserPortalConfigService implements Startable {
   public static final String             SITE_NAME_PROP_NAME            = "siteName";
 
   public static final String             SITE_TYPE_PROP_NAME            = "siteType";
+
+  /**
+   * A path of the same origin, or an http(s) URL for a link node, without any
+   * character that could leave the HTML attribute or the script literal the
+   * URI is written into
+   */
+  private static final Pattern           HOME_PAGE_URI_PATTERN          =
+                                                                Pattern.compile("^(/(?![/\\\\])|https?://)[^\\s\\p{Cntrl}<>\"'`$\\\\]*$",
+                                                                                Pattern.CASE_INSENSITIVE);
 
   private static final Log               LOG                            = ExoLogger.getLogger("Portal:UserPortalConfigService");
 
@@ -616,11 +628,23 @@ public class UserPortalConfigService implements Startable {
       SettingValue<?> homePageSettingValue = settingService.get(Context.USER.id(username),
                                                                 HOME_PAGE_URI_PREFERENCE_SCOPE,
                                                                 HOME_PAGE_URI_PREFERENCE_KEY);
-      if (homePageSettingValue != null && homePageSettingValue.getValue() != null) {
+      if (homePageSettingValue != null
+          && homePageSettingValue.getValue() != null
+          && isValidHomePageUri(homePageSettingValue.getValue().toString())) {
         return homePageSettingValue.getValue().toString();
       }
       return PropertyManager.getProperty("exo.portal.user.defaultHome");
     }
+  }
+
+  /**
+   * @param uri a home page URI, stored or about to be stored
+   * @return true when the URI satisfies the home page rule: a same-origin
+   *         path or an http(s) URL, within the length limit, without any
+   *         character that could leave an HTML attribute or a script literal
+   */
+  public static boolean isValidHomePageUri(String uri) {
+    return uri != null && uri.length() <= HOME_PAGE_URI_MAX_LENGTH && HOME_PAGE_URI_PATTERN.matcher(uri).matches();
   }
 
   /**

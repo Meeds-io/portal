@@ -799,6 +799,30 @@ public class TestUserPortalConfigService extends AbstractConfigTest {
     assertEquals("/portal", userPortalConfigService.getDefaultPath("john"));
   }
 
+  public void testStoredHomePageRefusedByTheRuleIsIgnored() {
+    String defaultPath = userPortalConfigService.getDefaultPath("james");
+    assertNotNull(defaultPath);
+    try {
+      for (String refused : new String[] { "ftp://host/path", "mailto:x@y", "//host/path", "/path with space",
+          "/path\"quote", "/path<tag>", "/path\\back", "/path?a=$b", "/path>x", "/path'x", "/path`x", "/path\tx", "/path\nx",
+          "/" + "a".repeat(UserPortalConfigService.HOME_PAGE_URI_MAX_LENGTH) }) {
+        userPortalConfigService.setUserHomePage("james", refused);
+        assertNull(refused, userPortalConfigService.getUserHomePage("james"));
+        assertEquals(refused, defaultPath, userPortalConfigService.getDefaultPath("james"));
+      }
+
+      userPortalConfigService.setUserHomePage("james", "/portal/classic/home");
+      assertEquals("/portal/classic/home", userPortalConfigService.getUserHomePage("james"));
+      assertEquals("/portal/classic/home", userPortalConfigService.getDefaultPath("james"));
+
+      userPortalConfigService.setUserHomePage("james", "https://example.org/start");
+      assertEquals("https://example.org/start", userPortalConfigService.getUserHomePage("james"));
+      assertEquals("https://example.org/start", userPortalConfigService.getDefaultPath("james"));
+    } finally {
+      userPortalConfigService.setUserHomePage("james", null);
+    }
+  }
+
   public void testGetDefaultSitePath() {
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", null));
     assertEquals(DEFAULT_CLASSIC_HOME, userPortalConfigService.getDefaultSitePath("classic", "NotExisting"));
