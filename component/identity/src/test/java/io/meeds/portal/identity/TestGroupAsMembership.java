@@ -525,28 +525,81 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
       groupDao.linkGroups(storedLink);
       groupDao.linkGroups(reverseLink);
       // Commit the stored links, as a previous request would have, since a refused update rolls the open transaction back
-      PicketLinkIDMOrganizationServiceImpl idmService = (PicketLinkIDMOrganizationServiceImpl) organizationService;
-      idmService.endRequest(getContainer());
-      idmService.startRequest(getContainer());
+      commitIdmTransaction();
       groupDao.addGroupEventListener(recorder);
-      Group nestedGroup = groupDao.findGroupById(GROUP_2);
+      Group storedGroup = groupDao.findGroupById(GROUP_2);
+      String storedLabel = storedGroup.getLabel();
+      Group updatedGroup = groupDao.createGroupInstance();
+      updatedGroup.setId(storedGroup.getId());
+      updatedGroup.setParentId(storedGroup.getParentId());
+      updatedGroup.setGroupName(storedGroup.getGroupName());
+      updatedGroup.setDescription(storedGroup.getDescription());
+      updatedGroup.setLabel("Refused label");
 
-      // When the stored link is replaced by one that would create a cycle
-      nestedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
-                                                                                              .groupId(GROUP_3)
-                                                                                              .nestedGroupId(GROUP_2)
-                                                                                              .build())));
-      assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(nestedGroup, true));
+      // When the label changes and the stored link is replaced by one that would create a cycle
+      updatedGroup.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                               .groupId(GROUP_3)
+                                                                                               .nestedGroupId(GROUP_2)
+                                                                                               .build())));
+      assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(updatedGroup, true));
 
       // Then
+      assertEquals(storedLabel, groupDao.findGroupById(GROUP_2).getLabel());
       assertEquals(Collections.singleton(storedLink), groupDao.findGroupById(GROUP_2).getEnclosingMemberships());
       assertEquals(Collections.singleton(storedLink), groupDao.getNestedMemberships(GROUP_1));
       assertTrue(recorder.events.isEmpty());
     } finally {
       groupDao.removeGroupEventListener(recorder);
-      groupDao.unlinkGroups(storedLink);
-      groupDao.unlinkGroups(reverseLink);
+      try {
+        groupDao.unlinkGroups(storedLink);
+      } finally {
+        try {
+          groupDao.unlinkGroups(reverseLink);
+        } finally {
+          commitIdmTransaction();
+        }
+      }
     }
+  }
+
+  public void testUpdateGroupSendingLinkNamingAnotherNestedGroupAppliesItToUpdatedGroup() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership expectedLink = NestedMembership.builder()
+                                                    .groupId(GROUP_1)
+                                                    .nestedGroupId(GROUP_2)
+                                                    .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                                    .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                                    .build();
+    try {
+      groupDao.addGroupEventListener(recorder);
+      Group group = groupDao.findGroupById(GROUP_2);
+
+      // When the sent link names another group as the nested one
+      group.setEnclosingMemberships(new HashSet<>(Collections.singleton(NestedMembership.builder()
+                                                                                        .groupId(GROUP_1)
+                                                                                        .nestedGroupId(GROUP_3)
+                                                                                        .build())));
+      groupDao.updateGroup(group, true);
+
+      // Then the link is stored for the updated group, and for no other one
+      assertEquals(Collections.singleton(expectedLink), groupDao.findGroupById(GROUP_2).getEnclosingMemberships());
+      assertEquals(Collections.singleton(expectedLink), groupDao.getNestedMemberships(GROUP_1));
+      assertTrue(CollectionUtils.isEmpty(groupDao.findGroupById(GROUP_3).getEnclosingMemberships()));
+      assertEquals(List.of("link:" + GROUP_1), recorder.events);
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      try {
+        groupDao.unlinkGroups(expectedLink);
+      } finally {
+        commitIdmTransaction();
+      }
+    }
+  }
+
+  private void commitIdmTransaction() {
+    PicketLinkIDMOrganizationServiceImpl idmService = (PicketLinkIDMOrganizationServiceImpl) organizationService;
+    idmService.endRequest(getContainer());
+    idmService.startRequest(getContainer());
   }
 
   public void testUpdateGroupKeepsUnchangedLinkSentWithoutNestedGroupId() throws Exception {
