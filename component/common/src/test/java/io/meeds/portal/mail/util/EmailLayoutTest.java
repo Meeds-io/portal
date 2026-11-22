@@ -62,8 +62,9 @@ public class EmailLayoutTest {
     assertTrue(html, html.contains("background-color:#2f5d62"));
     assertTrue(html, html.contains("color:#ffffff"));
     String onYellow = EmailLayout.render(model().build(), new EmailBrand("Acme", "#f2c230"));
-    assertTrue(onYellow, onYellow.contains("color:#1d2327;overflow-wrap"));
-    assertFalse(onYellow, onYellow.contains("color:#ffffff;overflow-wrap"));
+    assertTrue("white text on a light brand, whose fill is darkened", onYellow.contains("color:#ffffff;overflow-wrap"));
+    assertFalse(onYellow, onYellow.contains("color:#1d2327;overflow-wrap"));
+    assertTrue(onYellow, onYellow.contains("background-color:" + new EmailBrand("Acme", "#f2c230").getFillColor()));
   }
 
   @Test
@@ -402,8 +403,9 @@ public class EmailLayoutTest {
     assertTrue(link, link.contains("border-radius:8px"));
     assertTrue(link, link.contains(">Reply</a>"));
     assertFalse("no gradient or shadow", link.contains("gradient") || link.contains("shadow"));
-    assertTrue("a light brand color gets dark text", EmailLayout.actionLink(new EmailBrand("A", "#f2c230"), "Go", "https://a.example", true)
-                                                                .contains("color:#1d2327;"));
+    String onLight = EmailLayout.actionLink(new EmailBrand("A", "#f2c230"), "Go", "https://a.example", true);
+    assertTrue("a light brand color gets white text on a darker fill", onLight.contains("color:#ffffff;"));
+    assertTrue(onLight, onLight.contains("background-color:" + new EmailBrand("A", "#f2c230").getFillColor()));
   }
 
   @Test
