@@ -99,6 +99,26 @@ public class GroupLinkGroupListenerTest {
     verify(conversationRegistry, timeout(1000)).invalidateUser("john");
   }
 
+  /**
+   * On the IDM store, the members are invalidated now and once more after
+   * the unlink commits
+   */
+  @Test
+  public void testAnUnlinkInvalidatesTheMembersAgainAfterTheCommit() throws Exception {
+    PicketLinkIDMOrganizationServiceImpl idmOrganizationService = mock(PicketLinkIDMOrganizationServiceImpl.class);
+    stubMembers(idmOrganizationService);
+    GroupLinkGroupListener idmListener = new GroupLinkGroupListener();
+    setField(idmListener, "organizationService", idmOrganizationService);
+    setField(idmListener, "conversationRegistry", conversationRegistry);
+
+    idmListener.unlinkGroups(NestedMembership.builder().nestedGroupId(GROUP_ID).nestedMembershipType("member").build());
+
+    ArgumentCaptor<Runnable> action = ArgumentCaptor.forClass(Runnable.class);
+    verify(idmOrganizationService).runNowAndAfterTransaction(action.capture());
+    action.getValue().run();
+    verify(conversationRegistry, timeout(1000)).invalidateUser("john");
+  }
+
   @Test
   public void testAMembersLinkInvalidatesTheMembersOfThatType() throws Exception {
     listener.linkGroups(NestedMembership.builder().nestedGroupId(GROUP_ID).nestedMembershipType("member").build());
