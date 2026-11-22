@@ -507,7 +507,7 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
     }
   }
 
-  public void testUpdateGroupRefusingAddedLinkKeepsStoredLinkAndFiresNoEvent() throws Exception {
+  public void testUpdateGroupRefusingAddedLinkKeepsStoredLinkAndFiresNoLinkEvent() throws Exception {
     GroupEventRecorder recorder = new GroupEventRecorder();
     NestedMembership storedLink = NestedMembership.builder()
                                                   .groupId(GROUP_1)
@@ -591,7 +591,11 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
       try {
         groupDao.unlinkGroups(expectedLink);
       } finally {
-        commitIdmTransaction();
+        try {
+          groupDao.unlinkGroups(expectedLink.toBuilder().nestedGroupId(GROUP_3).build());
+        } finally {
+          commitIdmTransaction();
+        }
       }
     }
   }
