@@ -112,8 +112,8 @@ public class EmailBrandTest {
 
   @Test
   public void testFillIsTheBrandColorItselfWhenTextIsReadableOnIt() {
-    for (String color : new String[] { "#476a9c", "#2f5d62", "#c62828", "#6a1b9a", "#f2c230", "#ffffff", "#000000" }) {
-      assertEquals("an already readable color is not touched", color, new EmailBrand("A", color).getFillColor());
+    for (String color : new String[] { "#476a9c", "#2f5d62", "#c62828", "#6a1b9a", "#000000" }) {
+      assertEquals("a color white reads on is not touched", color, new EmailBrand("A", color).getFillColor());
     }
   }
 
@@ -123,6 +123,12 @@ public class EmailBrandTest {
     assertNotEquals("the Meeds teal needed a nudge", "#3f8487", teal.getFillColor());
     assertTrue(teal.getFillColor(), EmailBrand.contrast(teal.getTextColor(), teal.getFillColor()) >= 4.5d);
     assertEquals("the brand color itself is kept", "#3f8487", teal.getColor());
+    for (String light : new String[] { "#689a4a", "#f2c230", "#ffffff", "#d6d6d6" }) {
+      EmailBrand brand = new EmailBrand("A", light);
+      assertNotEquals("a light color is darkened so that white reads on it", light, brand.getFillColor());
+      assertEquals(light, brand.getColor());
+      assertTrue(light + " -> " + brand.getFillColor(), EmailBrand.contrast("#ffffff", brand.getFillColor()) >= 4.5d);
+    }
     for (int i = 0; i < 4096; i += 37) {
       String color = String.format("#%06x", i * 4093 % 0xffffff);
       EmailBrand brand = new EmailBrand("A", color);
@@ -178,14 +184,11 @@ public class EmailBrandTest {
   }
 
   @Test
-  public void testTextColorHasTheBetterContrast() {
-    assertEquals("#ffffff", new EmailBrand("A", "#000000").getTextColor());
-    assertEquals("#1d2327", new EmailBrand("A", "#ffffff").getTextColor());
-    assertEquals("#ffffff", new EmailBrand("A", "#476a9c").getTextColor());
-    assertEquals("#1d2327", new EmailBrand("A", "#f2c230").getTextColor());
-    for (String c : new String[] { "#476a9c", "#2f5d62", "#f2c230", "#d6d6d6", "#e53935", "#00897b" }) {
+  public void testTextOnTheBrandIsAlwaysWhite() {
+    for (String c : new String[] { "#000000", "#476a9c", "#2f5d62", "#689a4a", "#f2c230", "#d6d6d6", "#ffffff" }) {
       EmailBrand brand = new EmailBrand("A", c);
-      assertTrue(c, EmailBrand.contrast(brand.getTextColor(), brand.getColor()) >= 4.5d || c.equals("#e53935") || c.equals("#00897b"));
+      assertEquals(c, "#ffffff", brand.getTextColor());
+      assertTrue(c, EmailBrand.contrast(brand.getTextColor(), brand.getFillColor()) >= 4.5d);
     }
   }
 
