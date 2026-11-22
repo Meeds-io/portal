@@ -44,8 +44,6 @@ public final class EmailBrand {
 
   private static final AtomicReference<CachedEmailBrand> CACHED = new AtomicReference<>();
 
-  private static final String  DARK_TEXT     = "#1d2327";
-
   private static final String  LIGHT_TEXT    = "#ffffff";
 
   private static final Pattern HEX_COLOR     = Pattern.compile("#[0-9a-fA-F]{6}");
@@ -140,8 +138,8 @@ public final class EmailBrand {
 
   /**
    * @return the primary color as it is painted behind text (the header and
-   *         the buttons): the color itself, or the nearest one that text can
-   *         be read on
+   *         the buttons): the color itself, or the nearest one that white
+   *         text can be read on
    */
   public String getFillColor() {
     return fill;
@@ -190,11 +188,13 @@ public final class EmailBrand {
   }
 
   /**
-   * @return white or the dark ink, whichever has the better contrast on the
-   *         primary color
+   * @return the color of the text on the primary color (the company name and
+   *         the title of the header, the label of a button): always white, in
+   *         light and in dark mode. It is the fill that moves, so that white
+   *         reads on it ({@link #getFillColor()})
    */
   public String getTextColor() {
-    return contrast(LIGHT_TEXT, fill) >= contrast(DARK_TEXT, fill) ? LIGHT_TEXT : DARK_TEXT;
+    return LIGHT_TEXT;
   }
 
   /**
@@ -243,18 +243,14 @@ public final class EmailBrand {
   }
 
   /**
-   * The color itself when text on it can reach 4.5:1 (white or dark ink,
-   * whichever is better), otherwise the color moved as little as needed
-   * toward black or white to reach it, so that the text of the header and of
-   * the buttons can be read
+   * The color itself when white text on it can reach 4.5:1, otherwise the
+   * color moved toward black, as little as needed to reach it, so that the
+   * white text of the header and of the buttons can be read
    */
   private static String readableFill(String color) {
-    boolean light = contrast(LIGHT_TEXT, color) >= contrast(DARK_TEXT, color);
-    String target = light ? "#000000" : LIGHT_TEXT;
-    String ink = light ? LIGHT_TEXT : DARK_TEXT;
     String fill = color;
-    for (int step = 1; contrast(ink, fill) < 4.5d && step <= 30; step++) {
-      fill = mix(color, target, step * 0.02d);
+    for (int step = 1; contrast(LIGHT_TEXT, fill) < 4.5d && step <= 35; step++) {
+      fill = mix(color, "#000000", step * 0.02d);
     }
     return fill;
   }
