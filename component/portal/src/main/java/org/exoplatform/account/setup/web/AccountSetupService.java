@@ -75,9 +75,6 @@ public class AccountSetupService {
       return true;
     }
     Boolean setupDone = readSetupDone(false);
-    if (Boolean.TRUE.equals(setupDone)) {
-      skipSetup = true;
-    }
     // An uncertain answer counts as "done": no setup screen is offered
     return setupDone != Boolean.FALSE;
   }
@@ -196,7 +193,12 @@ public class AccountSetupService {
     try {
       SettingValue<?> node = fromStore ? settingService.getFromStore(Context.GLOBAL, Scope.GLOBAL, ACCOUNT_SETUP_NODE)
                                        : settingService.getOrThrow(Context.GLOBAL, Scope.GLOBAL, ACCOUNT_SETUP_NODE);
-      return node != null;
+      if (node == null) {
+        return Boolean.FALSE;
+      }
+      // Every read that says "set up", cached or stored, is remembered
+      skipSetup = true;
+      return Boolean.TRUE;
     } catch (Exception e) {
       LOG.warn("Can not read the account setup state: {}", e.getMessage());
       LOG.debug("Account setup state read failure", e);

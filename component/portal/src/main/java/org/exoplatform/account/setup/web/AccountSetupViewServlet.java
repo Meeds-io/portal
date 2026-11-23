@@ -35,7 +35,8 @@ public class AccountSetupViewServlet extends HttpServlet {
   protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
     PortalContainer container = PortalContainer.getInstance();
     accountSetupService = container.getComponentInstanceOfType(AccountSetupService.class);
-    if (accountSetupService.mustSkipAccountSetup()) {
+    // The screen is offered only when the stored state says the platform was never set up
+    if (!accountSetupService.isAccountSetupAllowed()) {
       response.sendRedirect("/");
     } else {
       // Redirect to requested page

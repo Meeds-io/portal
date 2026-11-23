@@ -280,6 +280,24 @@ public class AccountSetupServiceTest {
   }
 
   @Test
+  public void shouldRememberTheSetupStateReadFromTheStoreWhenTheCacheSaysNotDone() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
+    when(settingService.getFromStore(any(Context.class),
+                                     any(Scope.class),
+                                     eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertFalse(accountSetupService.mustSkipAccountSetup());
+    assertFalse(accountSetupService.isAccountSetupAllowed());
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+  }
+
+  @Test
   public void shouldCreateTheFirstAdministratorOnlyOnceWhenSubmittedTwiceAtTheSameTime() throws Exception {
     PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
     PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
