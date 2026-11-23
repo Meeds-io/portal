@@ -83,8 +83,8 @@
     // Platform-wide "Fix Position when Scrolling" default of the Topbar (Branding and Theme), consumed by the skin
     bodyClasses += " topbar-sticky";
   }
-  if (brandingService.isDefaultPageBackgroundColor()) {
-    // The page background color is the Branding and Theme default: the login related pages show white over it (social SidebarLogin skin)
+  if (StringUtils.isBlank(brandingService.getPageBackgroundColor()) || brandingService.isDefaultPageBackgroundColor()) {
+    // No page background color, or the Branding and Theme default: the login related pages show white in light (social SidebarLogin skin)
     bodyClasses += " default-page-background-color";
   }
   def bodyStyle = "";
