@@ -18,6 +18,8 @@
  */
 package org.exoplatform.account.setup.web;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -30,6 +32,7 @@ import org.junit.Test;
 import org.mockito.MockedStatic;
 
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -47,6 +50,8 @@ public class AccountSetupViewServletTest {
 
   private HttpServletResponse           response;
 
+  private RequestDispatcher             dispatcher;
+
   private AccountSetupViewServlet       servlet;
 
   @Before
@@ -58,6 +63,12 @@ public class AccountSetupViewServletTest {
     portalContainer.when(PortalContainer::getInstance).thenReturn(container);
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);
+    ServletContext context = mock(ServletContext.class);
+    dispatcher = mock(RequestDispatcher.class);
+    when(container.getPortalContext()).thenReturn(context);
+    when(context.getRequestDispatcher("/WEB-INF/jsp/welcome-screens/accountSetup.jsp")).thenReturn(dispatcher);
+    // The cache says "not set up": only the stored state may decide
+    when(accountSetupService.mustSkipAccountSetup()).thenReturn(false);
     servlet = new AccountSetupViewServlet();
   }
 
@@ -67,26 +78,33 @@ public class AccountSetupViewServletTest {
   }
 
   @Test
-  public void redirectsWhenTheStoredStateDoesNotAllowTheSetup() throws Exception {
-    when(accountSetupService.isAccountSetupAllowed()).thenReturn(false);
+  public void redirectsWhenTheStoredStateSaysTheSetupIsDone() throws Exception {
+    when(accountSetupService.getStoredSetupDone()).thenReturn(true);
 
     servlet.doGet(request, response);
 
     verify(response).sendRedirect("/");
-    verify(container, never()).getPortalContext();
+    verify(dispatcher, never()).forward(any(), any());
   }
 
   @Test
-  public void showsTheScreenWhenTheStoredStateAllowsTheSetup() throws Exception {
-    when(accountSetupService.isAccountSetupAllowed()).thenReturn(true);
-    jakarta.servlet.ServletContext context = mock(jakarta.servlet.ServletContext.class);
-    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-    when(container.getPortalContext()).thenReturn(context);
-    when(context.getRequestDispatcher("/WEB-INF/jsp/welcome-screens/accountSetup.jsp")).thenReturn(dispatcher);
+  public void answersUnavailableWhenTheStoredStateCannotBeRead() throws Exception {
+    when(accountSetupService.getStoredSetupDone()).thenReturn(null);
 
     servlet.doGet(request, response);
 
-    verify(dispatcher).forward(org.mockito.ArgumentMatchers.any(HttpServletRequest.class), org.mockito.ArgumentMatchers.eq(response));
+    verify(response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+    verify(response, never()).sendRedirect("/");
+    verify(dispatcher, never()).forward(any(), any());
+  }
+
+  @Test
+  public void showsTheScreenWhenTheStoredStateSaysTheSetupIsNotDone() throws Exception {
+    when(accountSetupService.getStoredSetupDone()).thenReturn(false);
+
+    servlet.doGet(request, response);
+
+    verify(dispatcher).forward(any(HttpServletRequest.class), eq(response));
     verify(response, never()).sendRedirect("/");
   }
 }

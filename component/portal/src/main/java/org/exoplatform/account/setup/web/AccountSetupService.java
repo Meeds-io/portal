@@ -84,7 +84,16 @@ public class AccountSetupService {
    *         positively says that the setup is not done
    */
   public boolean isAccountSetupAllowed() {
-    return readSetupDone(true) == Boolean.FALSE;
+    return getStoredSetupDone() == Boolean.FALSE;
+  }
+
+  /**
+   * @return the setup state read from the store, never from a cache: true when
+   *         the setup is done (or skipped), false when it is not, null when
+   *         this can't be told (the read failed)
+   */
+  public Boolean getStoredSetupDone() {
+    return readSetupDone(true);
   }
 
   /**

@@ -54,7 +54,7 @@ public class WelcomeScreenRestServiceTest {
 
   @Test
   public void checkUsernameAnswersWhenPlatformNeverSetUp() throws Exception {
-    when(accountSetupService.mustSkipAccountSetup()).thenReturn(false);
+    when(accountSetupService.isAccountSetupAllowed()).thenReturn(true);
     when(userHandler.findUserByName("root")).thenReturn(mock(User.class));
 
     Response response = restService.checkUsername("root");
@@ -68,7 +68,7 @@ public class WelcomeScreenRestServiceTest {
 
   @Test
   public void checkUsernameRefusedWhenPlatformSetUp() throws Exception {
-    when(accountSetupService.mustSkipAccountSetup()).thenReturn(true);
+    when(accountSetupService.isAccountSetupAllowed()).thenReturn(false);
     when(userHandler.findUserByName("root")).thenReturn(mock(User.class));
 
     Response response = restService.checkUsername("root");

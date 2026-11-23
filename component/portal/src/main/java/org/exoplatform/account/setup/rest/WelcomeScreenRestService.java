@@ -55,7 +55,7 @@ public class WelcomeScreenRestService implements ResourceContainer {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   public Response checkUsername(@QueryParam("username") String username) {
-    if (accountSetupService.mustSkipAccountSetup()) {
+    if (!accountSetupService.isAccountSetupAllowed()) {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
 
