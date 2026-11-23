@@ -492,21 +492,6 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
     }
   }
 
-  private static class GroupEventRecorder extends GroupEventListener {
-
-    private final List<String> events = new ArrayList<>();
-
-    @Override
-    public void linkGroups(NestedMembership nestedMembership) {
-      events.add("link:" + nestedMembership.getGroupId());
-    }
-
-    @Override
-    public void unlinkGroups(NestedMembership nestedMembership) {
-      events.add("unlink:" + nestedMembership.getGroupId());
-    }
-  }
-
   public void testUpdateGroupRefusingAddedLinkKeepsStoredLinkAndFiresNoLinkEvent() throws Exception {
     GroupEventRecorder recorder = new GroupEventRecorder();
     NestedMembership storedLink = NestedMembership.builder()
@@ -562,6 +547,54 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
     }
   }
 
+  public void testUpdateGroupRefusingOneOfTwoAddedLinksStoresNoLinkAndFiresNoLinkEvent() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    NestedMembership nestedLink = NestedMembership.builder()
+                                                  .groupId(GROUP_2)
+                                                  .nestedGroupId(GROUP_3)
+                                                  .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                                  .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                                  .build();
+    try {
+      groupDao.linkGroups(nestedLink);
+      // Commit the stored link, as a previous request would have, since a refused update rolls the open transaction back
+      commitIdmTransaction();
+      groupDao.addGroupEventListener(recorder);
+      Group storedGroup = groupDao.findGroupById(GROUP_2);
+      String storedLabel = storedGroup.getLabel();
+      Group updatedGroup = groupDao.createGroupInstance();
+      updatedGroup.setId(storedGroup.getId());
+      updatedGroup.setParentId(storedGroup.getParentId());
+      updatedGroup.setGroupName(storedGroup.getGroupName());
+      updatedGroup.setDescription(storedGroup.getDescription());
+      updatedGroup.setLabel("Refused label");
+
+      // When the update removes nothing and adds one valid link and one that would create a cycle
+      updatedGroup.setEnclosingMemberships(new HashSet<>(List.of(NestedMembership.builder()
+                                                                                 .groupId(GROUP_1)
+                                                                                 .nestedGroupId(GROUP_2)
+                                                                                 .build(),
+                                                                 NestedMembership.builder()
+                                                                                 .groupId(GROUP_3)
+                                                                                 .nestedGroupId(GROUP_2)
+                                                                                 .build())));
+      assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(updatedGroup, true));
+
+      // Then neither link is stored nor announced
+      assertEquals(storedLabel, groupDao.findGroupById(GROUP_2).getLabel());
+      assertTrue(CollectionUtils.isEmpty(groupDao.findGroupById(GROUP_2).getEnclosingMemberships()));
+      assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
+      assertTrue(recorder.events.isEmpty());
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      try {
+        groupDao.unlinkGroups(nestedLink);
+      } finally {
+        commitIdmTransaction();
+      }
+    }
+  }
+
   public void testUpdateGroupSendingLinkNamingAnotherNestedGroupAppliesItToUpdatedGroup() throws Exception {
     GroupEventRecorder recorder = new GroupEventRecorder();
     NestedMembership expectedLink = NestedMembership.builder()
@@ -598,12 +631,6 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
         }
       }
     }
-  }
-
-  private void commitIdmTransaction() {
-    PicketLinkIDMOrganizationServiceImpl idmService = (PicketLinkIDMOrganizationServiceImpl) organizationService;
-    idmService.endRequest(getContainer());
-    idmService.startRequest(getContainer());
   }
 
   public void testUpdateGroupKeepsUnchangedLinkSentWithoutNestedGroupId() throws Exception {
@@ -779,6 +806,27 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
         groupDao.removeGroup(groupDao.findGroupById(leafId), false);
       }
     }
+  }
+
+  private static class GroupEventRecorder extends GroupEventListener {
+
+    private final List<String> events = new ArrayList<>();
+
+    @Override
+    public void linkGroups(NestedMembership nestedMembership) {
+      events.add("link:" + nestedMembership.getGroupId());
+    }
+
+    @Override
+    public void unlinkGroups(NestedMembership nestedMembership) {
+      events.add("unlink:" + nestedMembership.getGroupId());
+    }
+  }
+
+  private void commitIdmTransaction() {
+    PicketLinkIDMOrganizationServiceImpl idmService = (PicketLinkIDMOrganizationServiceImpl) organizationService;
+    idmService.endRequest(getContainer());
+    idmService.startRequest(getContainer());
   }
 
 }

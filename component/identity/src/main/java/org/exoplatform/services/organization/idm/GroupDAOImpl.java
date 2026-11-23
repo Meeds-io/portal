@@ -1171,9 +1171,9 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   @Override
   public void linkGroups(NestedMembership nestedMembership) throws Exception {
     try {
-      String enclosingGroupId = nestedMembership == null ? null : nestedMembership.getGroupId();
-      String nestedGroupId = nestedMembership == null ? null : nestedMembership.getNestedGroupId();
       Group nestedGroup = checkLinkable(nestedMembership);
+      String enclosingGroupId = nestedMembership.getGroupId();
+      String nestedGroupId = nestedMembership.getNestedGroupId();
       Set<NestedMembership> existingNestedMemberships = getNestedMemberships(enclosingGroupId);
       Set<NestedMembership> nestedMemberships = new HashSet<>(existingNestedMemberships);
       Set<NestedMembership> enclosingMemberships = nestedGroup.getEnclosingMemberships();
@@ -1393,8 +1393,8 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
   }
 
   private void updateNestedMemberships(Set<NestedMembership> toAdd, Set<NestedMembership> toRemove) {
-    if (CollectionUtils.isNotEmpty(toRemove) && CollectionUtils.isNotEmpty(toAdd)) {
-      // A refused addition must stop the update before any removal is applied and broadcast
+    if (CollectionUtils.isNotEmpty(toAdd)) {
+      // A refused addition must stop the update before any removal or other addition is applied and broadcast
       toAdd.forEach(nestedMembership -> {
         try {
           checkLinkable(nestedMembership);
