@@ -1856,7 +1856,14 @@ public class BrandingServiceImplTest {
   private BrandingServiceImpl readyBrandingService(FileService fileService,
                                                    io.meeds.portal.theme.service.ThemeService themeService,
                                                    io.meeds.portal.theme.model.BrandingState state) {
-    BrandingServiceImpl brandingService = newBrandingService(mock(SettingService.class),
+    return readyBrandingService(mock(SettingService.class), fileService, themeService, state);
+  }
+
+  private BrandingServiceImpl readyBrandingService(SettingService settingService,
+                                                   FileService fileService,
+                                                   io.meeds.portal.theme.service.ThemeService themeService,
+                                                   io.meeds.portal.theme.model.BrandingState state) {
+    BrandingServiceImpl brandingService = newBrandingService(settingService,
                                                              fileService,
                                                              mock(UploadService.class),
                                                              mock(LocaleConfigService.class),
@@ -1919,6 +1926,56 @@ public class BrandingServiceImplTest {
       assertEquals(6L, branding.getFavicon().getFileId());
       verify(fileService, never()).getFile(org.mockito.ArgumentMatchers.anyLong());
 
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  /**
+   * The login page reads the file id of the login background of the branding
+   * it is given, unguarded: with none stored nor configured, the branding
+   * carries an empty one, file id 0, while the service itself has none to
+   * serve.
+   */
+  @Test
+  public void testTheBrandingInformationGivesAnEmptyLoginBackgroundWhenNoneIsStoredNorConfigured() {
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    BrandingServiceImpl brandingService = readyBrandingService(mock(FileService.class), themeService, brandingState(1, null, null));
+    try {
+      assertNull(brandingService.getLoginBackground());
+      for (boolean retrieveBinaries : new boolean[] { false, true }) {
+        Branding branding = brandingService.getBrandingInformation(retrieveBinaries);
+
+        assertNotNull(branding.getLoginBackground());
+        assertEquals(0L, branding.getLoginBackground().getFileId());
+        assertNull(branding.getLoginBackground().getData());
+      }
+    } finally {
+      io.meeds.portal.theme.ThemeReadiness.reset();
+    }
+  }
+
+  @Test
+  public void testTheBrandingInformationKeepsTheStoredLoginBackground() throws Exception {
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.get(Context.GLOBAL, Scope.GLOBAL, BRANDING_LOGIN_BG_ID_SETTING_KEY)).thenReturn(new SettingValue("7"));
+    FileService fileService = mock(FileService.class);
+    when(fileService.getFileInfo(7L)).thenReturn(new org.exoplatform.commons.file.model.FileInfo(7L,
+                                                                                                 LOGIN_BACKGROUND_NAME,
+                                                                                                 "image/png",
+                                                                                                 "branding",
+                                                                                                 10L,
+                                                                                                 new java.util.Date(1234L),
+                                                                                                 "root",
+                                                                                                 null,
+                                                                                                 false));
+    io.meeds.portal.theme.service.ThemeService themeService = mock(io.meeds.portal.theme.service.ThemeService.class);
+    BrandingServiceImpl brandingService = readyBrandingService(settingService, fileService, themeService, brandingState(1, null, null));
+    try {
+      Branding branding = brandingService.getBrandingInformation(false);
+
+      assertEquals(7L, branding.getLoginBackground().getFileId());
+      assertEquals(10L, branding.getLoginBackground().getSize());
     } finally {
       io.meeds.portal.theme.ThemeReadiness.reset();
     }
