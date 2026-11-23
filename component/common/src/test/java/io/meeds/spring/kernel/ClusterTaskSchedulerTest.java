@@ -165,7 +165,9 @@ class ClusterTaskSchedulerTest {
     assertEquals("0 15 5 * * ?", ClusterTaskScheduler.toQuartzCron("0 15 5 * * *"));
     assertEquals("0 0 9 ? * MON,TUE,WED,THU,FRI", ClusterTaskScheduler.toQuartzCron("0 0 9 * * MON-FRI"));
     assertEquals("0 0 9 ? * SUN,MON,TUE,WED", ClusterTaskScheduler.toQuartzCron("0 0 9 * * 7-3"));
-    assertEquals("0 0 9 ? * SUN,MON,TUE,WED,THU,FRI,SAT", ClusterTaskScheduler.toQuartzCron("0 0 9 * * SUN-SUN"));
+    assertEquals("0 0 9 ? * SUN,MON,TUE,WED,THU,FRI,SAT", ClusterTaskScheduler.toQuartzCron("0 0 9 * * SUN-SAT"));
+    assertEquals("0 0 9 ? * SUN", ClusterTaskScheduler.toQuartzCron("0 0 9 * * SUN-SUN"));
+    assertEquals("0 0 9 ? * SUN", ClusterTaskScheduler.toQuartzCron("0 0 9 * * 7-7"));
     assertEquals("0 0 1 1 * ?", ClusterTaskScheduler.toQuartzCron("0 0 1 1 * ?"));
     assertEquals("0 15 5 ? * *", ClusterTaskScheduler.toQuartzCron("0 15 5 ? * *"));
     // Spring and Quartz number the days of the week differently: written by name
@@ -332,6 +334,9 @@ class ClusterTaskSchedulerTest {
                                      "0 0 9 * * SUN-WED",
                                      "0 0 9 * * SUN-SAT/2",
                                      "0 0 9 * * SUN-SUN",
+                                     "0 0 9 * * 7-7/2",
+                                     "0 0 9 * * SUN-SUN/2",
+                                     "0 0 9 * * SUN-7",
                                      "0 0 9 * * 7/2",
                                      "0 0 9 * * SUN/2",
                                      "0 0 9 * * */2",
