@@ -581,7 +581,8 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                                                                                  .build())));
       assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(updatedGroup, true));
 
-      // Then neither link is stored nor announced
+      // Then no link is kept, rolled back with the request as before the fix,
+      // and no link event fires, which is what the pre-check changes
       assertEquals(storedLabel, groupDao.findGroupById(GROUP_2).getLabel());
       assertTrue(CollectionUtils.isEmpty(groupDao.findGroupById(GROUP_2).getEnclosingMemberships()));
       assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
@@ -827,7 +828,8 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
       createdGroup.setEnclosingMemberships(enclosingMemberships);
       assertThrows(IllegalStateException.class, () -> groupDao.addChild(parentGroup, createdGroup, true));
 
-      // Then the valid link is neither stored nor announced
+      // Then no link is kept, rolled back with the request as before the fix,
+      // and no link event fires, which is what the pre-check changes
       assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
       assertTrue(recorder.events.isEmpty());
     } finally {
