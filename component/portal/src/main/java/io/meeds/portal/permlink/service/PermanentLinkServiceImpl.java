@@ -186,6 +186,16 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
     } else {
       salt = UUID.randomUUID().toString();
     }
+    // A node may have committed its salt since the first read, which the
+    // cached settings service can still answer with null, and the store would
+    // update that row instead of refusing the write: read the database again
+    // right before writing and adopt the salt found there
+    String committedSalt = readCommittedSalt();
+    if (committedSalt != null) {
+      salt = committedSalt;
+      LOG.debug("Permanent Link salt set in parallel by another node, adopting it");
+      return;
+    }
     try {
       settingService.set(PERMANEN_LINK_CONTEXT,
                          PERMANENT_LINK_SCOPE,
@@ -197,6 +207,18 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
       // settings cache, which may still hold the null answered by the first read
       // until the other node's invalidation arrives, and adopt it
       adoptStoredSalt(e);
+    }
+  }
+
+  private String readCommittedSalt() {
+    try {
+      SettingValue<?> committedSaltValue = jpaSettingService.get(PERMANEN_LINK_CONTEXT,
+                                                                 PERMANENT_LINK_SCOPE,
+                                                                 PERMANENT_LINK_SALT_NAME);
+      return committedSaltValue == null || committedSaltValue.getValue() == null ? null : committedSaltValue.getValue().toString();
+    } catch (RuntimeException e) {
+      LOG.debug("Permanent Link salt couldn't be read from the database before being stored, storing the local one", e);
+      return null;
     }
   }
 

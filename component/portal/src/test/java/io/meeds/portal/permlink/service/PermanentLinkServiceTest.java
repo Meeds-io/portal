@@ -133,12 +133,30 @@ public class PermanentLinkServiceTest {
              .set(any(Context.class), eq(PERMANENT_LINK_SCOPE), anyString(), any(SettingValue.class));
     // The cached service may still answer null (cached by the first read, until
     // the other node's invalidation arrives), the database holds the other node's salt
+    // and holds nothing yet when read right before the write
+    lenient().when(jpaSettingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME))
+             .thenReturn(null, (SettingValue) SettingValue.create("otherNodeSalt"));
+
+    permanentLinkService.start();
+
+    assertEquals("otherNodeSalt", permanentLinkService.getSalt());
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void testInitAdoptsSaltCommittedByAnotherNodeAfterCachedReadAnsweredNull() {
+    mockSettingStore();
+    // The cached service answers null, the other node committed its salt since
     lenient().when(jpaSettingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME))
              .thenReturn((SettingValue) SettingValue.create("otherNodeSalt"));
 
     permanentLinkService.start();
 
     assertEquals("otherNodeSalt", permanentLinkService.getSalt());
+    verify(settingService, never()).set(eq(PERMANEN_LINK_CONTEXT),
+                                        eq(PERMANENT_LINK_SCOPE),
+                                        eq(PERMANENT_LINK_SALT_NAME),
+                                        argThat(v -> true));
   }
 
   @Test
