@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -804,6 +805,40 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
     } finally {
       if (groupDao.findGroupById(leafId) != null) {
         groupDao.removeGroup(groupDao.findGroupById(leafId), false);
+      }
+    }
+  }
+
+  public void testCreateGroupRefusingOneOfTwoLinksStoresNoLinkAndFiresNoLinkEvent() throws Exception {
+    GroupEventRecorder recorder = new GroupEventRecorder();
+    String createdGroupId = GROUP_4 + "/linkedcreation";
+    try {
+      commitIdmTransaction();
+      groupDao.addGroupEventListener(recorder);
+      Group parentGroup = groupDao.findGroupById(GROUP_4);
+      Group createdGroup = groupDao.createGroupInstance();
+      createdGroup.setGroupName("linkedcreation");
+      createdGroup.setLabel("Linked creation");
+
+      // When a new group is sent with a valid enclosing link, then one naming a missing group
+      Set<NestedMembership> enclosingMemberships = new LinkedHashSet<>();
+      enclosingMemberships.add(NestedMembership.builder().groupId(GROUP_1).build());
+      enclosingMemberships.add(NestedMembership.builder().groupId("/organization/missing").build());
+      createdGroup.setEnclosingMemberships(enclosingMemberships);
+      assertThrows(IllegalStateException.class, () -> groupDao.addChild(parentGroup, createdGroup, true));
+
+      // Then the valid link is neither stored nor announced
+      assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
+      assertTrue(recorder.events.isEmpty());
+    } finally {
+      groupDao.removeGroupEventListener(recorder);
+      try {
+        Group leftover = groupDao.findGroupById(createdGroupId);
+        if (leftover != null) {
+          groupDao.removeGroup(leftover, false);
+        }
+      } finally {
+        commitIdmTransaction();
       }
     }
   }
