@@ -445,7 +445,9 @@ public class UploadService {
    * {@link UploadFileValidator}s on the staged file, and only then moves it to
    * the store location and reports the resource uploaded. The resource stays
    * in {@link UploadResource#UPLOADING_STATUS}, with its received size below
-   * the estimated one, until every check has passed; a refused upload ends in
+   * the estimated one (when the request length is known as an int, which
+   * {@link HttpServletRequest#getContentLength()} no longer reports above
+   * 2 GiB), until every check has passed; a refused upload ends in
    * {@link UploadResource#FAILED_STATUS} with no file left.
    *
    * @param upResource the registered resource
@@ -459,13 +461,18 @@ public class UploadService {
     try {
       writeFile(stagedFile, fileItem, upResource.getUploadId());
       validateUploadedFile(upResource, stagedFile.toFile());
-      if (uploadResources.get(upResource.getUploadId()) != upResource) {
-        // removed or replaced meanwhile: nothing to publish
-        return;
+      // The registry's monitor is the one a removal or a replacement takes:
+      // the check, the (same-folder, hence rename) move and the status are
+      // one step with respect to them
+      synchronized (uploadResources) {
+        if (uploadResources.get(upResource.getUploadId()) != upResource) {
+          // removed or replaced meanwhile: nothing to publish
+          return;
+        }
+        Files.move(stagedFile, Paths.get(upResource.getStoreLocation()), StandardCopyOption.REPLACE_EXISTING);
+        upResource.addUploadedBytes(receivedLength - upResource.getUploadedSize());
+        upResource.setStatus(UploadResource.UPLOADED_STATUS);
       }
-      Files.move(stagedFile, Paths.get(upResource.getStoreLocation()), StandardCopyOption.REPLACE_EXISTING);
-      upResource.addUploadedBytes(receivedLength - upResource.getUploadedSize());
-      upResource.setStatus(UploadResource.UPLOADED_STATUS);
     } catch (FileUploadException e) {
       upResource.setStatus(UploadResource.FAILED_STATUS);
       removeRefusedUpload(upResource);
@@ -490,7 +497,9 @@ public class UploadService {
   /**
    * @deprecated use
    *             {@link #createUploadResource(String, jakarta.servlet.http.HttpServletRequest)}
-   *             instead
+   *             instead; this overload does not stage the body: it is written
+   *             to the store location before the validators run, while the
+   *             status stays {@link UploadResource#UPLOADING_STATUS}
    */
   public void createUploadResource(String uploadId,
                                    String encoding,

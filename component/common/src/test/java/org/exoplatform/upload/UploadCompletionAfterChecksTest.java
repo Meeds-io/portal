@@ -34,8 +34,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.fileupload2.core.FileUploadException;
@@ -70,6 +73,8 @@ public class UploadCompletionAfterChecksTest {
   private final String             id4      = "completeId4" + UUID.randomUUID();
 
   private final String             id5      = "completeId5" + UUID.randomUUID();
+
+  private final String             id6      = "completeId6" + UUID.randomUUID();
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -181,6 +186,111 @@ public class UploadCompletionAfterChecksTest {
     assertEquals("replacement", Files.readString(Path.of(original.getStoreLocation())));
     assertEquals(List.of(id5), storedNames(original), "only the replacement's file is left, no staged file");
     uploadService.removeUploadResource(id5);
+  }
+
+  @Test
+  public void removalWaitsForThePublicationOfACheckedUpload() throws Exception {
+    AtomicBoolean removalWaited = new AtomicBoolean();
+    AtomicReference<Thread> removalThread = new AtomicReference<>();
+    AtomicReference<UploadResource> registered = new AtomicReference<>();
+    Runnable removalAfterTheRegistryCheck = () -> {
+      registered.set(uploadService.getUploadResource(id6));
+      Thread removal = new Thread(() -> uploadService.removeUploadResource(id6));
+      removalThread.set(removal);
+      removal.start();
+      try {
+        removal.join(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      removalWaited.set(removal.isAlive());
+    };
+    java.lang.reflect.Field field = UploadService.class.getDeclaredField("uploadResources");
+    field.setAccessible(true);
+    field.set(uploadService, new RegistryRunningAfterTheGetOf(id6, removalAfterTheRegistryCheck));
+
+    try {
+      uploadService.createUploadResource(id6, multipartRequest());
+    } finally {
+      removalThread.get().join(10000);
+    }
+    UploadResource resource = registered.get();
+
+    // a removal landing right after the registry check waits for the publication
+    assertTrue(removalWaited.get(), "the removal must not land between the registry check and the move");
+    assertNotNull(resource);
+    assertEquals(UploadResource.UPLOADED_STATUS, resource.getStatus());
+    assertNull(uploadService.getUploadResource(id6));
+    assertFalse(new File(resource.getStoreLocation()).exists());
+  }
+
+  /**
+   * A registry with the monitor semantics of
+   * {@link java.util.Collections#synchronizedMap(Map)}, that runs an action
+   * right after the first {@code get} of one id has returned.
+   */
+  private static class RegistryRunningAfterTheGetOf extends LinkedHashMap<String, UploadResource> {
+    private static final long serialVersionUID = 1L;
+
+    private final String      id;
+
+    private final transient Runnable action;
+
+    private final AtomicBoolean ran = new AtomicBoolean();
+
+    RegistryRunningAfterTheGetOf(String id, Runnable action) {
+      this.id = id;
+      this.action = action;
+    }
+
+    @Override
+    public UploadResource get(Object key) {
+      UploadResource value;
+      synchronized (this) {
+        value = super.get(key);
+      }
+      if (id.equals(key) && value != null && ran.compareAndSet(false, true)) {
+        action.run();
+      }
+      return value;
+    }
+
+    @Override
+    public synchronized UploadResource put(String key, UploadResource value) {
+      return super.put(key, value);
+    }
+
+    @Override
+    public synchronized UploadResource putIfAbsent(String key, UploadResource value) {
+      return super.putIfAbsent(key, value);
+    }
+
+    @Override
+    public synchronized boolean containsKey(Object key) {
+      return super.containsKey(key);
+    }
+
+    @Override
+    public synchronized UploadResource remove(Object key) {
+      return super.remove(key);
+    }
+
+    @Override
+    public synchronized boolean remove(Object key, Object value) {
+      return super.remove(key, value);
+    }
+
+    @Override
+    public synchronized UploadResource compute(String key,
+                                               java.util.function.BiFunction<? super String, ? super UploadResource, ? extends UploadResource> fn) {
+      return super.compute(key, fn);
+    }
+
+    @Override
+    public synchronized UploadResource computeIfPresent(String key,
+                                                        java.util.function.BiFunction<? super String, ? super UploadResource, ? extends UploadResource> fn) {
+      return super.computeIfPresent(key, fn);
+    }
   }
 
   private static List<String> storedNames(UploadResource resource) throws IOException {

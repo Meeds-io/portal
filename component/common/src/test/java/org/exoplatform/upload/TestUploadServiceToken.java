@@ -738,7 +738,7 @@ public class TestUploadServiceToken extends AbstractKernelTest {
    * A browser upload in the same window is handed out as uploading: the
    * receiving view applies to token uploads only.
    */
-  public void testBrowserUploadInTheWindowIsHandedOutAsBefore() throws Exception {
+  public void testBrowserUploadInTheWindowIsHandedOutAsUploading() throws Exception {
     UploadService service = new UploadService(containerInfo(), null);
     CountDownLatch inWindow = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
