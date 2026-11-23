@@ -944,15 +944,19 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
   }
 
   /**
-   * Walks the groups the membership's group is nested in. A group met again on
-   * the current path is a stored cycle: it is recorded and not followed, and a
-   * group that does not exist any more is skipped.
+   * Walks the groups the membership's group is nested in. The state of the
+   * walk is the group together with the membership type held in it: the same
+   * group met again on the current path with the same type is a stored cycle,
+   * recorded and not followed, whereas with another type it is walked, since
+   * the nested links it passes may differ. A group that does not exist any
+   * more is skipped.
    */
   @SneakyThrows
-  private Set<MembershipImpl> getInheritedMemberships(Membership m, Set<String> path, Set<String> cycleGroupIds) {
-    if (!path.add(m.getGroupId())) {
-      List<String> pathGroupIds = new ArrayList<>(path);
-      cycleGroupIds.addAll(pathGroupIds.subList(pathGroupIds.indexOf(m.getGroupId()), pathGroupIds.size()));
+  private Set<MembershipImpl> getInheritedMemberships(Membership m, Set<WalkStep> path, Set<String> cycleGroupIds) {
+    WalkStep step = new WalkStep(m.getGroupId(), m.getMembershipType());
+    if (!path.add(step)) {
+      List<WalkStep> pathSteps = new ArrayList<>(path);
+      pathSteps.subList(pathSteps.indexOf(step), pathSteps.size()).forEach(s -> cycleGroupIds.add(s.groupId()));
       return Collections.emptySet();
     }
     try {
@@ -966,14 +970,14 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                   .flatMap(Set::stream)
                   .collect(Collectors.toSet());
     } finally {
-      path.remove(m.getGroupId());
+      path.remove(step);
     }
   }
 
   @SneakyThrows
   private Set<MembershipImpl> getInheritedMemberships(NestedMembership nestedMembership,
                                                       Membership membership,
-                                                      Set<String> path,
+                                                      Set<WalkStep> path,
                                                       Set<String> cycleGroupIds) {
     Group parentGroup = orgService.getGroupHandler().findGroupById(nestedMembership.getGroupId());
     if (parentGroup != null
@@ -999,6 +1003,9 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     } else {
       return Collections.emptySet();
     }
+  }
+
+  private record WalkStep(String groupId, String membershipType) {
   }
 
 }

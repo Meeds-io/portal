@@ -75,6 +75,14 @@ public class TestNestedGroupsCycle extends AbstractKernelTest {// NOSONAR
 
   private static final String DIAMOND_E = "/organization/communication";
 
+  private static final String TYPED_X = "/organization/communication";
+
+  private static final String TYPED_Y = "/organization/operations";
+
+  private static final String TYPED_Z = "/organization/management";
+
+  private boolean             typedCycleStored;
+
   private final List<NestedMembership> diamondLinks = new ArrayList<>();
 
   private PicketLinkIDMOrganizationServiceImpl organizationService;
@@ -98,6 +106,9 @@ public class TestNestedGroupsCycle extends AbstractKernelTest {// NOSONAR
   @Override
   protected void tearDown() throws Exception {
     try {
+      if (typedCycleStored) {
+        storeLinks(TYPED_X, TYPED_Y, Collections.emptySet(), Collections.emptySet());
+      }
       for (int i = diamondLinks.size() - 1; i >= 0; i--) {
         groupDao.unlinkGroups(diamondLinks.get(i));
       }
@@ -184,6 +195,43 @@ public class TestNestedGroupsCycle extends AbstractKernelTest {// NOSONAR
     assertTrue(hasMembership(inherited, DIAMOND_E, "member"));
     assertTrue(hasMembership(inherited, DIAMOND_E, "manager"));
     verify(log, times(0)).warn(anyString(), (Object[]) org.mockito.ArgumentMatchers.any());
+  }
+
+  /**
+   * On a cycle, the walk can come back to a group with a membership type it did
+   * not hold the first time: X is nested in Y (member to manager), Y in X (all
+   * types, inherited), X in Z (manager to manager), root is member of X. The
+   * first visit of X, as member, does not pass the link to Z, the second one,
+   * as manager, does.
+   */
+  public void testInheritedMembershipsFollowLinksOnlyAnotherTypePasses() throws Exception {
+    linkTyped(TYPED_Y, TYPED_X, "member", "manager");
+    linkTyped(TYPED_Z, TYPED_X, "manager", "manager");
+    NestedMembership yInX = NestedMembership.builder()
+                                            .groupId(TYPED_X)
+                                            .nestedGroupId(TYPED_Y)
+                                            .nestedMembershipType(NestedMembership.ALL_MEMBERSHIP_TYPE)
+                                            .membershipType(NestedMembership.INHERIT_MEMBERSHIP_TYPE)
+                                            .build();
+    storeLinks(TYPED_X, TYPED_Y, new HashSet<>(Set.of(yInX)), new HashSet<>(Set.of(yInX)));
+    typedCycleStored = true;
+
+    Set<MembershipImpl> inherited = inheritedMemberships(new MembershipImpl("member", "root", TYPED_X, false));
+
+    assertTrue(hasMembership(inherited, TYPED_Y, "manager"));
+    assertTrue(hasMembership(inherited, TYPED_X, "manager"));
+    assertTrue(hasMembership(inherited, TYPED_Z, "manager"));
+  }
+
+  private void linkTyped(String groupId, String nestedGroupId, String nestedMembershipType, String membershipType) throws Exception {
+    NestedMembership link = NestedMembership.builder()
+                                            .groupId(groupId)
+                                            .nestedGroupId(nestedGroupId)
+                                            .nestedMembershipType(nestedMembershipType)
+                                            .membershipType(membershipType)
+                                            .build();
+    groupDao.linkGroups(link);
+    diamondLinks.add(link);
   }
 
   private boolean hasMembership(Set<MembershipImpl> memberships, String groupId, String membershipType) {
