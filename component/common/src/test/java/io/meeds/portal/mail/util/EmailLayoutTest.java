@@ -597,10 +597,12 @@ public class EmailLayoutTest {
   }
 
   @Test
-  public void testActionLinksStackAndNeverOverflowTheScreen() {
+  public void testActionLinksShareALineAndNeverOverflowTheScreen() {
     String link = EmailLayout.actionLink(BRAND, "View the full discussion", "https://acme.example/d", false);
-    assertTrue(link, link.contains("display:block;width:-moz-fit-content;width:fit-content;max-width:100%;margin:0 0 12px 0;"));
-    assertFalse("no side by side buttons that wrap raggedly", link.contains("inline-block"));
+    assertTrue("buttons that follow each other sit on one line, and wrap when the screen is narrow",
+               link.contains("display:inline-block;vertical-align:top;max-width:100%;margin:0 4px 12px 0;"));
+    assertFalse("a button is not a block on its own line", link.contains("display:block"));
+    assertTrue("a long label wraps inside its button rather than overflowing", link.contains("max-width:100%"));
   }
 
   @Test
