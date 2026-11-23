@@ -44,13 +44,13 @@ import org.exoplatform.portal.jdbc.entity.PageEntity;
 import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
 import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
-import org.exoplatform.portal.mop.dao.AbstractDAOTest;
 import org.exoplatform.portal.mop.PageType;
+import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.SiteType;
+import org.exoplatform.portal.mop.dao.AbstractDAOTest;
 import org.exoplatform.portal.mop.dao.PageDAO;
 import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.dao.WindowDAO;
-import org.exoplatform.portal.mop.SiteKey;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
 import org.exoplatform.portal.mop.storage.utils.MOPUtils;
@@ -506,8 +506,8 @@ public class LayoutStorageTest extends AbstractDAOTest {
 
   /**
    * A window that no longer exists is skipped, with no failure, whether the
-   * caller names the owner of the body or not (the log level is not asserted:
-   * the logger is not captured by this suite)
+   * caller names the owner of the body or not (the log line is asserted by
+   * testMissingComponentsAreReportedAtWarnWithTheirOwner)
    */
   public void testBuildChildrenSkipsAMissingWindow() {
     WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
