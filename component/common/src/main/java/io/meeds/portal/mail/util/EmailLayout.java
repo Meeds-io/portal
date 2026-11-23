@@ -411,11 +411,13 @@ public final class EmailLayout {
 
   /**
    * A button for an email that is laid out by its own template, such as a
-   * notification: a flat button with rounded corners. Buttons stack, one per
-   * line, as wide as their label and never wider than the screen, so that
-   * they read the same on a computer and on a phone without a media query. The primary one is filled with the brand color; the secondary one
-   * is quiet, outlined in the primary color, so that two buttons side by side do
-   * not compete.
+   * notification: a flat button with rounded corners. Buttons that follow each
+   * other sit on one line, as wide as their label and never wider than the
+   * screen, and wrap onto the next line when the screen is too narrow, so that
+   * they read the same on a computer and on a phone without a media query. The
+   * primary one is filled with the brand color; the secondary ones are quiet,
+   * outlined in the primary color, so that buttons side by side do not
+   * compete.
    *
    * @param brand how the email is dressed
    * @param label the text of the button, in plain text
@@ -433,7 +435,7 @@ public final class EmailLayout {
     String fill = primary ? brand.getFillColor() : "#ffffff";
     String ink = primary ? brand.getTextColor() : brand.getLinkColor();
     String border = primary ? brand.getFillColor() : brand.getOutlineColor();
-    return "<a href=\"" + escape(link) + "\" target=\"_blank\"" + (primary ? "" : " class=\"eml-out\"") + " style=\"display:block;width:-moz-fit-content;width:fit-content;max-width:100%;margin:0 0 12px 0;padding:" + BUTTON_PAD + ";border-radius:" + brand.getRadius() + ";"
+    return "<a href=\"" + escape(link) + "\" target=\"_blank\"" + (primary ? "" : " class=\"eml-out\"") + " style=\"display:inline-block;vertical-align:top;max-width:100%;margin:0 4px 12px 0;padding:" + BUTTON_PAD + ";border-radius:" + brand.getRadius() + ";"
         + "background-color:" + fill + ";border:1px solid " + border + COLOR_DECLARATION + ink + ";font:bold 14px/20px " + brand.getFontStack()
         + ";text-decoration:none;\">" + text + "</a>" + (primary ? actionMarkup(brand, plain(label), link) : "");
   }
