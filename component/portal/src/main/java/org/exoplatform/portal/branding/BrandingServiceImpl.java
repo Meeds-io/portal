@@ -581,6 +581,11 @@ public class BrandingServiceImpl implements BrandingService, Startable {
       Long loginBackgroundId = getLoginBackgroundId();
       branding.setLoginBackground(loginBackgroundId == null ? getLoginBackground() : readThemeFileInfo(loginBackgroundId, new Background()));
     }
+    if (branding.getLoginBackground() == null) {
+      // none stored nor configured, or its file could not be read: an empty login background, file id 0, which the login page
+      // reads to show its default
+      branding.setLoginBackground(new Background());
+    }
     branding.setTopBarBackground(getTopBarBackground());
     branding.setSideBarBackground(getSideBarBackground());
     branding.setDrawerBackground(getDrawerBackground());
@@ -614,7 +619,7 @@ public class BrandingServiceImpl implements BrandingService, Startable {
         brandingFile.setData(null);
         branding.setLogo(brandingFile);
       }
-      if (branding.getLoginBackground() != null && branding.getLoginBackground().getData() != null) {
+      if (branding.getLoginBackground().getData() != null) {
         Background brandingFile = branding.getLoginBackground().clone();
         brandingFile.setData(null);
         branding.setLoginBackground(brandingFile);
