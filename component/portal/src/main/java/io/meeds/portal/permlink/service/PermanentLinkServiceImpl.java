@@ -44,6 +44,7 @@ import org.exoplatform.container.RootContainer.PortalContainerPostCreateTask;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.security.Identity;
+import org.exoplatform.settings.jpa.JPASettingServiceImpl;
 
 import io.meeds.portal.permlink.model.PermanentLinkObject;
 import io.meeds.portal.permlink.plugin.PermanentLinkPlugin;
@@ -76,6 +77,8 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
 
   private SettingService                   settingService;
 
+  private JPASettingServiceImpl            jpaSettingService;
+
   /**
    * {@link Map} of Object Type with associated plugin
    */
@@ -84,9 +87,12 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
   @Getter
   private String                           salt;
 
-  public PermanentLinkServiceImpl(PortalContainer container, SettingService settingService) {
+  public PermanentLinkServiceImpl(PortalContainer container,
+                                  SettingService settingService,
+                                  JPASettingServiceImpl jpaSettingService) {
     this.container = container;
     this.settingService = settingService;
+    this.jpaSettingService = jpaSettingService;
   }
 
   @Override
@@ -165,15 +171,50 @@ public class PermanentLinkServiceImpl implements PermanentLinkService, Startable
 
   protected void initSalt() {
     SettingValue<?> saltSettingValue = settingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME);
-    if (saltSettingValue == null || saltSettingValue.getValue() == null) {
+    if (saltSettingValue != null && saltSettingValue.getValue() != null) {
+      salt = saltSettingValue.getValue().toString();
+      return;
+    }
+    // Platforms started before this fix stored the salt under the
+    // application scope: adopt the salt of the last node started (on a single
+    // node, the one in use since the last start)
+    SettingValue<?> legacySaltSettingValue = settingService.get(PERMANEN_LINK_CONTEXT,
+                                                                PERMANENT_LINK_IDS_SCOPE,
+                                                                PERMANENT_LINK_SALT_NAME);
+    if (legacySaltSettingValue != null && legacySaltSettingValue.getValue() != null) {
+      salt = legacySaltSettingValue.getValue().toString();
+    } else {
       salt = UUID.randomUUID().toString();
+    }
+    try {
       settingService.set(PERMANEN_LINK_CONTEXT,
-                         PERMANENT_LINK_IDS_SCOPE,
+                         PERMANENT_LINK_SCOPE,
                          PERMANENT_LINK_SALT_NAME,
                          SettingValue.create(salt));
-    } else {
-      salt = saltSettingValue.getValue().toString();
+    } catch (RuntimeException e) {
+      // The insert was refused, probably because another node stored its salt
+      // at the same time: read the stored salt from the database, bypassing the
+      // settings cache, which may still hold the null answered by the first read
+      // until the other node's invalidation arrives, and adopt it
+      adoptStoredSalt(e);
     }
+  }
+
+  private void adoptStoredSalt(RuntimeException storeError) {
+    try {
+      SettingValue<?> storedSaltValue = jpaSettingService.get(PERMANEN_LINK_CONTEXT,
+                                                              PERMANENT_LINK_SCOPE,
+                                                              PERMANENT_LINK_SALT_NAME);
+      if (storedSaltValue != null && storedSaltValue.getValue() != null) {
+        salt = storedSaltValue.getValue().toString();
+        LOG.debug("Permanent Link salt set in parallel by another node, adopting it");
+        return;
+      }
+    } catch (RuntimeException readError) {
+      storeError.addSuppressed(readError);
+    }
+    LOG.warn("Permanent Link salt couldn't be stored nor read back, the local one is kept in memory until next start",
+             storeError);
   }
 
   private PermanentLinkPlugin getPlugin(String objectType) {
