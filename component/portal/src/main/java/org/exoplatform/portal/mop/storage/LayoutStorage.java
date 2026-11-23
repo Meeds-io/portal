@@ -235,8 +235,21 @@ public class LayoutStorage {
   }
 
   public List<ComponentData> buildChildren(JSONArray jsonBody) {
-    Map<Long, ContainerEntity> containers = getContainerEntities(jsonBody);
-    Map<Long, WindowEntity> windows = getWindowEntities(jsonBody);
+    return buildChildren(jsonBody, (String) null);
+  }
+
+  /**
+   * Builds the components of a layout body. A window that no longer exists is
+   * skipped, and reported once at WARN with the given owner description.
+   *
+   * @param jsonBody layout body
+   * @param owner description of the page or site that owns the body, used in
+   *          the log only; may be null
+   * @return the components that still exist
+   */
+  public List<ComponentData> buildChildren(JSONArray jsonBody, String owner) {
+    Map<Long, ContainerEntity> containers = getContainerEntities(jsonBody, owner);
+    Map<Long, WindowEntity> windows = getWindowEntities(jsonBody, owner);
     return buildChildren(jsonBody, containers, windows);
   }
 
@@ -752,7 +765,7 @@ public class LayoutStorage {
     return results;
   }
 
-  private Map<Long, ContainerEntity> getContainerEntities(JSONArray jsonBody) {
+  private Map<Long, ContainerEntity> getContainerEntities(JSONArray jsonBody, String owner) {
     Set<Long> ids = new HashSet<>();
     filterBodyContainerIds(jsonBody, TYPE.CONTAINER, ids);
     List<ContainerEntity> entities = containerDAO.findByIds(new LinkedList<>(ids));
@@ -764,7 +777,9 @@ public class LayoutStorage {
 
     ids.removeAll(results.keySet());
     if (!ids.isEmpty()) {
-      LOG.warn("Can't find Container with ids: {}", StringUtils.join(ids, ","));
+      LOG.warn("Can't find Container with ids: {} requested by {}",
+               StringUtils.join(ids, ","),
+               owner == null ? "an unknown layout" : owner);
     }
 
     return results;
@@ -789,7 +804,7 @@ public class LayoutStorage {
     return dst;
   }
 
-  private Map<Long, WindowEntity> getWindowEntities(JSONArray jsonBody) {
+  private Map<Long, WindowEntity> getWindowEntities(JSONArray jsonBody, String owner) {
     Set<Long> ids = new HashSet<>();
     filterBodyContainerIds(jsonBody, TYPE.WINDOW, ids);
     List<WindowEntity> entities = ids.stream()
@@ -804,7 +819,9 @@ public class LayoutStorage {
 
     ids.removeAll(results.keySet());
     if (!ids.isEmpty()) {
-      LOG.error("Can't find Window with ids: {}", StringUtils.join(ids, ","));
+      LOG.warn("Can't find Window with ids: {} requested by {}",
+               StringUtils.join(ids, ","),
+               owner == null ? "an unknown layout" : owner);
     }
 
     return results;
