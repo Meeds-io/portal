@@ -419,22 +419,27 @@ public class UploadHandlerTokenTest {
     when(containerInfo.getContainerName()).thenReturn("portal");
     UploadService service = new UploadService(containerInfo, params);
     String uploadId = UUID.randomUUID().toString();
-    UploadFileValidator removesTheStoredFile = new UploadFileValidator() {
+    UploadFileValidator removesTheCheckedFile = new UploadFileValidator() {
       /** {@inheritDoc} */
       @Override
       public boolean supports(String fileName, String mimeType) {
-        new java.io.File(staging, uploadId).delete();
+        // the checks read the received file where it is staged, before it
+        // reaches its store location
+        java.io.File[] staged = staging.listFiles((dir, name) -> name.startsWith(uploadId + "."));
+        assertNotNull(staged);
+        assertEquals(1, staged.length);
+        assertTrue(staged[0].delete());
         return true;
       }
 
       /** {@inheritDoc} */
       @Override
       public void validate(String fileName, String mimeType, java.io.InputStream inputStream) {
-        // never reached: the stored file is gone before its stream is opened
+        // never reached: the checked file is gone before its stream is opened
       }
     };
     ExoContainer validatingContainer = mock(ExoContainer.class);
-    when(validatingContainer.getComponentInstancesOfType(UploadFileValidator.class)).thenReturn(List.of(removesTheStoredFile));
+    when(validatingContainer.getComponentInstancesOfType(UploadFileValidator.class)).thenReturn(List.of(removesTheCheckedFile));
     containerContext.when(ExoContainerContext::getCurrentContainer).thenReturn(validatingContainer);
     containerContext.when(() -> ExoContainerContext.getService(UploadService.class)).thenReturn(service);
     String token = service.createUploadToken("john", uploadId, 100);
