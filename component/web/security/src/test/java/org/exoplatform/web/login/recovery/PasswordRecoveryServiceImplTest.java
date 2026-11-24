@@ -298,6 +298,7 @@ public class PasswordRecoveryServiceImplTest {
     user.setLastLoginTime(new Date(now - TimeUnit.HOURS.toMillis(2)));
     assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
     // an account whose last sign-in is its creation, at the time the link is issued
+    user.setCreatedDate(new Date(issued));
     user.setLastLoginTime(new Date(issued));
     assertEquals("jdoe", passwordRecoveryService.verifyToken("tok.en", CookieTokenService.ONBOARD_TOKEN));
     verify(onboardingTokenService, never()).deleteToken(anyString(), anyString());

@@ -174,11 +174,13 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     }
     if (ONBOARD_TOKEN.equals(type)) {
       // an onboarding link ends once its account is in use
-      Boolean signedInSince = isSignedInSince(token);
-      if (signedInSince == null) {
-        return null;
-      } else if (signedInSince.booleanValue()) {
-        onboardingTokenService.deleteToken(tokenId, ONBOARD_TOKEN);
+      try {
+        if (isSignedInSince(token)) {
+          onboardingTokenService.deleteToken(tokenId, ONBOARD_TOKEN);
+          return null;
+        }
+      } catch (Exception e) {
+        log.warn("Can not read the last sign-in of the user of an onboarding link, refusing it", e);
         return null;
       }
     }
@@ -187,20 +189,16 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
 
   /**
    * @return whether the account signed in after the onboarding token was
-   *         issued, null when it cannot be told
+   *         issued
+   * @throws Exception when the account cannot be read
    */
-  private Boolean isSignedInSince(Token token) {
+  private boolean isSignedInSince(Token token) throws Exception {
     long issuedTime = token.getExpirationTimeMillis() - onboardingTokenService.getValidityMillis();
-    try {
-      User user = orgService.getUserHandler().findUserByName(token.getUsername(), UserStatus.ANY);
-      // creation records a sign-in at the creation date, which is no use
-      return user != null && user.getLastLoginTime() != null && user.getLastLoginTime().getTime() > issuedTime
-          && (user.getCreatedDate() == null
-              || user.getLastLoginTime().getTime() - user.getCreatedDate().getTime() >= CREATION_SIGN_IN_MARGIN);
-    } catch (Exception e) {
-      log.warn("Can not read the last sign-in of the user of an onboarding link, refusing it", e);
-      return null;
-    }
+    User user = orgService.getUserHandler().findUserByName(token.getUsername(), UserStatus.ANY);
+    // creation records a sign-in at the creation date, which is no use
+    return user != null && user.getLastLoginTime() != null && user.getLastLoginTime().getTime() > issuedTime
+        && (user.getCreatedDate() == null
+            || user.getLastLoginTime().getTime() - user.getCreatedDate().getTime() >= CREATION_SIGN_IN_MARGIN);
   }
 
   @Override

@@ -24,7 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.exoplatform.services.listener.Event;
 import org.exoplatform.services.organization.OrganizationService;
@@ -38,10 +38,10 @@ import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.web.security.security.CookieTokenService;
 import org.exoplatform.web.security.security.OnboardingTokenService;
 
-public class OnboardingLinkSignInListenerTest {
+class OnboardingLinkSignInListenerTest {
 
   @Test
-  public void aSignInEndsTheAccountsOnboardingLinks() throws Exception {
+  void aSignInEndsTheAccountsOnboardingLinks() throws Exception {
     OnboardingTokenService onboardingTokenService = mock(OnboardingTokenService.class);
     OrganizationService organizationService = mock(OrganizationService.class);
     UserHandler userHandler = mock(UserHandler.class);
@@ -54,7 +54,7 @@ public class OnboardingLinkSignInListenerTest {
   }
 
   @Test
-  public void anAnonymousSessionEndsNoLink() {
+  void anAnonymousSessionEndsNoLink() {
     OnboardingTokenService onboardingTokenService = mock(OnboardingTokenService.class);
     OnboardingLinkSignInListener listener = new OnboardingLinkSignInListener(onboardingTokenService,
                                                                              mock(OrganizationService.class));
