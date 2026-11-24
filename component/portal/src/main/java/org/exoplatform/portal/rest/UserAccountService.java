@@ -185,6 +185,7 @@ public interface UserAccountService {
    * first, through the active change-password connector, and an
    * internal-store account's new password is then proven to authenticate.
    * The other writes follow; they are then read back in a new transaction.
+   * A first or last name equal to the stored one is not validated again.
    *
    * @param account the account as edited, identified by its login
    * @param locale the locale of the validation messages

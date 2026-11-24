@@ -673,13 +673,15 @@ public class UserAccountServiceImplTest {
   @Test
   public void testUpdateUserChecksOnlyAChangedName() throws Exception {
     storedAccount(true);
+    createdUser.setFirstName("Jane2");
     createdUser.setLastName("Smith2");
-    userAccountService.updateUser(edit("Jane", "Smith2", "jane.new@example.com", null, true, null), Locale.ENGLISH, "admin");
+    userAccountService.updateUser(edit("Jane2", "Smith2", "jane.new@example.com", null, true, null), Locale.ENGLISH, "admin");
     assertEquals("jane.new@example.com", createdUser.getEmail());
+    assertEquals("Jane2", createdUser.getFirstName());
     assertEquals("Smith2", createdUser.getLastName());
 
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                                              () -> userAccountService.updateUser(edit("Jane2",
+                                              () -> userAccountService.updateUser(edit("Jane3",
                                                                                        "Smith2",
                                                                                        "jane.new@example.com",
                                                                                        null,
@@ -689,7 +691,7 @@ public class UserAccountServiceImplTest {
                                                                                   "admin"));
     assertTrue(e.getMessage().startsWith("FIRSTNAME:"));
     e = assertThrows(IllegalArgumentException.class,
-                     () -> userAccountService.updateUser(edit("Jane", "Smith3", "jane.new@example.com", null, true, null),
+                     () -> userAccountService.updateUser(edit("Jane2", "Smith3", "jane.new@example.com", null, true, null),
                                                          Locale.ENGLISH,
                                                          "admin"));
     assertTrue(e.getMessage().startsWith("LASTNAME:"));
