@@ -199,7 +199,9 @@ public class ClusterTaskScheduler implements TaskScheduler {
    * expanded as Spring expands it. Spring numbers the days of the week from
    * Monday, 0 and 7 being Sunday, Quartz from Sunday: a day of the week given by
    * number, in a range or with a step, is written as the list of the days' names
-   * it selects, Sunday at the start of a range counting as 0, as in Spring;
+   * it selects, Sunday at the start of a range counting as 0 unless the range
+   * also ends on Sunday, as in Spring ({@code SUN-SAT} is every day,
+   * {@code SUN-SUN} Sunday only);
    * {@code #} and {@code L} keep their meaning with the day's name.
    *
    * @param expression a Spring cron expression, of six fields, or a macro
@@ -251,9 +253,13 @@ public class ClusterTaskScheduler implements TaskScheduler {
           first = 1;
           last = 7;
         } else if (dash > 0) {
-          // Sunday starting a range is 0, as in Spring: SUN-SAT is every day
-          first = dayOfWeek(range.substring(0, dash), expression) % 7;
+          first = dayOfWeek(range.substring(0, dash), expression);
           last = dayOfWeek(range.substring(dash + 1), expression);
+          // Sunday starting a range is 0 unless the range also ends on it, as
+          // in Spring: SUN-SAT is every day, SUN-SUN and 7-7 are Sunday only
+          if (first == 7 && last != 7) {
+            first = 0;
+          }
         } else {
           first = dayOfWeek(range, expression);
           // A start with a step runs to the end of the week, as in Spring
