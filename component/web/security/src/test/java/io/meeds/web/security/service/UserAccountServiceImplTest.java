@@ -667,6 +667,35 @@ public class UserAccountServiceImplTest {
   }
 
   /**
+   * A stored name that the personal-name rule refuses keeps the account
+   * editable while it is sent back unchanged; a changed name meets the rule
+   */
+  @Test
+  public void testUpdateUserChecksOnlyAChangedName() throws Exception {
+    storedAccount(true);
+    createdUser.setLastName("Smith2");
+    userAccountService.updateUser(edit("Jane", "Smith2", "jane.new@example.com", null, true, null), Locale.ENGLISH, "admin");
+    assertEquals("jane.new@example.com", createdUser.getEmail());
+    assertEquals("Smith2", createdUser.getLastName());
+
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> userAccountService.updateUser(edit("Jane2",
+                                                                                       "Smith2",
+                                                                                       "jane.new@example.com",
+                                                                                       null,
+                                                                                       true,
+                                                                                       null),
+                                                                                  Locale.ENGLISH,
+                                                                                  "admin"));
+    assertTrue(e.getMessage().startsWith("FIRSTNAME:"));
+    e = assertThrows(IllegalArgumentException.class,
+                     () -> userAccountService.updateUser(edit("Jane", "Smith3", "jane.new@example.com", null, true, null),
+                                                         Locale.ENGLISH,
+                                                         "admin"));
+    assertTrue(e.getMessage().startsWith("LASTNAME:"));
+  }
+
+  /**
    * Every refusal comes before the first write: a deactivation of oneself or
    * of the super user, an email held by another account, an unknown language
    */

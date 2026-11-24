@@ -187,12 +187,18 @@ public class UserAccountServiceImpl implements UserAccountService {
     if (password != null) {
       validate(UserRestResourcesV1.PASSWORD_VALIDATOR, PASSWORD_PREFIX, validationLocale, password);
     }
-    validate(UserRestResourcesV1.LASTNAME_VALIDATOR, LASTNAME_PREFIX, validationLocale, account.getLastName());
-    validate(UserRestResourcesV1.FIRSTNAME_VALIDATOR, FIRSTNAME_PREFIX, validationLocale, account.getFirstName());
     validate(UserRestResourcesV1.EMAIL_VALIDATOR, EMAIL_PREFIX, validationLocale, account.getEmail());
     User user = readUser(username);
     if (user == null) {
       throw new IllegalArgumentException("USER:NOT_FOUND");
+    }
+    // A name sent back as stored is not checked again: an account whose name
+    // predates the rule stays editable until that name is changed
+    if (!StringUtils.equals(user.getLastName(), account.getLastName())) {
+      validate(UserRestResourcesV1.LASTNAME_VALIDATOR, LASTNAME_PREFIX, validationLocale, account.getLastName());
+    }
+    if (!StringUtils.equals(user.getFirstName(), account.getFirstName())) {
+      validate(UserRestResourcesV1.FIRSTNAME_VALIDATOR, FIRSTNAME_PREFIX, validationLocale, account.getFirstName());
     }
     if (!StringUtils.equals(user.getEmail(), account.getEmail()) && isEmailUsedQuietly(account.getEmail())) {
       throw new IllegalArgumentException(EMAIL_ALREADY_EXISTS);
