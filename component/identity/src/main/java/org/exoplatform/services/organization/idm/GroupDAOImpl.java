@@ -1273,15 +1273,43 @@ public class GroupDAOImpl extends AbstractDAOImpl implements GroupHandler {
     return new HashSet<>(collection);
   }
 
-  @SneakyThrows
   private boolean isNestedIn(String parentGroupId, String memberGroupId) {
-    Set<NestedMembership> nestedMemberships = getNestedMemberships(memberGroupId);
-    if (CollectionUtils.isEmpty(nestedMemberships)) {
+    Set<String> path = new LinkedHashSet<>();
+    Set<String> cycleGroupIds = new LinkedHashSet<>();
+    boolean nested = isNestedIn(parentGroupId, memberGroupId, path, cycleGroupIds);
+    if (!cycleGroupIds.isEmpty()) {
+      log.warn("Nested groups cycle detected while checking whether group '{}' is nested in '{}', groups of the cycle: {}",
+               parentGroupId,
+               memberGroupId,
+               cycleGroupIds);
+    }
+    return nested;
+  }
+
+  /**
+   * Whether {@code parentGroupId} is reachable from {@code memberGroupId}
+   * through nested memberships. A group met again on the current path is a
+   * stored cycle: the walk does not follow it, records it and answers for the
+   * remaining branches, so a cycle neither overflows the stack nor changes the
+   * answer for acyclic data.
+   */
+  @SneakyThrows
+  private boolean isNestedIn(String parentGroupId, String memberGroupId, Set<String> path, Set<String> cycleGroupIds) {
+    if (!path.add(memberGroupId)) {
+      List<String> pathGroupIds = new ArrayList<>(path);
+      cycleGroupIds.addAll(pathGroupIds.subList(pathGroupIds.indexOf(memberGroupId), pathGroupIds.size()));
       return false;
-    } else {
+    }
+    try {
+      Set<NestedMembership> nestedMemberships = getNestedMemberships(memberGroupId);
+      if (CollectionUtils.isEmpty(nestedMemberships)) {
+        return false;
+      }
       return nestedMemberships.stream()
                               .anyMatch(m -> StringUtils.equals(m.getNestedGroupId(), parentGroupId)
-                                             || isNestedIn(parentGroupId, m.getNestedGroupId()));
+                                             || isNestedIn(parentGroupId, m.getNestedGroupId(), path, cycleGroupIds));
+    } finally {
+      path.remove(memberGroupId);
     }
   }
 

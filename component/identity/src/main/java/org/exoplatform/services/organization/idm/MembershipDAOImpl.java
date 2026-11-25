@@ -931,22 +931,54 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
     return orgService.getConfiguration().getGtnGroupName(plidmGroupName);
   }
 
-  @SneakyThrows
   private Set<MembershipImpl> getInheritedMemberships(Membership m) {
-    Group group = orgService.getGroupHandler().findGroupById(m.getGroupId());
-    if (CollectionUtils.isEmpty(group.getEnclosingMemberships())) {
+    Set<String> cycleGroupIds = new LinkedHashSet<>();
+    Set<MembershipImpl> inheritedMemberships = getInheritedMemberships(m, new LinkedHashSet<>(), cycleGroupIds);
+    if (!cycleGroupIds.isEmpty()) {
+      log.warn("Nested groups cycle detected while resolving the inherited memberships of user '{}' in group '{}', groups of the cycle: {}",
+               m.getUserName(),
+               m.getGroupId(),
+               cycleGroupIds);
+    }
+    return inheritedMemberships;
+  }
+
+  /**
+   * Walks the groups the membership's group is nested in. The state of the
+   * walk is the group together with the membership type held in it: the same
+   * group met again on the current path with the same type is a stored cycle,
+   * recorded and not followed, whereas with another type it is walked, since
+   * the nested links it passes may differ. A group that does not exist any
+   * more is skipped.
+   */
+  @SneakyThrows
+  private Set<MembershipImpl> getInheritedMemberships(Membership m, Set<WalkStep> path, Set<String> cycleGroupIds) {
+    WalkStep step = new WalkStep(m.getGroupId(), m.getMembershipType());
+    if (!path.add(step)) {
+      List<WalkStep> pathSteps = new ArrayList<>(path);
+      pathSteps.subList(pathSteps.indexOf(step), pathSteps.size()).forEach(s -> cycleGroupIds.add(s.groupId()));
       return Collections.emptySet();
-    } else {
+    }
+    try {
+      Group group = orgService.getGroupHandler().findGroupById(m.getGroupId());
+      if (group == null || CollectionUtils.isEmpty(group.getEnclosingMemberships())) {
+        return Collections.emptySet();
+      }
       return group.getEnclosingMemberships()
                   .stream()
-                  .map(im -> getInheritedMemberships(im, m))
+                  .map(im -> getInheritedMemberships(im, m, path, cycleGroupIds))
                   .flatMap(Set::stream)
                   .collect(Collectors.toSet());
+    } finally {
+      path.remove(step);
     }
   }
 
   @SneakyThrows
-  private Set<MembershipImpl> getInheritedMemberships(NestedMembership nestedMembership, Membership membership) {
+  private Set<MembershipImpl> getInheritedMemberships(NestedMembership nestedMembership,
+                                                      Membership membership,
+                                                      Set<WalkStep> path,
+                                                      Set<String> cycleGroupIds) {
     Group parentGroup = orgService.getGroupHandler().findGroupById(nestedMembership.getGroupId());
     if (parentGroup != null
         && (nestedMembership.isIncludeAllMembershipTypes()
@@ -966,11 +998,14 @@ public class MembershipDAOImpl extends AbstractDAOImpl implements MembershipHand
                                                  true);
       }
       memberships.add(inheritedMembership);
-      memberships.addAll(getInheritedMemberships(inheritedMembership));
+      memberships.addAll(getInheritedMemberships(inheritedMembership, path, cycleGroupIds));
       return memberships;
     } else {
       return Collections.emptySet();
     }
+  }
+
+  private record WalkStep(String groupId, String membershipType) {
   }
 
 }
