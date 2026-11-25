@@ -25,12 +25,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.List;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.stereotype.Component;
@@ -44,6 +50,7 @@ import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.security.ConversationRegistry;
 
+import io.meeds.portal.identity.listener.GroupLinkGroupListener;
 import io.meeds.portal.identity.listener.UserConversationInvalidationListener;
 
 /**
@@ -54,7 +61,7 @@ import io.meeds.portal.identity.listener.UserConversationInvalidationListener;
 public class ConversationInvalidationListenersTest {
 
   // the portal package root the platform's Spring application scans
-  private static final String                        PORTAL_SCANNED_PACKAGE = "io.meeds.portal";
+  private static final List<String>                  PORTAL_SCANNED_PACKAGES = List.of("io.meeds.portal.", "io.meeds.web.security.");
 
   @Mock
   private ConversationRegistry                       conversationRegistry;
@@ -111,14 +118,39 @@ public class ConversationInvalidationListenersTest {
     assertNotNull(UserConversationInvalidationListener.class.getMethod("setup").getAnnotation(PostConstruct.class));
   }
 
+  /**
+   * The platform builds a bean only for a component under the packages its
+   * Spring context scans: every component of this module sits under one of
+   * them
+   */
   @Test
-  public void testTheListenerIsAComponentOfThePortalPackagesThePlatformLoads() {
+  public void testEveryComponentOfTheModuleIsUnderAPackageThePlatformLoads() {
     ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
     scanner.addIncludeFilter(new AnnotationTypeFilter(Component.class));
+    String moduleClasses = UserConversationInvalidationListener.class.getProtectionDomain()
+                                                                     .getCodeSource()
+                                                                     .getLocation()
+                                                                     .toString();
 
-    assertTrue(scanner.findCandidateComponents(PORTAL_SCANNED_PACKAGE)
-                      .stream()
-                      .anyMatch(bean -> UserConversationInvalidationListener.class.getName().equals(bean.getBeanClassName())));
+    List<String> moduleComponents = scanner.findCandidateComponents("io.meeds")
+                                           .stream()
+                                           .filter(bean -> resourceUrl(bean).startsWith(moduleClasses))
+                                           .map(BeanDefinition::getBeanClassName)
+                                           .toList();
+
+    assertTrue(moduleComponents.contains(UserConversationInvalidationListener.class.getName()));
+    assertTrue(moduleComponents.contains(GroupLinkGroupListener.class.getName()));
+    for (String component : moduleComponents) {
+      assertTrue(component, PORTAL_SCANNED_PACKAGES.stream().anyMatch(component::startsWith));
+    }
+  }
+
+  private static String resourceUrl(BeanDefinition bean) {
+    try {
+      return ((AbstractBeanDefinition) bean).getResource().getURL().toString();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private UserConversationInvalidationListener listenerOn(OrganizationService service) {

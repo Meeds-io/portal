@@ -36,7 +36,7 @@ import org.exoplatform.services.organization.NestedMembership;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.ConversationRegistry;
 
-import io.meeds.services.organization.listener.GroupLinkGroupListener;
+import io.meeds.portal.identity.listener.GroupLinkGroupListener;
 
 /**
  * The members of a linked group are read from the real store, on a thread that
