@@ -209,6 +209,31 @@ public class BrandingApplicationStylingTest {
   }
 
   @Test
+  public void shouldKeepTheDefaultPagePaddingForAnUnsetPageMargin() {
+    // initial, the branding.less default every theme version resolves where no margin is set: the default padding stays
+    Map<String, String> values = new HashMap<>();
+    values.put("pageMarginTop", "initial");
+    values.put("pageMarginBottom", " initial ");
+    Map<String, String> compiled = BrandingServiceImpl.toCompiledValues(values);
+    assertNull(compiled.get("pageNoMarginTop"));
+    assertNull(compiled.get("pageNoMarginBottom"));
+
+    values = new HashMap<>();
+    values.put("pageMarginTop", "");
+    compiled = BrandingServiceImpl.toCompiledValues(values);
+    assertNull(compiled.get("pageNoMarginTop"));
+    assertNull(compiled.get("pageNoMarginBottom"));
+
+    // a margin set replaces the default page padding
+    values = new HashMap<>();
+    values.put("pageMarginTop", "24px");
+    values.put("pageMarginBottom", "0px");
+    compiled = BrandingServiceImpl.toCompiledValues(values);
+    assertEquals("0px", compiled.get("pageNoMarginTop"));
+    assertEquals("0px", compiled.get("pageNoMarginBottom"));
+  }
+
+  @Test
   public void shouldNeutralizeStoredTopBarGradientAtReadTime() {
     // gradient behind an image, transparent colour: the image URL is kept, the gradient's first colour becomes the colour
     Map<String, String> themeStyle = new HashMap<>();
