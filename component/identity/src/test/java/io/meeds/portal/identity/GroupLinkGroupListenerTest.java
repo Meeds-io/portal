@@ -50,7 +50,7 @@ import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.idm.PicketLinkIDMOrganizationServiceImpl;
 import org.exoplatform.services.security.ConversationRegistry;
 
-import io.meeds.services.organization.listener.GroupLinkGroupListener;
+import io.meeds.portal.identity.listener.GroupLinkGroupListener;
 
 /**
  * Linking or unlinking a group invalidates, on every node, the conversations
