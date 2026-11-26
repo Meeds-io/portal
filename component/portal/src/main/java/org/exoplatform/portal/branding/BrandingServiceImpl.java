@@ -2620,13 +2620,23 @@ public class BrandingServiceImpl implements BrandingService, Startable {
   static Map<String, String> toCompiledValues(Map<String, String> values) {
     Map<String, String> effectiveValues = new HashMap<>(values);
     neutralizeTopBarGradient(effectiveValues);
-    if (StringUtils.isNotBlank(effectiveValues.get("pageMarginTop"))) {
+    if (isPageMarginSet(effectiveValues.get("pageMarginTop"))) {
       effectiveValues.put("pageNoMarginTop", "0px");
     }
-    if (StringUtils.isNotBlank(effectiveValues.get("pageMarginBottom"))) {
+    if (isPageMarginSet(effectiveValues.get("pageMarginBottom"))) {
       effectiveValues.put("pageNoMarginBottom", "0px");
     }
     return effectiveValues;
+  }
+
+  /**
+   * @param value a page margin as resolved for a theme version
+   * @return whether it sets a margin: initial, the branding.less default
+   *         resolved into every version where no margin is set, keeps the
+   *         default page padding
+   */
+  private static boolean isPageMarginSet(String value) {
+    return StringUtils.isNotBlank(value) && !"initial".equalsIgnoreCase(value.trim());
   }
 
   private InputStream getUploadDataAsStream(String uploadId) throws FileNotFoundException {
