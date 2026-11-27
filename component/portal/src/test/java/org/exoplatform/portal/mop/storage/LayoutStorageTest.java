@@ -26,7 +26,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.persistence.EntityTransaction;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.slf4j.LoggerFactory;
 
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
 import org.exoplatform.portal.config.model.ApplicationBackgroundStyle;
@@ -34,9 +40,16 @@ import org.exoplatform.portal.config.model.ModelStyle;
 import org.exoplatform.portal.config.model.PersistentApplicationState;
 import org.exoplatform.portal.jdbc.entity.ComponentEntity;
 import org.exoplatform.portal.jdbc.entity.ContainerEntity;
+import org.exoplatform.portal.jdbc.entity.PageEntity;
+import org.exoplatform.portal.jdbc.entity.SiteEntity;
 import org.exoplatform.portal.jdbc.entity.WindowEntity;
 import org.exoplatform.portal.jdbc.entity.WindowEntity.AppType;
+import org.exoplatform.portal.mop.PageType;
+import org.exoplatform.portal.mop.SiteKey;
+import org.exoplatform.portal.mop.SiteType;
 import org.exoplatform.portal.mop.dao.AbstractDAOTest;
+import org.exoplatform.portal.mop.dao.PageDAO;
+import org.exoplatform.portal.mop.dao.SiteDAO;
 import org.exoplatform.portal.mop.dao.WindowDAO;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
@@ -46,8 +59,16 @@ import org.exoplatform.portal.pom.data.ContainerData;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
+import org.exoplatform.services.log.ExoLogger;
+import org.exoplatform.services.log.Log;
 
 public class LayoutStorageTest extends AbstractDAOTest {
+
+  private static final Log      LOG                = ExoLogger.getLogger(LayoutStorageTest.class);
+
+  private static final long MISSING_WINDOW_ID    = Long.MAX_VALUE - 1;
+
+  private static final long MISSING_CONTAINER_ID = Long.MAX_VALUE - 2;
 
   private LayoutStorage      layoutStorage;
 
@@ -481,6 +502,138 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertNull(layoutStorage.loadCommitted(String.valueOf(Long.MAX_VALUE)));
     assertNull(layoutStorage.loadCommitted("notAnId"));
     assertNull(layoutStorage.loadCommitted(null));
+  }
+
+  /**
+   * A window that no longer exists is skipped, with no failure, whether the
+   * caller names the owner of the body or not (the log line is asserted by
+   * testMissingComponentsAreReportedAtWarnWithTheirOwner)
+   */
+  public void testBuildChildrenSkipsAMissingWindow() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    Long existingId = createWindow(windowDAO, new Portlet());
+    JSONArray body = new JSONArray();
+    body.add(windowJson(existingId));
+    body.add(windowJson(Long.MAX_VALUE));
+
+    assertEquals(1, layoutStorage.buildChildren(body, "page 'missing' of site PORTAL:classic").size());
+    assertEquals(1, layoutStorage.buildChildren(body).size());
+    assertEquals(1, layoutStorage.buildChildren(body, (String) null).size());
+  }
+
+  /**
+   * A page and a site whose body references a deleted window and a deleted
+   * container report each once at WARN, never at ERROR, naming the owner
+   */
+  public void testMissingComponentsAreReportedAtWarnWithTheirOwner() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    SiteDAO siteDAO = getContainer().getComponentInstanceOfType(SiteDAO.class);
+    PageDAO pageDAO = getContainer().getComponentInstanceOfType(PageDAO.class);
+    Long existingId = createWindow(windowDAO, new Portlet());
+
+    ContainerData root = new ContainerData(null, "logRoot", "logRoot", null, "system:/groovy/portal/webui/container/UIContainer.gtmpl",
+                                           null, null, null, null, null, null, null, null, null,
+                                           Collections.emptyList(), Collections.emptyList());
+    List<ComponentEntity> saved = layoutStorage.saveChildren(new JSONArray(), Collections.<ComponentData> singletonList(root));
+    JSONArray body = new JSONArray();
+    body.add(saved.get(0).toJSON());
+    body.add(windowJson(existingId));
+    body.add(windowJson(MISSING_WINDOW_ID));
+    JSONObject missingContainer = new JSONObject();
+    missingContainer.put("type", ComponentEntity.TYPE.CONTAINER.name());
+    missingContainer.put("id", MISSING_CONTAINER_ID);
+    missingContainer.put("children", new JSONArray());
+    body.add(missingContainer);
+
+    Logger logger = (Logger) LoggerFactory.getLogger(LayoutStorage.class.getName());
+    Level previousLevel = logger.getLevel();
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+
+    try {
+      SiteEntity site = new SiteEntity();
+      site.setSiteType(SiteType.PORTAL);
+      site.setName("logsite");
+      site.setLocale("en");
+      site.setSkin("Default");
+      site.setSiteBody(body.toJSONString());
+      site = siteDAO.create(site);
+      PageEntity page = new PageEntity();
+      page.setOwner(site);
+      page.setName("logpage");
+      page.setPageType(PageType.PAGE);
+      page.setPageBody(body.toJSONString());
+      pageDAO.create(page);
+      restartTransaction();
+
+      logger.setLevel(Level.DEBUG);
+      logger.addAppender(appender);
+      try {
+        SiteStorage siteStorage = getContainer().getComponentInstanceOfType(SiteStorage.class);
+        PageStorage pageStorage = getContainer().getComponentInstanceOfType(PageStorage.class);
+        assertNotNull(siteStorage.getPortalConfig(new SiteKey(SiteType.PORTAL, "logsite")));
+        assertNotNull(pageStorage.getPage(new org.exoplatform.portal.pom.data.PageKey(SiteType.PORTAL.getName(),
+                                                                                      "logsite",
+                                                                                      "logpage")));
+      } finally {
+        logger.detachAppender(appender);
+        logger.setLevel(previousLevel);
+      }
+    } finally {
+      removeLogFixtures(pageDAO, siteDAO);
+    }
+
+    assertTrue(appender.list.stream().noneMatch(e -> e.getLevel() == Level.ERROR));
+    assertEquals(List.of("Can't find Window with ids: " + MISSING_WINDOW_ID
+                             + " requested by page 'logpage' of site portal:logsite",
+                         "Can't find Window with ids: " + MISSING_WINDOW_ID + " requested by site portal:logsite"),
+                 messages(appender, "Window"));
+    assertEquals(List.of("Can't find Container with ids: " + MISSING_CONTAINER_ID
+                             + " requested by page 'logpage' of site portal:logsite",
+                         "Can't find Container with ids: " + MISSING_CONTAINER_ID + " requested by site portal:logsite"),
+                 messages(appender, "Container"));
+    assertTrue(appender.list.stream().allMatch(e -> e.getLevel() == Level.WARN));
+  }
+
+  /**
+   * Removes the committed page and site, each in its own try so that a failed
+   * removal never masks the failure of the test itself
+   */
+  private void removeLogFixtures(PageDAO pageDAO, SiteDAO siteDAO) {
+    try {
+      PageEntity page = pageDAO.findByKey(new org.exoplatform.portal.mop.page.PageKey(new SiteKey(SiteType.PORTAL, "logsite"),
+                                                                                      "logpage"));
+      if (page != null) {
+        pageDAO.delete(page);
+      }
+      restartTransaction();
+    } catch (RuntimeException e) {
+      LOG.warn("Cannot remove the test page", e);
+    }
+    try {
+      SiteEntity site = siteDAO.findByKey(new SiteKey(SiteType.PORTAL, "logsite"));
+      if (site != null) {
+        siteDAO.delete(site);
+      }
+      restartTransaction();
+    } catch (RuntimeException e) {
+      LOG.warn("Cannot remove the test site", e);
+    }
+  }
+
+  private List<String> messages(ListAppender<ILoggingEvent> appender, String kind) {
+    return appender.list.stream()
+                        .filter(e -> e.getFormattedMessage().startsWith("Can't find " + kind))
+                        .map(ILoggingEvent::getFormattedMessage)
+                        .sorted()
+                        .toList();
+  }
+
+  private JSONObject windowJson(Long id) {
+    JSONObject json = new JSONObject();
+    json.put("type", ComponentEntity.TYPE.WINDOW.name());
+    json.put("id", id);
+    return json;
   }
 
   /**

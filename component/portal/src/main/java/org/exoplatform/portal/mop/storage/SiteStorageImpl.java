@@ -362,7 +362,8 @@ public class SiteStorageImpl implements SiteStorage {
       return null;
     }
     JSONArray siteBody = parseJsonArray(entity.getSiteBody());
-    List<ComponentData> children = layoutStorage.buildChildren(siteBody);
+    List<ComponentData> children = layoutStorage.buildChildren(siteBody,
+                                                               "site " + entity.getSiteType().getName() + ":" + entity.getName());
     ContainerData rootContainer = null;
     if (!children.isEmpty()) {
       rootContainer = (ContainerData) children.get(0);

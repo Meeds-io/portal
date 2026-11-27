@@ -289,7 +289,9 @@ public class PageStorageImpl implements PageStorage {
                                                                 PermissionEntity.TYPE.EDIT);
     String editPermission = CollectionUtils.isEmpty(editPermissions) ? null : editPermissions.get(0);
 
-    List<ComponentData> children = layoutStorage.buildChildren(parseJsonArray(entity.getPageBody()));
+    List<ComponentData> children = layoutStorage.buildChildren(parseJsonArray(entity.getPageBody()),
+                                                               "page '" + entity.getName() + "' of site "
+                                                                   + entity.getOwnerType().getName() + ":" + entity.getOwnerId());
 
     return new PageData("page_" + entity.getId(), // storageId
                         null, // id
