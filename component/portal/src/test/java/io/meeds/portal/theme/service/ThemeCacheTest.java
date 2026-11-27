@@ -224,7 +224,7 @@ public class ThemeCacheTest {
     assertEquals(0L, themeService.getState().getVersion());
     anotherNodeCommitsATheme("Ocean", 7L);
 
-    IllegalStateException e = assertThrows(IllegalStateException.class,
+    IllegalStateException e = assertThrows(io.meeds.portal.theme.exception.ThemePublishConflictException.class,
                                            () -> service.publish(withTheme(publication(0), "new-1", "Forest"), ADMIN));
 
     assertEquals(ThemeService.PUBLISH_CONFLICT_MESSAGE, e.getMessage());

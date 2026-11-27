@@ -252,8 +252,7 @@ public class ThemeConfigurationSynchronizer implements ApplicationListener<Conte
       configuredPaths().forEach((column, path) -> {
         if (path != null && !StringUtils.equals(path, sync.getDefaultFileSources().get(column))) {
           plan.getDefaultPaths().put(column, path);
-          byte[] bytes = themeFileStorage.readConfiguredFile(path);
-          plan.getDefaultCopies().put(column, bytes == null ? null : themeFileStorage.writeFile(column, "image/png", bytes));
+          plan.getDefaultCopies().put(column, themeService.copyConfiguredFile(column));
         }
       });
     } catch (RuntimeException e) {
@@ -284,7 +283,8 @@ public class ThemeConfigurationSynchronizer implements ApplicationListener<Conte
         addIfNotNull(unused, copy);
         continue;
       }
-      // a configured default only ever fills an empty column: an upload or an administrator's removal wins
+      // a configured default only ever fills an empty column: an upload wins, and a removal stores the configured
+      // file of its time
       if (copy != null && fileColumns(state).get(column) == null) {
         setFileColumn(state, column, copy);
       } else {
@@ -478,10 +478,9 @@ public class ThemeConfigurationSynchronizer implements ApplicationListener<Conte
 
   private Map<String, String> configuredPaths() {
     Map<String, String> paths = new LinkedHashMap<>();
-    paths.put(LOGO_COLUMN, themeConfiguration.getConfiguredPath(LOGO_PROPERTY, DEFAULT_LOGO_PATH));
-    paths.put(FAVICON_COLUMN, themeConfiguration.getConfiguredPath(FAVICON_PROPERTY, DEFAULT_FAVICON_PATH));
-    paths.put(DARK_LOGO_COLUMN, themeConfiguration.getConfiguredPath(DARK_LOGO_PROPERTY, null));
-    paths.put(DARK_FAVICON_COLUMN, themeConfiguration.getConfiguredPath(DARK_FAVICON_PROPERTY, null));
+    for (String column : List.of(LOGO_COLUMN, FAVICON_COLUMN, DARK_LOGO_COLUMN, DARK_FAVICON_COLUMN)) {
+      paths.put(column, themeService.configuredFilePath(column));
+    }
     return paths;
   }
 

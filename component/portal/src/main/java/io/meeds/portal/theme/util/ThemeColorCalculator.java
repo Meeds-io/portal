@@ -140,6 +140,26 @@ public final class ThemeColorCalculator {
   }
 
   /**
+   * Less's mix() of two opaque colours, channel by channel in 0-255 and
+   * rounded as Less rounds: their alpha, if any, is not read.
+   *
+   * @param color1 a hex color
+   * @param color2 a hex color
+   * @param weight the share of the first color, 0 to 1
+   * @return the mixed color, 6 hex digits
+   */
+  public static String mix(String color1, String color2, double weight) {
+    double[] first = parse(color1);
+    double[] second = parse(color2);
+    StringBuilder mixed = new StringBuilder("#");
+    for (int channel = 0; channel < 3; channel++) {
+      long value = Math.round(Math.round(first[channel] * 255) * weight + Math.round(second[channel] * 255) * (1 - weight));
+      mixed.append(String.format(Locale.ROOT, "%02X", Math.max(0, Math.min(255, value))));
+    }
+    return mixed.toString();
+  }
+
+  /**
    * Primary or Secondary used as text: the color's OKLCH lightness moved
    * until it reaches 4.5:1 on the background it sits on.
    */

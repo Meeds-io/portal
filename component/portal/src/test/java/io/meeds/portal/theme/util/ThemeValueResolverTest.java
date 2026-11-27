@@ -89,6 +89,23 @@ public class ThemeValueResolverTest {
   }
 
   @Test
+  void theDarkTintsMixIntoTheThemesOwnDarkApplicationBackground() {
+    Map<String, String> dark = Map.of("primaryColor", "#5FA9AC", "secondaryColor", "#6B8FC2");
+    ResolvedTheme resolved = ThemeValueResolver.resolve(DEFAULTS, Map.of(), dark);
+    assertEquals("#2E4549", resolved.getDark().get("revealBackgroundSelected"), "Primary 25% into the default #1E2328");
+    assertEquals("#4C6484", resolved.getDark().get("inputFocusBorder"), "Secondary 60%");
+    assertFalse(resolved.getLight().containsKey("revealBackgroundSelected"), "the light version keeps the skin's derivation");
+
+    Map<String, String> ownSurface = new HashMap<>(dark);
+    ownSurface.put("appBackgroundColor", "#000000CC");
+    resolved = ThemeValueResolver.resolve(DEFAULTS, Map.of(), ownSurface);
+    assertEquals("#182A2B", resolved.getDark().get("revealBackgroundSelected"), "into the theme's own background, opaque");
+    assertEquals("#132222", resolved.getDark().get("quotePrimaryBackground"));
+    assertEquals("#396567", resolved.getDark().get("quotePrimaryBorder"));
+    assertEquals("#2B394E", resolved.getDark().get("inputFocusShadow"));
+  }
+
+  @Test
   void theLightBubblesAreTheOnesTheLightStylesheetHolds() {
     ResolvedTheme resolved = ThemeValueResolver.resolve(DEFAULTS,
                                                         Map.of("appBackgroundColor", "#EBADCBFF", "drawerBackgroundColor", "#3F8487"),

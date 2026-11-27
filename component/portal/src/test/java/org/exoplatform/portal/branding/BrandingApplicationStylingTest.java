@@ -681,7 +681,9 @@ public class BrandingApplicationStylingTest {
                                                                                                                        "#e1e8ee"),
                                                                                                                 Map.of(),
                                                                                                                 Map.of("primaryColor",
-                                                                                                                       "#5FA9AC"));
+                                                                                                                       "#5FA9AC",
+                                                                                                                       "secondaryColor",
+                                                                                                                       "#476A9C"));
     when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(resolved);
 
     String css = brandingService.compileThemeVersions(themeService).toLowerCase();
@@ -708,6 +710,22 @@ public class BrandingApplicationStylingTest {
     // an opacity of the Grey text colour, and a border raised from the dark grey
     assertTrue(darkBlock, darkBlock.contains("--allpagesgreycolorlighten1opacity3: rgba(95, 112, 138, 0.2)"));
     assertTrue(darkBlock, darkBlock.contains("--allpagesbtnborderbottom: #505c67"));
+
+    // a theme's own dark application background is the one the tints mix into
+    io.meeds.portal.theme.model.ResolvedTheme ownSurface =
+                                                          io.meeds.portal.theme.util.ThemeValueResolver.resolve(Map.of("primaryColor",
+                                                                                                                         "#3F8487",
+                                                                                                                         "primaryBackground",
+                                                                                                                         "#f0f0f0"),
+                                                                                                                  Map.of(),
+                                                                                                                  Map.of("primaryColor",
+                                                                                                                         "#5FA9AC",
+                                                                                                                         "appBackgroundColor",
+                                                                                                                         "#000000"));
+    when(themeService.resolve((io.meeds.portal.theme.model.Theme) null)).thenReturn(ownSurface);
+    css = brandingService.compileThemeVersions(themeService).toLowerCase();
+    darkBlock = css.substring(css.indexOf(":root[data-display-mode=\"dark\"] {\n"), css.indexOf(":root[data-display-mode=\"auto\"] {\n"));
+    assertTrue(darkBlock, darkBlock.contains("--allpagesrevealbackgroundselected: #182a2b"));
   }
 
   @Test
