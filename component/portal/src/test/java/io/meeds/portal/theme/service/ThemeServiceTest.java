@@ -562,10 +562,14 @@ public class ThemeServiceTest {
     org.exoplatform.portal.branding.model.Branding set = new org.exoplatform.portal.branding.model.Branding();
     set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233", "textColor", "#121212"));
     set.setPageBackgroundColor("#ABCDEF");
+    set.setPageBackgroundSize("contain");
     service.publishLegacy(set, false);
+    assertEquals("contain",
+                 ThemeMapper.readMap(themeDAO.findById(ThemeService.DEFAULT_THEME_ID).orElseThrow().getLightSettings())
+                            .get("pageBackgroundSize"));
 
     org.exoplatform.portal.branding.model.Branding reset = new org.exoplatform.portal.branding.model.Branding();
-    // a null theme value resets as an empty one does, a null page field is kept
+    // a null theme value resets as an empty one does; an empty page field resets, a null one is kept
     Map<String, String> resetStyle = new HashMap<>();
     resetStyle.put("primaryColor", "");
     resetStyle.put("textColor", null);
@@ -573,7 +577,7 @@ public class ThemeServiceTest {
     reset.setPageBackgroundColor(" ");
     service.publishLegacy(reset, false);
 
-    assertEquals(Map.of("secondaryColor", "#112233"),
+    assertEquals(Map.of("secondaryColor", "#112233", "pageBackgroundSize", "contain"),
                  ThemeMapper.readMap(themeDAO.findById(ThemeService.DEFAULT_THEME_ID).orElseThrow().getLightSettings()));
   }
 
