@@ -560,12 +560,16 @@ public class ThemeServiceTest {
   void anEmptyValueOfTheFormerWritersResetsItsOptionAndAnAbsentOneIsKept() throws Exception {
     ThemeService service = transactionalSpy();
     org.exoplatform.portal.branding.model.Branding set = new org.exoplatform.portal.branding.model.Branding();
-    set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233"));
+    set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233", "appBackgroundColor", "#EEEEEE"));
     set.setPageBackgroundColor("#ABCDEF");
     service.publishLegacy(set, false);
 
     org.exoplatform.portal.branding.model.Branding reset = new org.exoplatform.portal.branding.model.Branding();
-    reset.setThemeStyle(Map.of("primaryColor", ""));
+    // a null theme value resets as an empty one does, a null page field is kept
+    Map<String, String> resetStyle = new HashMap<>();
+    resetStyle.put("primaryColor", "");
+    resetStyle.put("appBackgroundColor", null);
+    reset.setThemeStyle(resetStyle);
     reset.setPageBackgroundColor(" ");
     service.publishLegacy(reset, false);
 
@@ -622,12 +626,41 @@ public class ThemeServiceTest {
     assertNotNull(state().getFaviconFileId());
     verify(themeFileStorage).writeFile("favicon.webp", "image/webp", webp);
 
-    // a configured file that is no image stores nothing
+    // a built-in file that is no image stores nothing
     when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH)).thenReturn(new byte[] { 1, 2, 3 });
     BrandingPublication again = publication(2);
     again.setBranding(new BrandingIdentityPublication(null, new BrandingFilePublication(null, true), null, null, null));
     publish(again);
     assertNull(state().getLogoFileId());
+  }
+
+  @Test
+  void aConfiguredLogoOrFaviconThatIsRefusedOrUnreadableFallsBackToTheBuiltInOne() throws Exception {
+    environment.getPropertySources()
+               .addFirst(new org.springframework.core.env.MapPropertySource("configuredFiles",
+                                                                            Map.of(ThemeConfigurationSynchronizer.LOGO_PROPERTY,
+                                                                                   "/custom/logo.svg",
+                                                                                   ThemeConfigurationSynchronizer.FAVICON_PROPERTY,
+                                                                                   "/custom/missing.ico")));
+    byte[] scriptSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] webp = { 'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P' };
+    when(themeFileStorage.readConfiguredFile("/custom/logo.svg")).thenReturn(scriptSvg);
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH)).thenReturn(PNG);
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_FAVICON_PATH)).thenReturn(webp);
+
+    BrandingPublication remove = publication(0);
+    remove.setBranding(new BrandingIdentityPublication(null,
+                                                       new BrandingFilePublication(null, true),
+                                                       null,
+                                                       new BrandingFilePublication(null, true),
+                                                       null));
+    publish(remove);
+
+    assertNotNull(state().getLogoFileId(), "a refused configured logo leaves the built-in one, never none");
+    verify(themeFileStorage).writeFile("logo.png", "image/png", PNG);
+    verify(themeFileStorage, never()).writeFile(eq("logo.svg"), anyString(), any());
+    assertNotNull(state().getFaviconFileId(), "an unreadable configured favicon leaves the built-in one");
+    verify(themeFileStorage).writeFile("favicon.webp", "image/webp", webp);
   }
 
   @Test

@@ -1179,12 +1179,28 @@ public class ThemeService {
 
   /**
    * @param column a logo or favicon column
-   * @return a stored copy of the file the deployment configures for it, null
-   *         when none is configured, it cannot be read or it is no image
-   *         ({@link BrandingImageValidator#validateConfigured})
+   * @return a stored copy of the file the deployment configures for it; for a
+   *         light column whose configured file cannot be read or is no image
+   *         ({@link BrandingImageValidator#validateConfigured}), a copy of the
+   *         built-in one; null for a dark column with none or refused, and for
+   *         a built-in file that is itself unreadable
    */
   Long copyConfiguredFile(String column) {
     String path = configuredFilePath(column);
+    Long copy = copyFile(column, path);
+    String builtInPath = switch (column) {
+    case LOGO_COLUMN -> ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH;
+    case FAVICON_COLUMN -> ThemeConfigurationSynchronizer.DEFAULT_FAVICON_PATH;
+    default -> null;
+    };
+    if (copy == null && builtInPath != null && !builtInPath.equals(path)) {
+      LOG.warn("The configured branding file {} is not used, the built-in {} is used instead", path, builtInPath);
+      copy = copyFile(column, builtInPath);
+    }
+    return copy;
+  }
+
+  private Long copyFile(String column, String path) {
     byte[] data = themeFileStorage.readConfiguredFile(path);
     if (data == null) {
       return null;
