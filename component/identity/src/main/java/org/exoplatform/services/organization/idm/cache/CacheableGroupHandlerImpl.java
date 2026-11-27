@@ -205,6 +205,7 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
    * {@inheritDoc}
    */
   public void saveGroup(Group group, boolean broadcast) throws Exception {
+    boolean disabledOnEntry = Boolean.TRUE.equals(disableCacheInThread.get());
     disableCacheInThread.set(true);
     try {
       groupCache.remove(getGroupId(group));
@@ -215,7 +216,7 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
       }
       super.saveGroup(group, broadcast);
     } finally {
-      disableCacheInThread.set(false);
+      disableCacheInThread.set(disabledOnEntry);
     }
   }
 
@@ -253,23 +254,25 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
 
   @Override
   public void linkGroups(NestedMembership nestedMembership) throws Exception {
+    boolean disabledOnEntry = Boolean.TRUE.equals(disableCacheInThread.get());
     disableCacheInThread.set(true);
     try {
       super.linkGroups(nestedMembership);
       clearNestedMembershipCache(nestedMembership);
     } finally {
-      disableCacheInThread.set(false);
+      disableCacheInThread.set(disabledOnEntry);
     }
   }
 
   @Override
   public void unlinkGroups(NestedMembership nestedMembership) throws Exception {
+    boolean disabledOnEntry = Boolean.TRUE.equals(disableCacheInThread.get());
     disableCacheInThread.set(true);
     try {
       super.unlinkGroups(nestedMembership);
       clearNestedMembershipCache(nestedMembership);
     } finally {
-      disableCacheInThread.set(false);
+      disableCacheInThread.set(disabledOnEntry);
     }
   }
 
@@ -323,8 +326,8 @@ public class CacheableGroupHandlerImpl extends GroupDAOImpl {
   }
 
   private void clearAffectedNestedMembershipsCache(Group existingGroup, Group updatedGroup) {
-    Set<NestedMembership> oldMemberships = super.toSet(existingGroup.getEnclosingMemberships());
-    Set<NestedMembership> newMemberships = super.toSet(updatedGroup.getEnclosingMemberships());
+    Set<NestedMembership> oldMemberships = super.normalizeEnclosing(existingGroup.getEnclosingMemberships(), updatedGroup.getId());
+    Set<NestedMembership> newMemberships = super.normalizeEnclosing(updatedGroup.getEnclosingMemberships(), updatedGroup.getId());
 
     Set<NestedMembership> toRemove = new HashSet<>(oldMemberships);
     toRemove.removeAll(newMemberships);
