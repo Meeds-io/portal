@@ -119,7 +119,7 @@ public class UserFieldValidator {
         String label = getFieldLabel(locale);
         return getLabel(locale, "ExpressionValidator.msg.value-invalid", label, pattern);
       }
-    } else if (personalNameValidation) {
+    } else if (personalNameValidation && StringUtils.isBlank(pattern)) {
       for (int i = 0; i < buff.length; i++) {
         char c = buff[i];
         if (Character.isLetter(c) || Character.isSpaceChar(c) || c == '\'' || c == '-') {

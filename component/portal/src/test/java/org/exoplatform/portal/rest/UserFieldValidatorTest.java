@@ -98,6 +98,19 @@ public class UserFieldValidatorTest {
   }
 
   @Test
+  public void testValidatePersonalNameWithConfiguredPattern() {
+    System.setProperty("gatein.validators.firstNameDigits.regexp", "[\\p{L}\\p{Nd} '-]+");
+    try {
+      UserFieldValidator fieldValidator = new UserFieldValidator("firstNameDigits", false, true);
+      assertNull(fieldValidator.validate(Locale.ENGLISH, "Smith2"));
+      assertNull(fieldValidator.validate(Locale.ENGLISH, "Sm1th"));
+      assertNotNull(fieldValidator.validate(Locale.ENGLISH, "Smith!"));
+    } finally {
+      System.setProperty("gatein.validators.firstNameDigits.regexp", "");
+    }
+  }
+
+  @Test
   public void testValidateEmail() {
     UserFieldValidator fieldValidator = new UserFieldValidator("email", false, false);
     assertNotNull(fieldValidator.validate(Locale.ENGLISH, ""));
