@@ -560,7 +560,7 @@ public class ThemeServiceTest {
   void anEmptyValueOfTheFormerWritersResetsItsOptionAndAnAbsentOneIsKept() throws Exception {
     ThemeService service = transactionalSpy();
     org.exoplatform.portal.branding.model.Branding set = new org.exoplatform.portal.branding.model.Branding();
-    set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233", "appBackgroundColor", "#EEEEEE"));
+    set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233", "textColor", "#121212"));
     set.setPageBackgroundColor("#ABCDEF");
     service.publishLegacy(set, false);
 
@@ -568,7 +568,7 @@ public class ThemeServiceTest {
     // a null theme value resets as an empty one does, a null page field is kept
     Map<String, String> resetStyle = new HashMap<>();
     resetStyle.put("primaryColor", "");
-    resetStyle.put("appBackgroundColor", null);
+    resetStyle.put("textColor", null);
     reset.setThemeStyle(resetStyle);
     reset.setPageBackgroundColor(" ");
     service.publishLegacy(reset, false);
