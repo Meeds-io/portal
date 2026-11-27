@@ -29,6 +29,7 @@ import jakarta.persistence.EntityTransaction;
 import org.json.simple.JSONArray;
 
 import org.exoplatform.commons.persistence.impl.EntityManagerService;
+import org.exoplatform.portal.config.model.Application;
 import org.exoplatform.portal.config.model.ApplicationBackgroundStyle;
 import org.exoplatform.portal.config.model.ModelStyle;
 import org.exoplatform.portal.config.model.PersistentApplicationState;
@@ -41,8 +42,10 @@ import org.exoplatform.portal.mop.dao.WindowDAO;
 import org.exoplatform.portal.mop.service.LayoutService;
 import org.exoplatform.portal.mop.storage.cache.CacheLayoutStorage;
 import org.exoplatform.portal.mop.storage.utils.MOPUtils;
+import org.exoplatform.portal.pom.data.ApplicationData;
 import org.exoplatform.portal.pom.data.ComponentData;
 import org.exoplatform.portal.pom.data.ContainerData;
+import org.exoplatform.portal.pom.data.MappedAttributes;
 import org.exoplatform.portal.pom.spi.portlet.Portlet;
 import org.exoplatform.services.cache.CacheService;
 import org.exoplatform.services.cache.ExoCache;
@@ -315,6 +318,37 @@ public class LayoutStorageTest extends AbstractDAOTest {
     assertEquals(Integer.valueOf(12), loadedStyle.getMarginRight());
     assertEquals(Integer.valueOf(24), loadedStyle.getMarginBottom());
     assertNull(loadedStyle.getMarginLeft());
+  }
+
+  /**
+   * A window reads every stored property back, its colours included, and
+   * writes them all again: a colour cleared from its style alone stays stored,
+   * one also removed from its properties is gone. The layout addon's
+   * shipped-style upgrade removes both.
+   */
+  public void testAWindowColourClearedFromItsStyleAloneStaysStored() {
+    WindowDAO windowDAO = getContainer().getComponentInstanceOfType(WindowDAO.class);
+    WindowEntity window = new WindowEntity();
+    window.setAppType(AppType.PORTLET);
+    window.setContentId("app/portlet");
+    window.setProperties("{\"text-title-color\":\"#20282C\",\"text-color\":\"#20282C\",\"text-header-color\":\"#707070\"}");
+    window = windowDAO.create(window);
+    restartTransaction();
+    JSONArray body = new JSONArray();
+    body.add(window.toJSON());
+
+    Application application = new Application((ApplicationData) layoutStorage.buildChildren(body).get(0));
+    assertEquals("#20282C", application.getCssStyle().getTextTitleColor());
+    application.getCssStyle().setTextTitleColor(null);
+    application.getCssStyle().setTextColor(null);
+    application.getProperties().remove(MappedAttributes.TEXT_COLOR.getName());
+    layoutStorage.saveChildren(body, Collections.<ComponentData> singletonList(application.build()));
+    restartTransaction();
+
+    ModelStyle reloaded = ((ApplicationData) layoutStorage.buildChildren(body).get(0)).getCssStyle();
+    assertEquals("cleared from the style alone, read back", "#20282C", reloaded.getTextTitleColor());
+    assertNull("removed from the properties too, gone", reloaded.getTextColor());
+    assertEquals("#707070", reloaded.getTextHeaderColor());
   }
 
   /**
