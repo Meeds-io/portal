@@ -20,6 +20,7 @@ package org.exoplatform.account.setup.rest;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.when;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Response;
 
 import org.exoplatform.account.setup.web.AccountSetupService;
@@ -60,6 +62,9 @@ public class WelcomeScreenRestServiceTest {
     Response response = restService.checkUsername("root");
     assertEquals(200, response.getStatus());
     assertEquals("{\"userExists\":true}", response.getEntity());
+    Object cacheControl = response.getMetadata().getFirst("Cache-Control");
+    assertTrue(cacheControl instanceof CacheControl);
+    assertTrue(((CacheControl) cacheControl).isNoStore());
 
     response = restService.checkUsername("john");
     assertEquals(200, response.getStatus());
