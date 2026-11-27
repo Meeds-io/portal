@@ -581,8 +581,8 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                                                                                  .build())));
       assertThrows(IllegalStateException.class, () -> groupDao.updateGroup(updatedGroup, true));
 
-      // Then no link is kept, rolled back with the request as before the fix,
-      // and no link event fires, which is what the pre-check changes
+      // Then no link is kept: the refusal rolls back the request's IDM transaction,
+      // and no link event fires: every addition is checked before any is stored
       assertEquals(storedLabel, groupDao.findGroupById(GROUP_2).getLabel());
       assertTrue(CollectionUtils.isEmpty(groupDao.findGroupById(GROUP_2).getEnclosingMemberships()));
       assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
@@ -828,8 +828,8 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
       createdGroup.setEnclosingMemberships(enclosingMemberships);
       assertThrows(IllegalStateException.class, () -> groupDao.addChild(parentGroup, createdGroup, true));
 
-      // Then no link is kept, rolled back with the request as before the fix,
-      // and no link event fires, which is what the pre-check changes
+      // Then no link is kept: the refusal rolls back the request's IDM transaction,
+      // and no link event fires: every addition is checked before any is stored
       assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_1)));
       assertTrue(recorder.events.isEmpty());
     } finally {
