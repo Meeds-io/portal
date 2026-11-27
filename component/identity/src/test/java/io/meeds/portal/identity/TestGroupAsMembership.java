@@ -482,4 +482,88 @@ public class TestGroupAsMembership extends AbstractKernelTest {// NOSONAR
                           .anyMatch(m -> m.getGroupId().equals(parentGroup.getId())));
   }
 
+  public void testRefusedGroupRemovalKeepsNestedLinks() throws Exception {
+    Group groupWithChildren = groupDao.findGroupById(GROUP_4);
+    Group enclosingGroup = groupDao.findGroupById(GROUP_3);
+    Group nestedGroup = groupDao.findGroupById(GROUP_1);
+    NestedMembership enclosingLink = NestedMembership.builder()
+                                                     .groupId(enclosingGroup.getId())
+                                                     .nestedGroupId(groupWithChildren.getId())
+                                                     .build();
+    NestedMembership nestedLink = NestedMembership.builder()
+                                                  .groupId(groupWithChildren.getId())
+                                                  .nestedGroupId(nestedGroup.getId())
+                                                  .build();
+    groupDao.linkGroups(enclosingLink);
+    groupDao.linkGroups(nestedLink);
+    try {
+      // Given
+      Group linkedGroup = groupDao.findGroupById(GROUP_4);
+      assertTrue(linkedGroup.getEnclosingMemberships().stream()
+                            .anyMatch(m -> m.getGroupId().equals(enclosingGroup.getId())));
+      assertTrue(groupDao.getNestedMemberships(GROUP_4).stream()
+                         .anyMatch(m -> m.getNestedGroupId().equals(nestedGroup.getId())));
+
+      // When
+      IllegalStateException refusal = assertThrows(IllegalStateException.class,
+                                                   () -> groupDao.removeGroup(linkedGroup, true));
+      assertTrue(refusal.getMessage().contains("has at least one child group"));
+
+      // Then
+      Group stillThere = groupDao.findGroupById(GROUP_4);
+      assertNotNull(stillThere);
+      assertNotNull(stillThere.getEnclosingMemberships());
+      assertTrue(stillThere.getEnclosingMemberships().stream()
+                           .anyMatch(m -> m.getGroupId().equals(enclosingGroup.getId())));
+      assertTrue(groupDao.getNestedMemberships(GROUP_4).stream()
+                         .anyMatch(m -> m.getNestedGroupId().equals(nestedGroup.getId())));
+    } finally {
+      groupDao.unlinkGroups(enclosingLink);
+      groupDao.unlinkGroups(nestedLink);
+    }
+  }
+
+  public void testRemoveLeafGroupUnlinksItsNestedGroups() throws Exception {
+    Group enclosingGroup = groupDao.findGroupById(GROUP_3);
+    Group nestedGroup = groupDao.findGroupById(GROUP_2);
+    Group leaf = groupDao.createGroupInstance();
+    leaf.setGroupName("leafToRemove");
+    leaf.setLabel("leafToRemove");
+    groupDao.addChild(null, leaf, true);
+    String leafId = leaf.getId();
+    NestedMembership enclosingLink = NestedMembership.builder()
+                                                     .groupId(enclosingGroup.getId())
+                                                     .nestedGroupId(leafId)
+                                                     .build();
+    NestedMembership nestedLink = NestedMembership.builder()
+                                                  .groupId(leafId)
+                                                  .nestedGroupId(nestedGroup.getId())
+                                                  .build();
+    try {
+      // Given
+      groupDao.linkGroups(enclosingLink);
+      groupDao.linkGroups(nestedLink);
+      assertTrue(groupDao.getNestedMemberships(GROUP_3).stream()
+                         .anyMatch(m -> m.getNestedGroupId().equals(leafId)));
+      assertTrue(groupDao.findGroupById(GROUP_2).getEnclosingMemberships().stream()
+                         .anyMatch(m -> m.getGroupId().equals(leafId)));
+
+      // When
+      groupDao.removeGroup(groupDao.findGroupById(leafId), true);
+
+      // Then
+      assertNull(groupDao.findGroupById(leafId));
+      assertTrue(CollectionUtils.isEmpty(groupDao.getNestedMemberships(GROUP_3))
+                 || groupDao.getNestedMemberships(GROUP_3).stream()
+                            .noneMatch(m -> m.getNestedGroupId().equals(leafId)));
+      Set<NestedMembership> enclosing = groupDao.findGroupById(GROUP_2).getEnclosingMemberships();
+      assertTrue(CollectionUtils.isEmpty(enclosing)
+                 || enclosing.stream().noneMatch(m -> m.getGroupId().equals(leafId)));
+    } finally {
+      if (groupDao.findGroupById(leafId) != null) {
+        groupDao.removeGroup(groupDao.findGroupById(leafId), false);
+      }
+    }
+  }
+
 }
