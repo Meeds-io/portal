@@ -49,6 +49,17 @@ public final class ThemeValueResolver {
 
   public static final String       DRAWER_COMMENT_BUBBLE    = "drawerCommentBubbleColor";
 
+  /**
+   * The dark version's tints (branding.less .derivedShades()): Primary or
+   * Secondary mixed into the theme's dark application background, by the
+   * share each one names.
+   */
+  private static final Map<String, Tint> DARK_TINTS        = Map.of("revealBackgroundSelected", new Tint("primaryColor", 0.25),
+                                                                    "quotePrimaryBackground", new Tint("primaryColor", 0.20),
+                                                                    "quotePrimaryBorder", new Tint("primaryColor", 0.60),
+                                                                    "inputFocusBorder", new Tint("secondaryColor", 0.60),
+                                                                    "inputFocusShadow", new Tint("secondaryColor", 0.40));
+
   private static final Pattern     BUBBLE_COLOUR            = Pattern.compile("#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})",
                                                                             Pattern.CASE_INSENSITIVE);
 
@@ -174,6 +185,12 @@ public final class ThemeValueResolver {
     }
     values.put(SECOND_PANEL_BACKGROUND, (darkVersion ? ThemeColorCalculator.DARK_GREY : ThemeColorCalculator.LIGHT_GREY) + "1A");
     if (darkVersion) {
+      DARK_TINTS.forEach((key, tint) -> {
+        String color = values.get(tint.color());
+        if (ThemeColorCalculator.isHexColor(color)) {
+          values.put(key, ThemeColorCalculator.mix(color, opaque(appBackground), tint.share()));
+        }
+      });
       values.put(COMMENT_BUBBLE_COLOR, ThemeColorCalculator.commentBubble(opaque(appBackground)));
       values.put(DRAWER_COMMENT_BUBBLE, ThemeColorCalculator.commentBubble(opaque(drawerBackground)));
     } else {
@@ -201,7 +218,7 @@ public final class ThemeValueResolver {
 
   private static boolean isDerivedKey(String key) {
     return PRIMARY_TEXT_COLOR.equals(key) || SECONDARY_TEXT_COLOR.equals(key) || SECOND_PANEL_BACKGROUND.equals(key)
-           || COMMENT_BUBBLE_COLOR.equals(key) || DRAWER_COMMENT_BUBBLE.equals(key);
+           || COMMENT_BUBBLE_COLOR.equals(key) || DRAWER_COMMENT_BUBBLE.equals(key) || DARK_TINTS.containsKey(key);
   }
 
   /**
@@ -252,6 +269,9 @@ public final class ThemeValueResolver {
   }
 
   /** The ratio is computed on the opaque color: a translucent background shows the page behind it. */
+  private record Tint(String color, double share) {
+  }
+
   private static String opaque(String color) {
     String hex = color.trim();
     return hex.length() == 9 ? hex.substring(0, 7) : hex.length() == 5 ? hex.substring(0, 4) : hex;

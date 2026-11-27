@@ -21,9 +21,9 @@ package io.meeds.portal.theme.rest.util;
 import org.apache.commons.lang3.StringUtils;
 
 import io.meeds.portal.theme.constant.DisplayMode;
+import io.meeds.portal.theme.exception.ThemePublishConflictException;
 import io.meeds.portal.theme.model.BrandingPublication;
 import io.meeds.portal.theme.model.ThemePublication;
-import io.meeds.portal.theme.service.ThemeService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
@@ -132,8 +132,8 @@ public final class ThemeRestUtils {
    *         engine failure, 400 for every other refusal
    */
   public static int statusOf(RuntimeException e) {
-    if (e instanceof IllegalStateException) {
-      return ThemeService.PUBLISH_CONFLICT_MESSAGE.equals(e.getMessage()) ? 409 : 500;
+    if (e instanceof ThemePublishConflictException) {
+      return 409;
     }
     return e instanceof IllegalArgumentException ? 400 : 500;
   }

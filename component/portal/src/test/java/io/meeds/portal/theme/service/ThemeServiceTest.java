@@ -20,6 +20,8 @@ package io.meeds.portal.theme.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,6 +68,9 @@ import io.meeds.portal.theme.dao.ThemeDAO;
 import io.meeds.portal.theme.dao.ThemeJpaTestConfiguration;
 import io.meeds.portal.theme.entity.BrandingStateEntity;
 import io.meeds.portal.theme.entity.ThemeEntity;
+import io.meeds.portal.theme.exception.ThemePublishConflictException;
+import io.meeds.portal.theme.model.BrandingFilePublication;
+import io.meeds.portal.theme.model.BrandingIdentityPublication;
 import io.meeds.portal.theme.model.BrandingPublication;
 import io.meeds.portal.theme.model.PlannedTheme;
 import io.meeds.portal.theme.model.PublicationPlan;
@@ -174,7 +179,7 @@ public class ThemeServiceTest {
     publish(withTheme(publication(0), "new-1", "Ocean"));
     BrandingPublication stale = withTheme(publication(0), "new-2", "Forest");
 
-    IllegalStateException e = assertThrows(IllegalStateException.class, () -> publish(stale));
+    ThemePublishConflictException e = assertThrows(ThemePublishConflictException.class, () -> publish(stale));
     assertEquals(ThemeService.PUBLISH_CONFLICT_MESSAGE, e.getMessage());
     assertNull(themeDAO.findByNameKey("forest"));
     assertEquals(1L, state().getVersion());
@@ -369,10 +374,16 @@ public class ThemeServiceTest {
   }
 
   @Test
-  void aWriteFailingMidwayLeavesNoRowAndNoStateChange() {
+  void aWriteFailingMidwayLeavesNoRowAndNoStateChange() throws Exception {
+    BrandingPublication add = withTheme(publication(0), "new-0", "Sea");
+    add.setThemeInUse(new ThemeReference(null, "new-0"));
+    publish(add);
+    long sea = themeDAO.findByNameKey("sea").getId();
     PublicationPlan plan = new PublicationPlan();
-    plan.setVersion(0);
+    plan.setVersion(1);
     plan.setModesOffered(ModesOffered.DARK);
+    // the theme in use deleted: the state row moves the selection to the Default Theme first, then the row goes
+    plan.getDeletedThemeIds().add(sea);
     // two new themes with one name: the second insert breaks the name key, after the first was written
     plan.getThemes().add(new PlannedTheme(null, "new-1", "Ocean", new ThemeSettings()));
     plan.getThemes().add(new PlannedTheme(null, "new-2", "ocean", new ThemeSettings()));
@@ -386,9 +397,11 @@ public class ThemeServiceTest {
                                         }
                                       }));
     assertEquals(ThemeService.NAME_ALREADY_EXISTS_MESSAGE, ThemeService.translate(e).getMessage());
-    assertEquals(1L, themeDAO.count(), "the first insert is rolled back");
+    assertEquals(2L, themeDAO.count(), "the deletion and the first insert are rolled back");
+    assertTrue(themeDAO.existsById(sea));
     BrandingStateEntity state = state();
-    assertEquals(0L, state.getVersion());
+    assertEquals(sea, state.getThemeInUseId(), "the selection written before the failure is rolled back");
+    assertEquals(1L, state.getVersion());
     assertNull(state.getModesOffered());
   }
 
@@ -423,7 +436,7 @@ public class ThemeServiceTest {
                                                                                   null,
                                                                                   null,
                                                                                   null));
-    IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.publish(stale, ADMIN));
+    ThemePublishConflictException e = assertThrows(ThemePublishConflictException.class, () -> service.publish(stale, ADMIN));
     assertEquals(ThemeService.PUBLISH_CONFLICT_MESSAGE, e.getMessage());
     verify(themeFileStorage).deleteFile(101L);
     verify(themeFileStorage).deleteFile(102L);
@@ -488,6 +501,23 @@ public class ThemeServiceTest {
   }
 
   @Test
+  void anUnchangedModeOrOneChosenWhileASingleModeIsOfferedIsNeitherStoredNorAnnounced() throws Exception {
+    when(settingService.get(any(), any(), eq(ThemeService.DISPLAY_MODE_KEY))).thenReturn((org.exoplatform.commons.api.settings.SettingValue) org.exoplatform.commons.api.settings.SettingValue.create("DARK@0"));
+    themeService.setDisplayMode("john", io.meeds.portal.theme.constant.DisplayMode.DARK);
+    verify(settingService, never()).set(any(), any(), any(), any());
+    verify(listenerService, never()).broadcast(eq(ThemeService.DISPLAY_MODE_UPDATED_EVENT), any(), any());
+
+    BrandingPublication light = publication(0);
+    light.setModesOffered(ModesOffered.LIGHT);
+    publish(light);
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                                              () -> themeService.setDisplayMode("john", io.meeds.portal.theme.constant.DisplayMode.LIGHT));
+    assertEquals(ThemeService.DISPLAY_MODE_NOT_OFFERED_MESSAGE, e.getMessage());
+    verify(settingService, never()).set(any(), any(), any(), any());
+    verify(listenerService, never()).broadcast(eq(ThemeService.DISPLAY_MODE_UPDATED_EVENT), any(), any());
+  }
+
+  @Test
   void aSingleModeOfferedIsEveryPagesModeAndAnAnonymousPageFollowsTheDevice() throws Exception {
     when(settingService.get(any(), any(), eq(ThemeService.DISPLAY_MODE_KEY))).thenReturn((org.exoplatform.commons.api.settings.SettingValue) org.exoplatform.commons.api.settings.SettingValue.create("DARK@0"));
     assertEquals(io.meeds.portal.theme.constant.DisplayMode.DARK, themeService.getEffectiveDisplayMode("john"));
@@ -524,6 +554,80 @@ public class ThemeServiceTest {
     service.publishLegacy(style, true);
     assertEquals(Map.of("primaryColor", "#123456", "textColor", "#333333"),
                  ThemeMapper.readMap(themeDAO.findById(ThemeService.DEFAULT_THEME_ID).orElseThrow().getLightSettings()));
+  }
+
+  @Test
+  void anEmptyValueOfTheFormerWritersResetsItsOptionAndAnAbsentOneIsKept() throws Exception {
+    ThemeService service = transactionalSpy();
+    org.exoplatform.portal.branding.model.Branding set = new org.exoplatform.portal.branding.model.Branding();
+    set.setThemeStyle(Map.of("primaryColor", "#123456", "secondaryColor", "#112233"));
+    set.setPageBackgroundColor("#ABCDEF");
+    service.publishLegacy(set, false);
+
+    org.exoplatform.portal.branding.model.Branding reset = new org.exoplatform.portal.branding.model.Branding();
+    reset.setThemeStyle(Map.of("primaryColor", ""));
+    reset.setPageBackgroundColor(" ");
+    service.publishLegacy(reset, false);
+
+    assertEquals(Map.of("secondaryColor", "#112233"),
+                 ThemeMapper.readMap(themeDAO.findById(ThemeService.DEFAULT_THEME_ID).orElseThrow().getLightSettings()));
+  }
+
+  @Test
+  void theFormerPagesRoundTripStoresNoValueTheThemeDidNotStore() throws Exception {
+    when(brandingService.getDefaultThemeStyle()).thenReturn(new HashMap<>(Map.of("primaryColor", "#3f8487",
+                                                                                 "secondaryColor", "#476A9C",
+                                                                                 "appBackgroundColor", "#FFFFFF",
+                                                                                 "textColor", "#20282C")));
+    ThemeService service = transactionalSpy();
+    org.exoplatform.portal.branding.model.Branding dark = new org.exoplatform.portal.branding.model.Branding();
+    dark.setThemeStyle(Map.of("appBackgroundColor", "#14181B"));
+    service.publishLegacy(dark, true);
+
+    // the former page loads every resolved value, the Auto text colour on that background included, and sends them back
+    org.exoplatform.portal.branding.model.Branding page = new org.exoplatform.portal.branding.model.Branding();
+    page.setThemeStyle(new HashMap<>(themeService.resolve(themeService.getThemeInUse()).getLight()));
+    assertNotEquals("#20282C", page.getThemeStyle().get("textColor"), "an Auto text colour other than its default");
+    service.publishLegacy(page, true);
+
+    assertEquals(Map.of("appBackgroundColor", "#14181B"),
+                 ThemeMapper.readMap(themeDAO.findById(ThemeService.DEFAULT_THEME_ID).orElseThrow().getLightSettings()),
+                 "the Auto text colour stays Auto");
+  }
+
+  @Test
+  void aRemovedLightLogoOrFaviconFallsBackToACopyOfTheConfiguredOne() throws Exception {
+    byte[] webp = { 'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P' };
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH)).thenReturn(PNG);
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_FAVICON_PATH)).thenReturn(webp);
+    BrandingPublication upload = publication(0);
+    upload.setBranding(new BrandingIdentityPublication(null, new BrandingFilePublication("up-1", false), null, null, null));
+    publish(upload);
+    Long uploaded = state().getLogoFileId();
+    org.mockito.Mockito.clearInvocations(themeFileStorage);
+
+    BrandingPublication remove = publication(1);
+    remove.setBranding(new BrandingIdentityPublication(null,
+                                                       new BrandingFilePublication(null, true),
+                                                       null,
+                                                       new BrandingFilePublication(null, true),
+                                                       null));
+    PublicationResult result = publish(remove);
+
+    assertNotNull(state().getLogoFileId());
+    assertNotEquals(uploaded, state().getLogoFileId());
+    assertTrue(result.getUnusedFileIds().contains(uploaded));
+    verify(themeFileStorage).writeFile("logo.png", "image/png", PNG);
+    // the built-in favicon is a WebP, which an upload may not be
+    assertNotNull(state().getFaviconFileId());
+    verify(themeFileStorage).writeFile("favicon.webp", "image/webp", webp);
+
+    // a configured file that is no image stores nothing
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH)).thenReturn(new byte[] { 1, 2, 3 });
+    BrandingPublication again = publication(2);
+    again.setBranding(new BrandingIdentityPublication(null, new BrandingFilePublication(null, true), null, null, null));
+    publish(again);
+    assertNull(state().getLogoFileId());
   }
 
   @Test
@@ -716,12 +820,19 @@ public class ThemeServiceTest {
   }
 
   @Test
-  void theStateIsReReadAtMostOncePerWindow() {
+  void theStateIsReReadOncePerWindow() {
+    AtomicLong now = new AtomicLong(1_000_000L);
+    themeService.setClock(now::get);
     int refreshes = 0;
     for (int i = 0; i < 100; i++) {
       refreshes += themeService.refreshState() ? 1 : 0;
     }
-    assertEquals(1, refreshes);
+    assertEquals(1, refreshes, "at most once in a window");
+    now.addAndGet(ThemeService.STATE_REFRESH_WINDOW_MS - 1);
+    assertFalse(themeService.refreshState(), "the window is still open");
+    now.addAndGet(1);
+    assertTrue(themeService.refreshState(), "the next window re-reads");
+    assertFalse(themeService.refreshState());
   }
 
   /**

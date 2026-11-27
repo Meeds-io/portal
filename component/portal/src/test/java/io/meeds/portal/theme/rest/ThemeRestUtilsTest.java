@@ -76,7 +76,10 @@ public class ThemeRestUtilsTest {
 
   @Test
   void aStaleVersionIsAConflictAndAnEngineFailureAServerError() {
-    assertEquals(409, ThemeRestUtils.statusOf(new IllegalStateException(ThemeService.PUBLISH_CONFLICT_MESSAGE)));
+    assertEquals(409, ThemeRestUtils.statusOf(new io.meeds.portal.theme.exception.ThemePublishConflictException()));
+    assertEquals(500,
+                 ThemeRestUtils.statusOf(new IllegalStateException(ThemeService.PUBLISH_CONFLICT_MESSAGE)),
+                 "the conflict is told by its type, not by a message another failure could carry");
     assertEquals(500, ThemeRestUtils.statusOf(new IllegalStateException(ThemeService.PUBLISH_FAILED_MESSAGE)));
     assertEquals(400, ThemeRestUtils.statusOf(new IllegalArgumentException(ThemeService.NAME_ALREADY_EXISTS_MESSAGE)));
   }

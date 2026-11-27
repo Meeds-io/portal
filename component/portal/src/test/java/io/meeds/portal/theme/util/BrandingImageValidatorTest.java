@@ -59,6 +59,38 @@ public class BrandingImageValidatorTest {
     System.arraycopy(png(40, 20), 0, bigImage, 0, 8);
     assertEquals(BrandingImageValidator.TOO_LARGE,
                  assertThrows(IllegalArgumentException.class, () -> BrandingImageValidator.validateImage(bigImage)).getMessage());
+    byte[] bigFavicon = pngHeader(32, 32, BrandingImageValidator.FAVICON_MAX_BYTES + 1);
+    assertEquals(BrandingImageValidator.TOO_LARGE,
+                 assertThrows(IllegalArgumentException.class, () -> BrandingImageValidator.validateFavicon(bigFavicon)).getMessage());
+  }
+
+  @Test
+  void aFileExactlyAtItsCapIsAccepted() throws Exception {
+    byte[] logo = new byte[BrandingImageValidator.LOGO_MAX_BYTES];
+    System.arraycopy(png(40, 20), 0, logo, 0, 8);
+    assertEquals(BrandingImageValidator.PNG, BrandingImageValidator.validateLogo(logo));
+    byte[] image = new byte[BrandingImageValidator.IMAGE_MAX_BYTES];
+    System.arraycopy(png(40, 20), 0, image, 0, 8);
+    assertEquals(BrandingImageValidator.PNG, BrandingImageValidator.validateImage(image));
+    assertEquals(BrandingImageValidator.PNG,
+                 BrandingImageValidator.validateFavicon(pngHeader(32, 32, BrandingImageValidator.FAVICON_MAX_BYTES)));
+  }
+
+  @Test
+  void aConfiguredFileIsAnyKnownImageTypeWithoutTheUploadCapsAndAnSvgStillChecked() throws Exception {
+    // the built-in favicon is a WebP, a type an uploaded favicon may not be
+    byte[] webp = { 'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P' };
+    assertEquals(BrandingImageValidator.WEBP, BrandingImageValidator.validateConfigured(webp));
+    assertEquals(BrandingImageValidator.ICO, BrandingImageValidator.validateConfigured(ico(16, 16)));
+    byte[] bigLogo = new byte[BrandingImageValidator.LOGO_MAX_BYTES + 1];
+    System.arraycopy(png(40, 20), 0, bigLogo, 0, 8);
+    assertEquals(BrandingImageValidator.PNG, BrandingImageValidator.validateConfigured(bigLogo));
+    assertEquals(BrandingImageValidator.TYPE_REFUSED,
+                 assertThrows(IllegalArgumentException.class,
+                              () -> BrandingImageValidator.validateConfigured(new byte[] { 1, 2, 3, 4 })).getMessage());
+    byte[] unsafe = svg("<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\" viewBox=\"0 0 40 40\"/>");
+    assertEquals(BrandingImageValidator.SVG_UNSAFE,
+                 assertThrows(IllegalArgumentException.class, () -> BrandingImageValidator.validateConfigured(unsafe)).getMessage());
   }
 
   @Test
@@ -115,7 +147,11 @@ public class BrandingImageValidatorTest {
   }
 
   private static byte[] pngHeader(int width, int height) {
-    byte[] data = new byte[274];
+    return pngHeader(width, height, 274);
+  }
+
+  private static byte[] pngHeader(int width, int height, int length) {
+    byte[] data = new byte[length];
     byte[] signature = { (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R' };
     System.arraycopy(signature, 0, data, 0, signature.length);
     for (int i = 0; i < 4; i++) {

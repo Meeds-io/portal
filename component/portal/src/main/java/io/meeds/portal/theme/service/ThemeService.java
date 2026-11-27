@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +56,7 @@ import io.meeds.portal.theme.constant.DisplayMode;
 import io.meeds.portal.theme.constant.ModesOffered;
 import io.meeds.portal.theme.constant.ThemeOrigin;
 import io.meeds.portal.theme.constant.ThemeVariables;
+import io.meeds.portal.theme.exception.ThemePublishConflictException;
 import io.meeds.portal.theme.model.BrandingFilePublication;
 import io.meeds.portal.theme.model.BrandingIdentityPublication;
 import io.meeds.portal.theme.model.BrandingPublication;
@@ -72,6 +74,7 @@ import io.meeds.portal.theme.model.ThemeSettings;
 import io.meeds.portal.theme.storage.ThemeFileStorage;
 import io.meeds.portal.theme.storage.ThemeStorage;
 import io.meeds.portal.theme.util.BrandingImageValidator;
+import io.meeds.portal.theme.util.ThemeColorCalculator;
 import io.meeds.portal.theme.util.ThemeMapper;
 import io.meeds.portal.theme.util.ThemeValueResolver;
 
@@ -95,6 +98,8 @@ public class ThemeService {
   public static final String  THEME_IN_USE_ID_DATA_KEY        = "themeInUseId";
 
   public static final String  DISPLAY_MODE_UPDATED_EVENT      = "branding.displayMode.updated";
+
+  public static final String  DISPLAY_MODE_NOT_OFFERED_MESSAGE = "branding.displayMode.notOffered";
 
   public static final String  DISPLAY_MODE_KEY                = "displayMode";
 
@@ -174,6 +179,8 @@ public class ThemeService {
   private Long                configurationHash;
 
   private final AtomicLong    lastStateRefresh               = new AtomicLong();
+
+  private LongSupplier        clock                          = System::currentTimeMillis;
 
   /**
    * @return every theme, sorted by id, as stored
@@ -257,10 +264,16 @@ public class ThemeService {
     if (mode == null) {
       throw new IllegalArgumentException("branding.displayMode.mandatory");
     }
-    settingService.set(Context.USER.id(username),
-                       DISPLAY_MODE_SCOPE,
-                       DISPLAY_MODE_KEY,
-                       SettingValue.create(mode.name() + "@" + themeStorage.readState().getModesGeneration()));
+    if (getModesOffered() != ModesOffered.LIGHT_AND_DARK) {
+      // a single mode offered is every page's mode: there is no choice to store
+      throw new IllegalArgumentException(DISPLAY_MODE_NOT_OFFERED_MESSAGE);
+    }
+    String value = mode.name() + "@" + themeStorage.readState().getModesGeneration();
+    SettingValue<?> stored = settingService.get(Context.USER.id(username), DISPLAY_MODE_SCOPE, DISPLAY_MODE_KEY);
+    if (stored != null && stored.getValue() != null && value.equals(stored.getValue().toString())) {
+      return;
+    }
+    settingService.set(Context.USER.id(username), DISPLAY_MODE_SCOPE, DISPLAY_MODE_KEY, SettingValue.create(value));
     broadcast(DISPLAY_MODE_UPDATED_EVENT, username, mode.name());
   }
 
@@ -346,8 +359,8 @@ public class ThemeService {
    *           administrator
    * @throws ObjectNotFoundException when a theme it names does not exist
    * @throws IllegalArgumentException with a message code, for a refused value
-   * @throws IllegalStateException {@link #PUBLISH_CONFLICT_MESSAGE} when the
-   *           state changed since the page loaded
+   * @throws ThemePublishConflictException when the state changed since the
+   *           page loaded
    */
   public long publish(BrandingPublication publication, String username) throws IllegalAccessException,
                                                                        ObjectNotFoundException {
@@ -405,10 +418,12 @@ public class ThemeService {
    * The deprecated single-theme writers (the Branding page's former PUT, the
    * single-field updates): their values are merged into the theme in use's
    * light and shared settings, validated and written under the same lock as
-   * a publication, which increments the version. A value equal to its
-   * default is not stored, since the former page sent back every default it
-   * loaded. Their signatures carry no user: the REST layer checks the role,
-   * as it always did.
+   * a publication, which increments the version. An empty value resets its
+   * option, an absent one is kept. The former page sends back every value it
+   * loaded: a value equal to its default is not stored, nor one equal to the
+   * value the theme resolves for an option it does not store (an Auto text
+   * colour), which stays Auto. Their signatures carry no user: the REST layer
+   * checks the role, as it always did.
    *
    * @param branding the former page's branding, or a single-field update
    * @param themeStyleOnly true when only the theme values are written
@@ -433,19 +448,21 @@ public class ThemeService {
     Map<String, String> submitted = new HashMap<>();
     if (branding.getThemeStyle() != null) {
       branding.getThemeStyle().forEach((key, value) -> {
-        if (StringUtils.isNotBlank(value)) {
+        if (StringUtils.isBlank(value)) {
+          submitted.put(key, null);
+        } else {
           submitted.put(key, ThemeVariables.isImageKey(key) ? LegacyBrandingImporter.stripImageLayers(value) : value.trim());
         }
       });
     }
     if (!themeStyleOnly) {
-      putIfNotBlank(submitted, ThemeVariables.PAGE_WIDTH, branding.getPageWidth());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_COLOR, branding.getPageBackgroundColor());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_IMAGE, branding.getPageBackgroundEffect());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_SIZE, branding.getPageBackgroundSize());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_POSITION, branding.getPageBackgroundPosition());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_REPEAT, branding.getPageBackgroundRepeat());
-      putIfNotBlank(submitted, ThemeVariables.PAGE_BACKGROUND_ATTACHMENT, branding.getPageBackgroundAttachment());
+      putSubmitted(submitted, ThemeVariables.PAGE_WIDTH, branding.getPageWidth());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_COLOR, branding.getPageBackgroundColor());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_IMAGE, branding.getPageBackgroundEffect());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_SIZE, branding.getPageBackgroundSize());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_POSITION, branding.getPageBackgroundPosition());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_REPEAT, branding.getPageBackgroundRepeat());
+      putSubmitted(submitted, ThemeVariables.PAGE_BACKGROUND_ATTACHMENT, branding.getPageBackgroundAttachment());
       putUpload(submitted, "topBarBackgroundImage", branding.getTopBarBackground());
       putUpload(submitted, "sideBarBackgroundImage", branding.getSideBarBackground());
       putUpload(submitted, "drawerBackgroundImage", branding.getDrawerBackground());
@@ -458,6 +475,7 @@ public class ThemeService {
     ThemeSettings stored = theme.getSettings();
     Map<String, String> shared = new HashMap<>(stored.getShared());
     Map<String, String> light = new HashMap<>(stored.getLight());
+    Map<String, String> resolved = resolve(theme).getLight();
     submitted.forEach((key, value) -> {
       Map<String, String> target = ThemeVariables.isShared(key) ? shared : light;
       String defaultValue = ThemeVariables.PAGE_BACKGROUND_IMAGE.equals(key) ? defaults.get("pageBackgroundEffect") : defaults.get(key);
@@ -468,7 +486,7 @@ public class ThemeService {
       } else if (!key.endsWith(UPLOAD_SUFFIX) && !getValueValidator().getDeclaredVariables().contains(key)
                  && !ThemeVariables.PAGE_VARIABLES.contains(key)) {
         LOG.debug("Legacy branding key {} is not a theme variable, it is ignored", key);
-      } else {
+      } else if (key.endsWith(UPLOAD_SUFFIX) || target.containsKey(key) || !sameValue(value, resolved.get(key))) {
         target.put(key, value);
       }
     });
@@ -522,10 +540,18 @@ public class ThemeService {
     plan.getConsumedUploadIds().forEach(themeFileStorage::removeUpload);
   }
 
-  private static void putIfNotBlank(Map<String, String> map, String key, String value) {
-    if (StringUtils.isNotBlank(value)) {
-      map.put(key, value.trim());
+  /**
+   * A page field of the former page: null leaves it out, an empty value
+   * resets it.
+   */
+  private static void putSubmitted(Map<String, String> map, String key, String value) {
+    if (value != null) {
+      map.put(key, StringUtils.isBlank(value) ? null : value.trim());
     }
+  }
+
+  private static boolean sameValue(String value, String resolved) {
+    return resolved != null && (value.equals(resolved.trim()) || ThemeColorCalculator.sameColor(value, resolved));
   }
 
   private static void putUpload(Map<String, String> map, String imageKey, BrandingFile file) {
@@ -660,13 +686,20 @@ public class ThemeService {
    * @return true when the snapshot was evicted
    */
   public boolean refreshState() {
-    long now = System.currentTimeMillis();
+    long now = clock.getAsLong();
     long last = lastStateRefresh.get();
     if (now - last < STATE_REFRESH_WINDOW_MS || !lastStateRefresh.compareAndSet(last, now)) {
       return false;
     }
     themeStorage.evictAll();
     return true;
+  }
+
+  /**
+   * @param clock the time {@link #refreshState} reads, in milliseconds
+   */
+  void setClock(LongSupplier clock) {
+    this.clock = clock;
   }
 
   /**
@@ -760,7 +793,7 @@ public class ThemeService {
   PublicationResult writePublication(PublicationPlan plan) throws ObjectNotFoundException { // NOSONAR the write order of the note
     BrandingState state = themeStorage.lockState();
     if (state.getVersion() != plan.getVersion()) {
-      throw new IllegalStateException(PUBLISH_CONFLICT_MESSAGE);
+      throw new ThemePublishConflictException();
     }
     PublicationResult result = new PublicationResult();
     Map<Long, Theme> rows = new HashMap<>();
@@ -1144,6 +1177,44 @@ public class ThemeService {
     return themeFileStorage.writeFile(column + imageExtension(type), type, data);
   }
 
+  /**
+   * @param column a logo or favicon column
+   * @return a stored copy of the file the deployment configures for it, null
+   *         when none is configured, it cannot be read or it is no image
+   *         ({@link BrandingImageValidator#validateConfigured})
+   */
+  Long copyConfiguredFile(String column) {
+    String path = configuredFilePath(column);
+    byte[] data = themeFileStorage.readConfiguredFile(path);
+    if (data == null) {
+      return null;
+    }
+    String type;
+    try {
+      type = BrandingImageValidator.validateConfigured(data);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("The configured branding file {} is refused ({}), it is not used", path, e.getMessage());
+      return null;
+    }
+    return themeFileStorage.writeFile(column + imageExtension(type), type, data);
+  }
+
+  /**
+   * @param column a logo or favicon column
+   * @return the file the deployment configures for it, the light columns'
+   *         built-in defaults otherwise, null for a dark column with none
+   */
+  String configuredFilePath(String column) {
+    return switch (column) {
+    case LOGO_COLUMN -> themeConfiguration.getConfiguredPath(ThemeConfigurationSynchronizer.LOGO_PROPERTY,
+                                                             ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH);
+    case FAVICON_COLUMN -> themeConfiguration.getConfiguredPath(ThemeConfigurationSynchronizer.FAVICON_PROPERTY,
+                                                                ThemeConfigurationSynchronizer.DEFAULT_FAVICON_PATH);
+    case DARK_LOGO_COLUMN -> themeConfiguration.getConfiguredPath(ThemeConfigurationSynchronizer.DARK_LOGO_PROPERTY, null);
+    default -> themeConfiguration.getConfiguredPath(ThemeConfigurationSynchronizer.DARK_FAVICON_PROPERTY, null);
+    };
+  }
+
   private static String imageExtension(String type) {
     return switch (type) {
     case BrandingImageValidator.JPEG -> ".jpg";
@@ -1160,7 +1231,13 @@ public class ThemeService {
       return;
     }
     if (file.isRemove()) {
-      plan.getBrandingFiles().put(column, null);
+      // a removed light logo or favicon falls back to the configured one, stored as a copy as at the first start; a
+      // removed dark one falls back to the light one
+      Long copy = LOGO_COLUMN.equals(column) || FAVICON_COLUMN.equals(column) ? copyConfiguredFile(column) : null;
+      if (copy != null) {
+        plan.getNewFileIds().add(copy);
+      }
+      plan.getBrandingFiles().put(column, copy);
     } else if (StringUtils.isNotBlank(file.getUploadId())) {
       long fileId = storeBrandingFile(file.getUploadId(), column, plan);
       plan.getNewFileIds().add(fileId);
@@ -1249,7 +1326,7 @@ public class ThemeService {
   }
 
   private static boolean isConflict(RuntimeException e) {
-    return e instanceof IllegalStateException && PUBLISH_CONFLICT_MESSAGE.equals(e.getMessage());
+    return e instanceof ThemePublishConflictException;
   }
 
   private static Set<Long> fileIds(ThemeSettings settings) {

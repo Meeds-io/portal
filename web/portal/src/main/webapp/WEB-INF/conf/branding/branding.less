@@ -312,6 +312,13 @@
 @primaryTextColor: @primaryColor;
 @secondaryTextColor: @secondaryColor;
 @secondPanelBackground: #6B6B6B1A;
+// the dark version's tints, computed by the server (ThemeValueResolver.DARK_TINTS) on the theme's dark application
+// background, which may carry an alpha less4j does not mix
+@revealBackgroundSelected: initial;
+@quotePrimaryBackground: initial;
+@quotePrimaryBorder: initial;
+@inputFocusBorder: initial;
+@inputFocusShadow: initial;
 
 :root {
     @{allPagesPrimaryColor}: @primaryColor;
@@ -460,16 +467,16 @@
 
 // The shades the skin derives from a theme or template colour (platform-ui variables.less, lighten/darken/fade of
 // its light defaults): the dark version derives them from its own colours, a hover lightening the surface and a tint
-// mixing the colour into the dark application surface (#1E2328). The light version declares them initial, so the
+// mixing the colour into the theme's dark application background (the server's values above). The light version declares them initial, so the
 // skin keeps its light derivation exactly, and a light scope inside a dark page gets it back. The version is told by
 // the background no theme sets: its dark value is the dark page background (BrandingServiceImpl.DARK_TEMPLATE_CONSTANTS).
 .derivedShades() when (lightness(@primaryBackground) < 50%) {
   @{allPagesPrimaryBackgroundHover}: lighten(@primaryBackground, 8%);
   @{allPagesPrimaryBackgroundLight}: lighten(@primaryBackground, 3%);
   @{allPagesPrimaryBackgroundLighter}: lighten(@primaryBackground, 13%);
-  @{allPagesRevealBackgroundSelected}: mix(@primaryColor, #1E2328, 25%);
-  @{allPagesQuotePrimaryBackground}: mix(@primaryColor, #1E2328, 20%);
-  @{allPagesQuotePrimaryBorder}: mix(@primaryColor, #1E2328, 60%);
+  @{allPagesRevealBackgroundSelected}: @revealBackgroundSelected;
+  @{allPagesQuotePrimaryBackground}: @quotePrimaryBackground;
+  @{allPagesQuotePrimaryBorder}: @quotePrimaryBorder;
   @{allPagesGreyColorLighten1Opacity2}: fade(@greyColorLighten1, 8%);
   @{allPagesGreyColorLighten1Opacity3}: fade(@greyColorLighten1, 20%);
   @{allPagesGreyColorLighten1Opacity4}: fade(@greyColorLighten1, 30%);
@@ -477,8 +484,8 @@
   @{allPagesGreyColorOpacity1}: fade(@greyColor, 35%);
   @{allPagesGreyColorOpacity3}: fade(@greyColor, 20%);
   @{allPagesBtnBorderBottom}: lighten(@greyColor, 10%);
-  @{allPagesInputFocusBorder}: mix(@secondaryColor, #1E2328, 60%);
-  @{allPagesInputFocusShadow}: mix(@secondaryColor, #1E2328, 40%);
+  @{allPagesInputFocusBorder}: @inputFocusBorder;
+  @{allPagesInputFocusShadow}: @inputFocusShadow;
 }
 .derivedShades() when (lightness(@primaryBackground) >= 50%) {
   @{allPagesPrimaryBackgroundHover}: initial;

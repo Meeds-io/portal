@@ -106,6 +106,23 @@ public final class BrandingImageValidator {
   }
 
   /**
+   * A logo or favicon the deployment configures: any image type this check
+   * knows (the built-in favicon is a WebP), an SVG checked as an upload is.
+   * The upload caps, size and shape, bound what an administrator uploads,
+   * not the deployment's own files.
+   *
+   * @param data a configured file's bytes
+   * @return its detected type
+   */
+  public static String validateConfigured(byte[] data) {
+    String type = detectType(data);
+    if (type == null) {
+      throw new IllegalArgumentException(TYPE_REFUSED);
+    }
+    return SVG.equals(type) ? validate(data, Set.of(SVG), IMAGE_MAX_BYTES) : type;
+  }
+
+  /**
    * @return the type the bytes are, read from their first bytes; null when
    *         they are no image type this check knows
    */

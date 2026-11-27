@@ -48,6 +48,14 @@ public class ThemeColorCalculatorTest {
   }
 
   @Test
+  void aMixIsLessMixRoundedAsLessRounds() {
+    // 169 * 0.25 + 35 * 0.75 = 68.5, rounded up as Less writes it (the light-to-dark stylesheet test pins the same value)
+    assertEquals("#2E4549", ThemeColorCalculator.mix("#5FA9AC", "#1E2328", 0.25));
+    assertEquals("#5FA9AC", ThemeColorCalculator.mix("#5fa9ac", "#000", 1));
+    assertEquals("#1E2328", ThemeColorCalculator.mix("#5FA9AC80", "#1E2328", 0), "an alpha is not read");
+  }
+
+  @Test
   void theOldGreyMissesTheReadableRatio() {
     assertEquals(4.35, ThemeColorCalculator.contrast("#707070", "#F0F0F0"), 0.01);
     assertTrue(ThemeColorCalculator.contrast("#707070", "#F0F0F0") < ThemeColorCalculator.READABLE_RATIO);

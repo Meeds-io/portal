@@ -20,6 +20,7 @@ package io.meeds.portal.theme.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +30,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
@@ -90,6 +93,8 @@ import io.meeds.portal.theme.util.ThemeMapper;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class ThemeConfigurationSynchronizerTest {
+
+  private static final byte[]            PNG                = { (byte) 0x89, 'P', 'N', 'G', 1, 2, 3, 4 };
 
   @MockitoBean
   private BrandingService                brandingService;
@@ -153,7 +158,7 @@ public class ThemeConfigurationSynchronizerTest {
     when(themeConfiguration.getValueValidator()).thenReturn(validator);
     when(themeConfiguration.getConfiguredPath(anyString(), any())).thenAnswer(i -> i.getArgument(1));
     when(legacyImporter.read()).thenReturn(new LegacyBranding());
-    when(themeFileStorage.readConfiguredFile(anyString())).thenReturn(new byte[] { 1, 2, 3 });
+    when(themeFileStorage.readConfiguredFile(anyString())).thenReturn(PNG);
     when(themeFileStorage.copyFile(anyLong())).thenAnswer(i -> nextFileId.incrementAndGet());
     when(themeFileStorage.writeFile(anyString(), anyString(), any())).thenAnswer(i -> nextFileId.incrementAndGet());
   }
@@ -282,6 +287,19 @@ public class ThemeConfigurationSynchronizerTest {
     assertFalse(again.getDefaultPaths().containsKey(ThemeService.LOGO_COLUMN));
     importInTransaction(again);
     assertNull(state().getLogoFileId());
+  }
+
+  @Test
+  void aConfiguredDefaultFileIsCheckedAndStoredWithItsTypeAndOneThatIsNoImageIsNot() {
+    byte[] ico = { 0, 0, 1, 0, 1, 0, 32, 32 };
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_FAVICON_PATH)).thenReturn(ico);
+    when(themeFileStorage.readConfiguredFile(ThemeConfigurationSynchronizer.DEFAULT_LOGO_PATH)).thenReturn(new byte[] { 1, 2, 3 });
+    importInTransaction(synchronizer.planImport(syncResult()));
+
+    assertNotNull(state().getFaviconFileId());
+    verify(themeFileStorage).writeFile("favicon.ico", "image/x-icon", ico);
+    assertNull(state().getLogoFileId());
+    verify(themeFileStorage, never()).writeFile(org.mockito.ArgumentMatchers.startsWith("logo"), anyString(), any());
   }
 
   @Test

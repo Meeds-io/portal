@@ -51,6 +51,7 @@ import org.exoplatform.services.security.Identity;
 import io.meeds.portal.theme.ThemeReadiness;
 import io.meeds.portal.theme.constant.ModesOffered;
 import io.meeds.portal.theme.constant.ThemeOrigin;
+import io.meeds.portal.theme.exception.ThemePublishConflictException;
 import io.meeds.portal.theme.model.BrandingState;
 import io.meeds.portal.theme.model.Theme;
 import io.meeds.portal.theme.model.ThemeSettings;
@@ -108,6 +109,36 @@ public class BrandingThemeRestTest {
     assertArrayEquals(administrators, rolesOf("saveCustomCss", String.class));
     assertArrayEquals(administrators, rolesOf("resolveTheme", String.class));
     assertArrayEquals(administrators, rolesOf("updateBrandingInformation", Branding.class));
+    // the display mode is every user's own, never an anonymous caller's
+    String[] users = { "users" };
+    assertArrayEquals(users, rolesOf("getDisplayMode"));
+    assertArrayEquals(users, rolesOf("setDisplayMode", String.class));
+  }
+
+  @Test
+  void aPublicationOrACustomCssSaveThatFailsOnTheServerIsLoggedWithItsCause() throws Exception {
+    ThemeReadiness.setReady();
+    Logger logger = (Logger) LoggerFactory.getLogger(BrandingRestResourcesV1.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      RuntimeException cause = new RuntimeException("flush failed");
+      when(themeService.publish(any(), any())).thenThrow(new IllegalStateException(ThemeService.PUBLISH_FAILED_MESSAGE, cause));
+      Response response = rest.publish(BODY);
+      assertEquals(500, response.getStatus());
+      assertEquals(ThemeService.PUBLISH_FAILED_MESSAGE, response.getEntity());
+      doThrow(new IllegalStateException(ThemeService.PUBLISH_FAILED_MESSAGE, cause)).when(themeService).saveCustomCss(any(), any());
+      assertEquals(500, rest.saveCustomCss("{\"customCss\": \"a\"}").getStatus());
+
+      List<ILoggingEvent> warnings = appender.list.stream().filter(event -> event.getLevel() == Level.WARN).toList();
+      assertEquals(2, warnings.size());
+      warnings.forEach(event -> assertEquals("flush failed",
+                                             event.getThrowableProxy().getCause().getMessage(),
+                                             "the cause's stack trace is in the server log"));
+    } finally {
+      logger.detachAppender(appender);
+    }
   }
 
   @Test
@@ -127,7 +158,7 @@ public class BrandingThemeRestTest {
       assertTrue(appender.list.stream().anyMatch(event -> event.getLevel() == Level.WARN), "a server failure leaves a WARN trace");
 
       appender.list.clear();
-      doThrow(new IllegalStateException(ThemeService.PUBLISH_CONFLICT_MESSAGE)).when(brandingService).updateBrandingInformation(any());
+      doThrow(new ThemePublishConflictException()).when(brandingService).updateBrandingInformation(any());
       assertEquals(409, rest.updateBrandingInformation(new Branding()).getStatus());
       assertTrue(appender.list.stream().noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.WARN)),
                  "a conflict is an expected refusal");
@@ -174,7 +205,7 @@ public class BrandingThemeRestTest {
     assertStatus(new IllegalAccessException("not an administrator"), 403, null);
     assertStatus(new ObjectNotFoundException("Theme 9 not found"), 404, null);
     assertStatus(new IllegalArgumentException(ThemeService.NAME_ALREADY_EXISTS_MESSAGE), 400, ThemeService.NAME_ALREADY_EXISTS_MESSAGE);
-    assertStatus(new IllegalStateException(ThemeService.PUBLISH_CONFLICT_MESSAGE), 409, ThemeService.PUBLISH_CONFLICT_MESSAGE);
+    assertStatus(new ThemePublishConflictException(), 409, ThemeService.PUBLISH_CONFLICT_MESSAGE);
     assertStatus(new IllegalStateException(ThemeService.PUBLISH_FAILED_MESSAGE, new RuntimeException("SQL text")),
                  500,
                  ThemeService.PUBLISH_FAILED_MESSAGE);

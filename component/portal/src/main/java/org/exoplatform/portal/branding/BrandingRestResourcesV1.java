@@ -214,8 +214,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     } catch (IllegalArgumentException | IllegalStateException e) {
       int status = ThemeRestUtils.statusOf(e);
       if (status == 500) {
-        // the engine's text stays at debug level, logged by the service
-        LOG.warn("Branding publication failed: {}", e.getMessage());
+        LOG.warn("Branding publication failed", e);
       } else {
         LOG.debug("Branding publication refused: {}", e.getMessage());
       }
@@ -254,7 +253,7 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
     } catch (IllegalArgumentException | IllegalStateException e) {
       int status = ThemeRestUtils.statusOf(e);
       if (status == 500) {
-        LOG.warn("Custom CSS save failed: {}", e.getMessage());
+        LOG.warn("Custom CSS save failed", e);
       } else {
         LOG.debug("Custom CSS save refused: {}", e.getMessage());
       }
@@ -378,7 +377,8 @@ public class BrandingRestResourcesV1 implements ResourceContainer {
              method = "PUT")
   @ApiResponses(value = {
                           @ApiResponse(responseCode = "204", description = "Display mode saved"),
-                          @ApiResponse(responseCode = "400", description = "Not a display mode, the body is the message code"),
+                          @ApiResponse(responseCode = "400",
+                                       description = "Not a display mode, or a single mode is offered; the body is the message code"),
                           @ApiResponse(responseCode = "503", description = "The theme services are still starting"),
   })
   public Response setDisplayMode(String body) {
