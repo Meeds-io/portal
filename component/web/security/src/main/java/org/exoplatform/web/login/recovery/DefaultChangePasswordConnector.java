@@ -68,6 +68,8 @@ public class DefaultChangePasswordConnector extends ChangePasswordConnector {
     user.setPassword(password);
     organizationService.getUserHandler().saveUser(user, true);
     cookieTokenService.deleteTokensByUsernameAndType(user.getUserName(), "");
+    // a pending onboarding link would set the password again
+    cookieTokenService.deleteTokensByUsernameAndType(user.getUserName(), CookieTokenService.ONBOARD_TOKEN);
     long totalTime = System.currentTimeMillis() - startTime;
 
     log.info("service={} operation={} parameters=\"user:{}\" status=ok duration_ms={}",

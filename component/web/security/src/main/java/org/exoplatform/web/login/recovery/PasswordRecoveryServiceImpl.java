@@ -54,6 +54,7 @@ import org.exoplatform.services.mail.MailService;
 import org.exoplatform.services.mail.Message;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.organization.User;
+import org.exoplatform.services.organization.UserStatus;
 import org.exoplatform.services.organization.UserHandler;
 import org.exoplatform.services.organization.UserProfile;
 import org.exoplatform.services.resources.LocaleContextInfo;
@@ -99,6 +100,9 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
    * holding a placeholder's form is rendered as text
    */
   private static final Pattern                 PLACEHOLDER_PATTERN              = Pattern.compile("\\$\\{(\\w+)\\}");
+
+  /** The gap below which a sign-in is the one account creation records */
+  private static final long                    CREATION_SIGN_IN_MARGIN          = 1000L;
 
   public static final String                   AUTHENTICATION_ATTEMPTS          = "authenticationAttempts";
 
@@ -168,7 +172,35 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     if (token == null || token.isExpired()) {
       return null;
     }
+    if (ONBOARD_TOKEN.equals(type)) {
+      // an onboarding link ends once its account is in use
+      boolean signedInSince;
+      try {
+        signedInSince = isSignedInSince(token);
+      } catch (Exception e) {
+        log.warn("Can not read the last sign-in of the user of an onboarding link, refusing it", e);
+        return null;
+      }
+      if (signedInSince) {
+        onboardingTokenService.deleteToken(tokenId, ONBOARD_TOKEN);
+        return null;
+      }
+    }
     return token.getUsername();
+  }
+
+  /**
+   * @return whether the account signed in after the onboarding token was
+   *         issued
+   * @throws Exception when the account cannot be read
+   */
+  private boolean isSignedInSince(Token token) throws Exception {
+    long issuedTime = token.getExpirationTimeMillis() - onboardingTokenService.getValidityMillis();
+    User user = orgService.getUserHandler().findUserByName(token.getUsername(), UserStatus.ANY);
+    // creation records a sign-in at the creation date, which is no use
+    return user != null && user.getLastLoginTime() != null && user.getLastLoginTime().getTime() > issuedTime
+        && (user.getCreatedDate() == null
+            || user.getLastLoginTime().getTime() - user.getCreatedDate().getTime() >= CREATION_SIGN_IN_MARGIN);
   }
 
   @Override

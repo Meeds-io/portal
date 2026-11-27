@@ -81,6 +81,7 @@ public class DefaultChangePasswordConnectorTest {
   
     Mockito.verify(userHandler, Mockito.times(1)).saveUser(any(), Mockito.anyBoolean());
     Mockito.verify(cookieTokenService, Mockito.times(1)).deleteTokensByUsernameAndType("utest", "");
+    Mockito.verify(cookieTokenService, Mockito.times(1)).deleteTokensByUsernameAndType("utest", CookieTokenService.ONBOARD_TOKEN);
 
   }
   
