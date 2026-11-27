@@ -174,13 +174,15 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     }
     if (ONBOARD_TOKEN.equals(type)) {
       // an onboarding link ends once its account is in use
+      boolean signedInSince;
       try {
-        if (isSignedInSince(token)) {
-          onboardingTokenService.deleteToken(tokenId, ONBOARD_TOKEN);
-          return null;
-        }
+        signedInSince = isSignedInSince(token);
       } catch (Exception e) {
         log.warn("Can not read the last sign-in of the user of an onboarding link, refusing it", e);
+        return null;
+      }
+      if (signedInSince) {
+        onboardingTokenService.deleteToken(tokenId, ONBOARD_TOKEN);
         return null;
       }
     }
