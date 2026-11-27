@@ -20,19 +20,27 @@ package io.meeds.portal.permlink.service;
 
 import static io.meeds.portal.permlink.service.PermanentLinkServiceImpl.PERMANENT_LINK_IDS_SCOPE;
 import static io.meeds.portal.permlink.service.PermanentLinkServiceImpl.PERMANENT_LINK_SALT_NAME;
+import static io.meeds.portal.permlink.service.PermanentLinkServiceImpl.PERMANENT_LINK_SCOPE;
 import static io.meeds.portal.permlink.service.PermanentLinkServiceImpl.PERMANEN_LINK_CONTEXT;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Before;
@@ -43,9 +51,12 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import org.exoplatform.commons.api.settings.SettingService;
 import org.exoplatform.commons.api.settings.SettingValue;
+import org.exoplatform.commons.api.settings.data.Context;
+import org.exoplatform.commons.api.settings.data.Scope;
 import org.exoplatform.commons.exception.ObjectNotFoundException;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.services.security.Identity;
+import org.exoplatform.settings.jpa.JPASettingServiceImpl;
 
 import io.meeds.portal.permlink.model.PermanentLinkObject;
 import io.meeds.portal.permlink.plugin.PermanentLinkPlugin;
@@ -67,20 +78,127 @@ public class PermanentLinkServiceTest {
   @Mock
   private SettingService           settingService;
 
+  @Mock
+  private JPASettingServiceImpl    jpaSettingService;
+
   private PermanentLinkServiceImpl permanentLinkService;
 
   @Before
   public void setup() {
-    permanentLinkService = new PermanentLinkServiceImpl(container, settingService);
+    permanentLinkService = new PermanentLinkServiceImpl(container, settingService, jpaSettingService);
   }
 
   @Test
   public void testInit() {
     permanentLinkService.start();
     verify(settingService).set(eq(PERMANEN_LINK_CONTEXT),
-                               eq(PERMANENT_LINK_IDS_SCOPE),
+                               eq(PERMANENT_LINK_SCOPE),
                                eq(PERMANENT_LINK_SALT_NAME),
                                argThat(v -> StringUtils.equals(permanentLinkService.getSalt(), v.getValue().toString())));
+  }
+
+  @Test
+  public void testInitTwiceKeepsOneSalt() {
+    Map<String, SettingValue<?>> store = mockSettingStore();
+    permanentLinkService.start();
+    String firstSalt = permanentLinkService.getSalt();
+    assertNotNull(firstSalt);
+
+    PermanentLinkServiceImpl restarted = new PermanentLinkServiceImpl(container, settingService, jpaSettingService);
+    restarted.start();
+    assertEquals(firstSalt, restarted.getSalt());
+    assertEquals(firstSalt, store.get(storeKey(PERMANENT_LINK_SCOPE)).getValue());
+  }
+
+  @Test
+  public void testInitAdoptsSaltStoredUnderApplicationScope() {
+    Map<String, SettingValue<?>> store = mockSettingStore();
+    store.put(storeKey(PERMANENT_LINK_IDS_SCOPE), SettingValue.create("legacySalt"));
+
+    permanentLinkService.start();
+
+    assertEquals("legacySalt", permanentLinkService.getSalt());
+    assertEquals("legacySalt", store.get(storeKey(PERMANENT_LINK_SCOPE)).getValue());
+    PermanentLinkServiceImpl restarted = new PermanentLinkServiceImpl(container, settingService, jpaSettingService);
+    restarted.start();
+    assertEquals("legacySalt", restarted.getSalt());
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void testInitAdoptsSaltStoredByAnotherNodeWhenInsertIsRefused() {
+    mockSettingStore();
+    lenient().doThrow(new IllegalStateException("Unique constraint violated"))
+             .when(settingService)
+             .set(any(Context.class), eq(PERMANENT_LINK_SCOPE), anyString(), any(SettingValue.class));
+    // The cached service may still answer null (cached by the first read, until
+    // the other node's invalidation arrives), the database holds the other node's salt
+    // and holds nothing yet when read right before the write
+    lenient().when(jpaSettingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME))
+             .thenReturn(null, (SettingValue) SettingValue.create("otherNodeSalt"));
+
+    permanentLinkService.start();
+
+    assertEquals("otherNodeSalt", permanentLinkService.getSalt());
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void testInitAdoptsSaltCommittedByAnotherNodeAfterCachedReadAnsweredNull() {
+    mockSettingStore();
+    // The cached service answers null, the other node committed its salt since
+    lenient().when(jpaSettingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME))
+             .thenReturn((SettingValue) SettingValue.create("otherNodeSalt"));
+
+    permanentLinkService.start();
+
+    assertEquals("otherNodeSalt", permanentLinkService.getSalt());
+    verify(settingService, never()).set(eq(PERMANEN_LINK_CONTEXT),
+                                        eq(PERMANENT_LINK_SCOPE),
+                                        eq(PERMANENT_LINK_SALT_NAME),
+                                        argThat(v -> true));
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void testInitKeepsLocalSaltWhenInsertIsRefusedAndDatabaseReadFails() {
+    mockSettingStore();
+    lenient().doThrow(new IllegalStateException("Unique constraint violated"))
+             .when(settingService)
+             .set(any(Context.class), eq(PERMANENT_LINK_SCOPE), anyString(), any(SettingValue.class));
+    lenient().when(jpaSettingService.get(PERMANEN_LINK_CONTEXT, PERMANENT_LINK_SCOPE, PERMANENT_LINK_SALT_NAME))
+             .thenThrow(new IllegalStateException("Store failure"));
+
+    permanentLinkService.start();
+
+    assertNotNull(permanentLinkService.getSalt());
+  }
+
+  @Test
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public void testInitKeepsLocalSaltWhenInsertIsRefusedAndNothingStored() {
+    mockSettingStore();
+    lenient().doThrow(new IllegalStateException("Store failure"))
+             .when(settingService)
+             .set(any(Context.class), eq(PERMANENT_LINK_SCOPE), anyString(), any(SettingValue.class));
+
+    permanentLinkService.start();
+
+    assertNotNull(permanentLinkService.getSalt());
+  }
+
+  @Test
+  public void testInitDoesNotRewriteExistingSalt() {
+    Map<String, SettingValue<?>> store = mockSettingStore();
+    store.put(storeKey(PERMANENT_LINK_SCOPE), SettingValue.create("currentSalt"));
+
+    permanentLinkService.start();
+
+    assertEquals("currentSalt", permanentLinkService.getSalt());
+    verify(settingService, never()).set(eq(PERMANEN_LINK_CONTEXT),
+                                        eq(PERMANENT_LINK_SCOPE),
+                                        eq(PERMANENT_LINK_SALT_NAME),
+                                        argThat(v -> true));
   }
 
   @Test
@@ -144,6 +262,24 @@ public class PermanentLinkServiceTest {
     String directAccessUrl = permanentLinkService.getDirectAccessUrl(PERMANENT_LINK_ID, identity);
     assertNotNull(directAccessUrl);
     assertTrue(directAccessUrl.contains(INTERNAL_PATH_TEST_PREFIX));
+  }
+
+  private static String storeKey(Scope scope) {
+    return scope.getName() + "/" + scope.getId() + "/" + PERMANENT_LINK_SALT_NAME;
+  }
+
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  private Map<String, SettingValue<?>> mockSettingStore() {
+    Map<String, SettingValue<?>> store = new HashMap<>();
+    lenient().when(settingService.get(any(Context.class), any(Scope.class), anyString()))
+             .thenAnswer(i -> store.get(((Scope) i.getArgument(1)).getName() + "/" + ((Scope) i.getArgument(1)).getId() + "/"
+                 + i.getArgument(2)));
+    lenient().doAnswer(i -> {
+      store.put(((Scope) i.getArgument(1)).getName() + "/" + ((Scope) i.getArgument(1)).getId() + "/" + i.getArgument(2),
+                (SettingValue) i.getArgument(3));
+      return null;
+    }).when(settingService).set(any(Context.class), any(Scope.class), anyString(), any(SettingValue.class));
+    return store;
   }
 
   private void mockEmptyPlugins() {
