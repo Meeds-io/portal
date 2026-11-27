@@ -68,11 +68,14 @@ public class AccountSetup extends HttpServlet {
     String redirectURI;
     String accountsetupbutton = request.getParameter(ACCOUNT_SETUP_BUTTON);
 
-    if (accountsetupbutton.equals(SETUP_SKIP_BUTTON) || accountSetupService.mustSkipAccountSetup()) {
+    boolean skipRequested = accountsetupbutton.equals(SETUP_SKIP_BUTTON);
+    if (skipRequested || accountSetupService.mustSkipAccountSetup()) {
       if (LOG.isWarnEnabled()) {
         LOG.warn("Direct access to Account Setup Form.");
       }
-      accountSetupService.setSkipSetup(true);
+      if (skipRequested && !accountSetupService.mustSkipAccountSetup()) {
+        accountSetupService.setSkipSetup(true);
+      }
       redirectURI = "/" + PortalContainer.getCurrentPortalContainerName();
     } else {
       String userNameAccount = request.getParameter(USER_NAME_ACCOUNT);
@@ -82,22 +85,24 @@ public class AccountSetup extends HttpServlet {
       String userPasswordAccount = request.getParameter(USER_PASSWORD_ACCOUNT);
       String adminPassword = request.getParameter(ADMIN_PASSWORD);
 
-      accountSetupService.createAccount(userNameAccount,
-                                        firstNameAccount,
-                                        lastNameAccount,
-                                        emailAccount,
-                                        userPasswordAccount,
-                                        adminPassword);
+      boolean created = accountSetupService.createAccount(userNameAccount,
+                                                          firstNameAccount,
+                                                          lastNameAccount,
+                                                          emailAccount,
+                                                          userPasswordAccount,
+                                                          adminPassword);
 
-      // Redirect to requested page
-      HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request) {
-        @Override
-        public String getContextPath() {
-          return "/portal";
-        }
-      };
-      Credentials credentials = new Credentials(userNameAccount, userPasswordAccount);
-      ServletContainerFactory.getServletContainer().login(wrappedRequest, response, credentials);;
+      if (created) {
+        // Redirect to requested page
+        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request) {
+          @Override
+          public String getContextPath() {
+            return "/portal";
+          }
+        };
+        Credentials credentials = new Credentials(userNameAccount, userPasswordAccount);
+        ServletContainerFactory.getServletContainer().login(wrappedRequest, response, credentials);
+      }
       redirectURI = "/" + PortalContainer.getCurrentPortalContainerName();
     }
     response.setCharacterEncoding("UTF-8");

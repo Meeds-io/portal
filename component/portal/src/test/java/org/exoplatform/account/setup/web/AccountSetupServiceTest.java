@@ -20,13 +20,23 @@ package org.exoplatform.account.setup.web;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,7 +73,7 @@ public class AccountSetupServiceTest {
     // Given
     PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
     PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
-    when(settingService.get(any(Context.class), any(Scope.class), eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
+    when(settingService.getOrThrow(any(Context.class), any(Scope.class), eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
 
     AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
 
@@ -93,9 +103,9 @@ public class AccountSetupServiceTest {
   @Test
   public void shouldSkipAccountSetupWhenAlreadyDoneOrSkipped() {
     // Given
-    when(settingService.get(any(Context.class),
-                            any(Scope.class),
-                            eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
 
     AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
 
@@ -164,11 +174,190 @@ public class AccountSetupServiceTest {
     when(membershipTypeHandler.findMembershipType("*")).thenReturn(anyType);
 
     AccountSetupService accountSetupService = new AccountSetupService(settingService, orgService);
-    accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword");
+    assertTrue(accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword"));
 
     verify(userHandler).createUser(admin, true);
     verify(membershipHandler).linkMembership(admin, administrators, anyType, true);
     assertEquals("admin@example.com", ((User) admin).getEmail());
     assertTrue(accountSetupService.mustSkipAccountSetup());
+  }
+
+  @Test
+  public void shouldNotSkipAccountSetupOnInitialInstall() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class), any(Scope.class), eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertFalse(accountSetupService.mustSkipAccountSetup());
+    assertTrue(accountSetupService.isAccountSetupAllowed());
+  }
+
+  @Test
+  public void shouldSkipAccountSetupWhenTheStateCanNotBeRead() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenThrow(new IllegalStateException("read failed"));
+    when(settingService.getFromStore(any(Context.class),
+                                     any(Scope.class),
+                                     eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenThrow(new IllegalStateException("read failed"));
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+    assertFalse(accountSetupService.isAccountSetupAllowed());
+    assertNull(accountSetupService.getStoredSetupDone());
+  }
+
+  @Test
+  public void shouldLetALaterSuccessfulReadDecideAfterAFailedOne() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenThrow(new IllegalStateException("read failed"))
+                                                                                 .thenReturn(null)
+                                                                                 .thenReturn(new SettingValue("true"));
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+    assertFalse(accountSetupService.mustSkipAccountSetup());
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+    // Once done, the answer is kept
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+    verify(settingService, times(3)).getOrThrow(any(Context.class),
+                                                any(Scope.class),
+                                                eq(AccountSetupService.ACCOUNT_SETUP_NODE));
+  }
+
+  @Test
+  public void shouldRefuseTheAccountCreationOnceTheSetupIsDone() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getFromStore(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+    boolean created = accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword");
+
+    assertFalse(created);
+    verify(organizationService, never()).getUserHandler();
+    verify(settingService, never()).set(any(Context.class), any(Scope.class), any(String.class), any(SettingValue.class));
+  }
+
+  @Test
+  public void shouldRefuseTheAccountCreationWhenTheStateCanNotBeRead() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getFromStore(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenThrow(new IllegalStateException("read failed"));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+    boolean created = accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword");
+
+    assertFalse(created);
+    verify(organizationService, never()).getUserHandler();
+    verify(settingService, never()).set(any(Context.class), any(Scope.class), any(String.class), any(SettingValue.class));
+  }
+
+  @Test
+  public void shouldRefuseTheAccountCreationWhenOnlyTheCacheSaysNotDone() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
+    when(settingService.getFromStore(any(Context.class),
+                                     any(Scope.class),
+                                     eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertFalse(accountSetupService.mustSkipAccountSetup());
+    assertFalse(accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword"));
+    verify(organizationService, never()).getUserHandler();
+  }
+
+  @Test
+  public void shouldRememberTheSetupStateReadFromTheStoreWhenTheCacheSaysNotDone() {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    when(settingService.getOrThrow(any(Context.class),
+                                   any(Scope.class),
+                                   eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(null);
+    when(settingService.getFromStore(any(Context.class),
+                                     any(Scope.class),
+                                     eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenReturn(new SettingValue("true"));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, organizationService);
+
+    assertFalse(accountSetupService.mustSkipAccountSetup());
+    assertFalse(accountSetupService.isAccountSetupAllowed());
+    assertTrue(accountSetupService.mustSkipAccountSetup());
+  }
+
+  @Test
+  public void shouldCreateTheFirstAdministratorOnlyOnceWhenSubmittedTwiceAtTheSameTime() throws Exception {
+    PropertyManager.setProperty(AccountSetupService.ACCOUNT_SETUP_SKIP_PROPERTY, "");
+    PropertyManager.setProperty(PropertyManager.DEVELOPING, "");
+    AtomicBoolean stored = new AtomicBoolean(false);
+    when(settingService.getFromStore(any(Context.class),
+                                     any(Scope.class),
+                                     eq(AccountSetupService.ACCOUNT_SETUP_NODE))).thenAnswer(i -> stored.get() ? new SettingValue("true") : null);
+    doAnswer(i -> {
+      stored.set(true);
+      return null;
+    }).when(settingService).set(any(Context.class), any(Scope.class), any(String.class), any(SettingValue.class));
+
+    OrganizationService orgService = mock(OrganizationService.class,
+                                          withSettings().extraInterfaces(ComponentRequestLifecycle.class));
+    UserHandler userHandler = mock(UserHandler.class);
+    when(orgService.getUserHandler()).thenReturn(userHandler);
+    when(orgService.getGroupHandler()).thenReturn(mock(GroupHandler.class));
+    when(orgService.getMembershipHandler()).thenReturn(mock(MembershipHandler.class));
+    when(orgService.getMembershipTypeHandler()).thenReturn(mock(MembershipTypeHandler.class));
+    when(userHandler.findUserByName("root")).thenReturn(new UserImpl("root"));
+    when(userHandler.createUserInstance(any(String.class))).thenAnswer(i -> new UserImpl(i.getArgument(0)));
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch reached = new CountDownLatch(1);
+    AtomicInteger created = new AtomicInteger();
+    doAnswer(i -> {
+      created.incrementAndGet();
+      reached.countDown();
+      assertTrue(release.await(10, TimeUnit.SECONDS));
+      return null;
+    }).when(userHandler).createUser(any(User.class), eq(true));
+
+    AccountSetupService accountSetupService = new AccountSetupService(settingService, orgService);
+    AtomicInteger accepted = new AtomicInteger();
+    Runnable submit = () -> {
+      if (accountSetupService.createAccount("admin", "Admin", "Admin", "admin@example.com", "password1", "rootPassword")) {
+        accepted.incrementAndGet();
+      }
+    };
+    Thread first = new Thread(submit);
+    first.start();
+    assertTrue(reached.await(10, TimeUnit.SECONDS));
+    Thread second = new Thread(submit);
+    second.start();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (second.getState() == Thread.State.NEW || second.getState() == Thread.State.RUNNABLE) {
+      if (System.nanoTime() > deadline) {
+        release.countDown();
+        fail("The second submission neither blocked nor finished");
+      }
+      Thread.sleep(5);
+    }
+    Thread.sleep(100);
+    release.countDown();
+    first.join(10000);
+    second.join(10000);
+
+    assertFalse(first.isAlive() || second.isAlive());
+    assertEquals(1, accepted.get());
+    assertEquals(1, created.get());
   }
 }

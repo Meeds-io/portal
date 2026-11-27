@@ -71,27 +71,52 @@ public class AccountSetupService {
   }
 
   public boolean mustSkipAccountSetup() {
-    if (skipSetup == null) {
-      SettingValue accountSetupNode = settingService.get(Context.GLOBAL, Scope.GLOBAL, ACCOUNT_SETUP_NODE);
-
-      String propertySetupSkip = PropertyManager.getProperty(ACCOUNT_SETUP_SKIP_PROPERTY);
-      if (propertySetupSkip == null) {
-        LOG.debug("Property accountsetup.skip not found in configuration.properties");
-        propertySetupSkip = "false";
-      }
-
-      skipSetup = accountSetupNode != null || propertySetupSkip.equals("true") || PropertyManager.isDevelopping();
+    if (Boolean.TRUE.equals(skipSetup)) {
+      return true;
     }
-
-    return skipSetup;
+    Boolean setupDone = readSetupDone(false);
+    // An uncertain answer counts as "done": no setup screen is offered
+    return setupDone != Boolean.FALSE;
   }
 
-  public void createAccount(String userNameAccount,
-                            String firstNameAccount,
-                            String lastNameAccount,
-                            String emailAccount,
-                            String userPasswordAccount,
-                            String adminPassword) {
+  /**
+   * @return true when a read of the stored state, never of a cache,
+   *         positively says that the setup is not done
+   */
+  public boolean isAccountSetupAllowed() {
+    return getStoredSetupDone() == Boolean.FALSE;
+  }
+
+  /**
+   * @return the setup state read from the store, never from a cache: true when
+   *         the setup is done (or skipped), false when it is not, null when
+   *         this can't be told (the read failed)
+   */
+  public Boolean getStoredSetupDone() {
+    return readSetupDone(true);
+  }
+
+  /**
+   * Creates the first administrator only when the stored state says that the
+   * setup is not done, checked under a lock on this node. Before the setup is
+   * done, a concurrent submission on this node waits on its request thread
+   * until the first one has finished. Once the setup is done, the action's
+   * own check refuses the request before this method, and the stored-state
+   * check below refuses one that a cached read let through.
+   *
+   * @return true when the setup ran (each step's failure is logged), false when
+   *         the request was refused and nothing has been changed
+   */
+  public synchronized boolean createAccount(String userNameAccount,
+                                            String firstNameAccount,
+                                            String lastNameAccount,
+                                            String emailAccount,
+                                            String userPasswordAccount,
+                                            String adminPassword) {
+    if (!isAccountSetupAllowed()) {
+      LOG.warn("Account setup refused: the platform is already set up or its state is unknown");
+      return false;
+    }
     MembershipTypeHandler membershipTypeHandler = organizationService.getMembershipTypeHandler();
     UserHandler userHandler = organizationService.getUserHandler();
 
@@ -153,8 +178,40 @@ public class AccountSetupService {
       }
 
       setSkipSetup(true);
+      return true;
     } finally {
       RequestLifeCycle.end();
+    }
+  }
+
+  /**
+   * @param fromStore true to read the stored state, false to allow a cached
+   *          read
+   * @return TRUE when the setup is done or skipped, FALSE when it positively
+   *         is not, null when this can't be told (the read failed)
+   */
+  private Boolean readSetupDone(boolean fromStore) {
+    String propertySetupSkip = PropertyManager.getProperty(ACCOUNT_SETUP_SKIP_PROPERTY);
+    if (propertySetupSkip == null) {
+      LOG.debug("Property accountsetup.skip not found in configuration.properties");
+      propertySetupSkip = "false";
+    }
+    if (propertySetupSkip.equals("true") || PropertyManager.isDevelopping() || Boolean.TRUE.equals(skipSetup)) {
+      return Boolean.TRUE;
+    }
+    try {
+      SettingValue<?> node = fromStore ? settingService.getFromStore(Context.GLOBAL, Scope.GLOBAL, ACCOUNT_SETUP_NODE)
+                                       : settingService.getOrThrow(Context.GLOBAL, Scope.GLOBAL, ACCOUNT_SETUP_NODE);
+      if (node == null) {
+        return Boolean.FALSE;
+      }
+      // Every read that says "set up", cached or stored, is remembered
+      skipSetup = true;
+      return Boolean.TRUE;
+    } catch (Exception e) {
+      LOG.warn("Can not read the account setup state: {}", e.getMessage());
+      LOG.debug("Account setup state read failure", e);
+      return null;
     }
   }
 }

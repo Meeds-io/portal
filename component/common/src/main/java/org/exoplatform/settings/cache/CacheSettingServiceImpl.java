@@ -141,6 +141,29 @@ public class CacheSettingServiceImpl implements SettingService {
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public SettingValue<?> getOrThrow(Context context, Scope scope, String key) {
+    SettingValue<?> settingValue = futureExoCache.get(service, new SettingKey(context, scope, key));
+    if (settingValue == null) {
+      throw new IllegalStateException("The setting " + key + " could not be read");
+    }
+    if (settingValue == NullSettingValue.getInstance() || settingValue.getValue() == null) {
+      return null;
+    }
+    return settingValue;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public SettingValue<?> getFromStore(Context context, Scope scope, String key) {
+    return service.get(context, scope, key);
+  }
+
+  /**
    * Remove all the value associated with the composite key(context,scope,key) in
    * cache and also in database.
    * 
