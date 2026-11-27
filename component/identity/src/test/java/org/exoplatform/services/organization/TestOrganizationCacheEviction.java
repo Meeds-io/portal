@@ -182,6 +182,36 @@ public class TestOrganizationCacheEviction extends AbstractKernelTest {// NOSONA
     assertThrows(DisabledUserException.class, () -> organizationService.getUserHandler().authenticate(typedName, "any"));
   }
 
+  public void testSuccessfulAuthenticationEvictsTheCachedMembershipsOfTheUserOnly() throws Exception {
+    String password = "Passw0rd-" + UUID.randomUUID();
+    User user = organizationService.getUserHandler().findUserByName(userName, UserStatus.ANY);
+    user.setPassword(password);
+    organizationService.getUserHandler().saveUser(user, false);
+    restartTransaction();
+    MembershipCacheKey listKey = new MembershipCacheKey(userName, null, null);
+    MembershipCacheKey otherKey = new MembershipCacheKey(UUID.randomUUID().toString(), null, null);
+    ExoCache<MembershipCacheKey, Object> membershipCache = cacheHandler().getMembershipCache();
+    MembershipHandler membershipHandler = organizationService.getMembershipHandler();
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+    assertNotNull(membershipCache.get(listKey));
+    membershipCache.put(otherKey, new ArrayList<Membership>());
+
+    assertFalse(organizationService.getUserHandler().authenticate(userName, password + "-wrong"));
+    assertNotNull("A failed authentication keeps the cached list", membershipCache.get(listKey));
+
+    assertTrue(organizationService.getUserHandler().authenticate(userName, password));
+    assertNull("A successful authentication evicts the cached list", membershipCache.get(listKey));
+    assertNotNull("Another user's list is untouched", membershipCache.get(otherKey));
+
+    // Seeded again through the reader
+    assertTrue(membershipHandler.findMembershipsByUser(userName).isEmpty());
+    assertNotNull(membershipCache.get(listKey));
+    assertTrue("An authentication typed in another case is accepted",
+               organizationService.getUserHandler().authenticate(userName.toUpperCase(), password));
+    assertNull("It evicts the list cached under the stored name", membershipCache.get(listKey));
+    membershipCache.remove(otherKey);
+  }
+
   public void testMembershipsReadUnderAnotherSpellingFollowTheWrites() throws Exception {
     MembershipHandler membershipHandler = organizationService.getMembershipHandler();
     String typedName = userName.toUpperCase();

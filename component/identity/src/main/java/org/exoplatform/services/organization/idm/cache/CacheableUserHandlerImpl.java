@@ -96,9 +96,9 @@ public class CacheableUserHandlerImpl extends UserDAOImpl {
   public boolean authenticate(String username, String password) throws Exception {
     boolean authenticate = super.authenticate(username, password);
     if (authenticate) {
-      if (membershipCache.get(username) != null) {
-        membershipCache.remove(username);
-      }
+      User user = findUserByName(username, UserStatus.ANY);
+      String storedName = user == null ? username : user.getUserName();
+      membershipCache.remove(new MembershipCacheKey(storedName, null, null));
     }
     return authenticate;
   }
